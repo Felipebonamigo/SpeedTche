@@ -9,7 +9,7 @@ Arquitetura completa em [`docs/ONLINE.md`](../docs/ONLINE.md).
 ## Rodar
 
 ```bash
-cd nitro-crew/server && npm ci      # uma vez (dependência única: ws)
+cd server && npm ci      # uma vez (dependência única: ws)
 cd .. && npm run relay              # = node server/relay.mjs, porta 8787
 PORT=9000 npm run relay             # outra porta
 PORT=0 node server/relay.mjs        # porta livre (a linha "ouvindo em" diz qual)

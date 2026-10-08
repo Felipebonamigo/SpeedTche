@@ -14,7 +14,7 @@ O que ler, nesta ordem, no começo de toda sessão:
 
 ## 1. Ambiente e comandos (copiar e colar)
 
-Tudo roda de `nitro-crew/` (a pasta do jogo dentro do repositório `padelizou`; nada de fora dela é usado).
+Tudo roda da raiz do repositório (`Felipebonamigo/nitro-crew`, privado; o jogo é independente de qualquer outro projeto).
 
 | Para quê | Comando |
 |---|---|
@@ -100,14 +100,13 @@ com o modo de usar no cabeçalho do arquivo.
 Copie e preencha os `<…>`. Tudo o que está aqui veio de problema real.
 
 ```
-Você trabalha no jogo Nitro Crew, em `nitro-crew/` dentro do repositório (TypeScript + Three.js; leia
-`nitro-crew/CLAUDE.md`, `nitro-crew/docs/PLAYBOOK.md` e <docs da área> antes de tudo). Responda e comente em português;
+Você trabalha no jogo Nitro Crew (este repositório; TypeScript + Three.js; leia
+`CLAUDE.md`, `docs/PLAYBOOK.md` e <docs da área> antes de tudo). Responda e comente em português;
 código em inglês.
 
 ## Ambiente (importante)
-- O seu worktree nasce do `main` do padelizou, que NÃO tem `nitro-crew/`. Antes de tudo:
-  `git fetch origin claude/top-gear-coop-game-ns9u5l && git checkout -b <nc/nome-da-frente> origin/claude/top-gear-coop-game-ns9u5l`.
-- `node_modules`: crie links para os do checkout principal (`ln -s /home/user/padelizou/nitro-crew/node_modules nitro-crew/node_modules`
+- O seu worktree nasce da ponta do `main`. Antes de tudo: `git checkout -b <nc/nome-da-frente>`.
+- `node_modules`: crie links para os do checkout principal (`ln -s <checkout principal>/node_modules node_modules`
   e o mesmo para `server/node_modules`); não os commite.
 - Vite na porta <porta> (`npx vite --port <porta> --strictPort`); encerre-o no fim.
 
@@ -123,7 +122,7 @@ código em inglês.
   mande no relatório um parágrafo pronto para eu colar.
 - `npx tsc --noEmit -p .` e a suíte completa verdes (`NC_REQUIRE_RELAY=1 npx vitest run --testTimeout=180000`). Se
   só estourar tempo-limite com a máquina carregada, rode o arquivo sozinho e diga isso.
-- Capturas antes/depois (mesma câmera) em `nitro-crew/scratch/<prefixo>-*.png`.
+- Capturas antes/depois (mesma câmera) em `scratch/<prefixo>-*.png`.
 
 ## Entrega
 Commit no SEU branch (português, terminando exatamente com o rodapé de atribuição da sessão). Não faça push. Relatório:
@@ -138,7 +137,7 @@ Termine com DONE / DONE_WITH_CONCERNS / BLOCKED.
 
 | Armadilha | O que acontece | O que fazer |
 |---|---|---|
-| Worktree nasce do `main` | `nitro-crew/` não existe nele | criar o branch da ponta de `claude/top-gear-coop-game-ns9u5l` (modelo §4) |
+| Worktree de agente sem `node_modules` | typecheck e testes não rodam | linkar os do checkout principal (modelo §4) |
 | Suíte com vários agentes rodando | estoura tempo: `cars` (beforeAll 600 s), `ghost`/`fuel` (30 s), `landmarks` "perLap" (120 s) | não é defeito: rode o arquivo sozinho; a suíte final só com a máquina livre |
 | Pista mudou de traçado + marco mudou de tamanho | um marco cai abaixo de 2,5 s à vista (`landmarks-enquadramento`) — foi a Pampulha | suíte completa depois de mesclar TUDO; corrigir pela pegada do marco (a lagoa de 70×104 m segurava a praça longe) ou pelo traçado |
 | Pista no `sim-golden` (copacabana, sampa_noite…) | `EXPECTED` muda | `perf-sim --fingerprints`, conferir que só elas mudaram, atualizar |
@@ -161,7 +160,7 @@ Termine com DONE / DONE_WITH_CONCERNS / BLOCKED.
 - **Antes × depois** em toda mudança visível, mesma câmera, enviado ao dono.
 - **Decisão que é do dono** (gosto, dinheiro, ordem das copas, trocar um símbolo): pergunte com a recomendação; o resto
   decida e diga em uma linha.
-- **Escada do mínimo** (`/home/user/padelizou/CLAUDE.md`, "Quanto código o pedido merece"): reaproveite o que existe
+- **Escada do mínimo** (`CLAUDE.md`, "Regras de trabalho"): reaproveite o que existe
   antes de criar; mas a escada encurta a solução, nunca a leitura.
 - **Feche cada bloco** com DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED.
 

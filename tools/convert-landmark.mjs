@@ -41,7 +41,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const RESERVED = new Set([5174, 4174, 5601]); // dev, preview e a do padelizou: nunca
+const RESERVED = new Set([5174, 4174, 5601]); // dev, preview e a do vite de captura (5601): nunca
 
 function parse(argv) {
   const o = { input: null, flags: {} };

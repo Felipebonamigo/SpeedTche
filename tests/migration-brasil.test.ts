@@ -84,7 +84,7 @@ describe('save antigo com a Copa Brasil', () => {
 });
 
 // ───────────────────────────── Saves de antes da onda G, um por situação ─────────────────────────────
-// O formato é o de `SaveData`/`CareerState` até 954bb92^ (git show 954bb92^:nitro-crew/src/game/contracts.ts): sem
+// O formato é o de `SaveData`/`CareerState` até 954bb92^ (no repositório antigo, o do padelizou: git show 954bb92^:nitro-crew/src/game/contracts.ts): sem
 // `stamps`, recordes com `fp` (onda E), copas da lista antiga de 8 — brasil, eua, …, mediterraneo, cada uma exigindo
 // a anterior. Nada aqui passa pelas funções de hoje antes do sanitizeSave: é o JSON como estava no disco.
 

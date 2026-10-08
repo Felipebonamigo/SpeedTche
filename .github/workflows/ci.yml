@@ -1,0 +1,36 @@
+# CI do Nitro Crew: typecheck, testes (com o relay do online de verdade) e build, a cada push e pull request no main.
+name: Nitro Crew
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: Typecheck + testes + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - run: npm ci
+      # O relay do online (server/relay.mjs) tem dependência própria (ws); o teste de integração
+      # sobe o relay de verdade e, com NC_REQUIRE_RELAY=1, falha em vez de ser pulado sem o ws.
+      - run: npm ci
+        working-directory: server
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          NC_REQUIRE_RELAY: '1'
+      - run: npx vite build
+      - run: npm audit --audit-level=moderate
+      - run: npm audit --audit-level=moderate
+        working-directory: server

@@ -5,8 +5,9 @@ TypeScript + Three.js (WebGL), empacotável com Electron para a Steam. **Alvo vi
 última geração, cartunesco** (Mario Kart 8, Crash Team Racing Nitro-Fueled; `docs/DIRECAO-DE-ARTE.md`) — o low-poly
 estilizado de hoje e a antiga referência Horizon Chase Turbo ficam abaixo desse alvo. O pseudo-3D de 16 bits existe só como **modo Retrô opcional** (Opções › Visual,
 `src/render-pseudo3d/`, `docs/RETRO.md`); o 3D é o padrão e o foco do trabalho visual. Interface e comentários em português (Brasil); código em inglês.
-Este projeto mora numa subpasta do repositório `padelizou` por enquanto; **tudo aqui é independente dele** —
-não use nada de fora desta pasta.
+Repositório próprio: `Felipebonamigo/nitro-crew` (privado). Nasceu em 08/10/2026 da pasta `nitro-crew/` do repositório do
+site Padelizou, com o histórico inteiro (202 commits); **o jogo não tem relação nenhuma com o site**. Os hashes de commit
+citados nos docs são do repositório antigo (branch `claude/top-gear-coop-game-ns9u5l` do padelizou); aqui eles são outros.
 
 ## Antes de qualquer trabalho (qualquer modelo)
 1. **`docs/PLAYBOOK.md`** — o manual de execução: comandos, ferramentas de ver/medir, como rodar uma onda com agentes,
@@ -67,13 +68,20 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
 `Settings`, `SaveData`). `src/game/session.ts` liga tudo. Textos visíveis: `registerStrings('<ns>', {pt, en})` num
 `strings.ts` da própria pasta; `tests/i18n.test.ts` exige PT e EN completos.
 
-## Regras de trabalho (as mesmas do padelizou)
+## Regras de trabalho
 - Defeito corrigido vira teste, escrito antes e visto falhar. Nada publicado com teste vermelho.
 - Dependência de produção é só `three`. Sem pacote novo para o que já se faz com Three/WebAudio/DOM. Modelos, céu,
   texturas, sons e músicas são procedurais até a arte da Fase 2 (que entra como glTF, sem trocar o renderizador).
 - Renderizador: mundo montado no referencial local de cada jogador a partir dos segmentos (as pistas do DSL não
   fecham geometricamente); ver `docs/DESIGN.md`. Mudança visual se prova com captura (`tools/render-harness.mjs`, com `npm run dev` no ar).
 - Commits em português, com o rodapé de atribuição exigido pela sessão.
+- **Como o dono quer ser atendido**: resultado primeiro, em português, curto; sem prosa que ele não pediu. Termine cada bloco de
+  trabalho com **um** de `DONE`, `DONE_WITH_CONCERNS` (feito, com ressalva que precisa ser lida), `NEEDS_CONTEXT` (falta
+  decisão dele) ou `BLOCKED`. Nenhuma alegação de "pronto", "corrigido" ou "os testes passam" sem ter rodado o comando
+  naquele turno e lido a saída. Três correções seguidas falhando: pare e volte à causa raiz.
+- **Escada do mínimo** (antes de escrever código, pare no primeiro degrau que resolve): 1) isso precisa existir? 2) já existe algo
+  equivalente aqui? 3) a biblioteca padrão faz? 4) um recurso nativo da plataforma cobre? 5) uma dependência já instalada
+  resolve? 6) cabe numa linha? 7) só então o mínimo de código novo. Ela encurta a solução, nunca a leitura do fluxo.
 
 ## Memória do projeto (ler primeiro em toda sessão)
 - **Roteiro e cronograma**: `docs/ROADMAP.md` (fases 0–6, passos numerados, V/A/T, marcos, custos, riscos). Documento vivo.
