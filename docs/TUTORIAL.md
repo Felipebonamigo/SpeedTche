@@ -97,3 +97,7 @@ passo, do carro parado e da tela final), "Correr a Copa Brasil", depois 1 jogado
 ## Cartão "Primeira vez?" focável (K1)
 
 O cartão do menu principal é um item da lista de foco (`tutorialOfferCard` devolve um `FocusItem`; clique e som vêm da lista), por último e fora de `.menu-list`. O foco inicial continua no 1º botão; chega-se ao cartão com ↑ a partir do 1º item, com ↓ a partir do último botão ou com →, e ← volta ao 1º botão. Quem já correu (`racesRun > 0`) ou fez o tutorial não vê o cartão.
+
+## Nitro no tutorial (N1)
+
+o passo do nitro agora começa com 1 carga por humano (a barra da equipe soma); sem carga, avisa e segue como antes.

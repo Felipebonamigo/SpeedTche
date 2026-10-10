@@ -325,3 +325,7 @@ existe. Entra na política de privacidade do passo 5.7 do roteiro.
   computador roda o jogo local e a Steam transmite o vídeo; não usa nada deste módulo.
 - Previsão de entrada/rollback para esconder o atraso com ping alto; escolha de região; relatório
   de dessincronia salvo em arquivo (estado serializado dos dois lados) para depuração.
+
+## Contagem adiantada pelo atraso de entrada (N1)
+
+a contagem (luzes, bipes e "JÁ!") é desenhada e tocada no tick do núcleo + o atraso de entrada (`RenderFrame.inputLead`, `countdownDisplayTick`/`countdownCue` em `src/render/hud-model.ts`); com isso o aperto no instante em que se vê o zero cai no tick do JÁ e a largada-foguete dá o mesmo resultado com atraso 3 ou 12 (`tests/largada.test.ts`). Sofá e tutorial: atraso 0.

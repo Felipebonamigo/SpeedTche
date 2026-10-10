@@ -433,3 +433,7 @@ com a regra de sempre: lixo vira ausente, campo ruim é consertado, nunca lança
 **Calibragem provisória, opção B** (a definitiva é da O2; o dono não respondeu A/B): 0 do RJ ao ES, 0,1 no RS, 0,4 do DF ao AC, 0,3 no TO e 0,2 no Mundial. Medido com 2 sementes, o piloto médio ia de PE 1,67 e PB 1,17 ("volta da vitória" do DF em diante) para 3,67 e 3,33, e o Mediterrâneo de 2,50 para 4,13. Copas com média entre 3º e 5º: 5 → 29 de 34; top 5 em pelo menos 50% das corridas: 34 de 34 antes e depois. Fora da faixa 3–5: PR 2,17, GO 5,50, RO 5,17, TO 5,83 e África do Sul 2,63.
 
 **Sonda 2.0** (`npx tsx scripts/career-balance.ts [última copa] [ritmo]`, ponto decimal): 5 perfis de compra (focado, colecionador, vaidoso, sempre 1º, sempre 8º) mostram o dinheiro parado e as corridas sem compra por copa. O focado completa o Falcão no fim do RS, fica 88 corridas seguidas sem ter o que comprar e termina com $ 364.270 parados; o vaidoso passa 79 corridas sem comprar e o catálogo não fecha em nenhum perfil. Quem fecha a economia é a P1.
+
+## Peça de nitro (N1)
+
+Nitro | a barra enche +15% por nível (1,00 → 1,15 → 1,30 → 1,45 ×) | preços iguais (P1 recalibra).
