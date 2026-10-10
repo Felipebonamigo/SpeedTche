@@ -27,6 +27,7 @@ export const GATE_SCENES: ReadonlyArray<{ id: string; track: string; humans: num
  * Deck é o `--bench` do dono. Cena nova ou degrau novo: medir (`node tools/render-harness.collect.mjs`, docs/ondas/L/L2.md §11) e escrever aqui.
  */
 // 10/10/2026: chamadas da copa subiram +1 a +5 com o lote `cutout` da L4 e os lotes de LOD1 da M4 (deliberado; triângulos dentro). Provisório até o bench do dono.
+// 10/10/2026 (M3): Sampa 4p Alta/Ultra 323 mil → 350 mil triângulos (medido 334 mil, +49% com o kit redondo: prédios, postes, arquibancadas). Provisório; o `--bench` do dono diz se cabe no Deck.
 export const GATE_LIMITS: GateLimits = {
   'copa-1p': {
     low: { calls: 38, triangles: 173000, passes: 0, postPxRatio: 0 },
@@ -49,8 +50,8 @@ export const GATE_LIMITS: GateLimits = {
   'sampa-4p': {
     low: { calls: 50, triangles: 160000, passes: 0, postPxRatio: 0 },
     medium: { calls: 89, triangles: 306000, passes: 5, postPxRatio: 5.8 },
-    high: { calls: 88, triangles: 323000, passes: 4, postPxRatio: 5.4 },
-    ultra: { calls: 92, triangles: 323000, passes: 5, postPxRatio: 8.7 },
+    high: { calls: 88, triangles: 350000, passes: 4, postPxRatio: 5.4 },
+    ultra: { calls: 92, triangles: 350000, passes: 5, postPxRatio: 8.7 },
   },
 };
 

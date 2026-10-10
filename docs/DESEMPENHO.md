@@ -543,3 +543,7 @@ no Steam Deck (roteiro acima) segue com o Felipe.
 | Alta e Ultra | 26 | ~8,4 mil | 4, MSAA 4× |
 
 Com 3–4 janelas na Alta não há AO (23 chamadas, 3 passes). Pódio de 3 carros: 31 chamadas e ~16,1 mil triângulos; revelação 28; oficina 25. Os tetos do `stage-gl` (≤ 60 chamadas e ≤ 60 mil triângulos por janela) são provisórios até o bench do dono.
+
+## Cenário redondo (M3, contagens em swiftshader, sem FPS)
+
+Chamadas iguais nas 16 amostras do gate. Triângulos: `copa-1p/high` 263.788 → 307.220; `sampa-4p/medium` 209.902 → 299.982; `sampa-4p/high` e `ultra` 224.341 → 334.097 (limite subido de 323 mil para 350 mil, provisório). Custo de quadro do cenário (janela [s-30, s+260], com LOD, sem marcos): pior pista 510 → 775 △/segmento, média 245 → 423 (teto 900). Montagem dos marcos ~2× mais cara (a araucária chega a ~1 s sob carga). O vento só foi medido em contagem; o custo do `texelFetch` extra e o FPS são do `--bench` do dono. Se o Deck não aguentar Sampa 4p: cortar malha de `bld:apt`, `bld:glass`, `bld:brick` e postes.
