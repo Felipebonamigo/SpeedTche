@@ -1,0 +1,67 @@
+# Release de teste do Speed Tchê (Windows x64 e Linux x64), acionado À MÃO: Actions › "Release de teste" › Run workflow.
+# Gera os pacotes pelo desktop/build-all.sh (o mesmo caminho do desktop/README.md), confere o pacote e o abre de verdade no
+# Linux (e2e do Electron com xvfb), e publica um pré-lançamento com os dois arquivos mais o LEIA-ME.
+# Só roda por `workflow_dispatch`: nenhum push publica nada.
+name: Release de teste
+
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: 'Versão do pacote (ex.: 0.1.1); vazio = a do package.json'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Pacotes Windows e Linux + release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: desktop
+      - name: Versão
+        id: v
+        run: |
+          V="${{ github.event.inputs.versao }}"
+          [ -n "$V" ] || V="$(node -p "require('./package.json').version")"
+          test "$V" = "$(node -p "require('./desktop/package.json').version")" || { echo "versão $V difere da do desktop/package.json"; exit 1; }
+          echo "versao=$V" >> "$GITHUB_OUTPUT"
+      - name: Pacotes (build do jogo, Linux, Windows, conferência e e2e)
+        working-directory: desktop
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          ./build-all.sh --e2e
+      - name: Arquivos de entrega
+        working-directory: desktop/release
+        run: |
+          V="${{ steps.v.outputs.versao }}"
+          cp -a win-unpacked "SpeedTche $V (Windows)" && cp ../teste/LEIA-ME.txt "SpeedTche $V (Windows)/"
+          zip -qr "SpeedTche-$V-teste-windows-x64.zip" "SpeedTche $V (Windows)"
+          cp -a linux-unpacked "speedtche-$V-linux" && cp ../teste/LEIA-ME.txt "speedtche-$V-linux/"
+          tar -czf "SpeedTche-$V-teste-linux-x64.tar.gz" "speedtche-$V-linux"
+          ls -l SpeedTche-*
+      - name: Publicar o pré-lançamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.v.outputs.versao }}"
+          gh release create "speedtche-teste-$V" \
+            --target "${{ github.sha }}" --prerelease \
+            --title "Speed Tchê $V — teste com amigos" \
+            --notes-file desktop/teste/release.md \
+            "desktop/release/SpeedTche-$V-teste-windows-x64.zip" \
+            "desktop/release/SpeedTche-$V-teste-linux-x64.tar.gz" \
+            desktop/teste/LEIA-ME.txt
