@@ -14,7 +14,7 @@ import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
 import type { Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer } from '../game/contracts';
-import { ChaseCamera, IdleCamera } from './camera';
+import { cameraExtraFor, ChaseCamera, IdleCamera, newCameraExtra } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
 import { Cars } from './cars';
 import { Effects, type Shake } from './effects';
@@ -98,6 +98,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   const frames: Array<RoadFrame | undefined> = [undefined, undefined, undefined, undefined];
   const cameras = [new ChaseCamera(), new ChaseCamera(), new ChaseCamera(), new ChaseCamera()];
   const idleCamera = new IdleCamera();
+  const cameraExtras = [newCameraExtra(), newCameraExtra(), newCameraExtra(), newCameraExtra()];
   const shake: Shake = { x: 0, y: 0, roll: 0 };
   // Legenda dos marcos turísticos (caption/caption.ts): uma por viewport, sobre as instâncias do layout que o cenário
   // desenha; a cena é montada uma vez por pista (o layout novo) e a câmera de cada jogador é conferida a 5 Hz.
@@ -273,7 +274,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       cam.setAspect(rect.w / Math.max(1, rect.h));
       const seg = segmentAt(track, car.z);
       effects.shake(vp.seat, frame.time, frame.options.screenShake && !frame.options.reduceEffects, shake);
-      cam.update(rf, car.x, car.speed / car.stats.topSpeed, seg.curve, car.nitroTicks > 0, frame.time, shake);
+      cam.update(rf, car.x, car.speed / car.stats.topSpeed, seg.curve, car.nitroTicks > 0, frame.time, shake, cameraExtraFor(frame, vp.carIndex, cameraExtras[i]));
       effects.pose(rf, track, (rect.h * dpr) / (2 * Math.tan((cam.camera.fov * Math.PI / 180) / 2)));
       // Legenda dos marcos: só correndo (nem na contagem, nem depois da chegada); desligada nas opções, sem cena (nada
       // montado, e a que estava na tela some). O relógio é o da corrida: parado na pausa (o HUD esconde a legenda), e
