@@ -1,12 +1,12 @@
-// A pintura pela sessão de verdade (session.ts): o que o lobby, a copa salva, a carreira e o tutorial mandam
-// chega ao renderizador em `RenderFrame.paints` (um por carro), e a corrida (config/estado) não a carrega.
+// O visual pela sessão de verdade (session.ts): o que o lobby, a copa salva, a carreira e o tutorial mandam
+// chega ao renderizador em `RenderFrame.looks` e `RenderFrame.paints` (um por carro), e a corrida (config/estado) não o carrega.
 // Renderizador, entrada, áudio e menus são dublês; o save mora num localStorage em memória.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CUPS } from '../src/core/data/cups';
-import type { HumanEntry } from '../src/core/types';
+import type { CarLook, HumanEntry } from '../src/core/types';
 import { NEUTRAL_INPUT } from '../src/core/types';
 import type { InputProvider, MenuContext, MenuNav, MenuScreen, Menus, RenderFrame } from '../src/game/contracts';
-import { paintColors, withPaint } from '../src/game/paints';
+import { paintColors, withLook } from '../src/game/paints';
 import { SAVE_KEY } from '../src/game/save';
 import { SETTINGS_KEY } from '../src/game/settings';
 import type { Session } from '../src/game/session';
@@ -92,8 +92,14 @@ function paintOfSeat(s: Session, f: RenderFrame, seat: number) {
 /** A sessão de verdade (importada na hora, como em career-session.test.ts) leva segundos sob carga. */
 const SESSION_TIMEOUT = 60_000;
 
-const human = (seat: number, carId: string, paint?: string): HumanEntry =>
-  withPaint({ seat, name: `P${seat + 1}`, carId, teamId: 0, color: '#fff' }, paint);
+const human = (seat: number, carId: string, paint?: string | CarLook): HumanEntry =>
+  withLook({ seat, name: `P${seat + 1}`, carId, teamId: 0, color: '#fff' }, typeof paint === 'string' ? { paint } : paint);
+
+function lookOfSeat(s: Session, f: RenderFrame, seat: number) {
+  const i = s.race?.state.cars.findIndex((c) => c.seat === seat) ?? -1;
+  expect(i).toBeGreaterThanOrEqual(0);
+  return f.looks?.[i] ?? null;
+}
 
 describe('sessão: a pintura chega ao renderizador', () => {
   it('corrida rápida: o carro de cada humano na cor escolhida, a IA de fábrica; a config e o estado sem pintura', async () => {
@@ -103,12 +109,26 @@ describe('sessão: a pintura chega ao renderizador', () => {
     expect(paintOfSeat(s, f, 0)).toEqual(paintColors('cobalto'));
     expect(paintOfSeat(s, f, 1)).toBeNull();
     s.race?.state.cars.forEach((c, i) => { if (c.seat < 0) expect(f.paints?.[i] ?? null).toBeNull(); });
-    expect(s.race?.state.config.humans.some((h) => 'paint' in h)).toBe(false);
-    expect(JSON.stringify(s.race?.state)).not.toContain('paint');
+    expect(s.race?.state.config.humans.some((h) => 'paint' in h || 'look' in h)).toBe(false);
+    expect(JSON.stringify(s.race?.state)).not.toMatch(/paint|"look"/);
     // "Correr de novo" mantém a pintura (os humanos da sessão a guardam; a config continua sem).
     s.handleMenuEvent({ type: 'retryRace' });
     expect(paintOfSeat(s, lastFrame(s), 0)).toEqual(paintColors('cobalto'));
-    expect(s.race?.state.config.humans.some((h) => 'paint' in h)).toBe(false);
+    expect(s.race?.state.config.humans.some((h) => 'paint' in h || 'look' in h)).toBe(false);
+  }, SESSION_TIMEOUT);
+
+  it('N3 — o look inteiro (acabamento, roda, faixa, chama) chega a RenderFrame.looks; a IA fica de fábrica; a config e o estado sem ele', async () => {
+    const s = await newSession();
+    const mine: CarLook = { paint: 'rubi', color: '#2346d6', finish: 'perolado', wheel: 'mag', rim: 'dourado', stripe: 'ab', flame: 'roxa' };
+    s.startQuick('copacabana', 2, [human(0, 'falcao', mine), human(1, 'trovao', { wheel: 'steel' })]);
+    const f = lastFrame(s);
+    expect(lookOfSeat(s, f, 0)).toEqual(mine);
+    expect(lookOfSeat(s, f, 1)).toEqual({ wheel: 'steel' });
+    expect(paintOfSeat(s, f, 0)).toEqual({ color: '#2346d6', accent: paintColors('rubi')?.accent });
+    expect(paintOfSeat(s, f, 1)).toBeNull();
+    s.race?.state.cars.forEach((c, i) => { if (c.seat < 0) expect(f.looks?.[i] ?? null).toBeNull(); });
+    expect(s.race?.state.config.humans.some((h) => 'look' in h)).toBe(false);
+    expect(JSON.stringify(s.race?.state)).not.toMatch(/perolado|camaleao|"look"|flame/);
   }, SESSION_TIMEOUT);
 
   it('copa: a pintura vai junto para o "Continuar"', async () => {
@@ -130,7 +150,16 @@ describe('sessão: a pintura chega ao renderizador', () => {
     const f = lastFrame(s);
     expect(paintOfSeat(s, f, 0)).toEqual(paintColors('onix'));
     expect(paintOfSeat(s, f, 1)).toEqual(paintColors('gelo'));
-    expect(s.race?.state.config.humans.some((h) => 'paint' in h)).toBe(false);
+    expect(s.race?.state.config.humans.some((h) => 'paint' in h || 'look' in h)).toBe(false);
+  }, SESSION_TIMEOUT);
+
+  it('N3 — carreira com o look guardado (acabamento e roda) no save novo', async () => {
+    store.set(SAVE_KEY, JSON.stringify({ seatLooks: [{ falcao: { paint: 'onix', finish: 'cromado', wheel: 'mag' } }, {}, {}, {}] }));
+    const s = await newSession();
+    s.handleMenuEvent({ type: 'startCareer', humans: [human(0, 'falcao')], resume: false });
+    s.handleMenuEvent({ type: 'careerRace' });
+    expect(lookOfSeat(s, lastFrame(s), 0)).toEqual({ paint: 'onix', finish: 'cromado', wheel: 'mag' });
+    expect(s.race?.state.config.humans.some((h) => 'look' in h)).toBe(false);
   }, SESSION_TIMEOUT);
 
   it('tutorial: a pintura que vem do cartão do tutorial, e a corrida sem ela', async () => {
@@ -138,6 +167,6 @@ describe('sessão: a pintura chega ao renderizador', () => {
     s.handleMenuEvent({ type: 'startTutorial', humans: [human(0, 'tatu', 'prata')] });
     const f = lastFrame(s);
     expect(paintOfSeat(s, f, 0)).toEqual(paintColors('prata'));
-    expect(s.race?.state.config.humans.some((h) => 'paint' in h)).toBe(false);
+    expect(s.race?.state.config.humans.some((h) => 'paint' in h || 'look' in h)).toBe(false);
   }, SESSION_TIMEOUT);
 });

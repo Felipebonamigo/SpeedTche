@@ -9,10 +9,10 @@ import '../../access/strings';
 import { assistedHumans } from '../../access/humans';
 import { seatColor } from '../../core/data/drivers';
 import { ASSIST_LEVELS } from '../../core/sim/assist';
-import type { CarDef, HumanEntry } from '../../core/types';
+import type { CarDef, CarLook, HumanEntry } from '../../core/types';
 import type { DeviceId, MenuContext, MenuNav, SaveData } from '../../game/contracts';
 import { carAvailable } from '../../game/career-save';
-import { ORIGINAL_PAINT, seatPaint, stepSeatPaint, withPaint } from '../../game/paints';
+import { ORIGINAL_PAINT, seatLook, seatPaint, stepSeatPaint, withLook } from '../../game/paints';
 import { NAME_MAX_LENGTH, saveSave } from '../../game/save';
 import { t } from '../../i18n';
 import { isPartyMode, lobbyHidesCar, lobbyHidesDriver, lobbyTeamLabel, partySeatsProblem, versusAllowed } from '../../party/rules';
@@ -30,10 +30,10 @@ export function availableCars(ctx: Pick<MenuContext, 'cars' | 'save'>): CarDef[]
 }
 
 /** Pilotos do jogo salvo que o lobby de "Continuar" religa (nome, carro e pintura, na ordem dos assentos). */
-export function resumeRoster(lobby: LobbyState, save: SaveData): Array<{ name: string; carId: string | null; paint?: string }> {
+export function resumeRoster(lobby: LobbyState, save: SaveData): Array<{ name: string; carId: string | null; look?: CarLook }> {
   if (!lobby.resume) return [];
   if (lobby.mode === 'career') return save.career?.drivers.map((d) => ({ name: d.name, carId: null })) ?? [];
-  return save.cupInProgress?.humans.map((h) => ({ name: h.name, carId: h.carId, paint: h.paint })) ?? [];
+  return save.cupInProgress?.humans.map((h) => ({ name: h.name, carId: h.carId, look: h.look })) ?? [];
 }
 
 export function maxSeats(lobby: LobbyState, save?: SaveData): number {
@@ -70,13 +70,13 @@ export function lobbyHumans(api: ScreenApi): HumanEntry[] {
   const versus = api.lobby.versus && versusAllowed(api.lobby.mode, seats.length);
   return assistedHumans(seats.map((s) => {
     const carId = (cars[s.carIndex] ?? cars[0]).id;
-    return withPaint({
+    return withLook({
       seat: s.seat,
       name: s.name.trim() || `P${s.seat + 1}`,
       carId,
       teamId: versus ? s.seat : 0,
       color: seatColor(s.seat, settings.colorPalette),
-    }, seatPaint(save, s.seat, carId));
+    }, seatLook(save, s.seat, carId));
   }), settings.seatAssists);
 }
 
@@ -214,9 +214,9 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       activate: () => { nameInput.focus(); nameInput.select(); },
     };
     const nameEl = hidesDriver ? null : nameRow ? nameRow.el : h('strong', { class: 'slot-name static', text: s.name, title: t('ui.lobby.name') });
-    // Pintura: a que este assento guardou para o carro à mostra (save.seatPaints); no "Continuar", a da copa salva.
+    // Pintura: a que este assento guardou para o carro à mostra (save.seatLooks); no "Continuar", a da copa salva.
     const carNow = () => cars[s.carIndex] ?? cars[0];
-    const paintNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.paint ?? ORIGINAL_PAINT : seatPaint(save, s.seat, carNow().id));
+    const paintNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.look?.paint ?? ORIGINAL_PAINT : seatPaint(save, s.seat, carNow().id));
     const heroBody = h('div', { class: 'car-hero-body' }, carCard(carNow(), cars, paintNow()));
     const showCar = () => heroBody.replaceChildren(carCard(carNow(), cars, paintNow()));
     let paintItem: Selector | null = null;

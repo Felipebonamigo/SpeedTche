@@ -4,7 +4,7 @@
 //   src/audio   → AudioEngine         src/game   → settings.ts, save.ts, desktop.ts, session.ts
 import type { ColorPalette } from '../core/data/drivers';
 import type {
-  AssistLevel, CarDef, ChampionshipState, CoopAssists, CupDef, Difficulty, HumanEntry, PlayerInput, RaceResultRow, RaceState,
+  AssistLevel, CarDef, CarLook, ChampionshipState, CoopAssists, CupDef, Difficulty, HumanEntry, PlayerInput, RaceResultRow, RaceState,
   SimEvent, Track, TrackDef,
 } from '../core/types';
 import type { CareerState } from '../core/career';
@@ -164,10 +164,11 @@ export interface SaveData {
   /** Carro escolhido por assento na última sessão. */
   seatCars: string[];
   /**
-   * Pintura escolhida por assento (P1..P4) para cada carro: carro → id da paleta (src/game/paints.ts). Carro
-   * ausente = a Original (a de fábrica). Gravada na hora da escolha (lobby, garagem, sala online). Ver docs/SAVE.md.
+   * Visual escolhido por assento (P1..P4) para cada carro: carro → CarLook (src/game/cosmetics.ts: pintura, cores livres, acabamento,
+   * roda, aro, faixa, chama). Carro ausente = o de fábrica. Gravado na hora da escolha (lobby, garagem, sala online). Substitui o
+   * `seatPaints` (carro → id da paleta) do save de antes, que o saneador migra na leitura. Ver docs/SAVE.md.
    */
-  seatPaints: Array<Record<string, string>>;
+  seatLooks: Array<Record<string, CarLook>>;
   /** Estatísticas por jogador (nome do lobby) e totais — src/game/stats.ts. */
   stats: StatsData;
   /** Carros comprados em alguma carreira: ficam liberados em todas as modalidades. */
@@ -189,7 +190,7 @@ export interface SavedCup {
 
 export const DEFAULT_SAVE: Readonly<SaveData> = Object.freeze({
   cupsCompleted: [], cupsUnlocked: [], stamps: [], bestLaps: {}, bestRaces: {}, achievements: [], racesRun: 0, racesWon: 0,
-  seatNames: ['P1', 'P2', 'P3', 'P4'], seatCars: ['falcao', 'trovao', 'tornado', 'camelo'], seatPaints: [{}, {}, {}, {}],
+  seatNames: ['P1', 'P2', 'P3', 'P4'], seatCars: ['falcao', 'trovao', 'tornado', 'camelo'], seatLooks: [{}, {}, {}, {}],
   stats: EMPTY_STATS,
   carsUnlocked: [], career: null, cupInProgress: null, tutorialDone: false,
 });
@@ -269,6 +270,11 @@ export interface RenderFrame {
    * aparência, montada pela sessão na largada (racePaints em src/game/paints.ts): o estado da corrida não a tem.
    */
   paints?: ReadonlyArray<CarColors | null>;
+  /**
+   * O visual de cada carro (índice = `state.cars`): pintura, acabamento, roda, aro, faixa e chama (N3, src/game/paints.ts: raceLooks);
+   * null ou ausente = o de fábrica. Só aparência, como `paints` (de que é a versão completa: o 3D lê este e, na falta, aquele).
+   */
+  looks?: ReadonlyArray<CarLook | null>;
   /**
    * Online: o atraso de entrada do lockstep, em ticks (onda N, N1). A contagem é desenhada no tick do núcleo mais isto, para o aperto
    * no instante em que o jogador vê o zero cair no tick do "JÁ" (a largada-foguete). Ausente ou 0 = sofá e tutorial: a contagem do núcleo.

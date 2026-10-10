@@ -1,168 +1,150 @@
-// Pintura do carro (docs/CARROS.md, "Pintura"): a paleta curada, a escolha de cada assento para cada carro
-// (guardada no save) e a pintura de cada carro na pista. Só aparência: a pintura vai no HumanEntry da sessão
-// e do online, mas NUNCA na RaceConfig nem no estado da corrida — `withoutPaint` a tira antes de `createRace`,
-// e o renderizador a recebe pronta em `RenderFrame.paints` (racePaints). Sem DOM nem Three: os testes usam direto.
-import { CARS } from '../core/data/cars';
-import type { CarDef, CarState, HumanEntry } from '../core/types';
+// O caminho do visual do carro (docs/CARROS.md "Pintura", docs/ondas/N/N3.md): a escolha de cada assento para cada carro (guardada no
+// save como `seatLooks`) e o visual de cada carro na pista. A paleta e o catálogo moram em cosmetics.ts (aqui são reexportados: quem
+// importava a paleta daqui continua importando). Só aparência: o look vai no HumanEntry da sessão e do online, mas NUNCA na RaceConfig nem
+// no estado da corrida — `withoutLook` o tira antes de `createRace`, e o renderizador o recebe pronto em `RenderFrame.looks` (raceLooks)
+// e, para o Retrô e para quem só quer as cores, em `RenderFrame.paints` (racePaints). Sem DOM nem Three: os testes usam direto.
+import { carDef } from '../core/data/cars';
+import type { CarDef, CarLook, CarState, HumanEntry } from '../core/types';
 import type { CarColors, SaveData } from './contracts';
+import {
+  factoryColors, isPaintId, lookColors, nextPaint, normalizeLook, ORIGINAL_PAINT, paintColors, sanitizeLook, SEAT_SLOTS,
+} from './cosmetics';
 
-/** A cor de fábrica do carro (CarDef.color/accent): a primeira opção da paleta e o valor de quem não escolheu. */
-export const ORIGINAL_PAINT = 'original';
+export {
+  isPaintId, nextPaint, ORIGINAL_PAINT, PAINT_IDS, PAINTS, paintColors, type PaintDef,
+} from './cosmetics';
 
-/** Uma pintura da paleta: carroceria + detalhe (faixas, aerofólio, pinças, capacete), já combinados. */
-export interface PaintDef {
-  id: string;
-  color: string;
-  accent: string;
-}
-
-/**
- * A paleta, depois da Original, na ordem do arco-íris e terminando nos neutros. Cada opção é um par cor + detalhe
- * escolhido junto (a combinação feia não existe); nenhuma repete a de fábrica de um carro (tests/paint.test.ts).
- * Os ids são do save e do online: renomear um apaga a escolha de quem o usava (vira a Original).
- */
-export const PAINTS: readonly PaintDef[] = Object.freeze([
-  { id: 'rubi', color: '#d7263d', accent: '#f4f4f2' },
-  { id: 'tangerina', color: '#ff7a1a', accent: '#f6f7f9' },
-  { id: 'canarinho', color: '#ffc425', accent: '#0f7a45' },
-  { id: 'limao', color: '#9bd61f', accent: '#24282f' },
-  { id: 'esmeralda', color: '#0f9d58', accent: '#ffd23f' },
-  { id: 'turquesa', color: '#18b8c4', accent: '#ff8a33' },
-  { id: 'ceu', color: '#4fb3ff', accent: '#14254f' },
-  { id: 'cobalto', color: '#2346d6', accent: '#ffcf26' },
-  { id: 'marinho', color: '#1b2b5e', accent: '#e8434f' },
-  { id: 'violeta', color: '#7a3ff0', accent: '#ffb02e' },
-  { id: 'flamingo', color: '#ff4fa0', accent: '#2fd9e6' },
-  { id: 'gelo', color: '#eef1f4', accent: '#d7263d' },
-  { id: 'prata', color: '#98a2ae', accent: '#2346d6' },
-  { id: 'grafite', color: '#3b4048', accent: '#c8ff2e' },
-  { id: 'onix', color: '#17191e', accent: '#d9b25a' },
-].map((p) => Object.freeze(p)));
-
-/** Todas as opções, na ordem em que o seletor as percorre: a Original primeiro. */
-export const PAINT_IDS: readonly string[] = Object.freeze([ORIGINAL_PAINT, ...PAINTS.map((p) => p.id)]);
-
-/** Assentos locais que o save lembra (P1..P4), como `seatNames`/`seatCars`. */
-const SEATS = 4;
-
-export function isPaintId(v: unknown): v is string {
-  return typeof v === 'string' && PAINT_IDS.includes(v);
-}
-
-/** Cores da pintura; null = a de fábrica (Original, ausente ou id que não existe mais). */
-export function paintColors(id: string | null | undefined): CarColors | null {
-  const p = PAINTS.find((x) => x.id === id);
-  return p ? { color: p.color, accent: p.accent } : null;
-}
-
-/** O carro com a pintura aplicada, para os desenhos dos menus (silhuetas). A Original devolve o próprio carro. */
-export function paintedCar<T extends Pick<CarDef, 'color' | 'accent'>>(car: T, id: string | null | undefined): T {
-  const c = paintColors(id);
+/** O carro com a pintura aplicada, para os desenhos dos menus (silhuetas). A Original devolve o próprio carro. Aceita o id da paleta ou o look inteiro. */
+export function paintedCar<T extends Pick<CarDef, 'color' | 'accent'>>(car: T, paint: string | CarLook | null | undefined): T {
+  const c = typeof paint === 'string' || paint == null ? paintColors(paint) : lookColors(paint, factoryColors(car));
   return c ? { ...car, color: c.color, accent: c.accent } : car;
 }
 
-/** A opção seguinte (ou a anterior) da paleta, em círculo; um id desconhecido conta como a Original. */
-export function nextPaint(id: string, dir: -1 | 1): string {
-  const i = Math.max(0, PAINT_IDS.indexOf(id));
-  return PAINT_IDS[(i + dir + PAINT_IDS.length) % PAINT_IDS.length];
-}
-
 /**
- * `base` com a pintura, só quando ela é uma da paleta: a Original (e o que não existe) não entra no objeto — quem
- * não pintou manda a mesma mensagem/save de antes (como `withAssist` em net/protocol.ts).
+ * `base` com o look, só quando ele não é o de fábrica: quem não personalizou manda a mesma mensagem/save de antes (como `withAssist`
+ * em net/protocol.ts). Confia no que recebe (quem lê de fora usa `sanitizeLook`/`parseLook`), mas o põe na forma canônica.
  */
-export function withPaint<T extends object>(base: T, paint: unknown): T & { paint?: string } {
-  const { paint: _drop, ...rest } = base as T & { paint?: string };
-  return isPaintId(paint) && paint !== ORIGINAL_PAINT ? { ...(rest as T), paint } : (rest as T);
+export function withLook<T extends { carId?: string }>(base: T, look: CarLook | null | undefined): T & { look?: CarLook } {
+  const { look: _drop, ...rest } = base as T & { look?: CarLook };
+  const canon = normalizeLook(look, base.carId);
+  return canon ? { ...(rest as T), look: canon } : (rest as T);
 }
 
-/** Cópias sem a pintura: os humanos que entram na RaceConfig (o estado da corrida não carrega cosmético). */
-export function withoutPaint<T extends { paint?: string }>(list: readonly T[]): T[] {
+/** Cópias sem o look: os humanos que entram na RaceConfig (o estado da corrida não carrega cosmético). */
+export function withoutLook<T extends { look?: CarLook }>(list: readonly T[]): T[] {
   return list.map((h) => {
-    const { paint: _drop, ...rest } = h;
+    const { look: _drop, ...rest } = h;
     return rest as T;
   });
 }
 
 // ───────────────────────────── Save: por assento e por carro ─────────────────────────────
 
-/** A pintura que o assento escolheu para o carro (a Original quando nunca escolheu). */
-export function seatPaint(save: Pick<SaveData, 'seatPaints'>, seat: number, carId: string): string {
-  const id = save.seatPaints[seat]?.[carId];
-  return isPaintId(id) ? id : ORIGINAL_PAINT;
+/** O look que o assento escolheu para o carro (null = o de fábrica). */
+export function seatLook(save: Pick<SaveData, 'seatLooks'>, seat: number, carId: string): CarLook | null {
+  const m = save.seatLooks[seat];
+  return m && Object.hasOwn(m, carId) ? sanitizeLook(m[carId], carId) : null;
 }
 
 /**
- * Grava a escolha do assento para o carro. Troca os objetos em vez de mexer neles (o save padrão é compartilhado);
- * a Original sai do mapa, então só quem pintou ocupa o save.
+ * Grava o look do assento para o carro. Troca os objetos em vez de mexer neles (o save padrão é compartilhado); o look de fábrica sai
+ * do mapa, então só quem personalizou ocupa o save.
  */
-export function setSeatPaint(save: Pick<SaveData, 'seatPaints'>, seat: number, carId: string, id: string): void {
-  if (seat < 0 || seat >= SEATS) return;
-  const lists = Array.from({ length: SEATS }, (_, i) => save.seatPaints[i] ?? {});
+export function setSeatLook(save: Pick<SaveData, 'seatLooks'>, seat: number, carId: string, look: CarLook | null): void {
+  if (seat < 0 || seat >= SEAT_SLOTS) return;
+  const lists = Array.from({ length: SEAT_SLOTS }, (_, i) => save.seatLooks[i] ?? {});
   const { [carId]: _old, ...rest } = lists[seat];
-  lists[seat] = isPaintId(id) && id !== ORIGINAL_PAINT ? { ...rest, [carId]: id } : rest;
-  save.seatPaints = lists;
+  const canon = sanitizeLook(look, carId);
+  lists[seat] = canon ? { ...rest, [carId]: canon } : rest;
+  save.seatLooks = lists;
 }
 
-/** ←/→ no seletor: a próxima (ou a anterior) da paleta, já gravada para o assento e o carro. Devolve a nova. */
-export function stepSeatPaint(save: Pick<SaveData, 'seatPaints'>, seat: number, carId: string, dir: -1 | 1): string {
+/** A pintura (id da paleta) do look que o assento escolheu para o carro; a Original quando não pintou. */
+export function seatPaint(save: Pick<SaveData, 'seatLooks'>, seat: number, carId: string): string {
+  return seatLook(save, seat, carId)?.paint ?? ORIGINAL_PAINT;
+}
+
+/** Troca só a pintura da paleta do look do assento (acabamento, roda, faixa… ficam como estão). */
+export function setSeatPaint(save: Pick<SaveData, 'seatLooks'>, seat: number, carId: string, id: string): void {
+  setSeatLook(save, seat, carId, { ...seatLook(save, seat, carId), paint: isPaintId(id) ? id : ORIGINAL_PAINT });
+}
+
+/** ←/→ na linha "Pintura": a próxima (ou a anterior) da paleta, já gravada para o assento e o carro. Devolve a nova. */
+export function stepSeatPaint(save: Pick<SaveData, 'seatLooks'>, seat: number, carId: string, dir: -1 | 1): string {
   const id = nextPaint(seatPaint(save, seat, carId), dir);
   setSeatPaint(save, seat, carId, id);
   return id;
 }
 
-/** Saneamento da leitura: 4 mapas carro → pintura, só com carro e pintura que existem (a Original não é guardada). */
-export function sanitizeSeatPaints(v: unknown): Array<Record<string, string>> {
-  const arr = Array.isArray(v) ? v : [];
-  return Array.from({ length: SEATS }, (_, i) => {
-    const out: Record<string, string> = {};
-    const m: unknown = arr[i];
-    if (typeof m !== 'object' || m === null || Array.isArray(m)) return out;
-    for (const [carId, id] of Object.entries(m as Record<string, unknown>)) {
-      if (CARS.some((c) => c.id === carId) && isPaintId(id) && id !== ORIGINAL_PAINT) out[carId] = id;
-    }
-    return out;
-  });
-}
-
-/** Humanos montados do save (carreira, tutorial): cada um com a pintura que o assento dele guardou para o carro. */
-export function paintFromSave(humans: readonly HumanEntry[], save: Pick<SaveData, 'seatPaints'>): HumanEntry[] {
-  return humans.map((h) => withPaint(h, seatPaint(save, h.seat, h.carId)));
+/** Humanos montados do save (carreira, tutorial): cada um com o look que o assento dele guardou para o carro. */
+export function looksFromSave(humans: readonly HumanEntry[], save: Pick<SaveData, 'seatLooks'>): HumanEntry[] {
+  return humans.map((h) => withLook(h, seatLook(save, h.seat, h.carId)));
 }
 
 // ───────────────────────────── Na pista ─────────────────────────────
 
 /**
- * A pintura de cada carro da corrida (índice = `cars`): a IA e o VIP da escolta de fábrica (null); cada humano
- * com a dele (a do HumanEntry do assento que larga com o carro — no revezamento, o primeiro da dupla).
- * Dois humanos com o mesmo carro e a mesma pintura sairiam iguais: o de assento maior ganha, só nesta corrida,
- * a próxima opção da paleta que ninguém com aquele carro escolheu. Pura e só da largada: no online todo
- * computador chega à mesma lista.
+ * O que se VÊ de um look para decidir se dois carros se confundem: pintura, cores livres, faixa e acabamento (a roda, o aro e a chama
+ * são detalhe pequeno). A faixa conta (N3): dois com a mesma pintura e faixas diferentes já se distinguem.
  */
-export function racePaints(cars: ReadonlyArray<Pick<CarState, 'seat' | 'carId'>>, humans: readonly HumanEntry[]): Array<CarColors | null> {
-  const out: Array<CarColors | null> = cars.map(() => null);
+function identity(look: CarLook | null): string {
+  return [look?.paint ?? ORIGINAL_PAINT, look?.color ?? '', look?.accent ?? '', look?.stripe ?? '', look?.finish ?? ''].join('|');
+}
+
+/** O mesmo look com outra pintura da paleta e SEM as cores livres (senão a troca não apareceria). */
+function repainted(look: CarLook | null, paint: string): CarLook | null {
+  const { color: _c, accent: _a, ...rest } = look ?? {};
+  return normalizeLook({ ...rest, paint });
+}
+
+/**
+ * O look de cada carro da corrida (índice = `cars`): a IA e o VIP da escolta de fábrica (null); cada humano com o dele (o do HumanEntry
+ * do assento que larga com o carro — no revezamento, o primeiro da dupla). Dois humanos com o mesmo carro e a mesma identidade visual
+ * (pintura, cores livres, faixa e acabamento) sairiam iguais: o de assento maior ganha, só nesta corrida, a próxima pintura da paleta que
+ * ninguém com aquele carro escolheu (e perde as cores livres). Pura e só da largada: no online todo computador chega à mesma lista.
+ */
+export function raceLooks(cars: ReadonlyArray<Pick<CarState, 'seat' | 'carId'>>, humans: readonly HumanEntry[]): Array<CarLook | null> {
+  const out: Array<CarLook | null> = cars.map(() => null);
   const drivers = cars
     .map((c, index) => ({ index, seat: c.seat, carId: c.carId }))
     .filter((d) => d.seat >= 0)
     .sort((a, b) => a.seat - b.seat);
-  const chosen = drivers.map((d) => {
-    const id = humans.find((h) => h.seat === d.seat)?.paint;
-    return isPaintId(id) ? id : ORIGINAL_PAINT;
-  });
-  const given = new Map<string, Set<string>>(); // carro → pinturas já na pista (só render; o núcleo não vê)
+  const chosen = drivers.map((d) => sanitizeLook(humans.find((h) => h.seat === d.seat)?.look, d.carId));
+  const given = new Map<string, Set<string>>(); // carro → identidades já na pista (só render; o núcleo não vê)
   drivers.forEach((d, k) => {
     const taken = given.get(d.carId) ?? new Set<string>();
-    let id = chosen[k];
-    if (taken.has(id)) {
-      // Reserva as escolhas de propósito dos outros com o mesmo carro: a troca não toma a pintura de ninguém.
-      const reserved = new Set(drivers.flatMap((o, j) => (o.carId === d.carId ? [chosen[j]] : [])));
-      let next = nextPaint(id, 1);
-      while ((taken.has(next) || reserved.has(next)) && next !== id) next = nextPaint(next, 1);
-      id = next;
+    let look = chosen[k];
+    if (taken.has(identity(look))) {
+      // Reserva as escolhas de propósito dos outros com o mesmo carro: a troca não toma o visual de ninguém.
+      const reserved = new Set(drivers.flatMap((o, j) => (o.carId === d.carId ? [identity(chosen[j])] : [])));
+      const start = look?.paint ?? ORIGINAL_PAINT;
+      let next = nextPaint(start, 1);
+      let candidate = repainted(look, next);
+      while ((taken.has(identity(candidate)) || reserved.has(identity(candidate))) && next !== start) {
+        next = nextPaint(next, 1);
+        candidate = repainted(look, next);
+      }
+      look = candidate;
     }
-    taken.add(id);
+    taken.add(identity(look));
     given.set(d.carId, taken);
-    out[d.index] = paintColors(id);
+    out[d.index] = look;
   });
   return out;
+}
+
+/** O look de cada carro reduzido às cores (o par pintura + detalhe que o Retrô e `RenderFrame.paints` usam); null = as de fábrica. */
+export function paintsOfLooks(cars: ReadonlyArray<Pick<CarState, 'carId'>>, looks: ReadonlyArray<CarLook | null>): Array<CarColors | null> {
+  return cars.map((c, i) => lookColors(looks[i], factoryColors(carDef(c.carId))));
+}
+
+/** O visual de cada carro da largada e as cores dele, de uma vez (o que a sessão guarda e manda no `RenderFrame`). */
+export function raceVisuals(cars: ReadonlyArray<Pick<CarState, 'seat' | 'carId'>>, humans: readonly HumanEntry[]): { looks: Array<CarLook | null>; paints: Array<CarColors | null> } {
+  const looks = raceLooks(cars, humans);
+  return { looks, paints: paintsOfLooks(cars, looks) };
+}
+
+/** A pintura (cores) de cada carro: o que `raceLooks` decidiu, reduzido ao par de cores. Mantida para o Retrô, o bench e quem só lê cores. */
+export function racePaints(cars: ReadonlyArray<Pick<CarState, 'seat' | 'carId'>>, humans: readonly HumanEntry[]): Array<CarColors | null> {
+  return paintsOfLooks(cars, raceLooks(cars, humans));
 }

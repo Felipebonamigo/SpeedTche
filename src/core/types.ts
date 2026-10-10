@@ -161,10 +161,33 @@ export interface HumanEntry {
   /** Direção assistida deste jogador; ausente = 'none'. Vai na config, então vale igual em todo cliente online. */
   assist?: AssistLevel;
   /**
-   * Pintura escolhida (id da paleta, src/game/paints.ts); ausente = a de fábrica. Só aparência: a sessão e o online
-   * a tiram (`withoutPaint`) antes de montar a RaceConfig — o núcleo nunca a vê e o estado da corrida não a carrega.
+   * Visual do carro (pintura, acabamento, roda, faixa, chama; src/game/cosmetics.ts); ausente = o de fábrica. Só aparência: a
+   * sessão e o online o tiram (`withoutLook`) antes de montar a RaceConfig — o núcleo nunca o vê e o estado da corrida não o carrega.
    */
+  look?: CarLook;
+}
+
+/**
+ * O pacote de aparência de um carro (onda N, N3), em forma CANÔNICA: chave ausente = padrão. Só dados, sem lógica: o catálogo, o
+ * saneador e as cores moram em src/game/cosmetics.ts. Os valores são ids do catálogo (texto), conferidos na fronteira (save e rede).
+ */
+export interface CarLook {
+  /** Id da paleta (src/game/paints.ts); ausente = original (a cor de fábrica do carro). */
   paint?: string;
+  /** Cor livre da carroceria ('#rrggbb' minúsculo, já com a saturação mínima). Vence a da pintura. */
+  color?: string;
+  /** Cor livre do detalhe (faixas, aerofólio, pinças). Vence a da pintura. */
+  accent?: string;
+  /** 'metalico' | 'perolado' | 'fosco' | 'cromado' | 'camaleao'; ausente = brilho (o de sempre). */
+  finish?: string;
+  /** Um dos 9 desenhos de roda, da lista do estilo do carro; ausente = a roda do estilo. */
+  wheel?: string;
+  /** 'prata' | 'grafite' | 'dourado' | 'acento'; ausente = o aro de fábrica da roda. */
+  rim?: string;
+  /** 'nenhuma' | 'a' | 'b' | 'ab'; ausente = a faixa do modelo. */
+  stripe?: string;
+  /** Cor da chama do nitro (id do catálogo); ausente = o azul tingido pelo detalhe. */
+  flame?: string;
 }
 
 export interface RaceConfig {
