@@ -78,7 +78,7 @@ export class Cars {
   private readonly stars: THREE.InstancedMesh;
   private readonly starPose: StarPose = { x: 0, y: 0, z: 0, scale: 0, roll: 0 };
   /** Entrada reaproveitada do `stepMotion` (nada de objeto novo por carro por quadro). */
-  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, topSpeed: 1, reduce: false };
+  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, maxSpeed: 1, reduce: false };
   /** Aparência por carro (estilo, cores, pintura), recalculada só quando o carro ou a pintura escolhida mudam. */
   private readonly looks: Array<CarLook | null> = [];
   private readonly lookIds: string[] = [];
@@ -269,7 +269,7 @@ export class Cars {
       // M4: guinada da derrapagem, batida e esticão, só visuais, por borda do estado (cars/motion.ts).
       const mi = this.motionIn;
       mi.driftDir = c.driftDir; mi.driftTicks = c.driftTicks; mi.driftBoostTicks = c.driftBoostTicks; mi.nitroTicks = c.nitroTicks;
-      mi.collisionCooldown = c.collisionCooldown; mi.speed = c.speed; mi.topSpeed = c.stats.topSpeed; mi.reduce = frame.options.reduceEffects;
+      mi.collisionCooldown = c.collisionCooldown; mi.speed = c.speed; mi.maxSpeed = c.stats.topSpeed; mi.reduce = frame.options.reduceEffects;
       stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;

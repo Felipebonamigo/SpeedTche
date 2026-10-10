@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DRIFT_YAW, STARS_SECONDS, newMotion, stepMotion, type Motion, type MotionInput } from '../src/render/cars/motion';
 
 const DT = 1 / 60;
-const IDLE: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 3000, topSpeed: 5000, reduce: false };
+const IDLE: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 3000, maxSpeed: 5000, reduce: false };
 
 /** Roda `seconds` de quadros de 1/60 s; `at(t)` devolve o que o estado diz naquele instante; `watch` olha a cada quadro. */
 function run(m: Motion, seconds: number, at: (t: number) => Partial<MotionInput>, watch?: (t: number) => void): void {

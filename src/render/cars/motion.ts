@@ -25,7 +25,7 @@ const DRIFT_OUT = 10;
 
 export interface MotionInput {
   driftDir: number; driftTicks: number; driftBoostTicks: number; nitroTicks: number; collisionCooldown: number;
-  speed: number; topSpeed: number;
+  speed: number; /** Velocidade máxima da corrida (car.stats.topSpeed). */ maxSpeed: number;
   /** "Reduzir efeitos": sem rodopio, sem squash/stretch e sem estrelinhas (a guinada é pose, fica). */
   reduce: boolean;
 }
@@ -69,7 +69,7 @@ export function stepMotion(m: Motion, e: MotionInput, dt: number): void {
   const hit = !first && e.collisionCooldown > m.cd && m.cd === 0;
   const nitroStart = !first && e.nitroTicks > 0 && m.nitro === 0;
   const boostStart = !first && e.driftBoostTicks > 0 && m.boost === 0;
-  const drop = e.topSpeed > 0 ? (m.speed - e.speed) / e.topSpeed : 0;
+  const drop = e.maxSpeed > 0 ? (m.speed - e.speed) / e.maxSpeed : 0;
   m.seen = true; m.cd = e.collisionCooldown; m.speed = e.speed; m.nitro = e.nitroTicks; m.boost = e.driftBoostTicks;
 
   if (hit) {
