@@ -236,7 +236,8 @@ export function focusPose(model: FocusModel, focus: StageFocus | string, aspect 
       return pose(Math.PI - 0.22, 0.14, 0.9, 0.6, [e[0], e[1], e[2]]);
     }
     default:
-      return { azimuth: 0, elevation: 0.22, distance: fit(2.3, 1.08), target: [0, Math.max(0.45, model.height * 0.4), 0], yaw: null };
+      // Janela alta (retrato: 4 pilotos na Concessionária) sobe a câmera para mostrar o prato; a larga fica baixa, como foto de produto.
+      return { azimuth: 0, elevation: 0.22 + Math.min(0.25, Math.max(0, (1.2 - aspect) * 0.4)), distance: fit(2.3, 1.08), target: [0, Math.max(0.45, model.height * 0.4), 0], yaw: null };
   }
 }
 

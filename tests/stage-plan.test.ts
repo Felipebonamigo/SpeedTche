@@ -183,6 +183,15 @@ describe('câmera de detalhe (focusPose)', () => {
     for (const d of [overview.distance, focusPose(model, 'tires').distance]) { expect(Number.isFinite(d)).toBe(true); expect(d).toBeGreaterThan(0); }
   });
 
+  it('janela alta (4 pilotos na Concessionária): a câmera sobe para mostrar o prato; janela larga mantém a vista baixa', () => {
+    const model = buildModel('gt');
+    const wide = focusPose(model, null, 16 / 9);
+    const tall = focusPose(model, null, 0.72);
+    expect(tall.elevation).toBeGreaterThan(wide.elevation + 0.1);
+    expect(tall.elevation).toBeLessThan(0.7);
+    expect(focusPose(model, null, 2.7).elevation).toBe(wide.elevation);
+  });
+
   it('o enquadramento serve aos 14 carros', () => {
     for (const car of CARS) {
       const model = buildModel(car.body);
