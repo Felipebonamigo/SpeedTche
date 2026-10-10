@@ -1,15 +1,16 @@
 // Microcarro: curto (3,3 m) e gordinho (mesma largura dos outros), rodas pequenas nos cantos, cabine
 // alta e redonda com o teto em outra cor, faróis redondos grandes ("olhos"), bigode cromado na frente,
 // para-choques cromados finos, lanternas redondas e calotas.
-import { BodyShape, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
-import { exhaust, mirrors, plate, roundLampPair } from '../details';
-import { beam, box, MeshBuilder, roundBar, roundBeam } from '../kit';
+import { BodyShape, bubble, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
+import { mirrors, plate, roundLampPair } from '../details';
+import { beam, box, MeshBuilder, roundBar, roundBeam, type Lod } from '../kit';
+import { buildRear, exhaustPoint } from '../rear';
 import { finish, regions, type CarModel } from '../model';
 import { AMBER, CHROME, GLASS, HEAD, LIVERY_A, LIVERY_B, PAINT, STRIPE_A, TAIL, TRIM_SOFT } from '../paints';
 
-export function buildMicro(): CarModel {
-  const b = new MeshBuilder();
-  const axles: [Axle, Axle] = [{ z: -1.1, r: 0.3, x: 0.78, w: 0.26 }, { z: 1.1, r: 0.3, x: 0.78, w: 0.26 }];
+export function buildMicro(lod: Lod = 0): CarModel {
+  const b = new MeshBuilder(lod);
+  const axles: [Axle, Axle] = [{ z: -1.1, r: 0.335, x: 0.78, w: 0.28 }, { z: 1.1, r: 0.335, x: 0.78, w: 0.28 }];
   const shape = new BodyShape({
     secs: [
       { z: -1.65, yb: 0.28, yt: 0.55, hw: 0.8, crown: 0.04, sh: 0.24, tuck: 0.1, belt: 0.5 },
@@ -21,13 +22,14 @@ export function buildMicro(): CarModel {
       { z: 1.65, yb: 0.3, yt: 0.76, hw: 0.8, crown: 0.04, sh: 0.24, tuck: 0.1 },
     ],
     axles, rise: [0.05, 0.04], band: 0.05,
+    lod,
     brush: regions({ sill: PAINT }),
     capFront: PAINT, capBack: PAINT,
   });
   shape.build(b);
   // Cabine alta e redonda; o teto é a camada A (na pintura A fica na cor de acento, como um teto branco).
   const ROOF = STRIPE_A;
-  const cab: CabinSpec = {
+  const cab: CabinSpec = bubble({
     secs: [
       { z: -0.82, hwb: 0.8, yb: 0.76, hwt: 0.8, yt: 0.76 },
       { z: -0.3, hwb: 0.84, yb: 0.79, hwt: 0.68, yt: 1.46, crown: 0.07 },
@@ -36,7 +38,7 @@ export function buildMicro(): CarModel {
     ],
     top: (gap) => (gap === 1 ? ROOF : GLASS),
     side: () => GLASS,
-  };
+  });
   buildCabin(b, cab);
   b.mirrored(() => {
     beam(b, [0.8, 0.78, -0.8], cabinGlassTop(cab, -0.34), 0.07, 0.04, PAINT);
@@ -50,10 +52,13 @@ export function buildMicro(): CarModel {
   roundBar(b, [0, 0.32, -1.68], [1.5, 0.06, 0.07], CHROME, { r: 0.03 });
   plate(b, 0.4, -1.69);
   mirrors(b, 0.86, 0.9, -0.62, CHROME, 0.9);
-  // Traseira: lanternas redondas, para-choque cromado, escape pequeno.
-  roundLampPair(b, 0.6, 0.7, 1.62, 0.08, TAIL, false, CHROME, 0.05, 14);
+  // Traseira-vitrine: lanternas redondas grandes, para-choque cromado, escape e difusor.
+  roundLampPair(b, 0.58, 0.62, 1.62, 0.165, TAIL, false, CHROME, 0.05, 14);
   roundBar(b, [0, 0.36, 1.68], [1.5, 0.06, 0.07], CHROME, { r: 0.03 });
-  plate(b, 0.52, 1.66);
-  const exhausts = [exhaust(b, 0.46, 0.26, 1.72, 0.045, 0.14)];
-  return finish('micro', b, { wheel: 'hubcap', axles, exhausts, liveries: [LIVERY_A, LIVERY_B] });
+  plate(b, 0.5, 1.66);
+  const rear = buildRear(b, {
+    exhausts: [{ x: 0.46, y: 0.27, z: 1.72, r: 0.065, len: 0.14 }],
+    diffuser: { y: 0.3, z: 1.52, w: 0.96, fins: 3 },
+  });
+  return finish('micro', b, { wheel: 'hubcap', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [LIVERY_A, LIVERY_B] });
 }

@@ -4,7 +4,8 @@
 // pontas redondas entram sozinhas. `BodyShape` responde onde fica a superfície, para os detalhes pousarem nela.
 // Onda I ("menos quadrado" pela geometria): bico e traseira em quarto de elipse em planta e de perfil, ombro
 // em arco de três pontos, arco da roda de 10 facetas, borda do teto e dobras do para-brisa arredondadas.
-import { loft, type Brush, type MeshBuilder, type P2, type P3 } from './kit';
+import { loft, type Brush, type Lod, type MeshBuilder, type P2, type P3 } from './kit';
+import { GLASS, GLASS_DARK, GLINT } from './paints';
 
 /** Seção-chave da carroceria (metros). */
 export interface Sec {
@@ -33,8 +34,13 @@ const REGIONS: Region[] = ['under', 'well', 'well', 'sill', 'lower', 'band', 'up
 export const RING_POINTS = 26;
 /** Facetas do semicírculo do arco da roda. */
 export const ARCH_FACETS = 10;
+/** Quanto a borda do para-lama passa do topo do arco da roda (m). */
+const COVER = 0.07;
+/** O mesmo no casco simples (lod1). */
+const ARCH_FACETS_LOD = 4;
 /** Pontos de cada ponta redonda (bico e traseira): o quarto de elipse em 4 passos de 22,5°. */
 const END_ANGLES = [22.5, 45, 67.5].map((a) => (a * Math.PI) / 180);
+const END_ANGLES_LOD = [45].map((a) => (a * Math.PI) / 180);
 
 export interface BodySpec {
   secs: Sec[];
@@ -53,6 +59,8 @@ export interface BodySpec {
    * como até a onda H; 1 = quarto de elipse, a superfície sai da tampa tangente a ela). Padrão 1.
    */
   round?: number;
+  /** Nível de detalhe (M4): 1 = menos facetas no arco da roda, uma estação só em cada ponta redonda e sem a rampa do para-lama. Padrão 0. */
+  lod?: Lod;
   brush: (region: Region, z: number, inArch: boolean) => Brush | null;
   capFront: Brush; capBack: Brush;
 }
@@ -89,12 +97,14 @@ export class BodyShape {
   constructor(readonly spec: BodySpec) {
     const secs = spec.secs;
     this.round = spec.round ?? 1;
+    const lod = spec.lod ?? 0;
+    const facets = lod ? ARCH_FACETS_LOD : ARCH_FACETS;
     this.zFront = secs[0].z; this.zBack = secs[secs.length - 1].z;
     const st: Station[] = secs.map((s) => ({ z: s.z, archY: null, bump: 0, axle: -1 }));
     // Pontas redondas: estações no quarto de elipse entre as duas primeiras e as duas últimas seções.
     if (secs.length >= 3 && this.round > 0) {
       const [a, b] = [secs[0], secs[1]]; const [c, d] = [secs[secs.length - 2], secs[secs.length - 1]];
-      for (const th of END_ANGLES) {
+      for (const th of lod ? END_ANGLES_LOD : END_ANGLES) {
         st.push({ z: a.z + (b.z - a.z) * (1 - Math.cos(th)), archY: null, bump: 0, axle: -1 });
         st.push({ z: c.z + (d.z - c.z) * Math.sin(th), archY: null, bump: 0, axle: -1 });
       }
@@ -103,10 +113,10 @@ export class BodyShape {
     spec.axles.forEach((ax, ai) => {
       const ra = ax.r + clear;
       // Estações do arco: rampa do para-lama, parede vertical, semicírculo em `ARCH_FACETS` facetas.
-      st.push({ z: ax.z - ra * 1.45, archY: null, bump: 0, axle: ai }, { z: ax.z + ra * 1.45, archY: null, bump: 0, axle: ai });
+      if (!lod) st.push({ z: ax.z - ra * 1.45, archY: null, bump: 0, axle: ai }, { z: ax.z + ra * 1.45, archY: null, bump: 0, axle: ai });
       st.push({ z: ax.z - ra, archY: null, bump: 0, axle: ai }, { z: ax.z - ra, archY: ax.r, bump: 0, axle: ai });
-      for (let k = ARCH_FACETS - 1; k >= 1; k--) {
-        const rad = (k / ARCH_FACETS) * Math.PI;
+      for (let k = facets - 1; k >= 1; k--) {
+        const rad = (k / facets) * Math.PI;
         st.push({ z: ax.z + Math.cos(rad) * ra, archY: ax.r + Math.sin(rad) * ra, bump: 0, axle: ai });
       }
       st.push({ z: ax.z + ra, archY: ax.r, bump: 0, axle: ai }, { z: ax.z + ra, archY: null, bump: 0, axle: ai });
@@ -137,7 +147,10 @@ export class BodyShape {
     const sec = lerpSec(this.spec.secs, s.z, this.round);
     const axleIdx = s.axle >= 0 ? s.axle : (Math.abs(s.z - this.spec.axles[0].z) < Math.abs(s.z - this.spec.axles[1].z) ? 0 : 1);
     const flare = (this.spec.flare?.[axleIdx] ?? 0) * s.bump;
-    const rise = (this.spec.rise?.[axleIdx] ?? 0) * s.bump;
+    // O para-lama sobe até cobrir o pneu (roda grande, M4): a borda fica `COVER` acima do topo do arco, senão o pneu aparece por cima do capô.
+    const ax = this.spec.axles[axleIdx];
+    const cover = 2 * ax.r + (this.spec.clear ?? 0.06) + COVER - sec.yt;
+    const rise = Math.max(this.spec.rise?.[axleIdx] ?? 0, cover) * s.bump;
     return { sec, flare, rise, yw: Math.max(sec.yb, s.archY ?? sec.yb) };
   }
 
@@ -237,10 +250,14 @@ const lerpCab = (a: CabSec, b: CabSec, t: number): CabSec => ({
   hwt: a.hwt + (b.hwt - a.hwt) * t, yt: a.yt + (b.yt - a.yt) * t, crown: (a.crown ?? 0.03) + ((b.crown ?? 0.03) - (a.crown ?? 0.03)) * t,
 });
 
-/** Estações da cabine: as pontas como estão; cada seção do meio vira três (Bézier quadrática com o canto de controle). */
-function cabinStations(spec: CabinSpec): { secs: CabSec[]; gaps: number[] } {
-  const bend = spec.bend ?? 0.1;
+/**
+ * Estações da cabine: as pontas como estão; cada seção do meio vira três (Bézier quadrática com o canto de controle).
+ * No lod1 as seções-chave ficam como estão (sem o arco das dobras).
+ */
+function cabinStations(spec: CabinSpec, lod: Lod = 0): { secs: CabSec[]; gaps: number[] } {
   const ks = spec.secs;
+  if (lod) return { secs: [...ks], gaps: ks.slice(1).map((_, i) => i) };
+  const bend = spec.bend ?? 0.1;
   const secs: CabSec[] = [ks[0]]; const gaps: number[] = [];
   for (let i = 1; i < ks.length - 1; i++) {
     const p = ks[i - 1]; const s = ks[i]; const n = ks[i + 1];
@@ -293,7 +310,7 @@ export function cabinGlassTop(spec: CabinSpec, z: number): P3 {
  * pincel continua o da seção-chave (0 = para-brisa…); o arco de uma dobra fica com o vão do teto.
  */
 export function buildCabin(b: MeshBuilder, spec: CabinSpec): void {
-  const { secs, gaps } = cabinStations(spec);
+  const { secs, gaps } = cabinStations(spec, b.lod);
   const rings = secs.map((s) => {
     const right = cabinRight(spec, s);
     const left = right.map(([x, yy]) => [-x, yy] as P2).reverse();
@@ -306,4 +323,46 @@ export function buildCabin(b: MeshBuilder, spec: CabinSpec): void {
     const gap = gaps[i];
     return r === 'side' ? spec.side(gap) : spec.top(gap, r);
   }, false, null, spec.capBack ?? null);
+  cabinGlint(b, spec);
+}
+
+/**
+ * Cabine bolha (M4): a lateral sobe quase reta, o teto abaúla e a cabine fica um pouco mais alta, em vez de afunilar para cima.
+ * `k` é quanto da diferença entre a largura da base e a do teto se fecha (0 = como estava, 1 = paredes retas); o teto ganha
+ * `crownBoost` de abaulado e `lift` de altura (0 onde o carro já está no teto de altura, como a picape), e a borda do teto fica mais
+ * redonda. As seções planas (a base que assenta na carroceria) não mudam.
+ */
+export function bubble(spec: CabinSpec, k = 0.7, crownBoost = 0.03, lift = 0.07): CabinSpec {
+  return {
+    ...spec,
+    edge: Math.max(spec.edge ?? 0.07, 0.1),
+    secs: spec.secs.map((s) => (s.yt - s.yb > 0.3 ? { ...s, hwt: s.hwt + (s.hwb - s.hwt) * k, yt: s.yt + lift, crown: (s.crown ?? 0.03) + crownBoost } : s)),
+  };
+}
+
+const isGlass = (br: Brush): boolean => br === GLASS || br === GLASS_DARK;
+
+/**
+ * Reflexo do vidro (M4): duas faixas diagonais de espelho claro em cada janela lateral comprida (cartum: o reflexo do céu), 6 mm
+ * acima do vidro. Entre as seções-chave a lateral é um painel quase plano, então a faixa é um paralelogramo sobre ele.
+ */
+export function cabinGlint(b: MeshBuilder, spec: CabinSpec): void {
+  if (b.lod) return;
+  const ks = spec.secs;
+  for (let g = 0; g < ks.length - 1; g++) {
+    if (!isGlass(spec.side(g))) continue;
+    const a = ks[g]; const c = ks[g + 1];
+    const zlen = c.z - a.z;
+    if (zlen < 0.45) continue;
+    const ta = cabinRight(spec, a)[1]; const tc = cabinRight(spec, c)[1];
+    const at = (u: number, v: number): P3 => {
+      const bx = a.hwb + (c.hwb - a.hwb) * u; const by = a.yb + (c.yb - a.yb) * u;
+      const tx = ta[0] + (tc[0] - ta[0]) * u; const ty = ta[1] + (tc[1] - ta[1]) * u;
+      return [bx + (tx - bx) * v + 0.006, by + (ty - by) * v, a.z + zlen * u];
+    };
+    for (const [u0, w] of [[0.2, 0.1], [0.4, 0.035]] as const) {
+      const sh = 0.12;
+      b.mirrored(() => b.quad(at(u0, 0.15), at(u0 + sh, 0.85), at(u0 + w + sh, 0.85), at(u0 + w, 0.15), GLINT));
+    }
+  }
 }

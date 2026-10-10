@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { CarBody } from '../../core/types';
 import type { Axle, Region } from './body';
-import type { Brush, MeshBuilder, P3 } from './kit';
+import type { Brush, Lod, MeshBuilder, P3 } from './kit';
 import { PAINT, STRIPE_A, STRIPE_B, TRIM, UNDER } from './paints';
 import type { WheelDesign, WheelModel } from './wheels';
 
@@ -28,6 +28,21 @@ export interface CarContract {
   meshesWithoutUv: string[];
   /** Os nós de topo de LOD que o arquivo traz. */
   lodNodes: { lod0: boolean; lod1: boolean };
+}
+
+export type { Lod };
+
+/** Caixa no referencial do carro (metros), para o teste conferir a peça contra a malha. */
+export interface Box3Like { min: P3; max: P3 }
+
+/**
+ * A traseira-vitrine (M4, cars/rear.ts): onde ficam os escapes (com o raio da ponteira), o difusor e o aerofólio de brinquedo.
+ * É o descritor do que o `buildRear` construiu; o teste confere a malha DENTRO destas caixas, então ele não pode mentir.
+ */
+export interface RearKit {
+  exhausts: Array<{ x: number; y: number; z: number; r: number }>;
+  diffuser: Box3Like;
+  wing: Box3Like | null;
 }
 
 export interface CarModel {
@@ -54,6 +69,8 @@ export interface CarModel {
   /** Ordem das pinturas (bits LIVERY_A/LIVERY_B) para o 1º, 2º... carro do estilo. */
   liveries: readonly number[];
   triangles: number;
+  /** Só no procedural (M4): a traseira-vitrine, para o teste conferir. */
+  rear?: RearKit;
 }
 
 export interface ModelParts {
@@ -61,6 +78,7 @@ export interface ModelParts {
   axles: readonly [Axle, Axle];
   exhausts: readonly P3[];
   liveries: readonly number[];
+  rear?: RearKit;
 }
 
 /** Fecha o modelo: mede a altura, conta triângulos, monta a geometria. */

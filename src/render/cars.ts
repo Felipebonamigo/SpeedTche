@@ -4,7 +4,7 @@
 // cada desenho de roda presente é outra. Modelo com atlas de paleta (`map`) tem o próprio material. Carroceria, cabine, vidro, cromo, lentes e peças vivem na
 // mesma malha e no mesmo material (cars/material.ts): pintura e acento por instância, faixas por
 // camada, farol/lanterna emissivos (freio por instância), verniz com o reflexo do céu na qualidade alta.
-// Chama de nitro em billboard animado, sombra de contato e etiqueta de nome. Pose por viewport via
+// Chama de nitro em malha (cor por instância), estrelinhas da batida, sombra de contato e etiqueta de nome. Pose por viewport via
 // locateOnFrame; a animação (giro de roda, rolagem, mergulho) é por carro, uma vez por quadro.
 import * as THREE from 'three';
 import { CARS, carDef } from '../core/data/cars';
@@ -22,7 +22,9 @@ import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, type WheelDesign, type WheelModel } from './cars/wheels';
-import { FLAME_FRAG, FLAME_VERT, flameTexture } from './cars/flame';
+import { FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameColorFor } from './cars/flame';
+import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
+import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
 
 const MAX_CARS = 20;
@@ -46,11 +48,13 @@ interface WheelBatch extends Batch { readonly model: WheelModel; readonly label:
 /** Material e uniformes de um programa de carro: o comum e um por modelo com atlas. */
 interface Rig { readonly material: THREE.MeshPhysicalMaterial; readonly uniforms: CarUniforms }
 
-interface CarLook { style: StyleBatch; color: THREE.Color; accent: THREE.Color; livery: number }
+interface CarLook { style: StyleBatch; color: THREE.Color; accent: THREE.Color; livery: number; /** Cor da chama do nitro (por instância); a N3 a troca pela escolhida. */ flame: THREE.Color }
 
 interface CarAnim {
   spinF: number; spinR: number; yaw: number; roll: number; pitch: number; bob: number;
   brake: boolean; prevSpeed: number; nitro: number;
+  /** Guinada da derrapagem, rodopio, quique, squash & stretch e estrelinhas (cars/motion.ts). */
+  motion: Motion;
 }
 
 export class Cars {
@@ -68,6 +72,13 @@ export class Cars {
   private readonly blob: THREE.InstancedMesh;
   private readonly flames: THREE.InstancedMesh;
   private readonly flameMaterial: THREE.ShaderMaterial;
+  /** (fase do tremor, força 0..1) de cada chama. */
+  private readonly flameExtra: THREE.InstancedBufferAttribute;
+  /** Estrelinhas da batida (3 por carro). */
+  private readonly stars: THREE.InstancedMesh;
+  private readonly starPose: StarPose = { x: 0, y: 0, z: 0, scale: 0, roll: 0 };
+  /** Entrada reaproveitada do `stepMotion` (nada de objeto novo por carro por quadro). */
+  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, maxSpeed: 1, reduce: false };
   /** Aparência por carro (estilo, cores, pintura), recalculada só quando o carro ou a pintura escolhida mudam. */
   private readonly looks: Array<CarLook | null> = [];
   private readonly lookIds: string[] = [];
@@ -91,7 +102,7 @@ export class Cars {
   private readonly ghost: THREE.Mesh;
 
   private get instanced(): THREE.InstancedMesh[] {
-    return [...this.styles.flatMap((s) => (s.lod1 ? [s.mesh, s.lod1.mesh] : [s.mesh])), ...this.wheelBatches.map((w) => w.mesh), this.blob, this.flames];
+    return [...this.styles.flatMap((s) => (s.lod1 ? [s.mesh, s.lod1.mesh] : [s.mesh])), ...this.wheelBatches.map((w) => w.mesh), this.blob, this.flames, this.stars];
   }
 
   constructor(scene: THREE.Scene) {
@@ -131,12 +142,23 @@ export class Cars {
     this.batches.push(...this.wheelBatches);
     this.blob = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.5, 4.9).rotateX(-Math.PI / 2).translate(0, 0.02, 0), new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false }), MAX_CARS);
     this.blob.renderOrder = 1;
+    // Chama em malha: a cor vem de `instanceColor` (a do visual do carro) e a fase do tremor de `aFlame`, por instância.
     this.flameMaterial = new THREE.ShaderMaterial({
-      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-      uniforms: { uMap: { value: flameTexture() }, uTime: { value: 0 } },
+      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uTime: { value: 0 } },
     });
-    this.flames = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.flameMaterial, MAX_CARS * 2);
+    const flameGeometry = buildFlameGeometry();
+    this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 2), 2);
+    this.flameExtra.setUsage(THREE.DynamicDrawUsage);
+    flameGeometry.setAttribute('aFlame', this.flameExtra);
+    this.flames = new THREE.InstancedMesh(flameGeometry, this.flameMaterial, MAX_CARS * 2);
+    this.flames.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 3), 3);
+    this.flames.instanceColor.setUsage(THREE.DynamicDrawUsage);
     this.flames.renderOrder = 4;
+    this.stars = new THREE.InstancedMesh(buildStarGeometry(), new THREE.MeshBasicMaterial({ toneMapped: false, fog: false }), MAX_CARS * STARS_PER_CAR);
+    this.stars.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * STARS_PER_CAR * 3), 3);
+    for (let k = 0; k < MAX_CARS * STARS_PER_CAR; k++) this.stars.setColorAt(k, new THREE.Color(STAR_COLORS[k % STAR_COLORS.length]));
+    this.stars.renderOrder = 6;
     for (const im of this.instanced) {
       im.frustumCulled = false;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -149,7 +171,7 @@ export class Cars {
     this.ghost.matrixAutoUpdate = false; this.ghost.frustumCulled = false; this.ghost.visible = false; this.ghost.renderOrder = 3;
     this.group.add(this.ghost);
     for (let i = 0; i < MAX_CARS; i++) {
-      this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0 });
+      this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, motion: newMotion() });
       this.looks.push(null); this.lookIds.push('');
     }
     // Faróis do carro do viewport (sempre na origem, olhando −Z): dois SpotLights fixos.
@@ -202,7 +224,7 @@ export class Cars {
     const def = carDef(carId);
     const style = this.styleOf(def);
     const paint = carPaint(def, CARS, style.model.liveries, chosen);
-    const look: CarLook = { style, color: new THREE.Color(paint.color), accent: new THREE.Color(paint.accent), livery: paint.livery };
+    const look: CarLook = { style, color: new THREE.Color(paint.color), accent: new THREE.Color(paint.accent), livery: paint.livery, flame: flameColorFor(paint.accent) };
     this.looks[i] = look; this.lookIds[i] = key;
     return look;
   }
@@ -244,6 +266,11 @@ export class Cars {
       a.pitch += (pitchTarget - a.pitch) * k;
       a.bob = c.skidTicks > 0 && c.speed > 200 ? 1 : 0;
       a.nitro = c.nitroTicks > 0 ? c.nitroTicks / NITRO_DURATION_TICKS : 0;
+      // M4: guinada da derrapagem, batida e esticão, só visuais, por borda do estado (cars/motion.ts).
+      const mi = this.motionIn;
+      mi.driftDir = c.driftDir; mi.driftTicks = c.driftTicks; mi.driftBoostTicks = c.driftBoostTicks; mi.nitroTicks = c.nitroTicks;
+      mi.collisionCooldown = c.collisionCooldown; mi.speed = c.speed; mi.maxSpeed = c.stats.topSpeed; mi.reduce = frame.options.reduceEffects;
+      stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;
   }
@@ -260,7 +287,7 @@ export class Cars {
     const cars = state.cars;
     const d = this.dummy;
     const w = this.wheelDummy;
-    let nBlob = 0; let nFlames = 0;
+    let nBlob = 0; let nFlames = 0; let nStars = 0;
     for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
     for (const wb of this.wheelBatches) wb.count = 0;
     for (const s of this.labels) if (s) s.visible = false;
@@ -275,9 +302,12 @@ export class Cars {
       const model = look.style.model;
       const bobY = a.bob ? Math.sin(time * 71 + i) * 0.025 : 0;
       const bobR = a.bob ? Math.sin(time * 57 + i * 2) * 0.02 : 0;
-      d.position.set(this.pt.x, this.pt.y + bobY, this.pt.z);
-      d.rotation.set(a.pitch, -(this.pt.heading + a.yaw), a.roll + bobR, 'YXZ');
-      d.scale.set(1, 1, 1);
+      // Rumo do desenho: o da pista + o volante + a guinada da derrapagem + o rodopio da batida (cars/motion.ts); quique e squash & stretch no mesmo lugar.
+      const mo = a.motion;
+      const yaw = a.yaw + mo.drift + mo.spin;
+      d.position.set(this.pt.x, this.pt.y + bobY + mo.hop, this.pt.z);
+      d.rotation.set(a.pitch, -(this.pt.heading + yaw), a.roll + bobR, 'YXZ');
+      d.scale.set(mo.sx, mo.sy, mo.sz);
       d.updateMatrix();
       this.m.copy(d.matrix);
       const flags = look.livery | (a.brake ? BRAKE_BIT : 0);
@@ -285,8 +315,9 @@ export class Cars {
       const far = this.lowQuality || this.pt.z < -FAR_WHEELS_M;
       this.put(far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);
       // Sombra de contato: no chão, sem rolagem/mergulho.
-      d.rotation.set(0, -(this.pt.heading + a.yaw), 0, 'YXZ');
+      d.rotation.set(0, -(this.pt.heading + yaw), 0, 'YXZ');
       d.position.y = this.pt.y;
+      d.scale.set(1, 1, 1);
       d.updateMatrix();
       this.blob.setMatrixAt(nBlob++, d.matrix);
       // Rodas: matriz do carro × deslocamento × giro (dianteiras viram com o volante). O desenho
@@ -308,17 +339,32 @@ export class Cars {
           this.put(wheels, this.mw, look, look.livery);
         }
       }
-      // Chama do nitro: origem no escape, +Z para trás = comprimento, escala x = largura.
+      // Chama do nitro (malha): origem no escape, +Z para trás = comprimento, escala x/y = largura. Cor e fase por instância.
       if (a.nitro > 0) {
         const pulse = 0.85 + 0.3 * Math.sin(time * 41 + i * 1.7) + 0.25 * hash2(Math.floor(time * 28), i);
-        for (const e of model.exhausts) {
+        let e = 0;
+        for (const ex of model.exhausts) {
           if (nFlames >= MAX_CARS * 2) break;
-          w.position.set(e[0], e[1], e[2]);
+          w.position.set(ex[0], ex[1], ex[2]);
           w.rotation.set(0, 0, 0);
-          w.scale.set(0.7, 1, 2.3 * pulse * (0.55 + 0.45 * a.nitro));
+          w.scale.set(0.5, 0.5, 2.3 * pulse * (0.55 + 0.45 * a.nitro));
           w.updateMatrix();
           this.mw.multiplyMatrices(this.m, w.matrix);
-          this.flames.setMatrixAt(nFlames++, this.mw);
+          this.flames.setMatrixAt(nFlames, this.mw);
+          this.flames.setColorAt(nFlames, look.flame);
+          this.flameExtra.setXY(nFlames, i * 1.7 + e * 3.1, a.nitro);
+          nFlames++; e++;
+        }
+      }
+      // Estrelinhas da batida: três, em órbita sobre o teto (no referencial do carro sem o rumo: é um círculo).
+      if (mo.starsT >= 0) {
+        for (let k = 0; k < STARS_PER_CAR && nStars < MAX_CARS * STARS_PER_CAR; k++) {
+          const sp = starPose(k, mo.starsT, model.height + mo.hop, this.starPose);
+          w.position.set(this.pt.x + sp.x, this.pt.y + sp.y, this.pt.z + sp.z);
+          w.rotation.set(0, 0, sp.roll);
+          w.scale.set(sp.scale, sp.scale, sp.scale);
+          w.updateMatrix();
+          this.stars.setMatrixAt(nStars++, w.matrix);
         }
       }
       const labelY = this.pt.y + model.height + 0.9;
@@ -347,9 +393,15 @@ export class Cars {
         b.extra.needsUpdate = true;
       }
     }
-    this.blob.count = nBlob; this.flames.count = nFlames;
+    this.blob.count = nBlob; this.flames.count = nFlames; this.stars.count = nStars;
     this.blob.visible = nBlob > 0; if (nBlob > 0) this.blob.instanceMatrix.needsUpdate = true;
-    this.flames.visible = nFlames > 0; if (nFlames > 0) this.flames.instanceMatrix.needsUpdate = true;
+    this.flames.visible = nFlames > 0;
+    if (nFlames > 0) {
+      this.flames.instanceMatrix.needsUpdate = true;
+      if (this.flames.instanceColor) this.flames.instanceColor.needsUpdate = true;
+      this.flameExtra.needsUpdate = true;
+    }
+    this.stars.visible = nStars > 0; if (nStars > 0) this.stars.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -419,8 +471,8 @@ export class Cars {
     (this.blob.material as THREE.Material).dispose();
     (this.blob.material as THREE.MeshBasicMaterial).map?.dispose();
     this.flameMaterial.dispose();
+    (this.stars.material as THREE.Material).dispose();
     this.ghostMaterial.dispose(); // a geometria é a de um estilo, já liberada acima
-    (this.flameMaterial.uniforms.uMap.value as THREE.Texture).dispose();
     for (const s of this.labels) if (s) { if (s.material.map) s.material.map.dispose(); s.material.dispose(); }
     for (const s of this.spots) s.dispose();
   }

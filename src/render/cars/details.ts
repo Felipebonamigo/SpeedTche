@@ -52,7 +52,7 @@ export function grille(b: MeshBuilder, y: number, z: number, w: number, h: numbe
   pitched(b, [0, y, z], pitch, () => {
     // A boca sobra 1 cm à frente da moldura, que sobra 0,5 cm à frente de `z` (nunca no plano da lataria).
     roundBar(b, [0, y, z + 0.025], [w, h, 0.08], GRILLE, { r: cornerR(w, h, 0.32, 0.06), axis: 'z' });
-    for (let i = 1; i <= bars; i++) {
+    for (let i = 1; i <= bars && !b.lod; i++) {
       const yy = y - h / 2 + (i * h) / (bars + 1);
       box(b, [0, yy, z - 0.02], [w - 0.04, 0.022, 0.03], bar);
     }
@@ -65,6 +65,7 @@ export function grille(b: MeshBuilder, y: number, z: number, w: number, h: numbe
 
 /** Retrovisores: haste e concha de cantos redondos, com a face de trás espelhada (cromo). */
 export function mirrors(b: MeshBuilder, x: number, y: number, z: number, shell: Brush, s = 1): void {
+  if (b.lod) return;
   b.mirrored(() => {
     beam(b, [x - 0.1 * s, y - 0.04 * s, z + 0.02], [x + 0.02 * s, y, z + 0.02], 0.03 * s, 0.03 * s, TRIM);
     roundBar(b, [x + 0.05 * s, y + 0.02 * s, z], [0.12 * s, 0.09 * s, 0.13 * s], shell, { r: 0.035 * s, axis: 'z', faces: { pu: CHROME } });
@@ -93,7 +94,8 @@ export function wing(b: MeshBuilder, w: WingSpec): void {
   pitched(b, [0, w.y, w.z], w.pitch ?? -0.12, () => {
     // Perfil de asa: borda de ataque redonda e mais grossa que a de fuga (perfil (z, y) arredondado, extrudado em x).
     const hs = w.span / 2; const c0 = w.z - w.chord / 2; const c1 = w.z + w.chord / 2;
-    extrudeZY(b, airfoil(c0, c1, w.y, t), -hs, hs, w.brush);
+    if (b.lod) box(b, [0, w.y, w.z], [w.span, t, w.chord], w.brush); // casco simples: a lâmina é uma caixa
+    else extrudeZY(b, airfoil(c0, c1, w.y, t), -hs, hs, w.brush);
     if (w.plate !== null) {
       const pb = w.plate ?? w.brush;
       b.mirrored(() => roundBar(b, [hs + 0.015, w.y - 0.03, w.z + 0.02], [0.03, 0.2, w.chord + 0.1], pb, { r: 0.05, axis: 'x' }));
@@ -114,11 +116,13 @@ export function wing(b: MeshBuilder, w: WingSpec): void {
 
 /** Placa (sem texto), na frente ou atrás. */
 export function plate(b: MeshBuilder, y: number, z: number, pitch = 0): void {
+  if (b.lod) return;
   pitched(b, [0, y, z], pitch, () => box(b, [0, y, z], [0.46, 0.13, 0.02], PLATE, { pv: TRIM, nv: TRIM }));
 }
 
 /** Pinça de freio (acento) no lado de dentro do aro, fora do que gira. */
 export function calipers(b: MeshBuilder, axles: readonly Axle[], brush: Brush = ACCENT): void {
+  if (b.lod) return;
   for (const a of axles) {
     b.mirrored(() => box(b, [a.x + a.w * 0.08, a.r + a.r * 0.32, a.z + a.r * 0.26], [0.05, a.r * 0.36, a.r * 0.3], brush));
   }
@@ -127,7 +131,7 @@ export function calipers(b: MeshBuilder, axles: readonly Axle[], brush: Brush = 
 /** Difusor traseiro com aletas. */
 export function diffuser(b: MeshBuilder, y: number, z: number, w: number, fins: number, finBrush: Brush = TRIM): void {
   box(b, [0, y, z], [w, 0.1, 0.3], UNDER);
-  for (let i = 0; i < fins; i++) {
+  for (let i = 0; i < fins && !b.lod; i++) {
     const x = -w / 2 + ((i + 0.5) * w) / fins;
     box(b, [x, y + 0.02, z + 0.08], [0.025, 0.14, 0.26], finBrush);
   }

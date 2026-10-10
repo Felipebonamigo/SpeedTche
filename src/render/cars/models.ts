@@ -2,7 +2,7 @@
 // reserva (estilo sem construtor é erro, e o teste confere que as 13 malhas são diferentes). O modelo de
 // um .glb da arte (assets.ts, passo 2.4) tem precedência sobre o construtor — por carro (`falcao.glb`) ou por estilo (`gt.glb`).
 import type { CarBody, CarDef } from '../../core/types';
-import type { CarModel } from './model';
+import type { CarModel, Lod } from './model';
 import { buildClassic } from './styles/classic';
 import { buildElectric } from './styles/electric';
 import { buildGt } from './styles/gt';
@@ -17,7 +17,7 @@ import { buildRoadster } from './styles/roadster';
 import { buildSedan } from './styles/sedan';
 import { buildWedge } from './styles/wedge';
 
-export const MODEL_BUILDERS: Readonly<Record<CarBody, () => CarModel>> = {
+export const MODEL_BUILDERS: Readonly<Record<CarBody, (lod?: Lod) => CarModel>> = {
   gt: buildGt,
   muscle: buildMuscle,
   hatch: buildHatch,
@@ -67,5 +67,8 @@ export function buildModel(key: string): CarModel {
   if (loaded) return loaded;
   const make = MODEL_BUILDERS[key as CarBody];
   if (!make) throw new Error(`Estilo de carroceria sem modelo: ${key}`);
-  return make();
+  // O casco simples (lod1) do procedural sai do MESMO construtor, no nível 1 (M4): carros a mais de 30 m e a qualidade Baixa.
+  const full = make();
+  const low = make(1);
+  return { ...full, lod1: { shell: low.shell, triangles: low.triangles } };
 }
