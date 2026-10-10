@@ -146,20 +146,23 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
     expect(errors).toEqual([]);
   });
 
-  it('janela fora do canvas (rolada, sem tamanho): o palco não entra e o mundo do menu é desenhado com o que é dele', async () => {
+  it('janela que sai do canvas (rolada, sem tamanho): o palco sai de cena e o mundo do menu é desenhado com o que é dele', async () => {
     const r = await page.evaluate(() => {
       const L = (window as unknown as { lab: LabApi }).lab;
       L.raceFrame('medium', 1); L.raceFrame('medium', 1);
       const before = L.snapshot();
       L.mount(1, { quality: 'medium' });
+      L.frames(1, 2);
+      const on = L.effects(); // a janela está na tela: o palco está montado
       const host = document.querySelector('.lab-host') as HTMLElement;
-      host.style.left = '5000px';
-      const dbg = L.frames(1, 2).pop() as DebugInfo;
+      host.style.left = '5000px'; // a lista rolou: a janela saiu do canvas
+      const dbg = L.frame(3);
       const fx = L.effects();
       const after = L.snapshot();
       L.unmount(); L.frame(100);
-      return { fx, before, after, vps: dbg.viewports.length, calls: dbg.calls };
+      return { on, fx, before, after, vps: dbg.viewports.length, calls: dbg.calls };
     });
+    expect(r.on.active).toBe(true);
     expect(r.fx.active).toBe(false);
     expect(r.after).toEqual(r.before);
     expect(r.vps).toBe(1); // o fundo do menu (um viewport, o mundo todo)

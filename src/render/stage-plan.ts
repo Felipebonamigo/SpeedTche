@@ -228,8 +228,8 @@ export function focusPose(model: FocusModel, focus: StageFocus | string, aspect 
   switch (focus) {
     case 'engine': return pose(0.5, 0.42, 1.2, 0.7, [0, hood, front.z * 0.62]);
     case 'turbo': return pose(-0.55, 0.36, 1.2, 0.7, [0, hood, front.z * 0.62]);
-    case 'tires': return pose(1.15, 0.14, 0.75, 0.5, [-front.x, front.r, front.z]);
-    case 'brakes': return pose(1.35, 0.06, 0.45, 0.35, [-front.x, front.r, front.z]);
+    case 'tires': return pose(1.15, 0.14, 1.0, 0.7, [-front.x, front.r, front.z]);
+    case 'brakes': return pose(1.35, 0.06, 0.7, 0.5, [-front.x, front.r, front.z]);
     case 'tank': return pose(Math.PI - 0.65, 0.25, 1.3, 0.8, [-rear.x, 0.62, rear.z - 0.2]);
     case 'nitro': {
       const e = model.exhausts[0] ?? [0, 0.4, rear.z + 0.7];
