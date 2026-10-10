@@ -116,16 +116,16 @@ function cristoRedentor(): ReturnType<Kit['model']> {
     paint(bevelBox(20, 14, 20, 1.6), base, tf(sx, y0 + 17, sz)),
   ];
   // Túnica: sólido de revolução que afina para o pescoço (raio, altura a partir de `yb`).
-  const robe = new THREE.LatheGeometry([[7.8, 0], [7.2, 10], [6.0, 26], [4.9, 44], [4.3, 58], [3.6, 64], [1.4, 69]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  const robe = new THREE.LatheGeometry([[8.8, 0], [8.1, 10], [7.0, 26], [6.0, 44], [5.4, 58], [4.6, 64], [1.8, 69]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
   parts.push(paint(robe, stone, tf(sx, yb, sz)));
   // Ombros, braços (o pulso mais fino que o ombro) e mãos; a cruz de 84 m de envergadura (28 × S) ao longo de Z.
-  parts.push(paint(cyl(3.6, 3.6, 14, 10), stone, tf(sx, ya - 0.5, sz, 1, 1, 1, Math.PI / 2, 0, 0)));
+  parts.push(paint(cyl(4.6, 4.6, 14, 10), stone, tf(sx, ya - 0.5, sz, 1, 1, 1, Math.PI / 2, 0, 0)));
   for (const d of [1, -1]) {
-    parts.push(paint(cyl(2.4, 3.4, 36, 10, true), stone, tf(sx, ya - 0.5, sz + d * 24, 1, 1, 1, d * (Math.PI / 2), 0, 0)));
-    parts.push(paint(sphere(2.9, 8, 6), stone, tf(sx, ya - 0.5, sz + d * 42.2)));
+    parts.push(paint(cyl(3.1, 4.3, 36, 10, true), stone, tf(sx, ya - 0.5, sz + d * 24, 1, 1, 1, d * (Math.PI / 2), 0, 0)));
+    parts.push(paint(sphere(3.6, 8, 6), stone, tf(sx, ya - 0.5, sz + d * 42.4)));
   }
-  parts.push(paint(cyl(1.6, 2.1, 3.4, 8), stone, tf(sx, ya + 2.4, sz))); // pescoço
-  parts.push(paint(sphere(1, 10, 8), stone, tf(sx + 0.6, 291.69 - 4.6, sz, 3.9, 4.6, 3.9))); // cabeça: o topo do modelo de antes (291,69 m)
+  parts.push(paint(cyl(2.0, 2.6, 3.4, 8), stone, tf(sx, ya + 2.4, sz))); // pescoço
+  parts.push(paint(sphere(1, 10, 8), stone, tf(sx + 0.6, 291.69 - 5.2, sz, 4.5, 5.2, 4.5))); // cabeça: o topo do modelo de antes (291,69 m)
   const g = mergeRound(parts);
   bakeAO(g, { reach: 12, strength: 0.55, rays: 10, smoothDeg: 62 });
   return { parts: [{ geometry: g, mat: 'flat' }], blob: 0 };
