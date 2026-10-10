@@ -6,23 +6,27 @@
 // camada, farol/lanterna emissivos (freio por instância), verniz com o reflexo do céu na qualidade alta.
 // Chama de nitro em malha (cor por instância), estrelinhas da batida, sombra de contato e etiqueta de nome. Pose por viewport via
 // locateOnFrame; a animação (giro de roda, rolagem, mergulho) é por carro, uma vez por quadro.
+// O VISUAL do carro (N3, RenderFrame.looks / src/game/cosmetics.ts) é todo por instância: o acabamento nos bits 3–5 de `instExtra.w`, a faixa
+// nos bits A/B do corpo, a roda escolhida é só QUAL dos 9 lotes de roda recebe as 4 instâncias, o aro é o bit B do lote de roda (outro bit
+// que o da faixa B do corpo) com a cor do aro em `instExtra.rgb`, e a cor da chama vai em `instanceColor` da chama. Nenhum lote novo.
 import * as THREE from 'three';
 import { CARS, carDef } from '../core/data/cars';
 import { NITRO_DURATION_TICKS } from '../core/constants';
-import type { CarDef, RaceState, Track } from '../core/types';
+import type { CarDef, CarLook, RaceState, Track } from '../core/types';
 import type { CarColors, GhostFrame, Quality, RenderFrame } from '../game/contracts';
+import { FINISH_IDS, lookColors, lookKey, RIM_COLORS } from '../game/cosmetics';
 import { hash2 } from './noise';
 import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
-import { createCarMaterial, setCarQuality, type CarUniforms } from './cars/material';
+import { createCarMaterial, FINISH_SHIFT, setCarQuality, type CarUniforms } from './cars/material';
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
-import { carPaint } from './cars/paints';
-import { buildSimpleWheel, buildWheel, spinStep, type WheelDesign, type WheelModel } from './cars/wheels';
-import { FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameColorFor } from './cars/flame';
+import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
+import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
+import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor } from './cars/flame';
 import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
@@ -48,7 +52,22 @@ interface WheelBatch extends Batch { readonly model: WheelModel; readonly label:
 /** Material e uniformes de um programa de carro: o comum e um por modelo com atlas. */
 interface Rig { readonly material: THREE.MeshPhysicalMaterial; readonly uniforms: CarUniforms }
 
-interface CarLook { style: StyleBatch; color: THREE.Color; accent: THREE.Color; livery: number; /** Cor da chama do nitro (por instância); a N3 a troca pela escolhida. */ flame: THREE.Color }
+/** O que se desenha de um carro (resolvido do `CarLook` de src/game/cosmetics.ts, uma vez, quando o carro ou o look mudam). */
+interface CarDraw {
+  style: StyleBatch;
+  color: THREE.Color;
+  accent: THREE.Color;
+  /** Bits do corpo: faixa A/B (a escolhida ou a do modelo) e o acabamento (`<< FINISH_SHIFT`). O freio entra a cada quadro. */
+  body: number;
+  /** O lote de roda: o do desenho escolhido ou o do estilo. */
+  wheels: WheelBatch;
+  /** Bit do aro nas rodas (`WHEEL_RIM` ou 0) e a cor que vai no `instExtra.rgb` do lote de roda (a do aro escolhido, ou o detalhe). */
+  rimBit: number;
+  rim: THREE.Color;
+  /** Cor da chama do nitro (por instância): a escolhida ou o azul tingido pelo detalhe, e a brancura do núcleo dela (1 = a de sempre). */
+  flame: THREE.Color;
+  flameWhite: number;
+}
 
 interface CarAnim {
   spinF: number; spinR: number; yaw: number; roll: number; pitch: number; bob: number;
@@ -79,11 +98,18 @@ export class Cars {
   private readonly starPose: StarPose = { x: 0, y: 0, z: 0, scale: 0, roll: 0 };
   /** Entrada reaproveitada do `stepMotion` (nada de objeto novo por carro por quadro). */
   private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, maxSpeed: 1, reduce: false };
-  /** Aparência por carro (estilo, cores, pintura), recalculada só quando o carro ou a pintura escolhida mudam. */
-  private readonly looks: Array<CarLook | null> = [];
+  /** Aparência por carro (estilo, cores, acabamento, roda, aro, chama), recalculada só quando o carro ou o look mudam. */
+  private readonly looks: Array<CarDraw | null> = [];
   private readonly lookIds: string[] = [];
-  /** Pintura de cada carro no quadro atual (RenderFrame.paints; ausente = todos de fábrica). */
+  private readonly lookCars: string[] = [];
+  /** O que gerou cada aparência (por identidade: o `RenderFrame.looks`/`paints` da sessão é montado na largada e não muda por quadro). */
+  private readonly lookRefs: Array<CarLook | CarColors | null | undefined> = [];
+  /** Visual de cada carro no quadro atual (RenderFrame.looks; ausente = vale `paints`, e sem ele todos de fábrica). */
+  private looksIn: ReadonlyArray<CarLook | null> | undefined;
+  /** Só as cores de cada carro no quadro atual (RenderFrame.paints: o Retrô, o bench, quem ainda não manda o look). */
   private paints: ReadonlyArray<CarColors | null> | undefined;
+  /** Os lotes de roda por desenho (os 9 de `WHEEL_DESIGNS`, criados todos: qualquer um pode ser escolhido pela lista do estilo). */
+  private readonly wheelByDesign = new Map<string, WheelBatch>();
   /** Etiquetas por assento (0..3) e, no índice VIP_LABEL, a do VIP da escolta; denso de propósito. */
   private readonly labels: Array<THREE.Sprite | null> = [null, null, null, null, null];
   private readonly labelKeys = ['', '', '', '', ''];
@@ -108,7 +134,16 @@ export class Cars {
   constructor(scene: THREE.Scene) {
     const base = createCarMaterial();
     this.rigs.push(base);
+    // Os 9 desenhos de roda têm lote desde o início (N3): o look escolhe QUAL recebe as 4 rodas do carro. Com o material comum: o desenho
+    // procedural não tem atlas, mesmo em carro cujo casco tem.
     const wheelByDesign = new Map<WheelDesign | CarModel, WheelBatch>();
+    for (const design of WHEEL_DESIGNS) {
+      const wm = buildWheel(design);
+      const batch: WheelBatch = { ...this.batch(wm.geometry, MAX_CARS * 4, false, base.material), model: wm, label: wm.design };
+      wheelByDesign.set(design, batch);
+      this.wheelByDesign.set(design, batch);
+      this.wheelBatches.push(batch);
+    }
     for (const key of modelKeys(CAR_BODIES, CARS)) {
       const model = buildModel(key);
       // Atlas de paleta: material próprio (o `map` multiplica a cor de vértice e a pintura; o resto do shader é o mesmo).
@@ -123,7 +158,7 @@ export class Cars {
       // sombra da carroceria e da de contato.
       const wheelKey: WheelDesign | CarModel = model.wheelModel ? model : model.wheel;
       let wheels = wheelByDesign.get(wheelKey);
-      if (!wheels) {
+      if (!wheels) { // a roda do próprio arquivo (.glb): um lote só dele
         const wm = model.wheelModel ?? buildWheel(model.wheel);
         wheels = { ...this.batch(wm.geometry, MAX_CARS * 4, false, rig.material), model: wm, label: model.wheelModel ? `${key}:roda` : wm.design };
         wheelByDesign.set(wheelKey, wheels);
@@ -148,7 +183,7 @@ export class Cars {
       uniforms: { uTime: { value: 0 } },
     });
     const flameGeometry = buildFlameGeometry();
-    this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 2), 2);
+    this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 3), 3);
     this.flameExtra.setUsage(THREE.DynamicDrawUsage);
     flameGeometry.setAttribute('aFlame', this.flameExtra);
     this.flames = new THREE.InstancedMesh(flameGeometry, this.flameMaterial, MAX_CARS * 2);
@@ -172,7 +207,7 @@ export class Cars {
     this.group.add(this.ghost);
     for (let i = 0; i < MAX_CARS; i++) {
       this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, motion: newMotion() });
-      this.looks.push(null); this.lookIds.push('');
+      this.looks.push(null); this.lookIds.push(''); this.lookCars.push('');
     }
     // Faróis do carro do viewport (sempre na origem, olhando −Z): dois SpotLights fixos.
     for (const sx of [-0.55, 0.55]) {
@@ -216,17 +251,35 @@ export class Cars {
     this.lowQuality = q === 'low';
   }
 
-  private look(i: number, carId: string): CarLook {
-    const chosen = this.paints?.[i] ?? null;
-    const key = chosen ? `${carId}|${chosen.color}|${chosen.accent}` : carId;
+  private look(i: number, carId: string): CarDraw {
+    const lk = this.looksIn ? this.looksIn[i] ?? null : null;
+    const colors = this.looksIn ? null : this.paints?.[i] ?? null; // `looks` vale mais que `paints`; sem nenhum dos dois, de fábrica
     const cached = this.looks[i];
-    if (cached && this.lookIds[i] === key) return cached;
+    const ref = lk ?? colors;
+    // Mesmo carro e mesmo objeto da sessão: nada a refazer (sem alocar por quadro). Objeto novo de mesmo conteúdo: confere pela chave.
+    if (cached && this.lookCars[i] === carId && this.lookRefs[i] === ref) return cached;
+    const key = lk ? lookKey(lk) : colors ? `${colors.color}|${colors.accent}` : '';
+    if (cached && this.lookCars[i] === carId && this.lookIds[i] === key) { this.lookRefs[i] = ref; return cached; }
     const def = carDef(carId);
     const style = this.styleOf(def);
-    const paint = carPaint(def, CARS, style.model.liveries, chosen);
-    const look: CarLook = { style, color: new THREE.Color(paint.color), accent: new THREE.Color(paint.accent), livery: paint.livery, flame: flameColorFor(paint.accent) };
-    this.looks[i] = look; this.lookIds[i] = key;
-    return look;
+    const factory = { color: def.color, accent: def.accent ?? defaultAccent(def.color) };
+    const paint = carPaint(def, CARS, style.model.liveries, colors ?? lookColors(lk, factory));
+    const finish = Math.max(0, FINISH_IDS.indexOf(lk?.finish ?? FINISH_IDS[0])); // id que não existe: brilho
+    const accent = new THREE.Color(paint.accent);
+    // O aro: o escolhido (liga o bit e traz a cor) ou, sem escolha, o de fábrica — que segue a faixa B do MODELO, não a escolhida.
+    const rimHex = lk?.rim !== undefined && Object.hasOwn(RIM_COLORS, lk.rim) ? RIM_COLORS[lk.rim] : undefined;
+    const rimChosen = lk?.rim !== undefined && Object.hasOwn(RIM_COLORS, lk.rim);
+    const draw: CarDraw = {
+      style, color: new THREE.Color(paint.color), accent,
+      body: stripeBits(lk?.stripe, paint.livery) | (finish << FINISH_SHIFT),
+      wheels: (lk?.wheel !== undefined ? this.wheelByDesign.get(lk.wheel) : undefined) ?? style.wheels,
+      rimBit: rimChosen || (paint.livery & LIVERY_B) !== 0 ? WHEEL_RIM : 0,
+      rim: rimChosen && rimHex ? new THREE.Color(rimHex) : accent,
+      flame: flameChosenColor(lk?.flame) ?? flameColorFor(paint.accent),
+      flameWhite: flameChosenColor(lk?.flame) ? FLAME_CHOSEN_WHITE : 1,
+    };
+    this.looks[i] = draw; this.lookIds[i] = key; this.lookCars[i] = carId; this.lookRefs[i] = ref;
+    return draw;
   }
 
   /** O lote do modelo do carro: o dele (com `.glb` próprio) ou o do estilo. */
@@ -241,6 +294,7 @@ export class Cars {
   update(frame: RenderFrame): void {
     const dt = this.lastTime < 0 ? 1 / 60 : Math.min(0.1, Math.max(0, frame.time - this.lastTime));
     this.lastTime = frame.time;
+    this.looksIn = frame.looks;
     this.paints = frame.paints;
     const cars = frame.state.cars;
     const segs = frame.track.segments;
@@ -249,7 +303,7 @@ export class Cars {
       const a = this.anims[i];
       const look = this.look(i, c.carId);
       const [fa, ra] = look.style.model.axles;
-      const sym = look.style.wheels.model.symmetry;
+      const sym = look.wheels.model.symmetry;
       const sf = Math.min(1.2, c.speed / c.stats.topSpeed);
       const dist = zToMeters(c.speed) * dt;
       a.spinF += spinStep(dist / fa.r, sym);
@@ -275,11 +329,12 @@ export class Cars {
     this.flameMaterial.uniforms.uTime.value = frame.time;
   }
 
-  private put(b: Batch, m: THREE.Matrix4, look: CarLook, flags: number): void {
+  /** Uma instância: a matriz, a cor da carroceria e `instExtra` = (cor do detalhe — no lote de roda, a do aro —, bits). */
+  private put(b: Batch, m: THREE.Matrix4, look: CarDraw, flags: number, extra: THREE.Color = look.accent): void {
     const idx = b.count++;
     b.mesh.setMatrixAt(idx, m);
     b.mesh.setColorAt(idx, look.color);
-    b.extra.setXYZW(idx, look.accent.r, look.accent.g, look.accent.b, flags);
+    b.extra.setXYZW(idx, extra.r, extra.g, extra.b, flags);
   }
 
   /** Posiciona os carros no referencial do viewport (`ownIndex` = carro do viewport). */
@@ -310,7 +365,7 @@ export class Cars {
       d.scale.set(mo.sx, mo.sy, mo.sz);
       d.updateMatrix();
       this.m.copy(d.matrix);
-      const flags = look.livery | (a.brake ? BRAKE_BIT : 0);
+      const flags = look.body | (a.brake ? BRAKE_BIT : 0);
       // Longe (e na Baixa) o casco simplificado do LOD1, se o modelo tem; o mesmo critério da roda simples.
       const far = this.lowQuality || this.pt.z < -FAR_WHEELS_M;
       this.put(far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);
@@ -324,7 +379,7 @@ export class Cars {
       // é montado com a face de fora em +x: as da esquerda giram meia volta em y (e o giro inverte).
       // Longe (roda com ~10 px na tela) o desenho do aro não aparece: vai a roda simples, com as dos
       // outros carros distantes, numa chamada só.
-      const wheels = far ? this.simpleWheels : look.style.wheels;
+      const wheels = far ? this.simpleWheels : look.wheels;
       for (let ax = 0; ax < 2; ax++) {
         const axle = model.axles[ax];
         const spin = ax === 0 ? a.spinF : a.spinR;
@@ -336,7 +391,7 @@ export class Cars {
           w.scale.set(axle.w, axle.r, axle.r);
           w.updateMatrix();
           this.mw.multiplyMatrices(this.m, w.matrix);
-          this.put(wheels, this.mw, look, look.livery);
+          this.put(wheels, this.mw, look, look.rimBit, look.rim);
         }
       }
       // Chama do nitro (malha): origem no escape, +Z para trás = comprimento, escala x/y = largura. Cor e fase por instância.
@@ -352,7 +407,7 @@ export class Cars {
           this.mw.multiplyMatrices(this.m, w.matrix);
           this.flames.setMatrixAt(nFlames, this.mw);
           this.flames.setColorAt(nFlames, look.flame);
-          this.flameExtra.setXY(nFlames, i * 1.7 + e * 3.1, a.nitro);
+          this.flameExtra.setXYZ(nFlames, i * 1.7 + e * 3.1, a.nitro, look.flameWhite);
           nFlames++; e++;
         }
       }

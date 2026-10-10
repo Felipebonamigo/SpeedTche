@@ -2,9 +2,9 @@
 // Nada aqui mede FPS (swiftshader não diz nada sobre GPU): só CONTAGENS (chamadas, triângulos, passes, pixels de alvo), a compilação dos
 // programas de shader e o que o renderizador conta de si (composers criados, redimensionamentos, escala dinâmica, mapas de sombra).
 import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type HumanEntry, type RaceState } from '../src/core';
-import type { Track } from '../src/core/types';
+import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
-import { racePaints } from '../src/game/paints';
+import { paintsOfLooks, raceLooks } from '../src/game/paints';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
 
@@ -27,11 +27,12 @@ let current: Setup | null = null;
 let tick = 0;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
-function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night'): void {
+function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[]): void {
   const base = getTrack(trackId);
   const track = tod ? { ...base, def: { ...base.def, timeOfDay: tod } } : base;
-  const humans: HumanEntry[] = Array.from({ length: humansN }, (_, i) => ({ seat: i, name: `P${i + 1}`, carId: CARS[i % 8].id, teamId: 0, color: seatColor(i) }));
-  const state = createRace({ trackId, laps: track.def.laps, humans, totalCars: 20, difficulty: 'profissional', manualGear: false,
+  const humans: HumanEntry[] = Array.from({ length: humansN }, (_, i) => ({ seat: i, name: `P${i + 1}`, carId: CARS[i % 8].id, teamId: 0, color: seatColor(i), ...(looks?.[i] ? { look: looks[i] } : {}) }));
+  // O visual (N3) fica com os humanos da sessão e vai ao renderizador em `looks`: a config da corrida não o carrega.
+  const state = createRace({ trackId, laps: track.def.laps, humans: humans.map(({ look: _look, ...h }) => h), totalCars: 20, difficulty: 'profissional', manualGear: false,
     assists: { sharedNitro: true, tow: true, teamDraft: true, catchup: true }, seed: 42 }, track);
   for (const c of state.cars) if (c.seat >= 0) c.ai = { skill: 0.97, laneX: 0.2 * (c.seat - 1.5), laneUntil: 0, lookahead: 28, aggression: 0.6 } satisfies AiBrain;
   for (let i = 0; i < ticks; i++) stepRace(state, track, []);
@@ -42,11 +43,12 @@ function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'd
 function frameFor(quality: Quality): RenderFrame {
   if (!current) throw new Error('lab.setup primeiro');
   const { state, track, humans } = current;
+  const looks = raceLooks(state.cars, humans);
   return {
     state, track,
     viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [] })),
     options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false },
-    time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: racePaints(state.cars, humans),
+    time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
 }
 

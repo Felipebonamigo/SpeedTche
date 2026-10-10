@@ -8,6 +8,8 @@ import {
   COSMETICS_CATALOG, FINISH_IDS, FLAME_IDS, FREE_COLORS, LOOK_FIELDS, lookColors, lookKey, lookOptions, normalizeLook, parseLook,
   RIM_IDS, sanitizeLook, snapFreeColor, STRIPE_IDS, stepLook, WHEEL_IDS, WHEEL_LISTS,
 } from '../src/game/cosmetics';
+import '../src/cosmetics/strings';
+import { setLanguage, t } from '../src/i18n';
 import { buildModel } from '../src/render/cars/models';
 import { WHEEL_DESIGNS } from '../src/render/cars/wheels';
 
@@ -72,6 +74,19 @@ describe('catálogo', () => {
   it('o catálogo que vai na impressão do online é dado puro e muda se um id mudar', () => {
     expect(JSON.parse(JSON.stringify(COSMETICS_CATALOG))).toEqual(COSMETICS_CATALOG);
     expect(COSMETICS_CATALOG).toMatchObject({ finishes: FINISH_IDS, stripes: STRIPE_IDS });
+  });
+});
+
+describe('nomes do catálogo', () => {
+  it('todo id do catálogo tem nome em PT e EN (e os campos do editor também)', () => {
+    const groups: Array<[string, readonly string[]]> = [['finish', FINISH_IDS], ['wheel', WHEEL_IDS], ['rim', RIM_IDS], ['stripe', STRIPE_IDS], ['flame', FLAME_IDS]];
+    for (const lang of ['pt', 'en'] as const) {
+      setLanguage(lang);
+      for (const [field, ids] of groups) for (const id of ids) expect(t(`look.${field}.${id}`), `${lang} ${field}.${id}`).not.toBe(`look.${field}.${id}`);
+      for (const f of LOOK_FIELDS) expect(t(`look.field.${f}`), `${lang} campo ${f}`).not.toBe(`look.field.${f}`);
+      for (const k of ['row', 'open', 'title', 'back', 'standard', 'fromPaint']) expect(t(`look.${k}`), `${lang} ${k}`).not.toBe(`look.${k}`);
+    }
+    setLanguage('pt');
   });
 });
 

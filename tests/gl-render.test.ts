@@ -12,6 +12,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { checkCostOrder, checkGate, fillCost, GATE_LIMITS, GATE_SCENES, type GateSample } from '../src/bench/gate';
+import type { CarLook } from '../src/core/types';
 import type { Quality } from '../src/game/contracts';
 import type { DebugInfo } from '../src/render/renderer';
 
@@ -30,7 +31,8 @@ interface Collected {
 /** O que `tools/render-harness.lab.ts` põe em `window.lab` (só o que este teste chama). */
 interface LabApi {
   collect(): Collected;
-  setup(track: string, humans: number, ticks: number, tod?: 'day' | 'dusk' | 'night'): void;
+  setup(track: string, humans: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[]): void;
+  programs(): { total: number; bad: string[]; shaderErrors: string[] };
   render(quality: Quality, frames: number): DebugInfo[];
   resize(w: number, h: number, dpr: number): void;
   info(): DebugInfo;
@@ -79,6 +81,38 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500
       expect(p.total, `${p.quality}: programas`).toBeGreaterThan(10);
       expect(p.shaderErrors, `${p.quality}: onShaderError`).toEqual([]);
       expect(p.bad, `${p.quality}: programas com log`).toEqual([]);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it('os acabamentos, as rodas e o aro escolhidos (N3) compilam e desenham no mesmo programa: sem erro de shader e dentro do gate de chamadas', async () => {
+    // Quatro carros, cada um com um acabamento (e o resto do look): o programa dos carros é UM, o acabamento é bit de instância.
+    const LOOKS = [
+      { paint: 'rubi', finish: 'metalico', wheel: 'mag', rim: 'dourado', stripe: 'ab' },
+      { paint: 'cobalto', finish: 'perolado', flame: 'roxa', rim: 'acento' },
+      { finish: 'fosco', wheel: 'dish', stripe: 'nenhuma' },
+      { paint: 'violeta', finish: 'cromado', color: '#2346d6' },
+    ];
+    const MORE = [{ finish: 'camaleao', paint: 'violeta', accent: '#ffcf26' }, { wheel: 'multi', finish: 'camaleao' }];
+    const r = await page.evaluate(({ looks, more }) => {
+      const L = window.lab;
+      const out: Array<{ quality: Quality; calls: number; bad: string[]; shaderErrors: string[] }> = [];
+      for (const quality of ['low', 'medium', 'high', 'ultra'] as const) {
+        L.setup('copacabana', 4, 300, undefined, looks);
+        const d = L.render(quality, 4).slice(-2);
+        L.setup('copacabana', 2, 300, undefined, more);
+        L.render(quality, 2);
+        const p = L.programs();
+        out.push({ quality, calls: Math.max(...d.flatMap((x) => x.viewports.map((v) => v.calls))), bad: p.bad, shaderErrors: p.shaderErrors });
+      }
+      return out;
+    }, { looks: LOOKS, more: MORE });
+    expect(r.map((x) => x.quality)).toEqual([...LEVELS]);
+    for (const x of r) {
+      expect(x.shaderErrors, `${x.quality}: onShaderError`).toEqual([]);
+      expect(x.bad, `${x.quality}: programas com log`).toEqual([]);
+      const limit = GATE_LIMITS['copa-4p'][x.quality];
+      expect(x.calls, `${x.quality}: chamadas com 4 visuais diferentes`).toBeLessThanOrEqual(limit?.calls ?? 0);
     }
     expect(errors).toEqual([]);
   });
