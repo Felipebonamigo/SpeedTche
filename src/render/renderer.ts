@@ -245,6 +245,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     const t0 = performance.now();
     ensureTrack(frame.track);
     ensureQuality(frame.options.quality);
+    sky.setFlare(!frame.options.reduceEffects);
     const q = frame.options.quality;
     const track = frame.track;
     cars.update(frame);
