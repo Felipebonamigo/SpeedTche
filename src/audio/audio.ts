@@ -11,7 +11,7 @@
 // limpos justamente no menu de pausa.
 import type { SimEvent, TrackDef } from '../core/types';
 import { DEFAULT_SETTINGS, type AudioEngine, type MusicInfo, type RenderFrame } from '../game/contracts';
-import { EngineBank } from './engine';
+import { EngineBank, type RevHook } from './engine';
 import { Jukebox, musicInfos, songById, songForScenery, SONGS } from './music';
 import { createSampleBank } from './samples';
 import { loadSampleUrl } from './sample-assets';
@@ -45,6 +45,11 @@ function audioContextClass(): (new () => AudioContext) | null {
 export interface SessionAudio extends AudioEngine {
   /** Raspão de lado de um jogador local (race-feel.ts: observeScrapes); `strength` 0..1. */
   scrape(strength: number): void;
+  /**
+   * Gancho do motor na contagem (N6, para a largada-foguete da N1): devolve o giro 0..1 de um carro no lugar do padrão
+   * (`countdownRpm`), ou nada para ficar com o padrão. `null` tira o gancho. Vale antes e depois do `unlock()`.
+   */
+  setRevHook(hook: RevHook | null): void;
 }
 
 export function createAudio(): SessionAudio {
@@ -54,6 +59,7 @@ export function createAudio(): SessionAudio {
   let wanted: string | null = null;
   let lastTrack: TrackDef | null = null;
   let paused = false;
+  let revHook: RevHook | null = null;
 
   function resolveWanted(): string | null {
     if (wanted === null) return null;
@@ -130,6 +136,7 @@ export function createAudio(): SessionAudio {
       applyVolumes();
       applyPause();
       applyMusic();
+      graph.engines.setRevHook(revHook);
     }
     if (graph.ctx.state === 'suspended') void graph.ctx.resume().catch(() => { /* sem gesto válido ainda */ });
   }
@@ -183,7 +190,12 @@ export function createAudio(): SessionAudio {
     graph?.effects.scrape(strength);
   }
 
-  return { unlock, update, onEvent, setMusic, currentMusic, setVolumes, musicList, ui, scrape };
+  function setRevHook(hook: RevHook | null): void {
+    revHook = hook;
+    graph?.engines.setRevHook(hook);
+  }
+
+  return { unlock, update, onEvent, setMusic, currentMusic, setVolumes, musicList, ui, scrape, setRevHook };
 }
 
 function clamp01(v: number): number {

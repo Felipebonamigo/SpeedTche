@@ -1,11 +1,13 @@
 // Som de motor por jogador local: uma "voz" por viewport (até 4). Cada voz é um par de
-// osciladores (dente de serra + quadrada uma oitava abaixo) num passa-baixa cuja frequência e
-// abertura seguem o RPM; por cima, camadas de ruído para cascalho (grama), "whoosh" de nitro
+// osciladores (principal + "sub") num passa-baixa cuja frequência e abertura seguem o RPM, mais um
+// oscilador de ronco (modulação de amplitude) e um de zumbido; o TIMBRE vem do carro
+// (engine-timbre.ts: 14 motores, N6). Por cima, camadas de ruído para cascalho (grama), "whoosh" de nitro
 // e a pneumática do box. Os nós vivem o tempo todo e só os ganhos mudam, sempre por
-// setTargetAtTime — é isso que evita clique.
+// setTargetAtTime — é isso que evita clique. Na contagem o motor sobe de giro (countdownRpm).
 import { GEAR_TOP } from '../core/constants';
-import type { CarState } from '../core/types';
+import type { CarState, RaceState } from '../core/types';
 import type { RenderFrame } from '../game/contracts';
+import { countdownRpm, engineTimbre, launchRpm } from './engine-timbre';
 import { glide, makeFilter, noiseBurst, noiseSource } from './synth';
 
 export const ENGINE_MIN_HZ = 55;
@@ -43,16 +45,48 @@ export function engineRpm(speed: number, gear: number, topSpeed: number): number
   return floor + (1 - floor) * rpmFraction(speed, gear, topSpeed);
 }
 
-/** Frequência fundamental do motor (Hz) para um RPM normalizado; o nitro sobe o tom. */
-export function engineFrequency(rpm: number, nitro: boolean): number {
+/**
+ * Frequência fundamental do motor (Hz) para um RPM normalizado; o nitro sobe o tom. Com o id do carro, a faixa toda
+ * sobe ou desce pelo `pitch` do timbre dele (V8 grave, quatro cilindros agudo); sem ele, é o som de sempre (o do Falcão).
+ */
+export function engineFrequency(rpm: number, nitro: boolean, carId?: string): number {
   const r = Math.max(0, Math.min(1, rpm));
-  const base = ENGINE_MIN_HZ + (ENGINE_MAX_HZ - ENGINE_MIN_HZ) * r;
+  const base = (ENGINE_MIN_HZ + (ENGINE_MAX_HZ - ENGINE_MIN_HZ) * r) * (carId === undefined ? 1 : engineTimbre(carId).pitch);
   return nitro ? base * NITRO_PITCH_MULT : base;
 }
 
+/** Substitui o giro da CONTAGEM de um carro (a largada-foguete da N1): devolve 0..1, ou nada para ficar com `countdownRpm`. */
+export type RevHook = (car: CarState, state: RaceState) => number | null | undefined;
+
+/** Os parâmetros que uma voz aplica aos nós a cada quadro, calculados à parte para se poder provar sem placa de som. */
+export interface EngineVoiceParams {
+  main: number; sub: number; cutoff: number; gain: number;
+  lopeHz: number; lopeDepth: number; whineHz: number; whineGain: number;
+}
+
+export function engineVoiceParams(carId: string, rpm: number, nitro: boolean, slotGain: number): EngineVoiceParams {
+  const t = engineTimbre(carId);
+  const r = Math.max(0, Math.min(1, rpm));
+  const main = engineFrequency(r, nitro, carId);
+  return {
+    main, sub: main * t.subRatio,
+    cutoff: t.cutoff + r * t.span + (nitro ? 600 : 0),
+    gain: slotGain * t.gain * (0.12 + 0.08 * r + (nitro ? 0.03 : 0)),
+    lopeHz: t.lopeRate * (4 + 22 * r), lopeDepth: t.lope * 0.5,
+    whineHz: Math.max(120, Math.min(6000, main * t.whineRatio)), whineGain: t.whine * 0.4 * (0.3 + 0.7 * r),
+  };
+}
+
 class EngineVoice {
+  // Ordem fixa dos osciladores (os testes dependem dela): principal, sub, ronco (LFO) e zumbido.
   private readonly saw: OscillatorNode;
   private readonly square: OscillatorNode;
+  private readonly lfo: OscillatorNode;
+  private readonly whine: OscillatorNode;
+  private readonly subLevel: GainNode;
+  private readonly lopeDepth: GainNode;
+  private readonly lopeGain: GainNode;
+  private readonly whineGain: GainNode;
   private readonly filter: BiquadFilterNode;
   private readonly gain: GainNode;
   private readonly gravel: AudioBufferSourceNode;
@@ -65,27 +99,51 @@ class EngineVoice {
   private lastGear = -1;
   private lastNitroTicks = 0;
   private wasInPit = false;
+  /** O carro cujo timbre está aplicado (vazio até o primeiro quadro). */
+  private carId = '';
 
   constructor(private readonly ctx: AudioContext, private readonly dest: AudioNode, private readonly slotGain: number) {
     const now = ctx.currentTime;
     this.saw = ctx.createOscillator();
-    this.saw.type = 'sawtooth';
     this.square = ctx.createOscillator();
-    this.square.type = 'square';
+    this.lfo = ctx.createOscillator();
+    this.lfo.type = 'sine';
+    this.whine = ctx.createOscillator();
+    this.whine.type = 'sine';
     const mix = ctx.createGain();
     mix.gain.value = 0.5;
+    this.subLevel = ctx.createGain();
+    this.subLevel.gain.value = 1;
     this.filter = makeFilter(ctx, { type: 'lowpass', freq: 300, q: 1.2 });
+    // Ronco: o ganho vale `1 − profundidade` e o LFO soma ± profundidade a ele (amplitude balançando).
+    this.lopeGain = ctx.createGain();
+    this.lopeGain.gain.value = 1;
+    this.lopeDepth = ctx.createGain();
+    this.lopeDepth.gain.value = 0;
+    this.whineGain = ctx.createGain();
+    this.whineGain.gain.value = 0;
     this.gain = ctx.createGain();
     this.gain.gain.value = 0;
     this.saw.connect(mix);
-    this.square.connect(mix);
+    this.square.connect(this.subLevel);
+    this.subLevel.connect(mix);
     mix.connect(this.filter);
-    this.filter.connect(this.gain);
+    this.filter.connect(this.lopeGain);
+    this.lfo.connect(this.lopeDepth);
+    this.lopeDepth.connect(this.lopeGain.gain);
+    this.lopeGain.connect(this.gain);
+    this.whine.connect(this.whineGain);
+    this.whineGain.connect(this.gain);
     this.gain.connect(dest);
     this.saw.frequency.value = ENGINE_MIN_HZ;
     this.square.frequency.value = ENGINE_MIN_HZ / 2;
+    this.lfo.frequency.value = 0;
+    this.whine.frequency.value = 0;
     this.saw.start(now);
     this.square.start(now);
+    this.lfo.start(now);
+    this.whine.start(now);
+    this.applyTimbre('falcao');
 
     this.gravel = noiseSource(ctx, true);
     const gravelFilter = makeFilter(ctx, { type: 'bandpass', freq: 700, q: 0.5 });
@@ -106,26 +164,50 @@ class EngineVoice {
     this.whoosh.start(now, Math.random());
   }
 
-  update(car: CarState, dt: number): void {
+  /** Aplica a parte estática do timbre do carro (ondas, mistura, ressonância, ronco); a parte que anda com o giro vai em `update`. */
+  private applyTimbre(carId: string): void {
+    const t = engineTimbre(carId);
+    this.carId = carId;
+    this.saw.type = t.main;
+    this.square.type = t.sub;
+    this.subLevel.gain.value = t.subMix;
+    this.filter.Q.value = t.q;
+    this.lopeGain.gain.value = 1 - t.lope * 0.5;
+    this.lopeDepth.gain.value = t.lope * 0.5;
+  }
+
+  update(car: CarState, state: RaceState, dt: number, hook: RevHook | null): void {
     const now = this.ctx.currentTime;
     const top = car.stats.topSpeed;
     const nitro = car.nitroTicks > 0;
+    if (car.carId !== this.carId) this.applyTimbre(car.carId);
 
     // Troca de marcha: o RPM cai por um instante e volta a subir.
     if (this.lastGear >= 0 && car.gear !== this.lastGear) this.shiftTimer = SHIFT_DIP_SECONDS;
     this.lastGear = car.gear;
     let target = engineRpm(car.speed, car.gear, top);
+    if (state.phase === 'countdown') {
+      // Contagem: o piloto acelera parado — o giro sobe até o "JÁ" (a N1 pode trocar este alvo pelo gancho).
+      const hooked = hook ? hook(car, state) : undefined;
+      target = typeof hooked === 'number' && Number.isFinite(hooked) ? Math.max(0, Math.min(1, hooked)) : countdownRpm(state.tick);
+    } else if (state.phase === 'racing') {
+      // Logo depois do "JÁ" o giro cai devagar até o que a velocidade pede (sem buraco no som da largada).
+      target = Math.max(target, launchRpm(state.tick - state.startTick));
+    }
     if (this.shiftTimer > 0) {
       this.shiftTimer -= dt;
       target *= SHIFT_DIP_FACTOR;
     }
     this.rpm += (target - this.rpm) * (1 - Math.exp(-dt * RPM_FOLLOW_RATE));
 
-    const freq = engineFrequency(this.rpm, nitro);
-    glide(this.saw.frequency, freq, now, 0.03);
-    glide(this.square.frequency, freq / 2, now, 0.03);
-    glide(this.filter.frequency, 250 + this.rpm * 1400 + (nitro ? 600 : 0), now, 0.05);
-    glide(this.gain.gain, this.slotGain * (0.12 + 0.08 * this.rpm + (nitro ? 0.03 : 0)), now, 0.08);
+    const p = engineVoiceParams(car.carId, this.rpm, nitro, this.slotGain);
+    glide(this.saw.frequency, p.main, now, 0.03);
+    glide(this.square.frequency, p.sub, now, 0.03);
+    glide(this.filter.frequency, p.cutoff, now, 0.05);
+    glide(this.lfo.frequency, p.lopeHz, now, 0.05);
+    glide(this.whine.frequency, p.whineHz, now, 0.03);
+    glide(this.whineGain.gain, p.whineGain, now, 0.06);
+    glide(this.gain.gain, p.gain, now, 0.08);
 
     // Grama: cascalho enquanto durar a derrapagem, mais alto quanto mais rápido.
     const speedFrac = Math.min(1, car.speed / top);
@@ -165,27 +247,35 @@ class EngineVoice {
   }
 
   dispose(): void {
-    for (const src of [this.saw, this.square, this.gravel, this.whoosh]) {
+    for (const src of [this.saw, this.square, this.lfo, this.whine, this.gravel, this.whoosh]) {
       try { src.stop(); } catch { /* já parado */ }
       src.disconnect();
     }
     this.gain.disconnect();
     this.gravelGain.disconnect();
     this.whooshGain.disconnect();
+    this.whineGain.disconnect();
+    this.lopeGain.disconnect();
   }
 }
 
 /** Até quatro motores, um por viewport; o primeiro com ganho cheio, os demais reduzidos. */
 export class EngineBank {
   private readonly voices: Array<EngineVoice | null> = [null, null, null, null];
+  private revHook: RevHook | null = null;
 
   constructor(private readonly ctx: AudioContext, private readonly dest: AudioNode) {}
+
+  /** O gancho da largada-foguete (N1): troca o giro alvo da contagem de um carro; `null` volta ao `countdownRpm`. */
+  setRevHook(hook: RevHook | null): void {
+    this.revHook = hook;
+  }
 
   update(frame: RenderFrame | null, dt: number): void {
     for (let i = 0; i < this.voices.length; i++) {
       const vp = frame ? frame.viewports[i] : undefined;
       const car = frame && vp ? frame.state.cars[vp.carIndex] : undefined;
-      if (!car) {
+      if (!frame || !car) {
         this.voices[i]?.silence();
         continue;
       }
@@ -194,7 +284,7 @@ export class EngineBank {
         voice = new EngineVoice(this.ctx, this.dest, i === 0 ? 1 : SECONDARY_ENGINE_GAIN);
         this.voices[i] = voice;
       }
-      voice.update(car, dt);
+      voice.update(car, frame.state, dt, this.revHook);
     }
   }
 
