@@ -2,7 +2,7 @@
 
 Briefing de arte (direção, paleta, carros, cenário, especificação, lotes): https://claude.ai/code/artifact/049e138a-cb57-4adb-baef-d3084b4f0d03
 
-Contrato do asset (convenção do carro e do marco-herói, nós `kit_*`, `seat`, `lod0`/`lod1`, tetos; **proposta**, o dono aprova no Marco 1): `docs/CONTRATO-DO-ASSET.md`.
+Contrato do asset (convenção do carro e do marco-herói, nós `kit_*`, `seat`, `lod0`/`lod1`, tetos; a parte do carro é **conferida** pelo `check.ts` desde a L3, o resto é **proposta** até o dono aprovar no Marco 1): `docs/CONTRATO-DO-ASSET.md`.
 
 **Decisão (dono, 04/10/2026): não gerar 3D por IA neste jogo; baixar o orgânico pronto.** O alvo é cartunesco de última geração (`docs/DIRECAO-DE-ARTE.md`); hoje (até a L3) o estilo em código é low-poly
 e o código dá conta dele — prédios, pontes, torres, relevo. As formas orgânicas
@@ -18,25 +18,46 @@ ponto `seat`, conferidos por `npm run check-car`). A frase "nada de gerar pela A
 
 ## Carros — pronto
 1. **Modelo-base**: `art/templates/cars/<estilo>.glb` (13), o carro atual do jogo na convenção. `npm run car-templates` regera.
-2. **Redesenhar no Blender** mantendo a convenção: metros, +Y para cima, frente em +Z; nós `body`, `wheel_fl`,
-   `wheel_fr`, `wheel_rl`, `wheel_rr`, vazios `exhaust_l`/`exhaust_r`; materiais pelo nome:
+2. **Redesenhar no Blender** mantendo a convenção (`docs/CONTRATO-DO-ASSET.md`): metros, +Y para cima, frente em +Z; nós `body`, `wheel_fl`,
+   `wheel_fr`, `wheel_rl`, `wheel_rr` (cada roda com a malha dela, **eixo em x**: o desenho da roda do arquivo é o do `wheel_fr`), vazios
+   `exhaust_l`/`exhaust_r` e `seat`; materiais pelo nome:
    - `paint*`, `accent*`, `stripe_a*`, `stripe_b*`, `stripe_ab*`: recebem a cor do carro; a cor do material é o tom
      (branco = cor pura, cinza = um tom abaixo);
    - `headlight*`, `taillight*`: acendem; força = emissivo ÷ cor (sem emissivo = 1);
    - "popup" no nome: sobe com o farol escamoteável;
-   - qualquer outro nome: peça fixa com a cor, rugosidade e metal do material. **Hoje (até a L3): sem textura** nos carros;
-     o alvo é o atlas de paleta 256² (`docs/CONTRATO-DO-ASSET.md`).
+   - qualquer outro nome: peça fixa com a cor, rugosidade e metal do material.
+   Cor por **atlas de paleta 256²** (`map`, uma imagem só no arquivo; a face pintável aponta para um swatch branco) ou, como os 13 modelos-base,
+   cor chapada por material. LOD: nós de topo `lod0` e `lod1` (≤ metade dos triângulos). Opcionais conferidos: `kit_<peça>_<nível>`, `decal_*`.
 3. **Conferir**: `npm run check-car -- arquivo.glb` (mesmo validador do jogo: pegada, rodas, luzes, escape, ≤ 3.500
-   triângulos no casco — eram 2.000 até a onda I, que arredondou os carros do jogo para 2.600–3.400 —, faixas que os
-   carros do estilo usam).
-4. **Pôr no jogo**: copiar para `src/assets/cars/<estilo>.glb`. Entra no navegador, no build e no Electron
-   (embutido como data URL: `src/render/cars/assets.ts`, atalho com teto anotado). Recusado = fica procedural, motivo no console.
+   triângulos no casco, faixas, atlas, LOD, `seat`, `kit_*`, `decal_*`). O nome do arquivo é o ID de um **carro** (`falcao.glb`) ou um **estilo** (`gt.glb`).
+4. **Pôr no jogo**: copiar para `src/assets/cars/<carro>.glb` (só aquele carro; os outros do estilo seguem procedurais) ou `<estilo>.glb` (o estilo
+   todo). O arquivo vai como **arquivo do build** (`dist/assets/<nome>-<hash>.glb`): no navegador por `fetch`, no Electron pelo protocolo
+   `speedtche-asset://app/assets/…` (`desktop/assets.cjs`; a página é `file://`). Recusado = fica procedural, motivo no console. **Registre a licença**
+   na tabela abaixo (um teste cobra).
+5. **Carro de kit de paleta (Kenney Car Kit, CC0)**: `npm run convert-car -- "<kit>/Models/GLB format/sedan-sports.glb" falcao` — o conversor
+   (`scripts/lib/car-convert.ts`) faz a limpeza que o Blender faria: troca o material único do kit por um material por papel (`paint`, `accent`,
+   `headlight`, `taillight`, `glass`, `trim`, `tire`, `rim`, `plate`) pela tabela `KENNEY_ROLES` (swatch → papel; swatch desconhecido vira `trim` e
+   entra no relatório), escala o casco por eixo até a pegada (o kit é estreito), faz rodas redondas e maiores no chão, acrescenta `exhaust_*`,
+   `seat`, `lod0`/`lod1` (meshoptimizer do three) e reduz o `colormap` de 512² para 256². Depois: `npm run check-car` e as capturas.
+   Prova sem baixar nada: `npx tsx scripts/make-test-car.ts` grava o carro de caixas do contrato (`scratch/car-caixas.glb`).
 
-Por ora a malha das rodas do .glb só dá posição e tamanho; o desenho continua o do estilo.
+Código: `src/render/cars/gltf.ts` (leitura: UV, atlas, roda, LOD, contrato), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga),
+`models.ts` (um modelo por carro ou por estilo). O `Cars` (`src/render/cars.ts`) agrupa por **modelo**: um lote por modelo (mais um para o LOD1) e
+um material com o atlas para cada modelo que o tem.
+Testes: `tests/car-gltf*.test.ts`, `car-contrato-asset`, `car-por-modelo`, `car-pipeline`, `desktop-assets` — os 13 modelos-base voltam idênticos
+com e sem os extras (como saem do Blender).
+Provado em 02/10: `gt.glb` no navegador (0 pixels diferentes do procedural), no build (`vite preview`) e no Electron (`file://`); em 10/10 (L3):
+`falcao.glb` (Kenney) na corrida e no estúdio do harness, e no Electron de verdade pelo protocolo (`window.nc.carAssets.loaded = ["falcao"]`).
 
-Código: `src/render/cars/gltf.ts` (leitura), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga).
-Testes: `tests/car-gltf.test.ts` — os 13 modelos-base voltam idênticos com e sem os extras (como saem do Blender).
-Provado em 02/10: `gt.glb` no navegador (0 pixels diferentes do procedural), no build (`vite preview`) e no Electron (`file://`).
+### Licenças dos carros baixados
+
+Uma linha por arquivo de `src/assets/cars/` (conferida por `tests/car-pipeline.test.ts`: arquivo sem linha aqui reprova a suíte).
+O CC0 cobre o arquivo, **não** marca nem direito de imagem; o nome do arquivo do jogo é o do **carro** (`falcao.glb`), e o `.glb` é a
+saída do conversor (`scripts/convert-car.ts`), não o original.
+
+| Arquivo no jogo | Origem (página, arquivo, autor) | Licença | Data |
+|---|---|---|---|
+| `src/assets/cars/falcao.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
 
 ## Cenário e horizonte — falta (os marcos turísticos já têm o caminho: abaixo)
 Mesmo caminho (convenção na seção Especificação do briefing); para árvores, prédios e horizonte o carregador ainda não existe.

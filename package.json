@@ -16,7 +16,8 @@
     "playtest": "node scripts/playtest.mjs",
     "relay": "node server/relay.mjs",
     "car-templates": "tsx scripts/export-car-templates.ts",
-    "check-car": "tsx scripts/check-car-glb.ts"
+    "check-car": "tsx scripts/check-car-glb.ts",
+    "convert-car": "tsx scripts/convert-car.ts"
   },
   "license": "MIT",
   "devDependencies": {

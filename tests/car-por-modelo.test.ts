@@ -156,6 +156,17 @@ describe('modelo por carro: o instanciamento (Cars)', () => {
     cars.dispose();
   });
 
+  it('o normal map do arquivo vai para o material do modelo (e só dele)', async () => {
+    const { model } = await parseCarGlb('gt', ab(buildTestCar({ normalMap: true })), { carId: 'falcao' });
+    if (!model) throw new Error('sem modelo');
+    setModelOverride('falcao', model);
+    const { cars } = scene([]);
+    const lots = internals(cars).styles;
+    expect((lots.find((s) => s.model.carId === 'falcao')?.mesh.material as THREE.MeshPhysicalMaterial).normalMap).toBe(model.normalMap);
+    expect((lots.find((s) => s.model.body === 'gt' && !s.model.carId)?.mesh.material as THREE.MeshPhysicalMaterial).normalMap).toBeNull();
+    cars.dispose();
+  });
+
   it('a roda de perto é a do arquivo; longe, a roda simples de todos', async () => {
     const model = await falcaoModel();
     setModelOverride('falcao', model);
