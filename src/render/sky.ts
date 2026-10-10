@@ -6,12 +6,12 @@
 // absoluto do carro: é a única coisa "fixa no mundo".
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { TimeOfDay } from '../core/types';
+import type { SceneryId, TimeOfDay } from '../core/types';
 import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
-import type { Palette } from './palette';
+import { palette, type Palette } from './palette';
 import { applyGrade } from './stylize';
 
 const SKY_RADIUS = 1400;
@@ -99,18 +99,27 @@ void main() {
 
 interface SunSetup { dir: THREE.Vector3; size: number; halo: number; glow: number; disc: number; moon: boolean }
 
-/** Direção absoluta do sol/lua (x direita, y cima, −z frente na largada) e o desenho do disco. */
-export function sunSetup(time: TimeOfDay): SunSetup {
-  const fromAngles = (elevDeg: number, azDeg: number) => {
-    const el = elevDeg * Math.PI / 180; const az = azDeg * Math.PI / 180;
-    return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
-  };
-  // Dia: sol a 34° (sombras longas que desenham o relevo, halo no alto da tela).
-  if (time === 'day') return { dir: fromAngles(34, -42), size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false };
-  // Entardecer: sol grande e baixo, à frente na largada, com o horizonte em brasa em volta.
-  if (time === 'dusk') return { dir: fromAngles(9, 22), size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false };
-  // Noite: lua grande a 20°, para aparecer na tela nas retas que apontam para ela.
-  return { dir: fromAngles(20, -28), size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true };
+/** O disco e o halo do período (o tamanho cresce no pôr do sol); a direção vem da paleta (`sunAz`, `sunEl`). */
+function sunLook(time: TimeOfDay): Omit<SunSetup, 'dir'> {
+  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false }; // sol a 34°: sombras longas, halo no alto da tela
+  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false }; // sol grande e baixo, à frente, horizonte em brasa
+  return { size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true }; // lua grande a 20°, para aparecer nas retas que apontam para ela
+}
+
+/** Direção absoluta (x direita, y cima, −z frente na largada) do azimute e da elevação em graus. */
+function fromAngles(elevDeg: number, azDeg: number): THREE.Vector3 {
+  const el = elevDeg * Math.PI / 180; const az = azDeg * Math.PI / 180;
+  return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
+}
+
+/** O sol/lua de uma paleta (M2: o azimute e a elevação são dado da paleta, por bioma × período, e a M6 os interpola). */
+export function sunOf(p: Pick<Palette, 'sunAz' | 'sunEl'>, time: TimeOfDay): SunSetup {
+  return { dir: fromAngles(p.sunEl, p.sunAz), ...sunLook(time) };
+}
+
+/** Direção absoluta do sol/lua e o desenho do disco. O bioma só muda o entardecer (o anel de montanhas, ver `palette.ts`). */
+export function sunSetup(time: TimeOfDay, scenery?: SceneryId): SunSetup {
+  return sunOf(palette(scenery ?? 'coast', time), time);
 }
 
 function buildStars(): THREE.Points {
@@ -278,7 +287,7 @@ export class Sky {
   setPalette(p: Palette, time: TimeOfDay, key: string): void {
     if (key === this.paletteKey) return;
     this.paletteKey = key;
-    const s = sunSetup(time);
+    const s = sunOf(p, time);
     this.night = time === 'night';
     this.sunDirAbs.copy(s.dir);
     const u = this.dome.material.uniforms;

@@ -163,6 +163,21 @@ export function ringProfile(biome: SceneryId, layer: number, t: number): number 
   }
 }
 
+/**
+ * Elevação (graus) do topo dos planos do horizonte no ângulo `turns` (voltas, 0..1) do anel, visto do centro: o maior entre os planos
+ * (na cidade o plano mais perto é a skyline, não um anel). O anel gira com o céu, então o sol tem um `turns` fixo por bioma:
+ * quem escolhe onde o sol fica (`palette.ts`, `SUN`) confere por aqui que ele nasce acima das montanhas.
+ */
+export function horizonElevation(biome: SceneryId, turns: number): number {
+  const t = ((turns % 1) + 1) % 1;
+  let top = 0;
+  for (let l = 0; l < 3; l++) {
+    if (biome === 'city_night' && l === 0) continue;
+    top = Math.max(top, Math.atan2(RELIEF[biome].layers[l] * ringProfile(biome, l, t), LAYER_RADII[l]));
+  }
+  return (top * 180) / Math.PI;
+}
+
 const RING_VERT = /* glsl */ `
 varying vec3 vColor; varying vec3 vW; varying vec3 vN;
 void main() {

@@ -5,6 +5,9 @@
 // Horizon Chase Turbo — cor saturada, céu em gradiente forte, sombra colorida, névoa com cor.
 // Funções puras; sem DOM. Calibrado para o ACES; desde a L1 o tone mapping é o Neutral com gradação por paleta (stylize.ts:
 // `gradingFor` parte destes valores — a `exposure` ganha o ajuste da curva nova).
+// M2 (docs/ondas/M/M2.md): as 18 combinações bioma × período são um DADO exportado (`PALETTE_TABLE`, congelada) — a M6 interpola
+// entre elas durante a corrida —, calibradas por critérios que o teste mede (tests/paleta-m2.test.ts): contraste estrada × chão,
+// carro branco e escuro × asfalto, saturação máxima, luminância média, céus distintos por bioma, sol acima das montanhas.
 import type { SceneryId, TimeOfDay } from '../core/types';
 
 export interface Palette {
@@ -80,6 +83,22 @@ export interface Palette {
   lampPool: string | null;
   /** Brilho das marcações da pista (tinta refletiva) à noite: 0 de dia. */
   markingGlow: number;
+
+  // ── Sol e lua (M2) ──
+  /** Azimute (graus, 0 = à frente na largada, positivo = à direita) e elevação (graus) do sol ou da lua. */
+  sunAz: number;
+  sunEl: number;
+
+  // ── Mar e reflexo de lente (M2) ──
+  /** Força do caminho de brilho do sol/lua na água (1 = o do dia da Copacabana). */
+  seaGlint: number;
+  /** Quanto do céu o mar reflete no ângulo raso (teto do fresnel, 0..1). */
+  seaSky: number;
+  /** Expoente do brilho na água: menor = caminho mais largo e comprido (o do pôr do sol). */
+  seaSpec: number;
+  /** Reflexo de lente: força 0..1 (só o entardecer; 0 nos outros períodos) e a cor dele (a do bioma, a mesma nos 3 períodos para a M6 interpolar a força). */
+  flare: number;
+  flareColor: string;
 }
 
 export const SCENERIES: readonly SceneryId[] = ['tropical', 'desert', 'city_night', 'alpine', 'coast', 'savanna'];
@@ -118,6 +137,23 @@ export function luminance(hex: string): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
+/** Luminância relativa LINEAR (a do WCAG): o que a razão de contraste dos testes mede. */
+function linearLuminance(hex: string): number {
+  const f = (c: number): number => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const [r, g, b] = hexToRgb(hex);
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+/** Clareia a cor, sem mudar o matiz, até a luminância linear chegar a `min` (não mexe se já passa). Um piso, não um brilho fixo. */
+function liftTo(hex: string, min: number): string {
+  const l = linearLuminance(hex);
+  if (l >= min) return hex;
+  let k = Math.pow(min / Math.max(l, 1e-4), 1 / 2.2);
+  let out = shade(hex, k);
+  while (linearLuminance(out) < min && k < 4) { k *= 1.04; out = shade(hex, k); }
+  return out;
+}
+
 // ───────────────────────────── Bases diurnas ─────────────────────────────
 
 interface Base {
@@ -137,59 +173,66 @@ interface Base {
 const BASES: Record<SceneryId, Base> = {
   // Mata atlântica: verde fundo, terra vermelha na beira, serra azulada ao longe.
   tropical: {
-    sky: ['#1257d2', '#3b9bf2', '#aee8ff'], asphalt: '#55585e', shoulder: '#7a6654', verge: '#c8784a',
-    groundLow: '#34a844', groundHigh: '#1d7a44', rock: '#7c6a52', sand: '#e8d49a',
-    layers: ['#23814f', '#3c8f82', '#76a9c2'], waterDeep: '#0b6aa8', waterShallow: '#2fd0c4',
+    sky: ['#1a5cb8', '#3a9ede', '#c8f0dc'], asphalt: '#3e434b', shoulder: '#7a6654', verge: '#c8784a',
+    groundLow: '#34a844', groundHigh: '#238c4c', rock: '#7c6a52', sand: '#e8d49a',
+    layers: ['#23814f', '#3c8f82', '#76a9c2'], waterDeep: '#1a6aa8', waterShallow: '#2fd0c4',
   },
   // Deserto: areia dourada, rocha vermelha nas encostas, mesas no horizonte.
   desert: {
-    sky: ['#1c63cf', '#5eabf0', '#ffd89a'], asphalt: '#625b55', shoulder: '#a08a6c', verge: '#eec486',
+    sky: ['#1c5cc2', '#58a2e8', '#ffc98a'], asphalt: '#4a4745', shoulder: '#a08a6c', verge: '#eec486',
     groundLow: '#e9b464', groundHigh: '#d9964f', rock: '#bb5a36', sand: '#f0c77e',
     layers: ['#c56a3a', '#d08c62', '#dcae96'], waterDeep: '#1a6aa0', waterShallow: '#3ec0c0',
   },
   // Cidade: calçada clara, grama de praça, prédios no fundo (a skyline vem do terrain.ts).
   city_night: {
-    sky: ['#3468c4', '#80ade4', '#cddcf0'], asphalt: '#4a4d55', shoulder: '#7a7a7c', verge: '#bdbbb4',
+    sky: ['#3a6ec4', '#86b2e6', '#d5e2f2'], asphalt: '#3a3d45', shoulder: '#7a7a7c', verge: '#bdbbb4',
     groundLow: '#4e8f40', groundHigh: '#3e7a3a', rock: '#6c6c74', sand: '#c8c0a8',
     layers: ['#3e4c70', '#5a6892', '#8a94ba'], waterDeep: '#123a6a', waterShallow: '#2a7a9a',
   },
   // Montanha: prado verde, pedra azulada, neve no alto e nos picos do horizonte.
   alpine: {
-    sky: ['#1a53c9', '#5799ec', '#c4e4ff'], asphalt: '#565a61', shoulder: '#827c72', verge: '#a0968a',
-    groundLow: '#4aab4c', groundHigh: '#2b7646', rock: '#868b98', sand: '#c8c0a8',
+    sky: ['#2352c0', '#6498e2', '#d2e6ff'], asphalt: '#40444c', shoulder: '#827c72', verge: '#a0968a',
+    groundLow: '#4aab4c', groundHigh: '#318454', rock: '#868b98', sand: '#c8c0a8',
     layers: ['#2c6a4c', '#4a6aa0', '#7a8ccc'], waterDeep: '#1a5a8a', waterShallow: '#3aa0b0',
   },
   // Litoral: mar turquesa, praia clara, morros verdes e ilhas ao longe.
   coast: {
-    sky: ['#0e61da', '#43b0f5', '#a6e6ff'], asphalt: '#5a5c61', shoulder: '#b0a080', verge: '#ecd49c',
+    sky: ['#2070d2', '#43b0f5', '#a6e6ff'], asphalt: '#43464d', shoulder: '#b0a080', verge: '#ecd49c',
     groundLow: '#4aa848', groundHigh: '#2f8a4a', rock: '#9a8a72', sand: '#f3dca0',
-    layers: ['#2a8a5a', '#3a8ab0', '#6aa8dc'], waterDeep: '#0660b8', waterShallow: '#22d4cf',
+    layers: ['#2a8a5a', '#3a8ab0', '#6aa8dc'], waterDeep: '#1a68b0', waterShallow: '#22d4cf',
   },
   // Savana/planície: capim dourado-esverdeado, terra avermelhada, chapadas baixas.
   savanna: {
-    sky: ['#2876d2', '#7ebff0', '#fae2a8'], asphalt: '#5e5a54', shoulder: '#957a58', verge: '#c89456',
+    sky: ['#3280d6', '#8cc8ee', '#f2ecb0'], asphalt: '#46433f', shoulder: '#957a58', verge: '#c89456',
     groundLow: '#b5b547', groundHigh: '#86993b', rock: '#a07650', sand: '#e0c88a',
-    layers: ['#768a3c', '#9a8c62', '#bcae94'], waterDeep: '#2a6a7a', waterShallow: '#5aa8a0',
+    layers: ['#768a3c', '#9a8c62', '#bcae94'], waterDeep: '#1e6a86', waterShallow: '#40b8a8',
   },
 };
 
 /** Céus do entardecer por bioma (topo, meio, horizonte) e o brilho em volta do sol. */
 const DUSK_SKY: Record<SceneryId, { sky: [string, string, string]; glow: string }> = {
-  tropical: { sky: ['#272f7c', '#cf5a7c', '#ffb96a'], glow: '#ffd27a' },
+  tropical: { sky: ['#173f6a', '#e0587a', '#ffb870'], glow: '#ffd27a' },
   desert: { sky: ['#2b1e5e', '#d1526a', '#ffa64e'], glow: '#ffc460' },
-  city_night: { sky: ['#252a6c', '#b24f8c', '#ffa872'], glow: '#ffc88a' },
+  city_night: { sky: ['#2a2470', '#b5509a', '#ffa07c'], glow: '#ffc88a' },
   alpine: { sky: ['#333c90', '#d479aa', '#ffd0aa'], glow: '#ffe0b0' },
-  coast: { sky: ['#1d2a74', '#d4568a', '#ffbb70'], glow: '#ffd07a' },
-  savanna: { sky: ['#33296e', '#df673e', '#ffca60'], glow: '#ffdc7a' },
+  coast: { sky: ['#2a2a80', '#dc5aa0', '#ffb8a4'], glow: '#ffd07a' },
+  savanna: { sky: ['#3a2a70', '#e8803a', '#ffd860'], glow: '#ffdc7a' },
 };
 
-/** Céus da noite: a cidade tem o horizonte roxo-alaranjado da poluição luminosa; o resto, luar. */
-function nightSky(b: SceneryId): [string, string, string] {
-  if (b === 'city_night') return ['#05071c', '#161c4c', '#5c3a74'];
-  if (b === 'coast') return ['#03071a', '#0b1c50', '#26508e'];
-  if (b === 'desert') return ['#050722', '#161a52', '#3a3a7c'];
-  return ['#04081c', '#0e1a4a', '#2c3e7e'];
-}
+/**
+ * Céus da noite, um por bioma (M2): a cidade tem o horizonte roxo-alaranjado da poluição luminosa; a costa, luar azul sobre o mar;
+ * o deserto, o índigo limpo das estrelas; a mata, o verde-petróleo úmido; a montanha, o azul frio da neve sob a lua; a savana,
+ * o índigo empoeirado com o horizonte rosado.
+ */
+const NIGHT_SKY: Record<SceneryId, [string, string, string]> = {
+  city_night: ['#05071c', '#161c4c', '#5c3a74'],
+  coast: ['#03071a', '#0b1c50', '#26508e'],
+  desert: ['#04051a', '#10164a', '#3c3a90'],
+  tropical: ['#03101c', '#0a2c3e', '#1f5a64'],
+  alpine: ['#050a24', '#101c5c', '#3a5aa8'],
+  savanna: ['#0a0720', '#2a1a4a', '#6a4a64'],
+};
+function nightSky(b: SceneryId): [string, string, string] { return NIGHT_SKY[b]; }
 
 // ───────────────────────────── Gradação por hora ─────────────────────────────
 
@@ -200,13 +243,44 @@ const GRADE: Record<TimeOfDay, Grade> = {
   // Entardecer: o sol laranja já esquenta o que ilumina; o albedo só puxa um pouco para o vinho.
   dusk: { tint: '#6a2f58', amount: 0.14, bright: 0.96 },
   // Noite: azula sem apagar — quem escurece a cena é a luz, não a cor (senão vira borrão preto).
-  night: { tint: '#16204a', amount: 0.34, bright: 0.86 },
+  night: { tint: '#16204a', amount: 0.34, bright: 0.94 },
 };
 
 function grade(c: string, time: TimeOfDay): string {
   const g = GRADE[time];
   return shade(mix(c, g.tint, g.amount), g.bright);
 }
+
+/**
+ * O brilho do sol/lua na água por período (M2; antes eram 3 números fixos no shader do mar): no entardecer o caminho é mais forte e muito
+ * mais comprido (expoente baixo: o sol rasante abre o reflexo); de dia é um ponto firme; o luar é largo e mais fraco.
+ */
+const SEA: Record<TimeOfDay, { glint: number; sky: number; spec: number }> = {
+  day: { glint: 1, sky: 0.5, spec: 180 },
+  dusk: { glint: 1.5, sky: 0.55, spec: 60 },
+  night: { glint: 0.9, sky: 0.4, spec: 90 },
+};
+
+/**
+ * Onde o sol/lua está, por período; no entardecer, por bioma. O anel de montanhas gira com o céu, então o azimute do sol sobre ele é constante
+ * por bioma: o par (azimute, elevação) do entardecer foi escolhido onde o anel é baixo (tests/paleta-m2.test.ts exige o sol ≥ 2° acima dele).
+ * Até a M2 era 22°/9° para todos, e a mata (−1,2°) e a montanha (−3,5°) engoliam o sol.
+ */
+const SUN: Record<TimeOfDay, (b: SceneryId) => { az: number; el: number }> = {
+  day: () => ({ az: -42, el: 34 }), // sombras longas que desenham o relevo
+  dusk: (b) => ({ tropical: { az: 34, el: 10.5 }, desert: { az: 34, el: 9 }, city_night: { az: 30, el: 9 }, alpine: { az: 2, el: 10.5 }, coast: { az: 30, el: 9 }, savanna: { az: 32, el: 9 } })[b],
+  night: () => ({ az: -28, el: 20 }), // a lua aparece na tela nas retas que apontam para ela
+};
+
+/** Reflexo de lente do entardecer por bioma: força e a cor do reflexo (poeira do deserto abre mais; a neblina da cidade, menos). */
+const FLARE: Record<SceneryId, { strength: number; color: string }> = {
+  tropical: { strength: 0.8, color: '#ffc870' },
+  desert: { strength: 0.95, color: '#ff9a5a' },
+  city_night: { strength: 0.75, color: '#ff8fb0' },
+  alpine: { strength: 0.8, color: '#ffd0b8' },
+  coast: { strength: 0.9, color: '#ffb070' },
+  savanna: { strength: 0.9, color: '#ffbe50' },
+};
 
 /** Aplica a hora do dia a uma base diurna. */
 function build(scenery: SceneryId, time: TimeOfDay): Palette {
@@ -249,10 +323,11 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   }
   // Névoa: o horizonte com um pouco do meio do céu — tem cor, nunca cinza.
   const fog = mix(sky[2], sky[1], time === 'day' ? 0.28 : time === 'dusk' ? 0.32 : 0.2);
-  const groundLow = g(b.groundLow);
-  const groundHigh = g(b.groundHigh);
-  // À noite o asfalto escurece mais que a beira: a borda da pista continua lendo sob o luar.
-  const asphalt = time === 'night' ? shade(g(b.asphalt), 0.82) : g(b.asphalt);
+  // À noite o chão alto sobe um pouco (a mata e a montanha escuras engoliam a pista) e o asfalto leva menos azul que o resto: o carro
+  // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
+  const groundLow = time === 'night' ? liftTo(g(b.groundLow), 0.115) : g(b.groundLow);
+  const groundHigh = time === 'night' ? liftTo(g(b.groundHigh), 0.11) : g(b.groundHigh);
+  const asphalt = time === 'night' ? shade(mix(b.asphalt, GRADE.night.tint, 0.17), 0.95) : g(b.asphalt);
   // Os planos do horizonte puxam para o céu do período (o rosa do entardecer, o azul da noite).
   const skyPull = time === 'day' ? 0 : time === 'dusk' ? 0.28 : 0.5;
   const layers = b.layers.map((c, i) => mix(g(c), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];
@@ -275,19 +350,38 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     sand: g(b.sand),
     layers, layerHaze,
     waterDeep: time === 'day' ? b.waterDeep : time === 'dusk' ? mix(b.waterDeep, '#3a2a7a', 0.45) : mix(b.waterDeep, '#040c30', 0.7),
-    waterShallow: time === 'day' ? b.waterShallow : time === 'dusk' ? mix(b.waterShallow, '#d07a8a', 0.4) : mix(b.waterShallow, '#0c2a5a', 0.65),
+    waterShallow: time === 'day' ? b.waterShallow : time === 'dusk' ? mix(b.waterShallow, '#e0708a', 0.3) : mix(b.waterShallow, '#0c2a5a', 0.65),
     foam: time === 'night' ? '#9aaee0' : time === 'dusk' ? '#ffe6d8' : '#ffffff',
     lampPool: time === 'night' ? (scenery === 'city_night' ? '#ffc890' : '#ffd8a0') : null,
     markingGlow: time === 'night' ? 0.22 : time === 'dusk' ? 0.05 : 0,
+    sunAz: SUN[time](scenery).az, sunEl: SUN[time](scenery).el,
+    seaGlint: SEA[time].glint, seaSky: SEA[time].sky, seaSpec: SEA[time].spec,
+    flare: time === 'dusk' ? FLARE[scenery].strength : 0, flareColor: FLARE[scenery].color,
   };
 }
 
-const cache = new Map<string, Palette>();
+export type PaletteKey = `${SceneryId}:${TimeOfDay}`;
 
-/** Paleta da combinação (com cache: é a mesma para a corrida inteira). */
+/** A chave da combinação (a do `PALETTE_TABLE`). */
+export function paletteKey(scenery: SceneryId, time: TimeOfDay): PaletteKey { return `${scenery}:${time}`; }
+
+/** As 18 chaves, na ordem bioma × período. */
+export const PALETTE_KEYS: readonly PaletteKey[] = SCENERIES.flatMap((sc) => TIMES_OF_DAY.map((t) => paletteKey(sc, t)));
+
+function deepFreeze<T extends object>(o: T): Readonly<T> {
+  for (const v of Object.values(o)) if (v !== null && typeof v === 'object') deepFreeze(v as object);
+  return Object.freeze(o);
+}
+
+/**
+ * As 18 combinações bioma × período como DADO (M2): congelada, montada na carga, com as mesmas chaves em todas as entradas — a M6 interpola
+ * campo a campo entre dois períodos do mesmo bioma. `null` só em `sun`, `moon`, `cloudLit` e `lampPool` (a cena não tem a coisa).
+ */
+export const PALETTE_TABLE: Readonly<Record<PaletteKey, Readonly<Palette>>> = Object.freeze(
+  Object.fromEntries(SCENERIES.flatMap((sc) => TIMES_OF_DAY.map((t) => [paletteKey(sc, t), deepFreeze(build(sc, t))] as const))),
+) as Record<PaletteKey, Readonly<Palette>>;
+
+/** Paleta da combinação (a entrada da `PALETTE_TABLE`: é a mesma para a corrida inteira). */
 export function palette(scenery: SceneryId, time: TimeOfDay): Palette {
-  const key = `${scenery}:${time}`;
-  let p = cache.get(key);
-  if (!p) { p = build(scenery, time); cache.set(key, p); }
-  return p;
+  return PALETTE_TABLE[paletteKey(scenery, time)] as Palette;
 }

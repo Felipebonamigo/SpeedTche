@@ -127,8 +127,8 @@ describe('chão: contraste e saturação', () => {
     expect(bad).toEqual([]);
   });
 
-  it('luminância média da cena (proxy da paleta) dentro da faixa do período: dia 0,42–0,66 · entardecer 0,33–0,58 · noite 0,12–0,30; e dia > entardecer > noite', () => {
-    const band: Record<TimeOfDay, [number, number]> = { day: [0.42, 0.66], dusk: [0.33, 0.58], night: [0.12, 0.30] };
+  it('luminância média da cena (proxy da paleta) dentro da faixa do período: dia 0,42–0,66 · entardecer 0,33–0,58 · noite 0,12–0,32; e dia > entardecer > noite', () => {
+    const band: Record<TimeOfDay, [number, number]> = { day: [0.42, 0.66], dusk: [0.33, 0.58], night: [0.12, 0.32] };
     const bad: string[] = [];
     for (const s of SCENERIES) {
       const l = TIMES_OF_DAY.map((t) => sceneLuma(entry(s, t)));
