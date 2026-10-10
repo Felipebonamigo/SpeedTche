@@ -6,8 +6,10 @@ import * as THREE from 'three';
 import { COLLISION_COOLDOWN_TICKS } from '../core/constants';
 import type { RaceState, Track } from '../core/types';
 import type { RenderFrame } from '../game/contracts';
+import { createScrapeMemory, observeScrapes } from '../game/race-feel';
 import { hash2 } from './noise';
 import type { Palette } from './palette';
+import { scrapeSparks } from './scrape-sparks';
 import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 
 const VERT = /* glsl */ `
@@ -121,6 +123,7 @@ export class Effects {
   private readonly prevSpeed = new Float32Array(20);
   private readonly shakeAmp = new Float32Array(4);
   private readonly dustColor = new THREE.Color('#8a7a5a');
+  private readonly scrapeMemory = createScrapeMemory();
   private lastTime = -1;
   private seed = 0;
 
@@ -171,6 +174,14 @@ export class Effects {
       if (c.nitroTicks > 0 && state.phase === 'racing' && this.rnd() < 0.7) {
         const side = this.rnd() < 0.5 ? -0.065 : 0.065;
         this.sparks.emit(c.z - 66, c.x + side, 0.3, c.speed - 900 - this.rnd() * 700, (this.rnd() - 0.5) * 0.2, (this.rnd() - 0.4) * 0.8, 0.18 + this.rnd() * 0.18, 0.06, 0.04, 0.8, 0.45, 1.0, 1.8);
+      }
+    }
+    // Raspão de lado (L5): rajada de faíscas no vão entre os carros.
+    for (const cue of observeScrapes(this.scrapeMemory, state)) {
+      const a = state.cars.find((c) => c.id === cue.a); const b = state.cars.find((c) => c.id === cue.b);
+      if (!a || !b) continue;
+      for (const s of scrapeSparks(cue, a, b, () => this.rnd(), frame.options.reduceEffects)) {
+        this.sparks.emit(s.z, s.x, s.y, s.vz, s.vx, s.vy, s.life, 0.1, 0.04, 9, 2.2, 1.5, 0.5);
       }
     }
     this.dust.step(dt);
