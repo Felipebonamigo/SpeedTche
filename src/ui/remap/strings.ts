@@ -10,6 +10,8 @@ registerStrings('remap', {
     'action.nitro': 'Nitro',
     'action.gearUp': 'Marcha acima',
     'action.gearDown': 'Marcha abaixo',
+    'action.drift': 'Derrapar',
+    'action.lookBack': 'Olhar para trás',
     'action.pause': 'Pausar',
 
     'key.space': 'Espaço',
@@ -64,6 +66,8 @@ registerStrings('remap', {
     'action.nitro': 'Nitro',
     'action.gearUp': 'Gear up',
     'action.gearDown': 'Gear down',
+    'action.drift': 'Drift',
+    'action.lookBack': 'Look back',
     'action.pause': 'Pause',
 
     'key.space': 'Space',

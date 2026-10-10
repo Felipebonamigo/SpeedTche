@@ -13,6 +13,7 @@
 // O HUD é o mesmo do 3D (DOM por cima, src/render/hud.ts).
 import { MAX_CARS } from '../core/constants';
 import { seatColor } from '../core/data/drivers';
+import { driftLevel } from '../core/sim/physics';
 import type { RaceState, Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer, ViewportSpec } from '../game/contracts';
 import { Hud } from '../render/hud';
@@ -370,7 +371,7 @@ export class RetroRenderer implements Renderer {
       ctx.fillStyle = 'rgba(210,190,150,0.7)';
       for (let k = 0; k < 3; k++) ctx.fillRect(Math.round(x + w * (0.1 + 0.35 * k) + Math.sin(time * 30 + k) * 2), Math.round(d.y - h * 0.15), Math.max(1, Math.round(w * 0.14)), Math.max(1, Math.round(h * 0.15)));
     }
-    ctx.drawImage(this.atlas.car(car.carId, car.steerPose, braking, night, frame?.paints?.[d.index]), x, y, Math.round(w), Math.round(h));
+    ctx.drawImage(this.atlas.car(car.carId, car.steerPose, braking, night, frame?.paints?.[d.index], car.driftDir, driftLevel(car.driftCharge)), x, y, Math.round(w), Math.round(h));
     if (car.nitroTicks > 0) {
       const flick = 0.7 + 0.3 * Math.sin(time * 60);
       ctx.fillStyle = '#ffd23f';

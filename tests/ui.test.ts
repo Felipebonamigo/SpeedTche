@@ -219,15 +219,17 @@ describe('mapGamepad', () => {
     expect(mapGamepad(buttons(), [0, 0])).toEqual(NEUTRAL_RAW);
   });
 
-  it('mapeamento "standard": A/RT aceleram, X/B/LT freiam, RB nitro, Y/LB marchas, Start pausa', () => {
+  it('mapeamento "standard": A/RT aceleram, X/B/LT freiam, RB derrapa, LB/Y são o nitro, D-pad ↑/↓ trocam de marcha, Start pausa', () => {
     expect(mapGamepad(buttons(0), [])).toMatchObject({ throttle: true, confirm: true, brake: false });
     expect(mapGamepad(buttons(7), [])).toMatchObject({ throttle: true, confirm: false });
     expect(mapGamepad(buttons(1), [])).toMatchObject({ brake: true, back: true });
     expect(mapGamepad(buttons(2), [])).toMatchObject({ brake: true, back: false });
     expect(mapGamepad(buttons(6), [])).toMatchObject({ brake: true });
-    expect(mapGamepad(buttons(5), [])).toMatchObject({ nitro: true });
-    expect(mapGamepad(buttons(3), [])).toMatchObject({ gearUp: true, gearDown: false });
-    expect(mapGamepad(buttons(4), [])).toMatchObject({ gearDown: true, gearUp: false });
+    expect(mapGamepad(buttons(5), [])).toMatchObject({ drift: true, nitro: false });
+    expect(mapGamepad(buttons(4), [])).toMatchObject({ nitro: true, drift: false, gearDown: false });
+    expect(mapGamepad(buttons(3), [])).toMatchObject({ nitro: true, gearUp: false });
+    expect(mapGamepad(buttons(12), [])).toMatchObject({ gearUp: true, gearDown: false });
+    expect(mapGamepad(buttons(13), [])).toMatchObject({ gearDown: true, gearUp: false });
     expect(mapGamepad(buttons(9), [])).toMatchObject({ start: true, pause: true, confirm: false });
   });
 
@@ -280,11 +282,11 @@ describe('mapKeyboard', () => {
   });
 
   it('as teclas usadas (as que recebem preventDefault) incluem setas, espaço e WASD', () => {
-    for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyM', 'KeyN', 'KeyE', 'KeyQ', 'Enter', 'Escape']) {
+    for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyM', 'KeyN', 'KeyE', 'KeyQ', 'Enter', 'Escape', 'ShiftLeft', 'ShiftRight', 'KeyB', 'KeyR']) {
       expect(USED_KEY_CODES.has(code), code).toBe(true);
     }
     expect(USED_KEY_CODES.has('F5')).toBe(false);
-    expect(USED_KEY_CODES.has('KeyR')).toBe(false);
+    expect(USED_KEY_CODES.has('KeyZ')).toBe(false);
   });
 });
 
@@ -318,7 +320,7 @@ describe('bordas', () => {
   it('toPlayerInput junta o segurado (volante, acelerador, freio) com as bordas (nitro, marchas)', () => {
     const raw = { ...NEUTRAL_RAW, steer: -0.5, throttle: true, nitro: true, gearUp: true };
     const edges = { ...NO_EDGES, gearUp: true };
-    expect(toPlayerInput(raw, edges)).toEqual({ steer: -0.5, throttle: true, brake: false, nitro: false, gearUp: true, gearDown: false });
+    expect(toPlayerInput(raw, edges)).toEqual({ steer: -0.5, throttle: true, brake: false, nitro: false, gearUp: true, gearDown: false, drift: false });
   });
 });
 
