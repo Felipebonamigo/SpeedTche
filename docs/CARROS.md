@@ -207,6 +207,10 @@ npx tsx scripts/car-balance.ts grade 2 falcao,trovao,tornado,camelo copacabana,s
 npx vitest run tests/cars.test.ts              # as regras (inútil, domina, faixa dos livres, silhuetas)
 ```
 
+## Voz do carro
+
+14 timbres de motor (por carroceria + ajuste por carro) e 14 buzinas de até 0,9 s; as tabelas ficam em `src/audio/engine-timbre.ts` e `src/audio/horn.ts`, indexadas por `carId`. Nada de áudio em `CarDef`, para não invalidar recordes nem o `sim-golden`.
+
 ## Modelos
 
 Cada um dos 13 estilos de carroceria (`CarDef.body`, lista em `CAR_BODIES`) tem um modelo 3D procedural

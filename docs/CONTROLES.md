@@ -16,9 +16,13 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 | Marcha abaixo | N | Q | D-pad ↓ (13) |
 | **Derrapar** | **Shift direito** | **Shift esquerdo** | **RB (5)** |
 | **Olhar para trás** | **B** | **R** | **R3 (11)** |
+| **Buzina** | **H** | **G** | **L3 (10)** |
 | Pausar | Esc | Esc | Start (9) |
 
-- **10 ações** desde a M1 (a onda M passou de 8 para 10: `drift` e `lookBack`, antes de `pause`, que segue a última).
+- **11 ações** desde a N6 (a M1 levou de 8 a 10 com `drift` e `lookBack`; a N6 acrescentou `horn`, antes de `pause`, que segue a última).
+  A buzina é nível e vai na rede no bit 64 (`docs/ONLINE.md`). Segurar 0,35 s abre a roda de 8 frases: a marcha ▲▼ escolhe
+  e deixa de chegar à física enquanto ela está aberta; soltar a buzina com frase marcada fala. Mapas salvos da M1 só ganham o
+  padrão da buzina; quem já usava H/G/L3 em outra ação mantém. O `playtest-controls` tem 52 conferências.
   Derrapar é nível (segurado), não borda, e vai na rede como o bit 32 (`docs/ONLINE.md`). Olhar para trás só existe
   como ação (a câmera é que a usa; o núcleo não a lê).
 - As ações antigas mantêm as teclas de sempre (o antigo `KEY_LAYOUTS` de `src/ui/input.ts`). No controle, o nitro saiu do
@@ -80,7 +84,7 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 
 ## Tela de controles
 
-- Grade 10 ações × 3 colunas (30 células, mais um "Padrão" por coluna), compacta para caber com o VOLTAR em 1024×640 e 1280×800, também com texto grande. Setas/d-pad andam; Enter, A ou clique abrem a captura da célula.
+- Grade 11 ações × 3 colunas (33 células, mais um "Padrão" por coluna), compacta para caber com o VOLTAR em 1024×640 e 1280×800, também com texto grande. Setas/d-pad andam; Enter, A ou clique abrem a captura da célula.
 - Captura: a próxima tecla (colunas de teclado) ou botão (coluna Controles) vira o comando.
   Esc ou Start cancelam; sem nada em **5 s** ela desiste. O relógio anda com o `dt` da sessão,
   limitado a 0,25 s por quadro: a 60 Hz são 5 s de verdade, e um travamento não come a janela. Tecla proibida é recusada com aviso e a captura continua. Clique fora cancela.
