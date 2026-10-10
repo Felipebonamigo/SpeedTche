@@ -375,7 +375,8 @@ export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
         h('span', { class: 'gp-tag-line' }, h('small', { class: 'gp-tag-k', text: t('career.garage.forSale') }), h('b', { class: 'mono', text: formatMoney(car.price) })),
         h('small', { class: 'gp-tag-need', text: !career ? '' : short > 0 ? t('career.garage.need', { price: formatMoney(short) }) : t('career.garage.buyHint') }));
     }
-    const stageEl = use3d ? h('div', { class: 'gp-stage', attrs: { 'data-car': car.id } }) : null;
+    // `data-color`: a cor da pintura à mostra (o playtest confere a prévia por ela: no 3D não há SVG para ler).
+    const stageEl = use3d ? h('div', { class: 'gp-stage', attrs: { 'data-car': car.id, 'data-color': paintColors(seatPaint(ctx.save, seat, car.id))?.color ?? car.color } }) : null;
     const carItem: FocusItem = {
       el: h('div', { class: `gp-car${locked ? ' locked' : ''}` },
         arrowButton(-1, () => { changeView(seat, -1); api.sfx('move'); }),

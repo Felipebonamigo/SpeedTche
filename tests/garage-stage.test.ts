@@ -245,6 +245,9 @@ describe('Garagem: oficina, foco e pintura no palco', () => {
     expect(seatPaint(r.save, 0, 'falcao')).toBe(PAINT_IDS[1]);
     expect(stageBus.panel('garage:P1').paint).toEqual(paintColors(PAINT_IDS[1]));
     expect(stageBus.panel('garage:P2').paint).toBeNull();
+    // A janela leva a cor à mostra no DOM (o playtest-paint confere a prévia por ela, sem SVG): a pintura no 1º, a de fábrica no 2º.
+    expect(all(panels(r)[0], hasClass('gp-stage'))[0].getAttribute('data-color')).toBe(paintColors(PAINT_IDS[1])?.color);
+    expect(all(panels(r)[1], hasClass('gp-stage'))[0].getAttribute('data-color')).toBe(CARS.find((c) => c.id === 'trovao')?.color);
     press(r, 'kb1', 'left');
     expect(stageBus.panel('garage:P1').paint).toBeNull(); // a Original: as cores de fábrica
   });
