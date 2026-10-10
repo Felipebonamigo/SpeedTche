@@ -1,8 +1,10 @@
 // HUD da corrida em DOM, por viewport: velocímetro com arco de RPM (SVG), marcha, volta,
-// posição, tempos, combustível, nitro (ou o cofre da equipe), mensagens animadas, minimapa
-// SVG, etiqueta do jogador, companheiros no co-op, contagem regressiva e pausa. Com 3
+// posição (com mola e o selo "+N" da ultrapassagem), segundos para o carro da frente e o de trás, tempos, combustível e
+// nitro (com marca, número e rótulo, além da cor; ou o cofre da equipe), ícone de vácuo, faixa ÚLTIMA VOLTA, mensagens
+// animadas, minimapa SVG, etiqueta do jogador, companheiros no co-op, contagem regressiva e pausa. Com 3
 // jogadores a célula livre mostra a classificação completa. Os nós são criados uma vez e só
 // `textContent`/atributos mudam por quadro (cada escrita é comparada antes).
+import '../ui/fonts.css';
 import './hud.css';
 import './hud-rival.css';
 import '../rivals/strings';
@@ -13,6 +15,7 @@ import { trackTitle } from '../core/data/places';
 import '../access/strings';
 import { seatAssist } from '../access/humans';
 import { VIP_COLOR } from '../core/modes';
+import { computeModifiers } from '../core/sim/coop';
 import { formatTicks } from '../core/sim/race';
 import type { CarState, RaceState, Track } from '../core/types';
 import type { HudMessage, RenderFrame, ViewportSpec } from '../game/contracts';
@@ -20,6 +23,10 @@ import { getLanguage, t } from '../i18n';
 import { captionName, captionPlace } from './caption/names';
 import './caption/caption.css';
 import { GhostDelta } from './ghost-hud';
+import { formatGap, fuelModel, nitroModel, NITRO_SLOTS, timeGaps } from './hud-model';
+import {
+  newDraftHold, newLastLapBand, newPositionMotion, stepDraft, stepLastLapBand, stepPositionMotion, type DraftHold, type LastLapBand, type PositionMotion,
+} from './hud-motion';
 import { spareCell, uiScale, viewportRects, type Rect } from './layout';
 import { outlinePoint, trackOutline, type Outline } from './minimap';
 import { ordinalSuffix } from './strings';
@@ -47,6 +54,8 @@ function setText(e: Element, s: string): void { if (e.textContent !== s) e.textC
 function setClass(e: Element, cls: string, on: boolean): void { if (e.classList.contains(cls) !== on) e.classList.toggle(cls, on); }
 function setStyle(e: HTMLElement, prop: string, value: string): void { if (e.style.getPropertyValue(prop) !== value) e.style.setProperty(prop, value); }
 function setAttr(e: Element, name: string, value: string): void { if (e.getAttribute(name) !== value) e.setAttribute(name, value); }
+
+const NO_GAPS = { aheadSeconds: null, behindSeconds: null, aheadName: null, behindName: null } as const;
 
 function ordinal(n: number): string { return t('hud.ordinal', { n, s: ordinalSuffix(n) }); }
 
@@ -180,11 +189,14 @@ class MessageSlots {
 class SeatHud {
   readonly root: HTMLElement;
   private readonly tagName: HTMLElement; private readonly assist: HTMLElement;
-  private readonly posN: HTMLElement; private readonly posOf: HTMLElement; private readonly lap: HTMLElement;
+  private readonly pos: HTMLElement; private readonly posN: HTMLElement; private readonly posOf: HTMLElement; private readonly posBadge: HTMLElement; private readonly lap: HTMLElement;
+  private readonly gaps: { ahead: HTMLElement; aheadN: HTMLElement; behind: HTMLElement; behindN: HTMLElement };
+  private readonly motion: PositionMotion = newPositionMotion(); private readonly band: LastLapBand = newLastLapBand(); private readonly draftHold: DraftHold = newDraftHold();
+  private readonly finalBand: HTMLElement; private readonly finalLabel: HTMLElement; private readonly draft: HTMLElement; private readonly draftLabel: HTMLElement;
   private readonly time: HTMLElement; private readonly lastLabel: HTMLElement; private readonly lastVal: HTMLElement; private readonly bestLabel: HTMLElement; private readonly bestVal: HTMLElement;
   private readonly mates: HTMLElement; private readonly mateRows: Array<{ row: HTMLElement; dot: HTMLElement; name: HTMLElement; assist: HTMLElement; pos: HTMLElement }> = [];
-  private readonly fuel: HTMLElement; private readonly fuelLabel: HTMLElement; private readonly fuelFill: HTMLElement;
-  private readonly nitroLabel: HTMLElement; private readonly caps: HTMLElement[] = []; private readonly extra: HTMLElement;
+  private readonly fuel: HTMLElement; private readonly fuelLabel: HTMLElement; private readonly fuelFill: HTMLElement; private readonly fuelPct: HTMLElement; private readonly fuelFlag: HTMLElement;
+  private readonly nitroLabel: HTMLElement; private readonly nitroN: HTMLElement; private readonly caps: HTMLElement[] = []; private readonly extra: HTMLElement;
   private readonly nbar: HTMLElement; private readonly nfill: HTMLElement;
   private readonly rpmFg: SVGPathElement; private readonly kmh: HTMLElement; private readonly unit: HTMLElement; private readonly gear: HTMLElement; private readonly gearLabel: HTMLElement;
   private readonly mini: MiniMap;
@@ -200,8 +212,13 @@ class SeatHud {
     this.lines = el('div', 'lines', this.root);
     const tl = el('div', 'tl glass', this.root);
     const tag = el('div', 'tag', tl); el('i', 'dot', tag); this.tagName = el('span', 'name', tag); this.assist = el('span', 'assist', tag);
-    const pos = el('div', 'pos', tl); this.posN = el('span', 'pos-n', pos); this.posOf = el('span', 'pos-of', pos);
+    const pos = el('div', 'pos', tl); this.pos = pos; this.posN = el('span', 'pos-n', pos); this.posOf = el('span', 'pos-of', pos); this.posBadge = el('span', 'pos-badge', pos);
     this.lap = el('div', 'lap', tl);
+    // Segundos para o carro da frente (▲) e o de trás (▼): a forma da seta diz quem é quem, não a cor.
+    const gaps = el('div', 'gaps', tl);
+    const aheadRow = el('div', 'gap gap-ahead', gaps); el('i', 'gap-ico', aheadRow); const aheadN = el('span', 'gap-n', aheadRow);
+    const behindRow = el('div', 'gap gap-behind', gaps); el('i', 'gap-ico', behindRow); const behindN = el('span', 'gap-n', behindRow);
+    this.gaps = { ahead: aheadRow, aheadN, behind: behindRow, behindN };
     const tr = el('div', 'tr glass', this.root);
     this.time = el('div', 'time', tr);
     const laps = el('div', 'laps', tr);
@@ -215,11 +232,30 @@ class SeatHud {
       this.mateRows.push({ row, dot, name, assist, pos: p });
     }
     const bl = el('div', 'bl glass', this.root);
-    this.fuel = el('div', 'fuel', bl); this.fuelLabel = el('div', 'label', this.fuel); const fbar = el('div', 'bar', this.fuel); this.fuelFill = el('div', 'fill', fbar);
-    const nitro = el('div', 'nitro', bl); this.nitroLabel = el('div', 'label', nitro); const caps = el('div', 'caps', nitro);
-    for (let i = 0; i < 3; i++) this.caps.push(el('i', '', caps));
+    // Combustível: bomba + rótulo + percentual + (baixo) o rótulo em texto, e uma barra de marcas de 25%.
+    this.fuel = el('div', 'fuel', bl);
+    const frow = el('div', 'gauge-row', this.fuel);
+    const pump = svg('svg', frow, { class: 'ico pump', viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+    svg('path', pump, { d: 'M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h14M15 9h2.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 0 3 0V8l-3-3M7.5 7h5' });
+    this.fuelLabel = el('div', 'label', frow); this.fuelPct = el('span', 'fuel-pct', frow); this.fuelFlag = el('span', 'fuel-flag', frow);
+    const fbar = el('div', 'bar', this.fuel); this.fuelFill = el('div', 'fill', fbar);
+    const nitro = el('div', 'nitro', bl);
+    const nrow = el('div', 'gauge-row', nitro); this.nitroLabel = el('div', 'label', nrow); this.nitroN = el('span', 'nitro-n', nrow);
+    const caps = el('div', 'caps', nitro);
+    // Um raio por carga: cheio = acesa, vazio = só o contorno (a forma muda, não só a cor).
+    for (let i = 0; i < NITRO_SLOTS; i++) {
+      const cap = el('i', '', caps);
+      const bolt = svg('svg', cap, { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+      svg('path', bolt, { d: 'M13.5 2L5 13.5h6L9.5 22 19 9.8h-6.4z' });
+      this.caps.push(cap);
+    }
     this.extra = el('span', 'extra', caps);
     this.nbar = el('div', 'nbar', nitro); this.nfill = el('div', 'fill', this.nbar);
+    // Vácuo: pílula flutuando em cima do painel (não mexe na altura dele quando liga).
+    this.draft = el('div', 'draft', bl);
+    const wind = svg('svg', this.draft, { class: 'ico wind', viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+    svg('path', wind, { d: 'M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8' });
+    this.draftLabel = el('span', '', this.draft);
     const br = el('div', 'br glass', this.root);
     const rpm = svg('svg', br, { class: 'rpm', viewBox: '0 0 100 100' });
     const d = 'M 20.3 79.7 A 42 42 0 1 1 79.7 79.7';
@@ -229,6 +265,8 @@ class SeatHud {
     this.gear = el('div', 'gear', br); this.gearLabel = el('small', '', this.gear); this.gear.appendChild(document.createTextNode(''));
     this.mini = new MiniMap(this.root, 'mini glass');
     this.caption = new LandmarkCaption(this.root);
+    this.finalBand = el('div', 'final-band', this.root); this.finalBand.setAttribute('role', 'status');
+    el('i', 'stripes', this.finalBand); this.finalLabel = el('span', '', this.finalBand); el('i', 'stripes', this.finalBand);
     const top = el('div', 'top-msgs', this.root); this.topMsgs = new MessageSlots(top, 2);
     const center = el('div', 'center', this.root); this.count = el('div', 'count', center); this.centerMsgs = new MessageSlots(center, 3);
     this.pause = el('div', 'pause', this.root);
@@ -252,10 +290,29 @@ class SeatHud {
     // Posição e volta.
     setText(this.posN, ordinal(car.position));
     setText(this.posOf, t('hud.of', { total }));
+    const racing = state.phase === 'racing';
+    const calm = frame.options.reduceEffects === true; // Reduzir efeitos: sem a mola e sem a faixa deslizando
+    setClass(r, 'calm', calm);
+    const look = stepPositionMotion(this.motion, { position: car.position, tick: state.tick, startTick: state.startTick, racing, finished: car.finished, time: frame.time });
+    setStyle(this.posN, 'transform', calm ? 'none' : `scale(${look.scale.toFixed(3)})`);
+    setClass(this.pos, 'gain', look.tone === 'gain'); setClass(this.pos, 'loss', look.tone === 'loss');
+    setText(this.posBadge, look.badge); setStyle(this.posBadge, 'opacity', look.badgeOpacity.toFixed(2));
+    // Segundos para o carro da frente e o de trás (a contagem e o fim da corrida não têm "distância" que valha).
+    const lang = getLanguage();
+    const gap = racing && !car.finished ? timeGaps(state, car) : NO_GAPS;
+    for (const [row, n, secs, key] of [[this.gaps.ahead, this.gaps.aheadN, gap.aheadSeconds, 'hud.gapAhead'], [this.gaps.behind, this.gaps.behindN, gap.behindSeconds, 'hud.gapBehind']] as const) {
+      const text = formatGap(secs, lang);
+      setClass(row, 'none', secs === null); setClass(row, 'close', secs !== null && secs < 1);
+      setText(n, text); setAttr(row, 'aria-label', `${t(key)} ${text}`);
+    }
     const lapN = Math.max(1, Math.min(laps, car.lap));
     setText(this.lap, car.finished ? t('hud.finished') : car.lap >= laps ? t('hud.lastLap') : t('hud.lapOf', { n: lapN, total: laps }));
     setClass(this.lap, 'final', !car.finished && car.lap >= laps);
     setClass(this.lap, 'done', car.finished);
+    // Faixa ÚLTIMA VOLTA: dispara na transição para a última volta (hud-motion.ts).
+    const bandOn = stepLastLapBand(this.band, { lap: car.lap, laps, finished: car.finished, racing, tick: state.tick, time: frame.time });
+    setText(this.finalLabel, t('hud.lastLap'));
+    setClass(this.finalBand, 'show', bandOn && !frame.paused);
     // Tempos.
     const raceTicks = car.finished ? car.finishTick - state.startTick : Math.max(0, state.tick - state.startTick);
     setText(this.time, formatTicks(state.phase === 'countdown' ? 0 : raceTicks));
@@ -280,19 +337,28 @@ class SeatHud {
         setText(row.pos, ordinal(oc.position));
       }
     }
+    setClass(this.mates, 'empty', m === 0);
     for (; m < this.mateRows.length; m++) setStyle(this.mateRows[m].row, 'display', 'none');
     // Combustível.
     setClass(this.fuel, 'hidden', state.config.timeTrial === true);
     setText(this.fuelLabel, t('hud.fuel'));
     setStyle(this.fuelFill, 'clip-path', `inset(0 ${((1 - car.fuel) * 100).toFixed(1)}% 0 0)`);
-    setClass(this.fuel, 'low', car.fuel < 0.25);
+    // Nível em texto, número e marcas: o aviso de pouco combustível não depende de ver vermelho (docs/DIRECAO-DE-ARTE.md).
+    const fm = fuelModel(car.fuel);
+    setClass(this.fuel, 'low', fm.level !== 'ok'); setAttr(this.fuel, 'data-level', fm.level);
+    setText(this.fuelPct, `${fm.percent}%`);
+    setText(this.fuelFlag, fm.level === 'low' ? t('hud.fuelLowShort') : fm.level === 'empty' ? t('hud.fuelEmptyShort') : '');
     // Nitro: cofre da equipe ou cargas próprias.
     // Mesma regra da física: com sharedNitro o humano gasta do cofre do time, mesmo sozinho.
     const shared = state.config.assists.sharedNitro;
     const charges = shared ? (state.teamNitro[car.teamId] ?? 0) : car.nitroLeft;
     setText(this.nitroLabel, shared && frame.coop ? `${t('hud.nitro')} · ${t('hud.team')}` : t('hud.nitro'));
-    for (let i = 0; i < 3; i++) setClass(this.caps[i], 'on', i < charges);
-    setText(this.extra, charges > 3 ? `×${charges}` : '');
+    const nm = nitroModel(charges);
+    for (let i = 0; i < NITRO_SLOTS; i++) setClass(this.caps[i], 'on', i < nm.filled);
+    setText(this.extra, nm.extra); setText(this.nitroN, String(nm.count));
+    // Vácuo: o ícone fica um instante a mais para não piscar (hud-motion.ts: DRAFT_HOLD_SECONDS).
+    const drafting = racing && !car.finished && computeModifiers(state, track, car).draft;
+    setClass(this.draft, 'on', stepDraft(this.draftHold, drafting, frame.time)); setText(this.draftLabel, t('hud.draft'));
     setClass(this.nbar, 'on', car.nitroTicks > 0);
     setStyle(this.nfill, 'width', `${((car.nitroTicks / NITRO_DURATION_TICKS) * 100).toFixed(1)}%`);
     setClass(this.lines, 'on', car.nitroTicks > 0 && !frame.paused && !frame.options.reduceEffects);

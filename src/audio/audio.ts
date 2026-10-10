@@ -13,6 +13,8 @@ import type { SimEvent, TrackDef } from '../core/types';
 import { DEFAULT_SETTINGS, type AudioEngine, type MusicInfo, type RenderFrame } from '../game/contracts';
 import { EngineBank } from './engine';
 import { Jukebox, musicInfos, songById, songForScenery, SONGS } from './music';
+import { createSampleBank } from './samples';
+import { loadSampleUrl } from './sample-assets';
 import { createSfx, type Sfx } from './sfx';
 import { glide } from './synth';
 
@@ -39,7 +41,13 @@ function audioContextClass(): (new () => AudioContext) | null {
   return typeof AC === 'function' ? AC : null;
 }
 
-export function createAudio(): AudioEngine {
+/** O `AudioEngine` do contrato mais os sons que a sessão deriva do estado (não são eventos do núcleo). */
+export interface SessionAudio extends AudioEngine {
+  /** Raspão de lado de um jogador local (race-feel.ts: observeScrapes); `strength` 0..1. */
+  scrape(strength: number): void;
+}
+
+export function createAudio(): SessionAudio {
   let graph: Graph | null = null;
   const volumes = { master: DEFAULT_SETTINGS.masterVolume, music: DEFAULT_SETTINGS.musicVolume, sfx: DEFAULT_SETTINGS.sfxVolume };
   /** O que foi pedido em setMusic: id, 'auto' ou null. */
@@ -105,7 +113,7 @@ export function createAudio(): AudioEngine {
       ctx, master, music, sfx, ui, duckFilter, duckGain,
       engines: new EngineBank(ctx, sfx),
       jukebox: new Jukebox(ctx, music),
-      effects: createSfx(ctx, sfx, ui),
+      effects: createSfx(ctx, sfx, ui, createSampleBank(ctx, sfx, loadSampleUrl)),
     };
   }
 
@@ -171,7 +179,11 @@ export function createAudio(): AudioEngine {
     graph?.effects.ui(kind);
   }
 
-  return { unlock, update, onEvent, setMusic, currentMusic, setVolumes, musicList, ui };
+  function scrape(strength: number): void {
+    graph?.effects.scrape(strength);
+  }
+
+  return { unlock, update, onEvent, setMusic, currentMusic, setVolumes, musicList, ui, scrape };
 }
 
 function clamp01(v: number): number {

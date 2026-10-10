@@ -5,7 +5,7 @@ import { carDef } from '../src/core/data/cars';
 import { effectiveStats } from '../src/core/sim/stats';
 import type { CarState, RaceState, SimEvent } from '../src/core/types';
 import { DEFAULT_SETTINGS } from '../src/game/contracts';
-import { newRumbleMemory, RUMBLE_GRASS, rumbleCues } from '../src/game/rumble';
+import { newRumbleMemory, RUMBLE_COLLISION, RUMBLE_GRASS, RUMBLE_SCRAPE, rumbleCues } from '../src/game/rumble';
 import { sanitizeSettings } from '../src/game/settings';
 import { setLanguage } from '../src/i18n';
 import {
@@ -508,6 +508,20 @@ describe('rumbleCues (o que a sessão manda vibrar)', () => {
     expect(crash.strength).toBeGreaterThan(0.8);
     expect(nitro.ms).toBeLessThan(crash.ms);
     expect(nitro.strength).toBeLessThan(crash.strength);
+  });
+
+  it('raspão (onda L, L5): vibra só os humanos do par, curto e fraco, e mais forte com mais velocidade', () => {
+    const cars = [car(0, 0), car(1, -1), car(2, 1)];
+    const soft = rumbleCues(race(cars, []), newRumbleMemory(), [{ a: 0, b: 1, sideOfA: 1, strength: 0.3 }]);
+    expect(soft.map((c) => c.seat)).toEqual([0]); // o carro 1 é da IA: não vibra
+    const hard = rumbleCues(race(cars, []), newRumbleMemory(), [{ a: 0, b: 2, sideOfA: -1, strength: 1 }]);
+    expect(hard.map((c) => c.seat).sort()).toEqual([0, 1]);
+    expect(hard[0].strength).toBeGreaterThan(soft[0].strength);
+    expect(hard[0].strength).toBeLessThanOrEqual(RUMBLE_SCRAPE.min + RUMBLE_SCRAPE.range);
+    expect(hard[0].ms).toBe(RUMBLE_SCRAPE.ms);
+    expect(RUMBLE_SCRAPE.ms).toBeLessThan(RUMBLE_COLLISION.ms);
+    // sem o 3º argumento, o comportamento de antes
+    expect(rumbleCues(race(cars, []), newRumbleMemory())).toEqual([]);
   });
 
   it('grama: pulso fraco com limite de frequência, só andando e só na corrida', () => {
