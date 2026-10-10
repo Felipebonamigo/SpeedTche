@@ -72,16 +72,17 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
 
   const differs = (a: number[], b: number[], tol: number): boolean => a.slice(0, 3).some((v, i) => Math.abs(v - b[i]) > tol);
 
-  it('1, 2 e 4 janelas em cada degrau (2 janelas na Média): o canvas muda DENTRO de cada janela e só ali, sem erro de shader nem link falho', async () => {
+  it('1, 2 e 4 janelas em cada degrau (2 janelas na Média): o canvas muda DENTRO de cada janela (grade de 49 pontos) e só ali, sem erro de shader nem link falho', async () => {
     const combos: Array<[Quality, number]> = LEVELS.flatMap((q) => [[q, 1], [q, 4]] as Array<[Quality, number]>).concat([['medium', 2]]);
     const result = await page.evaluate(async (list) => {
-      const L = (window as unknown as { lab: LabApi }).lab; const out: Array<{ q: string; n: number; drawn: number; vps: number; calls: number[]; inside: number[][]; outside: number[][] }> = [];
+      const L = (window as unknown as { lab: LabApi }).lab; const out: Array<{ q: string; n: number; drawn: number; vps: number; calls: number[]; inside: number[][][]; outside: number[][] }> = [];
       for (const [q, n] of list) {
         const rects = L.mount(n, { quality: q as Quality });
         const dbg = L.frames(1, 2).pop() as DebugInfo;
         out.push({
           q, n, drawn: L.effects().drawn, vps: dbg.viewports.length, calls: dbg.viewports.map((v) => v.calls),
-          inside: rects.map((r) => L.sample(r.x + r.w / 2, r.y + r.h / 2)),
+          // Uma grade 7×7 dentro de cada janela, não um pixel: o do centro pode cair num pneu ou na sombra do carro, que é quase a cor de fundo.
+          inside: rects.map((r) => { const g: Array<[number, number, number, number]> = []; for (let i = 1; i <= 7; i++) for (let j = 1; j <= 7; j++) g.push(L.sample(r.x + (r.w * i) / 8, r.y + (r.h * j) / 8)); return g; }),
           outside: [L.sample(2, 2), L.sample(638, 358)],
         });
         L.unmount();
@@ -94,7 +95,8 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
       expect(r.drawn, tag).toBe(r.n);
       expect(r.vps, `${tag}: viewports no debugInfo`).toBe(r.n);
       for (const c of r.calls) expect(c, `${tag}: chamadas`).toBeGreaterThan(5);
-      for (const px of r.inside) expect(differs(px, BG, 6), `${tag}: o centro da janela é a cor de fundo ${px}`).toBe(true);
+      // O palco desenhou DENTRO de cada janela: a maioria dos 49 pontos difere do fundo (com nada desenhado, seriam todos o fundo).
+      for (const grid of r.inside) { const n = grid.filter((px) => differs(px, BG, 6)).length; expect(n, `${tag}: só ${n} de 49 pontos da janela diferem do fundo`).toBeGreaterThanOrEqual(30); }
       for (const px of r.outside) expect(differs(px, BG, 3), `${tag}: fora da janela mudou ${px}`).toBe(false);
     }
     expect(result.programs.total).toBeGreaterThan(8);
@@ -109,12 +111,12 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
       const rects = L.mount(1, { quality: 'medium', podium: true });
       const dbg = L.frames(1, 3).pop() as DebugInfo;
       const fx = L.effects();
-      const center = L.sample(rects[0].x + rects[0].w / 2, rects[0].y + rects[0].h / 2);
+      const r0 = rects[0]; const grid: number[][] = []; for (let i = 1; i <= 7; i++) for (let j = 1; j <= 7; j++) grid.push(L.sample(r0.x + (r0.w * i) / 8, r0.y + (r0.h * j) / 8));
       L.unmount(); L.frame(100);
-      return { fx, center, calls: dbg.viewports[0].calls, tri: dbg.viewports[0].triangles };
+      return { fx, grid, calls: dbg.viewports[0].calls, tri: dbg.viewports[0].triangles };
     });
     expect(r.fx.podium).toBe(true);
-    expect(differs(r.center, BG, 6)).toBe(true);
+    expect(r.grid.filter((px) => differs(px, BG, 6)).length).toBeGreaterThanOrEqual(30);
     // Três carros com ~3.500 triângulos de casco cada, mais as rodas e os blocos.
     expect(r.tri).toBeGreaterThan(15_000);
   });
