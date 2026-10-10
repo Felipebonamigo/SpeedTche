@@ -67,6 +67,8 @@ export type GameRenderer = Renderer & {
   setDynamicResolution(on: boolean): void;
   /** Fixa a escala da resolução dinâmica (harness e testes); nulo volta ao controle automático. */
   pinDynamicScale(scale: number | null): void;
+  /** Fixa a força do desfoque radial (0..1) no lugar da velocidade e do nitro (harness e testes); nulo volta ao normal. */
+  pinRadialBlur(strength: number | null): void;
 };
 
 export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement): GameRenderer {
@@ -116,6 +118,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   dynamic.setEnabled(dynamicResolutionDefault(typeof location === 'undefined' ? '' : location.search, typeof navigator !== 'undefined' && navigator.webdriver === true));
   let pinned: number | null = null;
   let lastScale = 1;
+  let pinnedRadial: number | null = null;
   let lastRenderAt = -1;
   let lastBlurAt = 0;
   /** Desfoque radial suavizado por viewport (0..1). */
@@ -274,6 +277,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       // Desfoque radial: velocidade acima de 85% ou nitro (plan.ts), com subida e descida suaves (nada de piscar).
       const blurTarget = radialBlurStrength(car.speed / car.stats.topSpeed, car.nitroTicks > 0, frame.options.reduceEffects);
       radial[i] += (blurTarget - radial[i]) * (1 - Math.exp(-blurDt * 7));
+      if (pinnedRadial !== null) radial[i] = pinnedRadial;
       setViewport(rect);
       const due = shadowRing && sp.enabled ? shadowRing.beginViewport(i, car.z, track.length) : false;
       drawViewport(i, rect, cam.camera, q, plan, radial[i]);
@@ -345,6 +349,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })), post: { builds, resizes, scale: lastScale, dynamic: dynamic.enabled } }),
     setDynamicResolution: (on: boolean) => { dynamic.setEnabled(on); if (!on) lastScale = 1; },
     pinDynamicScale: (scale: number | null) => { pinned = scale; },
+    pinRadialBlur: (strength: number | null) => { pinnedRadial = strength; },
     /** Só para depuração no harness (não faz parte do contrato). */
     __scene: scene, __gl: renderer, __pipes: pipes, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
   } as GameRenderer;

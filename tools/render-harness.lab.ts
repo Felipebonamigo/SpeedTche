@@ -99,10 +99,11 @@ const QUALITIES: Quality[] = ['low', 'medium', 'high', 'ultra'];
  * A medição inteira do gate e da compilação, de uma vez (uma página, um aquecimento): para cada qualidade, as cenas do gate (4 quadros,
  * valem os 2 últimos), o fundo do menu, `renderer.compile` e o relatório dos programas.
  */
-function collect(): { samples: GateSample[]; frames: Array<{ scene: string; quality: Quality; debug: DebugInfo[] }>; programs: Array<{ quality: Quality } & ProgramReport> } {
+function collect(): { samples: GateSample[]; frames: Array<{ scene: string; quality: Quality; debug: DebugInfo[] }>; programs: Array<{ quality: Quality } & ProgramReport>; forced: Array<{ quality: Quality; debug: DebugInfo[]; off: DebugInfo[] }> } {
   const samples: GateSample[] = [];
   const frames: Array<{ scene: string; quality: Quality; debug: DebugInfo[] }> = [];
   const reports: Array<{ quality: Quality } & ProgramReport> = [];
+  const forced: Array<{ quality: Quality; debug: DebugInfo[]; off: DebugInfo[] }> = [];
   for (const quality of QUALITIES) {
     for (const s of GATE_SCENES) {
       setup(s.track, s.humans, 300);
@@ -127,9 +128,17 @@ function collect(): { samples: GateSample[]; frames: Array<{ scene: string; qual
     setup('sampa_noite', 1, 300);
     render(quality, 2);
     idle(quality, 1);
+    // Os passes que só rodam em certas condições (o desfoque radial só acima de 85% da velocidade ou no nitro) também têm de compilar:
+    // força a condição, 2 jogadores (com AO na Alta e no Ultra), e solta.
+    setup('copacabana', 2, 300);
+    renderer.pinRadialBlur(0);
+    const off = render(quality, 2);
+    renderer.pinRadialBlur(1);
+    forced.push({ quality, debug: render(quality, 2), off });
+    renderer.pinRadialBlur(null);
     reports.push({ quality, ...programs() });
   }
-  return { samples, frames, programs: reports };
+  return { samples, frames, programs: reports, forced };
 }
 
 const lab = {

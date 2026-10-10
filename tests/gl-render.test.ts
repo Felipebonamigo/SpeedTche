@@ -24,6 +24,7 @@ interface Collected {
   samples: GateSample[];
   frames: Array<{ scene: string; quality: Quality; debug: DebugInfo[] }>;
   programs: Array<{ quality: Quality; total: number; bad: string[]; shaderErrors: string[] }>;
+  forced: Array<{ quality: Quality; debug: DebugInfo[]; off: DebugInfo[] }>;
 }
 
 /** O que `tools/render-harness.lab.ts` põe em `window.lab` (só o que este teste chama). */
@@ -78,6 +79,14 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
       expect(p.bad, `${p.quality}: programas com log`).toEqual([]);
     }
     expect(errors).toEqual([]);
+  });
+
+  it('o desfoque radial é um passe a mais só na Alta e no Ultra, e roda quando a condição é forçada (senão o programa dele nunca seria compilado)', async () => {
+    const data = await collect();
+    const por = (q: Quality) => data.forced.find((f) => f.quality === q)?.debug[1].viewports[0];
+    const sem = (q: Quality) => data.forced.find((f) => f.quality === q)?.off[1].viewports[0];
+    for (const q of ['low', 'medium'] as const) expect(por(q)?.passes, q).toBe(sem(q)?.passes);
+    for (const q of ['high', 'ultra'] as const) expect(por(q)?.passes, q).toBe((sem(q)?.passes ?? 0) + 1);
   });
 
   it('o resize() e a troca de lotação não recriam o composer', async () => {
