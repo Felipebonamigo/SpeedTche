@@ -181,6 +181,18 @@ describe('overlay de voz: os balões', () => {
     expect(all(root, has('vh-own'))[0].classList.contains('show')).toBe(false);
   });
 
+  it('só cabem 2 balões de outros no canto (mais que isso desce até o minimapa): ficam os mais novos', () => {
+    const { root, hud } = make();
+    hud.update(view({
+      balloons: [balloon({ id: 1, seat: 1, name: 'Bia', own: false, text: 'Velho!' }), balloon({ id: 2, seat: 2, name: 'Caio', own: false, text: 'Meio!' }), balloon({ id: 3, seat: -1, name: 'Zé Turbo', own: false, text: 'Novo!' })],
+    }));
+    const shown = all(root, has('vh-other')).filter((o) => o.classList.contains('show')).map(textOf);
+    expect(shown).toHaveLength(2);
+    expect(shown.some((x) => x.includes('Novo!'))).toBe(true);
+    expect(shown.some((x) => x.includes('Meio!'))).toBe(true);
+    expect(shown.some((x) => x.includes('Velho!'))).toBe(false);
+  });
+
   it('o balão some quando acaba o tempo e esmaece no último instante', () => {
     const { root, hud } = make();
     hud.update(view({ balloons: [balloon({ ttl: 2 })] }));

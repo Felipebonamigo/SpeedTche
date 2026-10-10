@@ -62,12 +62,30 @@ async function measure() {
   });
 }
 
+// NC_VOZ_ONLY="2:1280x720:1" roda só essa combinação (jogadores:resolução:escala do HUD); NC_VOZ_DUMP=1 imprime a geometria medida.
+const ONLY = process.env.NC_VOZ_ONLY ?? null;
+
+/** Confere o que está à vista: dentro do viewport, texto >= 12 px e (HUD a 100%) sem cobrir painel do HUD. A 150% o HUD enche a célula e só vale "dentro". */
+function conferir(tag, medidas, hudScale, esperado) {
+  const vistos = medidas.flatMap((v) => v.shown.map((s) => s.label));
+  for (const [label, n] of Object.entries(esperado)) check(vistos.filter((l) => l === label).length === n, `${tag}: ${n} ${label}(s) à vista (${vistos.filter((l) => l === label).length})`);
+  for (const [i, v] of medidas.entries()) {
+    for (const s of v.shown) {
+      check(s.inside, `${tag}: viewport ${i + 1}, ${s.label} dentro do viewport (${Math.round(s.x)},${Math.round(s.y)} ${Math.round(s.w)}×${Math.round(s.h)} em ${Math.round(v.box.w)}×${Math.round(v.box.h)})`);
+      check(s.minFont >= 12, `${tag}: viewport ${i + 1}, ${s.label} com texto ≥ 12 px (${s.minFont.toFixed(1)})`);
+      if (hudScale === 1) check(s.hits.length === 0, `${tag}: viewport ${i + 1}, ${s.label} não cobre painéis do HUD (${s.hits.join(', ') || 'nenhum'})`);
+    }
+  }
+}
+
 for (const hudScale of [1, 1.5]) {
   for (const n of [1, 2, 4]) {
     for (const [w, h] of SIZES) {
+      if (ONLY && ONLY !== `${n}:${w}x${h}:${hudScale}`) continue;
       const tag = `${n}J ${w}×${h} HUD ${hudScale * 100}%`;
+      const principal = hudScale === 1 && w === 1280 && h === 720;
       await startScene(n, w, h, hudScale);
-      // Segura a buzina (e G no teclado 2) até as rodas abrirem, marca uma frase em cada e injeta balões para o que não dá para teclar.
+      // Fase 1: segura a buzina (e G no teclado 2) até as rodas abrirem e marca uma frase em cada; injeta balões para o que não dá para teclar.
       const wheels = Math.min(n, 2);
       for (let i = 0; i < wheels; i++) await page.keyboard.down(KEYS[i].horn);
       const open = await page.waitForFunction((k) => { const v = window.nc.session.race?.voice; return !!v && Array.from({ length: k }, (_, i) => v.wheels[i]?.open === true).every(Boolean); }, wheels, { timeout: 120_000 }).then(() => true, () => false);
@@ -83,19 +101,23 @@ for (const hudScale of [1, 1.5]) {
         for (const list of r.messages.values()) list.push({ text: 'Zé Turbo: Te vejo na reta!', kind: 'info', ttl: 600 });
       }, { n });
       await page.waitForTimeout(1500);
-      const m = await measure();
+      let m = await measure();
       check(m.length === n, `${tag}: um overlay por viewport (${m.length})`);
-      const wheelsSeen = m.flatMap((v) => v.shown).filter((s) => s.label === 'roda');
-      check(wheelsSeen.length === wheels, `${tag}: ${wheels} roda(s) à vista (${wheelsSeen.length})`);
-      for (const [i, v] of m.entries()) {
-        for (const s of v.shown) {
-          check(s.inside, `${tag}: viewport ${i + 1}, ${s.label} dentro do viewport (${Math.round(s.x)},${Math.round(s.y)} ${Math.round(s.w)}×${Math.round(s.h)} em ${Math.round(v.box.w)}×${Math.round(v.box.h)})`);
-          check(s.minFont >= 12, `${tag}: viewport ${i + 1}, ${s.label} com texto ≥ 12 px (${s.minFont.toFixed(1)})`);
-          if (s.label !== 'balão-alto') check(s.hits.length === 0, `${tag}: viewport ${i + 1}, ${s.label} não cobre painéis do HUD (${s.hits.join(', ') || 'nenhum'})`);
-        }
-      }
-      if (hudScale === 1 && w === 1280 && h === 720) await page.screenshot({ path: `${out}-${n}j.png`, timeout: 180_000 });
+      if (process.env.NC_VOZ_DUMP) console.log(JSON.stringify(m, (k, v) => (typeof v === 'number' ? Math.round(v) : v)));
+      conferir(`${tag} [roda aberta]`, m, hudScale, { roda: wheels });
+      if (principal) await page.screenshot({ path: `${out}-${n}j-roda.png`, timeout: 180_000 });
+      // Fase 2: solta a buzina — as frases marcadas viram balões de verdade sobre cada carro.
       for (let i = 0; i < wheels; i++) await page.keyboard.up(KEYS[i].horn);
+      const falou = await page.waitForFunction((k) => { const v = window.nc.session.race?.voice; return !!v && Array.from({ length: k }, (_, i) => v.balloons.some((b) => b.seat === i && b.own)).every(Boolean); }, wheels, { timeout: 120_000 }).then(() => true, () => false);
+      check(falou, `${tag}: soltar a buzina com a frase marcada vira balão sobre o carro (${wheels})`);
+      // O balão de verdade dura 2 s de tempo de quadro (o 3D por software leva ~0,3 s por quadro): segura-o à vista para medir e fotografar.
+      await page.evaluate(() => { for (const b of window.nc.session.race.voice.balloons) { b.ttl = 600; b.total = 600; } });
+      await page.waitForTimeout(800);
+      m = await measure();
+      const proprios = m.flatMap((v) => v.shown).filter((s) => s.label === 'balão-próprio').length;
+      conferir(`${tag} [balões]`, m, hudScale, { roda: 0, 'balão-próprio': n });
+      if (principal) await page.screenshot({ path: `${out}-${n}j-balao.png`, timeout: 180_000 });
+      void proprios;
       await page.waitForTimeout(300);
     }
   }

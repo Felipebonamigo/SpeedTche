@@ -31,8 +31,8 @@ export interface VoiceHud {
   dispose(): void;
 }
 
-/** Quantos balões de outros falantes cabem empilhados no alto de um viewport. */
-const OTHER_SLOTS = 3;
+/** Quantos balões de outros falantes cabem empilhados no canto de um viewport (mais que isto desce até o minimapa): os 2 mais novos. */
+const OTHER_SLOTS = 2;
 const FADE_SECONDS = 0.3;
 
 function el(tag: string, cls: string, parent: HTMLElement): HTMLElement {
@@ -128,8 +128,9 @@ class ViewportNodes {
     // Balões: o do próprio falante em cima do carro dele; os de outros (outro assento, outro computador, o rival) no alto.
     let own: Balloon | null = null;
     let k = 0;
-    for (const b of balloons) {
-      if (b.own && b.seat === vp.seat) { own = b; continue; }
+    for (let j = balloons.length - 1; j >= 0; j--) { // do mais novo para o mais velho: os dois mais novos aparecem
+      const b = balloons[j];
+      if (b.own && b.seat === vp.seat) { own ??= b; continue; }
       if (k < this.others.length) this.others[k++].show(b);
     }
     this.own.show(own);
