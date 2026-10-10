@@ -120,20 +120,25 @@ let g = await until(guest, (s) => s.phase === 'lobby' && s.room === 2, 'convidad
 check(!g.isHost && g.code === h.code, `convidado na sala ${g.code}`);
 h = await until(host, (s) => s.room === 2, 'anfitrião vê o convidado');
 
-// Convidado troca de carro, pinta o carro (duas para a frente na paleta) e fica pronto (itens: nome, carro,
-// pintura, direção, PRONTO, sair).
+// Convidado troca de carro, pinta o carro (duas para a frente na paleta), personaliza o visual (N3: acabamento, faixa e roda
+// pelo controlador, o mesmo caminho do editor) e fica pronto (itens: nome, carro, pintura, direção, Visual, PRONTO, sair).
 await press(guest, 'ArrowDown');
 await press(guest, 'ArrowRight');
 await press(guest, 'ArrowDown');
 await press(guest, 'ArrowRight', 2);
 const guestPaint = await guest.evaluate(() => window.nc.session.online.paintOf(0));
 check(guestPaint !== 'original', `convidado pinta o carro (${guestPaint})`);
-await press(guest, 'ArrowDown', 2);
+await guest.evaluate(() => { const o = window.nc.session.online; for (const [f, n] of [['finish', 3], ['stripe', 2], ['wheel', 1], ['flame', 2]]) for (let i = 0; i < n; i++) o.stepLookField(0, f, 1); });
+const guestLook = await guest.evaluate(() => JSON.stringify(window.nc.session.online.lookOf(0)));
+check(/"finish":"fosco"/.test(guestLook) && /"stripe":"a"/.test(guestLook) && /"wheel"/.test(guestLook) && /"flame"/.test(guestLook), `convidado personaliza o visual (${guestLook})`);
+await press(guest, 'ArrowDown', 3);
 await press(guest, 'Enter');
 const guestReady = await waitFor(guest, () => window.nc.session.online.ready);
 check(guestReady, 'convidado pronto');
-const seenPaint = await waitFor(host, (p) => window.nc.session.online.room?.clients.some((c) => c.info?.players[0]?.paint === p), guestPaint);
+const seenPaint = await waitFor(host, (p) => window.nc.session.online.room?.clients.some((c) => c.info?.players[0]?.look?.paint === p), guestPaint);
 check(seenPaint, `o anfitrião vê a pintura do convidado na sala (${guestPaint})`);
+const seenLook = await host.evaluate(() => JSON.stringify(window.nc.session.online.room?.clients.find((c) => c.id !== window.nc.session.online.myId)?.info?.players[0]?.look ?? null));
+check(seenLook === guestLook, `o anfitrião vê o visual inteiro do convidado, idêntico (${seenLook})`);
 await shot(guest, '02-lobby-guest');
 
 // Anfitrião: nome, carro, pintura, direção, pista (→ próxima), voltas (← uma a menos), modo, dificuldade, carros
@@ -150,7 +155,7 @@ await host.evaluate(() => {
   o.onChange(() => { const s = o.room?.settings; const k = s ? `${s.laps}/${s.totalCars}` : null; if (k && window.__seen[window.__seen.length - 1] !== k) window.__seen.push(k); });
 });
 const initial = await host.evaluate(() => { const s = window.nc.session.online.room.settings; return { laps: s.laps, totalCars: s.totalCars }; });
-await press(host, 'ArrowDown', 4);
+await press(host, 'ArrowDown', 5); // nome, carro, pintura, direção, Visual → a pista
 await press(host, 'ArrowRight');
 await press(host, 'ArrowDown');
 await press(host, 'ArrowLeft');
@@ -178,7 +183,10 @@ const [cfgHost, cfgGuest] = [JSON.parse(await raceCfg(host)), JSON.parse(await r
 check(cfgHost.trackId === chosen.trackId && cfgHost.laps === chosen.laps && cfgHost.totalCars === chosen.totalCars,
   `a largada leva o que o anfitrião escolheu (${cfgHost.trackId}, ${cfgHost.laps} voltas, ${cfgHost.totalCars} carros)`);
 check(JSON.stringify(cfgHost) === JSON.stringify(cfgGuest), 'config da corrida idêntica nos dois computadores');
-check(!JSON.stringify(cfgHost).includes('paint'), 'a pintura não vai na config da corrida (o estado não carrega cosmético)');
+check(!/paint|"look"/.test(JSON.stringify(cfgHost)), 'o visual não vai na config da corrida (o estado não carrega cosmético)');
+const raceLooks = (p) => p.evaluate(() => { const r = window.nc.session.race; return JSON.stringify(r.looks[r.state.cars.findIndex((c) => c.seat === 1)]); });
+const [looksHost, looksGuest] = [await raceLooks(host), await raceLooks(guest)];
+check(looksHost === looksGuest && looksHost === guestLook, `os dois computadores desenham o carro do convidado com o MESMO visual (${looksHost})`);
 const racePaints = (p) => p.evaluate(() => { const r = window.nc.session.race; return JSON.stringify({ paints: r.paints, guest: r.paints[r.state.cars.findIndex((c) => c.seat === 1)] }); });
 const [paintsHost, paintsGuest] = [JSON.parse(await racePaints(host)), JSON.parse(await racePaints(guest))];
 check(JSON.stringify(paintsHost) === JSON.stringify(paintsGuest) && paintsHost.guest !== null,

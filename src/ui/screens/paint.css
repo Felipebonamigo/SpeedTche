@@ -23,3 +23,22 @@
 :is(.slot, .online-local) .sel-paint .sel-label, :is(.slot, .online-local) .sel-paint .sel-value { font-size: var(--fs-sm); }
 :is(.slot, .online-local) .sel-paint .sel-value { min-width: calc(96 * var(--u)); }
 :is(.slot, .online-local) .sel-paint.locked .sel-arrow { visibility: hidden; }
+
+/* O editor do visual inteiro (N3, paint.ts: lookEditor): a prévia (silhueta na cor e no detalhe), uma linha por campo do CarLook em duas
+   colunas e o Voltar. No cartão do lobby ele toma o lugar do carro e das barras; na sala online, desce abaixo do botão "Visual". */
+.look-editor { display: flex; flex-direction: column; gap: calc(4 * var(--u)); min-height: 0; }
+.look-preview { display: flex; justify-content: center; }
+.look-preview .car-svg { max-height: calc(54 * var(--u)); width: auto; }
+.look-rows { display: grid; grid-template-columns: 1fr 1fr; gap: calc(3 * var(--u)) calc(6 * var(--u)); }
+.sel-look { padding: calc(1 * var(--u)) calc(4 * var(--u)) calc(1 * var(--u)) calc(8 * var(--u)); flex: none; min-width: 0; }
+.sel-look .sel-label, .sel-look .sel-value { font-size: var(--fs-sm); white-space: nowrap; }
+.sel-look .sel-box { min-width: 0; }
+.sel-look .sel-arrow { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
+.sel-look .look-value { display: inline-flex; align-items: center; justify-content: center; gap: calc(4 * var(--u)); min-width: calc(70 * var(--u)); overflow: hidden; }
+.sel-look .look-name { overflow: hidden; text-overflow: ellipsis; }
+.look-dot { width: calc(11 * var(--u)); height: calc(11 * var(--u)); box-shadow: 0 0 0 calc(1 * var(--u)) rgba(255, 255, 255, 0.55); }
+.btn-look { padding: calc(3 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn-look.locked { opacity: 0.55; }
+.btn-look-back { padding: calc(3 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); align-self: center; }
+.slot.editing { justify-content: flex-start; }
+.online-look-editor { margin-top: calc(2 * var(--u)); }

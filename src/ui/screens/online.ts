@@ -20,7 +20,7 @@ import { isKeyboard } from '../input';
 import { button, createFocusList, dayIcon, flagFor, h, listNav, screenFrame, selector, trackName, trackThumb, type FocusItem, type FocusList, type ScreenApi, type ScreenInstance } from './common';
 import { icon, medal } from './icons';
 import './online.css';
-import { paintSelector, paintSwatch } from './paint';
+import { lookEditor, lookSummary, paintSelector, paintSwatch } from './paint';
 import { assistMark } from './results';
 import { createMuteModel } from '../../voice/mute';
 
@@ -75,10 +75,13 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
   let refreshers: Array<() => void> = [];
   /** Dispositivo que abriu a tela (vira o jogador 1 deste computador). */
   let opener: DeviceId = 'kb1';
+  /** O editor do visual (N3) aberto no cartão de cada jogador local, e onde ficava o botão dele na lista de foco (o cursor volta para lá ao fechar). */
+  const lookOpen = [false, false];
+  const lookIndex = [0, 0];
 
   function structureKey(): string {
     const r = online!.room;
-    return [view, online!.locals.length, online!.isHost, online!.ready, online!.error ?? '', r ? 'room' : '-', ctx.settings.language].join('|');
+    return [view, online!.locals.length, online!.isHost, online!.ready, online!.error ?? '', r ? 'room' : '-', ctx.settings.language, lookOpen.join('')].join('|');
   }
 
   function render(): void {
@@ -179,6 +182,8 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
   function lobbyView(): { body: HTMLElement; items: FocusItem[] } {
     const items: FocusItem[] = [];
     const locked = online!.ready;
+    // Com o "pronto" dado (ou o 2º jogador removido) o editor do visual fecha: nada muda trancado.
+    for (let i = 0; i < lookOpen.length; i++) if (locked || i >= online!.locals.length) lookOpen[i] = false;
 
     // Jogadores deste computador.
     const localEls = online!.locals.map((p, i) => {
@@ -198,15 +203,33 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
       // Direção assistida deste jogador (a do assento local nas opções): vai para a sala e para a largada.
       const assistSel = selector(t('access.lobby.assist'), () => t(`access.level.${online!.assistOf(i)}`), (d) => online!.cycleAssist(i, d),
         { sfx: api.sfx, cls: `sel-assist online-assist${locked ? ' locked' : ''}` });
+      // O visual inteiro (N3): um botão no cartão que abre o editor logo abaixo (acabamento, roda, aro, faixa, chama, cores livres).
+      const lookBtn = button(`${t('look.row')}: ${lookSummary(online!.lookOf(i))}`, () => {
+        if (online!.ready) return;
+        lookOpen[i] = !lookOpen[i];
+        list = null; // o render não regrava o cursor desta lista (o do botão é o que vale)
+        cursors.lobby = lookIndex[i];
+        render();
+      }, `btn-look online-look${locked ? ' locked' : ''}${lookOpen[i] ? ' open' : ''}`);
+      const editor = lookOpen[i] && !locked ? lookEditor({
+        car: () => carDef(online!.locals[i]?.car ?? CARS[0].id),
+        look: () => online!.lookOf(i),
+        onStep: (field, dir) => { if (field === 'paint') online!.cyclePaint(i, dir); else online!.stepLookField(i, field, dir); },
+        onClose: () => { lookOpen[i] = false; list = null; cursors.lobby = lookIndex[i]; render(); },
+        sfx: api.sfx, cls: 'online-look-editor',
+      }) : null;
       items.push(nameRow, carSel, paintSel, assistSel);
-      refreshers.push(() => carSel.refresh(), () => paintSel.refresh(), () => assistSel.refresh());
+      lookIndex[i] = items.length;
+      items.push(lookBtn);
+      if (editor) items.push(...editor.items);
+      refreshers.push(() => carSel.refresh(), () => paintSel.refresh(), () => assistSel.refresh(), () => editor?.refresh());
       const badge = h('span', { class: 'seat-badge' });
       const box = h('div', { class: 'online-local' },
         h('div', { class: 'online-local-head' },
           badge,
           h('span', { class: 'slot-device' }, icon(isKeyboard(p.device) ? 'keyboard' : 'gamepad'), h('span', { text: deviceLabel(p.device) })),
         ),
-        nameRow.el, carSel.el, paintSel.el, assistSel.el,
+        nameRow.el, carSel.el, paintSel.el, assistSel.el, lookBtn.el, editor?.el,
       );
       // O assento (e a cor) segue a ordem da sala: muda se alguém de id menor sai.
       refreshers.push(() => {
@@ -375,7 +398,7 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
             // Nome e, embaixo dele, o selo da direção (ao lado, o selo espremia o nome até sumir).
             h('span', { class: 'online-player-who' }, h('span', { class: 'online-player-name', text: seatName(p.name, seat) }), assistTag(p.assist)),
             // Carro com a amostra da pintura que o jogador escolheu (a Original, nas cores de fábrica).
-            h('span', { class: 'online-player-car' }, paintSwatch(p.look?.paint ?? ORIGINAL_PAINT, carDef(p.car)), h('span', { text: carName(p.car) })),
+            h('span', { class: 'online-player-car' }, paintSwatch(p.look ?? ORIGINAL_PAINT, carDef(p.car)), h('span', { text: carName(p.car) })),
           );
         }),
       );
