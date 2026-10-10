@@ -41,6 +41,7 @@ import { createPartySession, isPartyRaceMode } from './party-session';
 import { racePaints, withoutPaint } from './paints';
 import { carIndexOfSeat } from '../core/modes';
 import { createFeelTracker, createScrapeMemory, observeFeel, observeScrapes, type FeelTracker, type ScrapeCue, type ScrapeMemory } from './race-feel';
+import { countdownCue } from '../render/hud-model';
 import { getActivePlaylog, playlogRace } from './playlog';
 import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
@@ -87,6 +88,8 @@ interface ActiveRace {
   scrapes: ScrapeMemory;
   talk: RivalTalk | null;
   heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown'> | undefined>;
+  /** Online: o atraso de entrada do lockstep, em ticks; 0 no sofá e no tutorial. A contagem (luzes, bipes, "JÁ!") anda adiantada por ele (N1). */
+  inputLead: number;
 }
 
 export interface Session {
@@ -261,6 +264,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       paints: racePaints(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
       scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null,
+      inputLead: net && net.driver === online ? Math.max(0, online.status().delayTicks) : 0,
     };
     getActivePlaylog()?.raceStarted({ mode, trackId: config.trackId, humans: localSeats.length });
     session.paused = false;
@@ -461,9 +465,14 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   }
 
   function stepOnce(r: ActiveRace, inputs: PlayerInput[]): void {
+    // Online, a contagem anda adiantada pelo atraso de entrada (hud-model.ts: countdownCue): o bipe e o "JÁ!" saem no tick DESENHADO,
+    // junto da luz, e os eventos `countdown` e `go` do núcleo (que saem `inputLead` ticks depois) não tocam de novo.
+    const lead = r.inputLead;
+    const cue = lead > 0 ? countdownCue(r.state.tick, lead) : null;
     const events = stepObserved(r, inputs); // observa antes: o tick que fecha a corrida já conta
     for (const f of Object.values(r.feel)) observeFeel(f, r.state);
-    for (const e of events) handleEvent(r, e);
+    if (cue) handleEvent(r, cue);
+    for (const e of events) { if (lead > 0 && (e.type === 'countdown' || e.type === 'go')) continue; handleEvent(r, e); }
     r.ghost?.afterTick(r.state);
     // Sinais que o núcleo não emite: o raspão de lado (derivado do estado) e a fala do rival na pista. Só visual e sonoro.
     const scrapes = observeScrapes(r.scrapes, r.state);
@@ -498,6 +507,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       showHud: menus.current() === null || menus.current() === 'pause' || (r.driver !== null && online.quitOpen),
       ghost: r.ghost?.frame(r.state),
       paints: r.paints,
+      ...(r.inputLead > 0 ? { inputLead: r.inputLead } : {}),
     };
   }
 

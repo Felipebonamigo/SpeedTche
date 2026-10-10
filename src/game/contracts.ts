@@ -269,6 +269,11 @@ export interface RenderFrame {
    * aparência, montada pela sessão na largada (racePaints em src/game/paints.ts): o estado da corrida não a tem.
    */
   paints?: ReadonlyArray<CarColors | null>;
+  /**
+   * Online: o atraso de entrada do lockstep, em ticks (onda N, N1). A contagem é desenhada no tick do núcleo mais isto, para o aperto
+   * no instante em que o jogador vê o zero cair no tick do "JÁ" (a largada-foguete). Ausente ou 0 = sofá e tutorial: a contagem do núcleo.
+   */
+  inputLead?: number;
 }
 
 /**
