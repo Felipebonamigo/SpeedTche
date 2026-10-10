@@ -140,8 +140,8 @@ html, body {
 
 .logo-wrap { display: flex; justify-content: center; }
 .logo { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 calc(10 * var(--u)) calc(22 * var(--u)) rgba(0, 0, 0, 0.45)); }
-.logo-wrap-big { width: calc(560 * var(--u)); max-width: 80vw; }
-.logo-wrap-small { width: calc(150 * var(--u)); margin-bottom: calc(6 * var(--u)); }
+.logo-wrap-big { width: calc(500 * var(--u)); max-width: 80vw; margin-bottom: calc(14 * var(--u)); }
+.logo-wrap-small { width: calc(140 * var(--u)); margin-bottom: calc(4 * var(--u)); }
 
 /* Quebra de linha só quando não cabe: o chip desce para baixo do título ("PASSE O CONTROLE" partia ao meio). */
 .screen-title-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: calc(6 * var(--u)) var(--gap); margin-bottom: var(--gap); }

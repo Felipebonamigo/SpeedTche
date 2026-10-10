@@ -418,6 +418,8 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
           .filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0);
         const overlaps = [];
         for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {
+          // Selo que mora dentro de um painel (o "+2" da posição, o BAIXO do combustível) cobre o canto do próprio painel de propósito.
+          if (panels[i].contains(panels[j]) || panels[j].contains(panels[i])) continue;
           const a = panels[i].getBoundingClientRect(); const b = panels[j].getBoundingClientRect();
           if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) overlaps.push(`${panels[i].className.split(' ')[0]}×${panels[j].className.split(' ')[0]}`);
         }

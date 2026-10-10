@@ -74,7 +74,7 @@
 .nc-hud .fuel[data-level="low"] .bar .fill { background: repeating-linear-gradient(135deg, #ff7a5c 0 calc(5px * var(--s)), #fff2c2 calc(5px * var(--s)) calc(10px * var(--s))); animation: nc-blink 0.9s steps(2, start) infinite; }
 .nc-hud .fuel[data-level="low"] .label, .nc-hud .fuel[data-level="empty"] .label { color: #ffd28a; }
 .nc-hud .fuel[data-level="empty"] .bar { background: repeating-linear-gradient(135deg, rgba(255, 122, 92, 0.35) 0 calc(5px * var(--s)), transparent calc(5px * var(--s)) calc(10px * var(--s))); }
-.nc-hud .fuel-flag { position: absolute; right: calc(12px * var(--s)); top: calc(-11px * var(--s)); display: inline-flex; align-items: center; gap: calc(4px * var(--s)); padding: 0 calc(8px * var(--s)); border-radius: 999px;
+.nc-hud .fuel-flag { position: absolute; right: calc(10px * var(--s)); bottom: calc(100% - max(2px, calc(4px * var(--s)))); display: inline-flex; align-items: center; gap: calc(4px * var(--s)); padding: 0 calc(8px * var(--s)); border-radius: 999px;
   background: #ffd23f; color: #3b1500; border: max(2px, calc(2.5px * var(--s))) solid #fff; font-size: calc(12px * var(--s)); font-weight: 900; letter-spacing: 0.06em; line-height: 1.25; animation: nc-blink 0.9s steps(2, start) infinite; }
 .nc-hud .fuel-flag:empty { display: none; }
 .nc-hud .fuel-flag::before { content: '!'; display: inline-block; width: 1.25em; height: 1.25em; border-radius: 50%; background: #3b1500; color: #ffd23f; text-align: center; line-height: 1.25; }
