@@ -8,17 +8,19 @@
 // de tela que cobre vários ticks.
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
+import { computeModifiers } from '../core/sim/coop';
 import { driftLevel } from '../core/sim/physics';
 import type { RaceState, Track } from '../core/types';
 import type { RenderFrame } from '../game/contracts';
 import { createScrapeMemory, observeScrapes } from '../game/race-feel';
 import { newCueMemory, observeCues, type FxCue } from './fx/cues';
-import { fxPlan } from './fx/plan';
+import { fxPlan, type FxPlan } from './fx/plan';
 import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
 import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
 import { Pows, powSize } from './fx/pow';
 import { Shockwaves } from './fx/shockwave';
+import { draftLine, lineCount, speedLine, speedLineStrength, type LineSpec } from './fx/lines';
 import { markStrength, TireMarks, type MarkCarState } from './fx/marks';
 import { hash2 } from './noise';
 import type { Palette } from './palette';
@@ -155,6 +157,9 @@ class Pool {
 /** Teto de pontos do anel das marcas de pneu (o do Ultra, `fxPlan`); o degrau escolhe quantos usa. */
 const MARKS_MAX = 2048;
 
+/** O que cada viewport guarda entre quadros para as linhas: intensidades suavizadas e a posição do carro dele. */
+interface ViewFx { lineS: number; draftI: number; z: number; x: number; travel: number; speedMs: number; time: number }
+
 export interface Shake { x: number; y: number; roll: number }
 
 export class Effects {
@@ -169,6 +174,9 @@ export class Effects {
   private readonly pows = new Pows();
   private readonly markCar: MarkCarState = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, collisionCooldown: 0, launch: 0 };
   private markClock = 0;
+  private plan: FxPlan = fxPlan('high', false);
+  private readonly views: ViewFx[] = [0, 1, 2, 3].map(() => ({ lineS: 0, draftI: 0, z: 0, x: 0, travel: 0, speedMs: 0, time: 0 }));
+  private readonly spec: LineSpec = { dz: 0, tail: 0, lat: 0, h: 0, width: 0, r: 0, g: 0, b: 0, a: 0 };
   private readonly cues: FxCue[] = [];
   private readonly cueMemory = newCueMemory();
   private readonly sparkCar: SparkCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0 };
@@ -212,6 +220,7 @@ export class Effects {
     const state: RaceState = frame.state;
     const reduce = frame.options.reduceEffects === true;
     const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length);
+    this.plan = plan;
     this.marks.buffer.setCapacity(plan.marks);
     this.markClock += dt;
     this.dustRgb[0] = this.dustColor.r; this.dustRgb[1] = this.dustColor.g; this.dustRgb[2] = this.dustColor.b;
@@ -263,6 +272,21 @@ export class Effects {
         this.sparks.emit({ z: s.z, x: s.x, h: s.y, vz: s.vz, vx: s.vx, vh: s.vy, svz: s.vz - slow, svx: s.vx, svh: s.vy, life: s.life, width: 0.05, gravity: 9, r: 2.2, g: 1.5, b: 0.5 });
       }
     }
+    // Linhas de velocidade e túnel do vácuo: a intensidade de cada viewport sobe e desce com suavidade (nada de piscar ao cruzar 85%).
+    for (let v = 0; v < 4; v++) {
+      const view = this.views[v];
+      const car = v < frame.viewports.length ? state.cars[frame.viewports[v].carIndex] : undefined;
+      if (!car) { view.lineS = 0; view.draftI = 0; continue; }
+      const live = state.phase !== 'countdown';
+      const top = car.stats.topSpeed;
+      const lineT = live && plan.speedLines > 0 ? speedLineStrength(top > 0 ? car.speed / top : 0, car.nitroTicks > 0) : 0;
+      view.lineS += (lineT - view.lineS) * (1 - Math.exp(-dt * 5));
+      if (lineT === 0 && view.lineS < 0.02) view.lineS = 0;
+      const draftT = live && plan.draftLines > 0 && !car.finished && computeModifiers(state, frame.track, car).draft ? 1 : 0;
+      view.draftI += (draftT - view.draftI) * (1 - Math.exp(-dt * 6));
+      if (draftT === 0 && view.draftI < 0.02) view.draftI = 0;
+      view.z = car.z; view.x = car.x; view.travel = car.progress * 0.02; view.speedMs = car.speed * 0.02; view.time = frame.time;
+    }
     this.dust.step(dt);
     this.sparks.step(dt);
     this.waves.step(dt);
@@ -271,11 +295,12 @@ export class Effects {
   }
 
   /** `viewport` = o índice do viewport desta pose (as linhas de velocidade e o túnel são de quem corre nele). */
-  pose(rf: RoadFrame, track: Track, scale: number, _viewport = 0): void {
+  pose(rf: RoadFrame, track: Track, scale: number, viewport = 0): void {
     this.dust.pose(rf, track, scale);
     const st = this.streaks;
     st.begin();
     this.sparks.pose(rf, track, st);
+    this.poseLines(rf, track, st, viewport);
     st.end();
     this.marks.pose(rf, track, this.markClock);
     this.waves.pose(rf, track);
@@ -292,6 +317,28 @@ export class Effects {
     this.streaks.begin(); this.streaks.end();
     this.marks.buffer.clear(); this.marks.mesh.visible = false;
     this.waves.clear(); this.pows.clear();
+  }
+
+  /** As linhas de velocidade e o túnel do vácuo do viewport, no lote de traços (coordenada de pista em volta do carro dele). */
+  private poseLines(rf: RoadFrame, track: Track, st: Streaks, viewport: number): void {
+    const v = this.views[viewport];
+    if (!v || (v.lineS === 0 && v.draftI === 0)) return;
+    const s = this.spec;
+    const nSpeed = lineCount(this.plan.speedLines, v.lineS);
+    for (let k = 0; k < nSpeed; k++) if (speedLine(k, nSpeed, v.travel, v.speedMs, v.lineS, s)) this.addLine(rf, track, st, v, s);
+    const ring = this.plan.draftLines;
+    const nDraft = lineCount(ring, v.draftI);
+    for (let k = 0; k < nDraft; k++) if (draftLine(k, ring, v.travel, v.time, v.speedMs, v.draftI, s)) this.addLine(rf, track, st, v, s);
+  }
+
+  private readonly lineHead: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
+  private readonly lineTail: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
+
+  private addLine(rf: RoadFrame, track: Track, st: Streaks, v: ViewFx, s: LineSpec): void {
+    const hd = this.lineHead; const tl = this.lineTail;
+    if (!locateOnFrame(rf, track, v.z + s.dz * 50, v.x + s.lat / 7, hd)) return;
+    const ok = locateOnFrame(rf, track, v.z + s.tail * 50, v.x + s.lat / 7, tl);
+    st.add(hd.x, hd.y + s.h, hd.z, ok ? tl.x : hd.x, ok ? tl.y + s.h : hd.y + s.h, ok ? tl.z : hd.z - 1, s.width, s.r, s.g, s.b, s.a);
   }
 
   /** Deslocamento da câmera pelo chacoalho do assento (zero se desligado nas opções). */

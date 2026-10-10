@@ -275,7 +275,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       const seg = segmentAt(track, car.z);
       effects.shake(vp.seat, frame.time, frame.options.screenShake && !frame.options.reduceEffects, shake);
       cam.update(rf, car.x, car.speed / car.stats.topSpeed, seg.curve, car.nitroTicks > 0, frame.time, shake, cameraExtraFor(frame, vp.carIndex, cameraExtras[i]));
-      effects.pose(rf, track, (rect.h * dpr) / (2 * Math.tan((cam.camera.fov * Math.PI / 180) / 2)));
+      effects.pose(rf, track, (rect.h * dpr) / (2 * Math.tan((cam.camera.fov * Math.PI / 180) / 2)), i);
       // Legenda dos marcos: só correndo (nem na contagem, nem depois da chegada); desligada nas opções, sem cena (nada
       // montado, e a que estava na tela some). O relógio é o da corrida: parado na pausa (o HUD esconde a legenda), e
       // volta a zero numa corrida nova.
