@@ -98,6 +98,20 @@ describe('onda de choque: o anel', () => {
     expect((w.mesh.material as THREE.MeshBasicMaterial).vertexColors).toBe(true);
   });
 
+  it('o halo do nitro acompanha o carro que engatou (fixo no mundo, o carro o deixava para trás e ele passava atrás da câmera: invisível)', () => {
+    const w = new Shockwaves();
+    w.spawn('halo', 3000 - 70, 0.2, 0.55, 5);
+    w.spawn('ground', 3000, 0, 0.05); // sem dono: fica onde nasceu
+    w.follow(5, 3500, 0.1); // o carro 5 andou 10 m
+    w.follow(6, 9999, 0.9);
+    w.step(0.1); w.pose(rf, track);
+    const m = new THREE.Matrix4(); const pos = new THREE.Vector3();
+    w.mesh.getMatrixAt(0, m); pos.setFromMatrixPosition(m);
+    expect(pos.z).toBeCloseTo(-(500 / 50), 3); expect(pos.x).toBeCloseTo(0.1 * 7, 3); // 3500 − 3000 = 500 unidades = 10 m à frente de rf
+    w.mesh.getMatrixAt(1, m); pos.setFromMatrixPosition(m);
+    expect(pos.z).toBeCloseTo(0, 3);
+  });
+
   it('o brilho vai pela cor da instância (aditivo) e cai com a idade; fora da janela da pista não aparece', () => {
     const w = new Shockwaves();
     const mat = w.mesh.material as THREE.MeshBasicMaterial;
@@ -222,6 +236,14 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     expect(waves(s.fx)).toBe(antes + 1);
     s.car.nitroTicks = 140; tick(s);
     expect(waves(s.fx)).toBe(antes + 1);
+    // o carro dispara 10 m à frente: o halo vai junto, 1,4 m atrás do centro dele
+    s.car.z = (s.car.z + 500) % s.state.trackLength; tick(s);
+    const w = (s.fx as unknown as { waves: Shockwaves }).waves;
+    w.pose(buildRoadFrame(s.frame.track, s.car.z, 30, 200), s.frame.track);
+    const mm = new THREE.Matrix4(); const p = new THREE.Vector3();
+    let found = false;
+    for (let i = 0; i < w.mesh.count; i++) { w.mesh.getMatrixAt(i, mm); p.setFromMatrixPosition(mm); if (Math.abs(p.y - 0.55) < 1e-3 && Math.abs(p.z - 70 / 50) < 1e-2) found = true; }
+    expect(found).toBe(true);
   });
 
   it('só os carros dos humanos ganham o halo do nitro, e só a batida perto de um viewport ganha POW (o anel e o quadrinho dos rivais longe não tomam a vaga dos que se veem)', () => {

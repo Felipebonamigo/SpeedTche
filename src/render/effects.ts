@@ -164,6 +164,8 @@ const MARKS_MAX = 2048;
 const NEAR_VIEWER = 8000;
 /** O POW fica 0,4 m (20 unidades) à frente do centro do carro que bateu, e vai com ele. */
 const POW_AHEAD = 20;
+/** O halo do nitro nasce 1,4 m (70 unidades) atrás do centro do carro, no escape, e vai com ele. */
+const HALO_BEHIND = 70;
 
 /** O que cada viewport guarda entre quadros para as linhas: intensidades suavizadas e a posição do carro dele. */
 interface ViewFx { lineS: number; draftI: number; z: number; x: number; travel: number; speedMs: number; time: number }
@@ -260,6 +262,7 @@ export class Effects {
       }
       this.prevSpeed[i] = c.speed;
       this.pows.follow(c.id, c.z + POW_AHEAD, c.x);
+      this.waves.follow(c.id, c.z - HALO_BEHIND, c.x);
       // Faíscas das rodas na derrapagem, na cor da carga (azul, laranja, roxa).
       if (plan.wheelSparks && state.phase !== 'countdown') emitWheelSparks(this.sparkCarOf(c), driftLevel(c.driftCharge), dt, plan.sparks, rnd, this.emitSpark);
       // Rastro do nitro: traços curtos e discretos (a chama em si é a malha de cars.ts).
@@ -273,7 +276,7 @@ export class Effects {
         this.waves.spawn(cue.perfect ? 'perfect' : 'ground', c.z, c.x, 0.05);
       } else if (cue.kind === 'nitro' && plan.shockwave) {
         // O halo é do carro de quem joga: o dos rivais (até 19) tomaria as 8 vagas dos anéis que se veem.
-        if (c.seat >= 0) this.waves.spawn('halo', c.z - 70, c.x, 0.55);
+        if (c.seat >= 0) this.waves.spawn('halo', c.z - HALO_BEHIND, c.x, 0.55, c.id);
       } else if (cue.kind === 'hit') {
         if (plan.pow && this.nearViewer(frame, c.z)) this.pows.spawn(c.z + POW_AHEAD, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5, c.id);
         emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);

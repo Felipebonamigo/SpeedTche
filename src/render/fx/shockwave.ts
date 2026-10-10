@@ -61,6 +61,7 @@ export class Shockwaves {
   private readonly x = new Float32Array(SHOCK_MAX);
   private readonly h = new Float32Array(SHOCK_MAX);
   private readonly age = new Float32Array(SHOCK_MAX).fill(-1);
+  private readonly owner = new Int32Array(SHOCK_MAX).fill(-1);
   private next = 0;
   private readonly pt: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
   private readonly dummy = new THREE.Object3D();
@@ -78,10 +79,19 @@ export class Shockwaves {
     this.mesh.name = 'fx-shockwaves';
   }
 
-  /** Acende um anel em (z, x, altura em m). O mais velho cai se já há 8. */
-  spawn(kind: ShockKind, z: number, x: number, h: number): void {
+  /**
+   * Acende um anel em (z, x, altura em m). O mais velho cai se já há 8. `owner` (id do carro, −1 = nenhum): o anel acompanha esse carro enquanto dura
+   * (`follow`) — o halo do nitro, que fixo no mundo ficaria 10 m para trás em 0,1 s, atrás da câmera; o do chão da largada fica onde nasceu.
+   */
+  spawn(kind: ShockKind, z: number, x: number, h: number, owner = -1): void {
     const i = this.next; this.next = (this.next + 1) % SHOCK_MAX;
-    this.kind[i] = KIND_INDEX.indexOf(kind); this.z[i] = z; this.x[i] = x; this.h[i] = h; this.age[i] = 0;
+    this.kind[i] = KIND_INDEX.indexOf(kind); this.z[i] = z; this.x[i] = x; this.h[i] = h; this.age[i] = 0; this.owner[i] = owner;
+  }
+
+  /** Leva os anéis do carro `owner` para (z, x): a posição que ele tem agora (já com o afastamento do anel). */
+  follow(owner: number, z: number, x: number): void {
+    if (owner < 0) return;
+    for (let i = 0; i < SHOCK_MAX; i++) if (this.age[i] >= 0 && this.owner[i] === owner) { this.z[i] = z; this.x[i] = x; }
   }
 
   step(dt: number): void {
