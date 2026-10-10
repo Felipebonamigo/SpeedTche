@@ -7,6 +7,7 @@ import * as SIM_CONSTANTS from '../core/constants';
 import { CARS } from '../core/data/cars';
 import { AI_DRIVERS, DRIVER_PERSONALITY, NEUTRAL_TUNING, PERSONALITY_TUNING } from '../core/data/drivers';
 import { hashString } from '../core/rng';
+import { COSMETICS_CATALOG } from './cosmetics';
 import { DIFFICULTY_SKILL, DIFFICULTY_SPEED } from '../core/sim/ai';
 import { effectiveStats } from '../core/sim/stats';
 import { getTrack, TRACKS } from '../core/track';
@@ -38,6 +39,9 @@ export function contentFingerprint(content: unknown): string {
 export function fingerprintContent(): Record<string, unknown> {
   return {
     protocol: PROTOCOL_VERSION, constants: SIM_CONSTANTS, cars: CARS, tracks: TRACKS, aiSkill: DIFFICULTY_SKILL,
+    // O catálogo de cosméticos (N3): só a impressão do ONLINE o leva — a rede recusa id fora dele, então dois builds de catálogo diferente
+    // não podem dividir sala. A `lapFingerprint` não: cosmético não invalida recorde nem fantasma.
+    cosmetics: COSMETICS_CATALOG,
     // Dados que decidem a pilotagem da IA sem estar em constants.ts: elenco, personalidade de cada um e ritmo.
     aiSpeed: DIFFICULTY_SPEED, aiDrivers: AI_DRIVERS, driverPersonality: DRIVER_PERSONALITY,
     personalityTuning: PERSONALITY_TUNING, neutralTuning: NEUTRAL_TUNING,

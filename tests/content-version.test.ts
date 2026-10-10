@@ -9,6 +9,7 @@ import {
   onlineFingerprint, contentFingerprint, fingerprintContent, lapContent, lapFingerprint, PHYSICS_REVISION, trackLength,
 } from '../src/game/content-version';
 import type { BestLap } from '../src/game/contracts';
+import { COSMETICS_CATALOG } from '../src/game/cosmetics';
 import * as online from '../src/game/online-session';
 import { recordFromOtherVersion, recordRaceResults, sanitizeSave } from '../src/game/save';
 
@@ -141,9 +142,9 @@ describe('a derrapagem renova as versões (M1)', () => {
     expect(recordFromOtherVersion({ ...old, fp: lapFingerprint('copacabana', 'falcao') as string }, 'copacabana')).toBe(false);
   });
 
-  it('a impressão do online mudou (as constantes da derrapagem; o protocolo agora é o 3): um build novo não entra na sala de um velho', () => {
+  it('a impressão do online mudou (as constantes da derrapagem; o protocolo agora é o 4): um build novo não entra na sala de um velho', () => {
     expect(onlineFingerprint()).not.toBe(BEFORE.online);
-    expect(fingerprintContent()).toMatchObject({ protocol: 3 });
+    expect(fingerprintContent()).toMatchObject({ protocol: 4 });
   });
 
   it('a revisão da física, sozinha, já muda a impressão da volta (cobre a mudança só de código)', () => {
@@ -220,8 +221,34 @@ describe('a voz do carro renova só a impressão do online (N6)', () => {
     expect(recordFromOtherVersion(old, 'copacabana')).toBe(false);
   });
 
-  it('a impressão do online mudou e leva o protocolo 3', () => {
+  it('a impressão do online mudou e leva o protocolo (4 desde a N3)', () => {
     expect(onlineFingerprint()).not.toBe(AT_640538F.online);
-    expect(fingerprintContent()).toMatchObject({ protocol: 3 });
+    expect(fingerprintContent()).toMatchObject({ protocol: 4 });
+  });
+});
+
+// Onda N, N3: o visual do carro vai na rede (PROTOCOL_VERSION 4) e o catálogo de cosméticos entra na impressão do online, para dois builds de catálogo
+// diferente nem dividirem sala (assim "id desconhecido" só pode ser adulteração). NADA disso muda a física: a impressão de uma volta é a de antes.
+// Valores gravados em 80ec96e (antes da N3).
+describe('o visual do carro renova só a impressão do online (N3)', () => {
+  const AT_80EC96E = { lap: '9fb16efb', lapRota66Trovao: 'e3e257b4', online: '2d28a42b' };
+
+  it('a impressão de uma volta é a de antes: cosmético não invalida recorde nem fantasma', () => {
+    expect(lapFingerprint('copacabana', 'falcao')).toBe(AT_80EC96E.lap);
+    expect(lapFingerprint('rota_66', 'trovao')).toBe(AT_80EC96E.lapRota66Trovao);
+    expect(PHYSICS_REVISION).toBe(3);
+    expect(JSON.stringify(lapContent('copacabana', 'falcao'))).not.toMatch(/cosmetic|finish|perolado/);
+  });
+
+  it('a impressão do online mudou, leva o protocolo 4 e o catálogo', () => {
+    expect(onlineFingerprint()).not.toBe(AT_80EC96E.online);
+    expect(fingerprintContent()).toMatchObject({ protocol: 4, cosmetics: COSMETICS_CATALOG });
+  });
+
+  it('trocar um id do catálogo muda a impressão (builds de catálogo diferente não dividem sala)', () => {
+    const a = contentFingerprint(fingerprintContent());
+    const cat = JSON.parse(JSON.stringify(COSMETICS_CATALOG)) as { finishes: string[] };
+    cat.finishes[2] = 'perola';
+    expect(contentFingerprint({ ...fingerprintContent(), cosmetics: cat })).not.toBe(a);
   });
 });

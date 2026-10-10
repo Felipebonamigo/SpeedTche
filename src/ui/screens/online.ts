@@ -375,7 +375,7 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
             // Nome e, embaixo dele, o selo da direção (ao lado, o selo espremia o nome até sumir).
             h('span', { class: 'online-player-who' }, h('span', { class: 'online-player-name', text: seatName(p.name, seat) }), assistTag(p.assist)),
             // Carro com a amostra da pintura que o jogador escolheu (a Original, nas cores de fábrica).
-            h('span', { class: 'online-player-car' }, paintSwatch(p.paint ?? ORIGINAL_PAINT, carDef(p.car)), h('span', { text: carName(p.car) })),
+            h('span', { class: 'online-player-car' }, paintSwatch(p.look?.paint ?? ORIGINAL_PAINT, carDef(p.car)), h('span', { text: carName(p.car) })),
           );
         }),
       );
