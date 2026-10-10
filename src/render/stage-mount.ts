@@ -97,9 +97,11 @@ function mount(host: HostEl, kind: StagePanel['kind'], opts: ShowroomOptions): S
   panel.setHost(host);
   const { id: _id, ...rest } = opts;
   void _id;
+  // `undefined` = "não mexe"; `null` é um valor (sem carro, de fábrica, sem foco).
   panel.set({
-    carId: rest.carId ?? panel.carId, paint: rest.paint === undefined ? panel.paint : rest.paint, focus: rest.focus ?? panel.focus,
-    quality: rest.quality ?? panel.quality, reduceEffects: rest.reduceEffects ?? panel.reduceEffects, ring: rest.ring ?? panel.ring,
+    carId: rest.carId === undefined ? panel.carId : rest.carId, paint: rest.paint === undefined ? panel.paint : rest.paint,
+    focus: rest.focus === undefined ? panel.focus : rest.focus, quality: rest.quality ?? panel.quality,
+    reduceEffects: rest.reduceEffects ?? panel.reduceEffects, ring: rest.ring ?? panel.ring,
   });
   attachOverlay(panel, host, panel.reduceEffects);
   return handleFor(panel);

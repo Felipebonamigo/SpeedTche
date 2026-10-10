@@ -11,6 +11,7 @@ import { sanitizeSave } from '../src/game/save';
 import '../src/ui/strings';
 import type { LobbyState, ScreenApi, ScreenInstance } from '../src/ui/screens/common';
 import { garageScreen } from '../src/ui/screens/garage';
+import { stageBus } from '../src/render/stage-bus';
 import { lobbyScreen } from '../src/ui/screens/lobby';
 import { human } from './helpers';
 
@@ -42,6 +43,7 @@ class FakeEl {
   setAttribute(k: string, v: string): void { this.attrs[k] = v; }
   getAttribute(k: string): string | null { return this.attrs[k] ?? null; }
   appendChild<T>(c: T): T { this.children.push(c); return c; }
+  remove(): void { /* os selos do palco (stage-mount.ts) */ }
   append(...c: unknown[]): void { this.children.push(...c); }
   prepend(...c: unknown[]): void { this.children.unshift(...c); }
   replaceChildren(...c: unknown[]): void { this.children = [...c]; }
@@ -79,8 +81,8 @@ function fakeInput(bound: Array<DeviceId | null>): InputProvider {
   };
 }
 
-function api(save: SaveData, bound: Array<DeviceId | null>, lobby: LobbyState): ScreenApi {
-  const settings: Settings = { ...DEFAULT_SETTINGS, seatAssists: [...DEFAULT_SETTINGS.seatAssists] };
+function api(save: SaveData, bound: Array<DeviceId | null>, lobby: LobbyState, over: Partial<Settings> = {}): ScreenApi {
+  const settings: Settings = { ...DEFAULT_SETTINGS, seatAssists: [...DEFAULT_SETTINGS.seatAssists], ...over };
   return {
     ctx: { cars: CARS, save, settings, input: fakeInput(bound), cups: [], tracks: [] },
     lobby,
@@ -153,10 +155,11 @@ describe('lobby: cada assento escolhe a pintura do carro', () => {
 });
 
 describe('garagem da carreira: cada piloto pinta o carro', () => {
-  it('"Pintura" na linha do PRONTO (↑ do carro dá a volta: PRONTO, pintura); → troca e grava para o piloto e o carro à mostra; a prévia muda', () => {
+  it('"Pintura" na linha do PRONTO (↑ do carro dá a volta: PRONTO, pintura); → troca e grava para o piloto e o carro à mostra; a prévia (no Retrô, a silhueta) muda', () => {
     const save = sanitizeSave({});
     save.career = newCareer([human(0, 0, 'falcao'), human(1, 0, 'saci')]);
-    const screen = garageScreen(api(save, ['kb1', 'kb2', null, null], { mode: 'career', versus: false, seats: [null, null, null, null] }));
+    // Retrô: a prévia é a silhueta SVG. No 3D (N2) a prévia é o carro do palco: o teste seguinte confere a pintura no painel dele.
+    const screen = garageScreen(api(save, ['kb1', 'kb2', null, null], { mode: 'career', versus: false, seats: [null, null, null, null] }, { renderStyle: 'retro' }));
     const panels = () => all(screen.el, hasClass('gp'));
     expect(panels()).toHaveLength(2);
     press(screen, 'kb2', 'up');
@@ -174,5 +177,22 @@ describe('garagem da carreira: cada piloto pinta o carro', () => {
     press(screen, 'kb2', 'confirm');
     expect(seatPaint(save, 1, 'saci')).toBe(PAINT_IDS[3]);
     expect(save.career?.drivers[1].garage.carId).toBe('saci');
+  });
+
+  it('no 3D a prévia é o carro do palco: a pintura escolhida chega ao painel do assento certo, para o carro certo', () => {
+    stageBus.clear();
+    const save = sanitizeSave({});
+    save.career = newCareer([human(0, 0, 'falcao'), human(1, 0, 'saci')]);
+    const screen = garageScreen(api(save, ['kb1', 'kb2', null, null], { mode: 'career', versus: false, seats: [null, null, null, null] }));
+    press(screen, 'kb2', 'up');
+    press(screen, 'kb2', 'up');
+    press(screen, 'kb2', 'right');
+    press(screen, 'kb2', 'right');
+    expect(seatPaint(save, 1, 'saci')).toBe(PAINT_IDS[2]);
+    expect(stageBus.panel('garage:P2').carId).toBe('saci');
+    expect(stageBus.panel('garage:P2').paint).toEqual(paintColors(PAINT_IDS[2]));
+    expect(stageBus.panel('garage:P1').paint).toBeNull();
+    screen.destroy?.();
+    stageBus.clear();
   });
 });

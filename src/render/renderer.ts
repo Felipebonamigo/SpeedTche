@@ -9,6 +9,8 @@
 // Cada viewport tem um ViewportPipeline (postfx/pipeline.ts) criado UMA vez e redimensionado em lugar (resize, lotação); a resolução
 // dinâmica usa um sub-retângulo do alvo de tamanho fixo. O limiar do bloom fica acima do branco iluminado pelo sol (de dia só o disco
 // do sol e os emissivos brilham; à noite, faróis, postes e neon).
+// Fora da corrida, se uma tela de menu registrou janelas de palco (stage-bus.ts), o `renderIdle` desenha o PALCO 3D (stage.ts) no lugar do mundo:
+// garagem, Concessionária e pódio. O palco empresta os carros e a estilização daqui e os devolve ao sair; a corrida o tira de cena.
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
@@ -30,6 +32,8 @@ import { absoluteHeading, buildRoadFrame, FRAME_AHEAD, FRAME_BEHIND, type RoadFr
 import { Scenery } from './scenery';
 import type { Layout } from './scenery/layout';
 import { Sky } from './sky';
+import { Stage, STAGE_IDLE_RELEASE } from './stage';
+import { stageBus } from './stage-bus';
 import { installToneMapping, setStylizePalette } from './stylize';
 import { Terrain } from './terrain';
 import { buildHorizon } from './horizon';
@@ -132,6 +136,11 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   const vps: ViewportDebug[] = [0, 1, 2, 3].map(() => ({ calls: 0, triangles: 0, targetW: 0, targetH: 0, samples: 0, passes: 0, postPx: 0 }));
   let vpCount = 0;
   let disposed = false;
+  /** O palco 3D (garagem, Concessionária, pódio): nasce na primeira janela registrada e morre com o renderizador. */
+  let stage: Stage | null = null;
+  /** `palette.light` da pista atual (a luz dos carros na corrida): o palco a devolve ao sair. */
+  let carLight = 1;
+  let lastStageAt = -1;
 
   let horizonFor: { id: string; p: Palette } | null = null;
   function rebuildHorizon(): void {
@@ -151,6 +160,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     rebuildHorizon();
     scenery.setNight(night);
     cars.setLight(p.light);
+    carLight = p.light;
     effects.setPalette(p);
     effects.clear();
     renderer.toneMappingExposure = setStylizePalette(p).exposure;
@@ -242,6 +252,8 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
 
   function render(frame: RenderFrame): void {
     if (disposed) return;
+    stage?.idleRelease(); // a corrida tira o palco de cena (devolve os carros, a estilização e a exposição) e solta os alvos de GPU dele
+    lastStageAt = -1;
     const t0 = performance.now();
     ensureTrack(frame.track);
     ensureQuality(frame.options.quality);
@@ -306,8 +318,37 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     lastRenderAt = now;
   }
 
+  /**
+   * O palco 3D no lugar do mundo, se alguma tela registrou janelas (stage-bus.ts). Sem janelas, devolve o que o palco pegou emprestado e,
+   * passado `STAGE_IDLE_RELEASE`, solta os alvos de GPU dele. Devolve se desenhou (então o mundo do menu não é desenhado).
+   */
+  function renderStage(time: number): boolean {
+    const live = stageBus.live();
+    if (live.length === 0) {
+      if (stage) {
+        stage.leave();
+        if (lastStageAt >= 0 && time - lastStageAt > STAGE_IDLE_RELEASE) { stage.idleRelease(); lastStageAt = -1; }
+      }
+      return false;
+    }
+    const t0 = performance.now();
+    stage ??= new Stage({ renderer, cars, raceScene: scene, raceCarLight: () => carLight, raceCarQuality: () => quality });
+    renderer.info.reset();
+    const stats = stage.render(time, { width, height, dpr }, live);
+    lastStageAt = time;
+    vpCount = stats.length;
+    stats.forEach((s, i) => Object.assign(vps[i], s));
+    hud.hide();
+    debug.calls = renderer.info.render.calls;
+    debug.triangles = renderer.info.render.triangles;
+    debug.quality = quality; debug.shadows = false; debug.shadowUpdates = 0;
+    debug.frameMs = performance.now() - t0;
+    return stats.length > 0;
+  }
+
   function renderIdle(time: number, track: Track): void {
     if (disposed) return;
+    if (renderStage(time)) return;
     const t0 = performance.now();
     ensureTrack(track);
     ensureQuality(quality ?? 'high');
@@ -349,6 +390,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     disposed = true;
     disposePosts();
     shadowRing?.dispose();
+    stage?.dispose(); stage = null;
     sky.dispose(); road.dispose(); terrain.dispose(); scenery.dispose(); cars.dispose(); effects.dispose(); hud.dispose();
     renderer.dispose();
   }
@@ -360,6 +402,6 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     pinDynamicScale: (scale: number | null) => { pinned = scale; },
     pinRadialBlur: (strength: number | null) => { pinnedRadial = strength; },
     /** Só para depuração no harness (não faz parte do contrato). */
-    __scene: scene, __gl: renderer, __pipes: pipes, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
+    __scene: scene, __gl: renderer, __stage: () => stage, __pipes: pipes, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
   } as GameRenderer;
 }

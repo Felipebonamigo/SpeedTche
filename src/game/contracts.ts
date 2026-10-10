@@ -340,7 +340,7 @@ export interface RaceDriver {
 
 // ───────────────────────────── Menus ─────────────────────────────
 
-export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'online'
+export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'online'
   | 'party' | 'tournament' | 'handoff' | 'tournamentTable' | 'access'
   | 'tutorial' | 'tutorialDone' | 'passport' | 'survey';
 

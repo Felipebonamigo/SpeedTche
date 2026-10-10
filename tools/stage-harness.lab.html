@@ -1,0 +1,8 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>stage harness lab</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#game{position:fixed;inset:0;width:100vw;height:100vh;display:block}#hud{position:fixed;inset:0;pointer-events:none}
+.lab-host{position:fixed;box-sizing:border-box;outline:1px dashed rgba(255,255,255,.25)}</style>
+</head><body><canvas id="game"></canvas><div id="hud"></div>
+<!-- Laboratório GL do palco 3D (tests/stage-gl.test.ts): janelas de palco como as das telas, desenhadas pelo renderizador de verdade.
+     Uso à mão: abrir esta página no vite (`?w=1280&h=720&shot=1`) e, no console, `lab.mount(2, { quality: 'high' })`, `lab.frames(0, 30)`. -->
+<script type="module" src="./stage-harness.lab.ts"></script>
+</body></html>
