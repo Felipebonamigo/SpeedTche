@@ -54,9 +54,9 @@ export function speedLine(k: number, count: number, travel: number, speedMs: num
   return true;
 }
 
-/** A volta de um traço do túnel: de 9 m atrás do carro a 46 m à frente (até o carro do vácuo). */
+/** A volta de um traço do túnel: de 9 m atrás do carro a 23 m à frente (o miolo da tela: mais longe o traço encolhe até sumir; o carro do vácuo está a até 24 m). */
 const T_NEAR = -9;
-const T_SPAN = 55;
+const T_SPAN = 32;
 
 /**
  * O traço `k` do anel de `count` do túnel de ar, com a intensidade `intensity` (0..1, suavizada por quem chama). Um tubo de 1,9 a 2,8 m de raio em
@@ -68,12 +68,12 @@ export function draftLine(k: number, count: number, travel: number, time: number
   const theta = (2 * Math.PI * k) / count + time * 0.9 + 0.5 * h1;
   const r = 1.9 + 0.9 * h2;
   const dz = T_NEAR + mod(h3 * T_SPAN - travel, T_SPAN);
-  const fade = smoothstep(T_NEAR + T_SPAN, T_NEAR + T_SPAN - 10, dz) * smoothstep(T_NEAR, T_NEAR + 6, dz);
+  const fade = smoothstep(T_NEAR + T_SPAN, T_NEAR + T_SPAN - 8, dz) * smoothstep(T_NEAR, T_NEAR + 6, dz);
   out.dz = dz;
-  out.tail = dz + 3 + 0.05 * speedMs * (0.7 + 0.6 * h4);
+  out.tail = dz + 4 + 0.06 * speedMs * (0.7 + 0.6 * h4);
   out.lat = r * Math.cos(theta);
   out.h = 0.8 + 0.75 * r * Math.sin(theta);
-  out.width = 0.09 + 0.07 * h2;
+  out.width = 0.14 + 0.12 * h2;
   out.r = 0.95; out.g = 1.0; out.b = 1.05;
   out.a = 0.8 * clamp01(intensity) * fade;
   return true;
