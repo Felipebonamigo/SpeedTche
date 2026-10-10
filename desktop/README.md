@@ -34,8 +34,10 @@ npm run check        # confere o conteúdo de todo pacote em release/ (check-pac
 A janela nasce em 1600×900 (mínimo 1024×640), fundo preto, sem barra de menu. Tela cheia é decisão do jogo
 (opção salva) — `main.cjs` só obedece.
 
-O pacote leva `main.cjs`, `preload.cjs`, `storage.cjs` e o `../dist` inteiro em `app/` (sem os `.map`) dentro
-do `resources/app.asar`; o `steamworks.js` fica fora do asar (`app.asar.unpacked/`, é módulo nativo, com as
+O pacote leva `main.cjs`, `preload.cjs`, `storage.cjs`, `assets.cjs` e o `../dist` inteiro em `app/` (sem os `.map`) dentro
+do `resources/app.asar`. Os `.glb` dos carros (`dist/assets/*.glb`) chegam à página por arquivo, pelo protocolo próprio
+`speedtche-asset://app/assets/<arquivo>.glb` (`assets.cjs`: só `assets/*.glb` sob `app/`; a página é `file://` e o `fetch` de `file:` não
+funciona), no lugar da data URL embutida no JS; o `steamworks.js` fica fora do asar (`app.asar.unpacked/`, é módulo nativo, com as
 bibliotecas de win64/linux64/osx); o `steam_appid.txt` vai **ao lado do executável** (`extraFiles`), que é
 onde o `SteamAPI_Init` procura quando o jogo é aberto fora da Steam — dentro do asar ele não servia para nada.
 

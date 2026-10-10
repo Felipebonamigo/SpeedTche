@@ -97,7 +97,7 @@ function checkDir(dir) {
   check(has('/app/index.html'), 'jogo em app/index.html (dentro do asar)');
   check(files.some((f) => /^\/app\/assets\/index-[^/]+\.js$/.test(f)), 'app/assets/index-*.js');
   check(!files.some((f) => f.endsWith('.map')), 'nenhum .map no pacote');
-  for (const f of ['main.cjs', 'preload.cjs', 'storage.cjs', 'package.json']) check(has(`/${f}`), f);
+  for (const f of ['main.cjs', 'preload.cjs', 'storage.cjs', 'assets.cjs', 'package.json']) check(has(`/${f}`), f);
   const inner = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   check(inner.version === pkg.version && inner.productName === PRODUCT, `package.json do pacote: ${inner.productName} ${inner.version}`);
   const sw = join(l.resources, 'app.asar.unpacked', 'node_modules', 'steamworks.js');

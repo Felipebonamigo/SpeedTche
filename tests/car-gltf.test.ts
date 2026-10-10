@@ -169,7 +169,7 @@ describe('carro em glTF: os arquivos da arte no jogo (assets.ts)', () => {
       expect(modelSource('sedan')).toBe('procedural');
       expect(buildModel('gt').triangles).toBe(MODEL_BUILDERS.gt().triangles);
       const rejected = Object.fromEntries(report.rejected.map((r) => [r.file, r.problems.join(' | ')]));
-      expect(rejected['fusca.glb']).toMatch(/não é um estilo/);
+      expect(rejected['fusca.glb']).toMatch(/não é um carro nem um estilo/);
       expect(rejected['sedan.glb']).toMatch(/não abre como glTF/);
     } finally {
       setModelOverride('gt', null);
