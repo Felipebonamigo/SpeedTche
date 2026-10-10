@@ -85,34 +85,44 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500
     expect(errors).toEqual([]);
   });
 
-  it('os acabamentos, as rodas e o aro escolhidos (N3) compilam e desenham no mesmo programa: sem erro de shader e dentro do gate de chamadas', async () => {
+  it('os acabamentos, as rodas e o aro escolhidos (N3) compilam e desenham no mesmo programa: sem erro de shader e sem chamada nova por carro', async () => {
     // Quatro carros, cada um com um acabamento (e o resto do look): o programa dos carros é UM, o acabamento é bit de instância.
-    const LOOKS = [
-      { paint: 'rubi', finish: 'metalico', wheel: 'mag', rim: 'dourado', stripe: 'ab' },
+    // Sem roda escolhida, as chamadas são EXATAMENTE as da mesma cena de fábrica; a roda escolhida só muda QUAL dos lotes de roda desenha,
+    // então custa no máximo uma chamada por desenho DIFERENTE que ninguém mais na pista usa (os 9 de sempre, nunca uma por carro).
+    const SEM_RODA = [
+      { paint: 'rubi', finish: 'metalico', rim: 'dourado', stripe: 'ab' },
       { paint: 'cobalto', finish: 'perolado', flame: 'roxa', rim: 'acento' },
-      { finish: 'fosco', wheel: 'dish', stripe: 'nenhuma' },
+      { finish: 'fosco', stripe: 'nenhuma' },
       { paint: 'violeta', finish: 'cromado', color: '#2346d6' },
     ];
-    const MORE = [{ finish: 'camaleao', paint: 'violeta', accent: '#ffcf26' }, { wheel: 'multi', finish: 'camaleao' }];
-    const r = await page.evaluate(({ looks, more }) => {
+    const COM_RODA = [
+      { ...SEM_RODA[0], wheel: 'mag' }, SEM_RODA[1], { ...SEM_RODA[2], wheel: 'dish' }, { ...SEM_RODA[3], wheel: 'wire' },
+    ];
+    const MAIS = [{ finish: 'camaleao', paint: 'violeta', accent: '#ffcf26' }, { wheel: 'multi', finish: 'camaleao' }];
+    const r = await page.evaluate(({ semRoda, comRoda, mais }) => {
       const L = window.lab;
-      const out: Array<{ quality: Quality; calls: number; bad: string[]; shaderErrors: string[] }> = [];
+      const out: Array<{ quality: Quality; base: number; semRoda: number; comRoda: number; bad: string[]; shaderErrors: string[] }> = [];
+      const worst = (d: ReturnType<typeof L.render>) => Math.max(...d.slice(-2).flatMap((x) => x.viewports.map((v) => v.calls)));
       for (const quality of ['low', 'medium', 'high', 'ultra'] as const) {
-        L.setup('copacabana', 4, 300, undefined, looks);
-        const d = L.render(quality, 4).slice(-2);
-        L.setup('copacabana', 2, 300, undefined, more);
+        L.setup('copacabana', 4, 300);
+        const base = worst(L.render(quality, 4));
+        L.setup('copacabana', 4, 300, undefined, semRoda);
+        const sr = worst(L.render(quality, 4));
+        L.setup('copacabana', 4, 300, undefined, comRoda);
+        const cr = worst(L.render(quality, 4));
+        L.setup('copacabana', 2, 300, undefined, mais);
         L.render(quality, 2);
         const p = L.programs();
-        out.push({ quality, calls: Math.max(...d.flatMap((x) => x.viewports.map((v) => v.calls))), bad: p.bad, shaderErrors: p.shaderErrors });
+        out.push({ quality, base, semRoda: sr, comRoda: cr, bad: p.bad, shaderErrors: p.shaderErrors });
       }
       return out;
-    }, { looks: LOOKS, more: MORE });
+    }, { semRoda: SEM_RODA, comRoda: COM_RODA, mais: MAIS });
     expect(r.map((x) => x.quality)).toEqual([...LEVELS]);
     for (const x of r) {
       expect(x.shaderErrors, `${x.quality}: onShaderError`).toEqual([]);
       expect(x.bad, `${x.quality}: programas com log`).toEqual([]);
-      const limit = GATE_LIMITS['copa-4p'][x.quality];
-      expect(x.calls, `${x.quality}: chamadas com 4 visuais diferentes`).toBeLessThanOrEqual(limit?.calls ?? 0);
+      expect(x.semRoda, `${x.quality}: acabamento, faixa, aro, cor e chama não criam chamada`).toBe(x.base);
+      expect(x.comRoda, `${x.quality}: a roda escolhida custa no máximo uma chamada por desenho diferente (3 aqui)`).toBeLessThanOrEqual(x.base + 3);
     }
     expect(errors).toEqual([]);
   });
