@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import type { Track } from '../../core/types';
 import { mix } from '../palette';
+import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
 import { getModel, landmarkOf } from './catalog';
 import type { MatKey, Model } from './geom';
@@ -134,23 +135,31 @@ export class Scenery {
 #endif`);
     };
     this.hazeMat.customProgramCacheKey = () => 'scenery-haze';
+    // Luz estilizada DEPOIS do callback e da chave acima: o stylize compõe com eles (o `fog_fragment` da névoa do horizonte fica).
+    applyStylize(this.flatMat, 'scenery');
+    applyStylize(this.hazeMat, 'scenery');
     const facade = (style: 'office' | 'apartment' | 'classic' | 'house'): THREE.MeshStandardMaterial => {
       const t = facadeTextures(style);
       this.textures.push(t.map, t.light);
       const glass = style === 'office';
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: t.map, emissiveMap: t.light, emissive: '#ffffff', emissiveIntensity: 0, roughness: glass ? 0.34 : 0.78, metalness: glass ? 0.22 : 0 });
+      applyStylize(mat, 'facade');
       this.facadeMats.push(mat);
       return mat;
     };
     this.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     this.beaconMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    applyGrade(this.glowMat); applyGrade(this.beaconMat);
     const atlas = panelAtlas();
     this.textures.push(atlas);
     this.panelMat = new THREE.MeshStandardMaterial({ map: atlas, emissiveMap: atlas, emissive: '#ffffff', emissiveIntensity: 0.3, roughness: 0.55, side: THREE.DoubleSide });
+    applyStylize(this.panelMat, 'facade');
     const blobTex = blobTexture();
     this.textures.push(blobTex);
     this.blobMat = new THREE.MeshBasicMaterial({ map: blobTex, color: '#1c2248', transparent: true, opacity: 0.34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    applyGrade(this.blobMat);
     const cone = new THREE.MeshBasicMaterial({ color: '#ffd98a', transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    applyGrade(cone);
     this.materials = {
       flat: this.flatMat, dress: this.flatMat, haze: this.hazeMat, office: facade('office'), apartment: facade('apartment'), classic: facade('classic'), house: facade('house'),
       glow: this.glowMat, beacon: this.beaconMat, cone, panel: this.panelMat, blob: this.blobMat,

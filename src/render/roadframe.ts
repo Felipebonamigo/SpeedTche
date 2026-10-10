@@ -14,7 +14,7 @@ import { HEADING_PER_CURVE, ROAD_HALF_WIDTH_M, SEGMENT_M, Y_SCALE } from './unit
  * não é desenhado. Exportada para a conta de enquadramento dos marcos (scenery/sight.ts).
  */
 export const FRAME_BEHIND = 30;
-export const FRAME_AHEAD: Readonly<Record<Quality, number>> = { low: 140, medium: 200, high: 260 };
+export const FRAME_AHEAD: Readonly<Record<Quality, number>> = { low: 140, medium: 200, high: 260, ultra: 260 };
 
 export interface RoadFrame {
   /** Pontos válidos (behind + ahead + 1). */

@@ -17,6 +17,7 @@ import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
 import { createCarMaterial, setCarQuality, type CarUniforms } from './cars/material';
+import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint } from './cars/paints';
@@ -143,6 +144,7 @@ export class Cars {
       im.visible = false;
       this.group.add(im);
     }
+    applyStylize(this.ghostMaterial, 'ghost');
     this.ghost = new THREE.Mesh(this.styles[0].model.shell, this.ghostMaterial);
     this.ghost.matrixAutoUpdate = false; this.ghost.frustumCulled = false; this.ghost.visible = false; this.ghost.renderOrder = 3;
     this.group.add(this.ghost);
@@ -188,7 +190,7 @@ export class Cars {
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
-    for (const { material } of this.rigs) setCarQuality(material, q === 'high');
+    for (const { material } of this.rigs) setCarQuality(material, q); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
     this.lowQuality = q === 'low';
   }
 
