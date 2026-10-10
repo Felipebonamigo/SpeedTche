@@ -136,6 +136,9 @@ const BUILDERS: Record<string, () => Model> = {
   'beam': () => S.lighthouseBeam(), 'fan': () => S.windpumpFan(),
 };
 
+/** Todos os ids do registro fixo (os de prédio e torre, com parâmetros, nascem do `dynamicBuilder`; os marcos, de `LANDMARKS`): a faceta da bíblia os mede. */
+export const BUILDER_IDS: readonly string[] = Object.keys(BUILDERS);
+
 const cache = new Map<string, Model>();
 
 /** Prefixo dos marcos turísticos no registro de modelos: "lm:<id de places.ts>" (landmarks/index.ts). */

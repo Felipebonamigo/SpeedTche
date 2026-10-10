@@ -33,22 +33,23 @@ function flat(geometry: Geo, blob: number, shadow = true): Model {
  * Bolha de copa: icosaedro subdividido (80 faces: o contorno é redondo, não o hexágono do de 20) em bolhas macias e
  * achatado. Bolha pequena (< 0,45 m, poucos pixels) fica com o de 20 faces.
  */
-function blob(r: number, x: number, y: number, z: number, color: string, seed: number, sy = 0.8, amount = 0.12): Geo {
-  return paint(lumpy(ico(r, cloudDetail(r)), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
+function blob(r: number, x: number, y: number, z: number, color: string, seed: number, sy = 0.8, amount = 0.12, detail?: 0 | 1 | 2): Geo {
+  return paint(lumpy(ico(r, detail ?? cloudDetail(r)), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
 }
 
 /**
- * Detalhe do icosaedro de uma bolha de copa pelo raio (vegetação-nuvem, M3): a bolha grande (≥ 0,9 m) é a que mostra a silhueta e vai a 180 faces
- * (faceta 13°; a de 80 faces tinha 20°); a média (0,45 a 0,9 m) fica em 80, a pequena em 20 (poucos pixels).
+ * Detalhe do icosaedro de uma bolha de copa pelo raio (vegetação-nuvem, M3): a bolha de 0,6 m ou mais é a que mostra a silhueta e vai a 180 faces
+ * (faceta 13°; a de 80 faces tinha 20°); a de 0,45 a 0,6 m fica em 80, a pequena em 20 (poucos pixels).
  */
-export function cloudDetail(r: number): 0 | 1 | 2 { return r < 0.45 ? 0 : r < 0.9 ? 1 : 2; }
+export function cloudDetail(r: number): 0 | 1 | 2 { return r < 0.45 ? 0 : r < 0.6 ? 1 : 2; }
 
 /** Uma bolha de copa (os parâmetros de `blob`). */
-interface Puff { r: number; x: number; y: number; z: number; color: string; seed: number; sy?: number; amount?: number }
+interface Puff { r: number; x: number; y: number; z: number; color: string; seed: number; sy?: number; amount?: number; /** Detalhe do icosaedro (padrão pelo raio, `cloudDetail`): a bolha pequena no meio da copa pode ficar em 1. */ detail?: 0 | 1 | 2 }
 
 /** O sólido garantido dentro da bolha: o elipsoide dela encolhido pela deformação e pela corda das faces. */
 function puffCore(b: Puff): Ellipsoid {
-  const m = (1 - 1.1 * (b.amount ?? 0.12)) * (b.r < 0.45 ? 0.78 : b.r < 0.9 ? 0.92 : 0.96);
+  const d = b.detail ?? cloudDetail(b.r);
+  const m = (1 - 1.1 * (b.amount ?? 0.12)) * (d === 0 ? 0.78 : d === 1 ? 0.92 : 0.96);
   return { x: b.x, y: b.y, z: b.z, rx: b.r * m, ry: b.r * (b.sy ?? 0.8) * m, rz: b.r * m };
 }
 
@@ -58,31 +59,31 @@ function puffCore(b: Puff): Ellipsoid {
  */
 function puffs(list: Puff[], solids: Ellipsoid[] = []): Geo[] {
   const cores = list.map(puffCore);
-  return list.map((b, i) => cullInside(blob(b.r, b.x, b.y, b.z, b.color, b.seed, b.sy, b.amount), [...cores.filter((_, j) => j !== i), ...solids]));
+  return list.map((b, i) => cullInside(blob(b.r, b.x, b.y, b.z, b.color, b.seed, b.sy, b.amount, b.detail), [...cores.filter((_, j) => j !== i), ...solids]));
 }
 
 /**
- * Tronco afinando, com leve inclinação: 8 lados e sem tampas (o pé fica no chão e a ponta dentro da copa — as
+ * Tronco afinando, com leve inclinação: 12 lados (15°; os 8 de antes davam 22°) e sem tampas (o pé fica no chão e a ponta dentro da copa — as
  * tampas eram 1/3 dos triângulos dele). `closed` para o tronco cuja ponta aparece (oliveira, baixa).
  */
-function trunk(r0: number, r1: number, h: number, color: string, seg = 8, lean = 0, dir = 0, closed = false): Geo {
+function trunk(r0: number, r1: number, h: number, color: string, seg = 12, lean = 0, dir = 0, closed = false): Geo {
   return paint(cyl(r1, r0, h, seg, !closed), color, tf(Math.cos(dir) * lean * h * 0.5, h / 2, Math.sin(dir) * lean * h * 0.5, 1, 1, 1, Math.sin(dir) * lean, 0, -Math.cos(dir) * lean));
 }
 
 /** Galho: cilindro fino de 6 lados sem tampas (o pé dentro do tronco, a ponta dentro da copa). */
 function branch(r0: number, r1: number, h: number, color: string, m: THREE.Matrix4): Geo {
-  return paint(cyl(r1, r0, h, 6, true), color, m);
+  return paint(cyl(r1, r0, h, 8, true), color, m);
 }
 
 /**
- * Moita contínua em volta do pé (meia esfera achatada de 12 lados): a borda fica em `reach` em todas as
+ * Moita contínua em volta do pé (meia esfera achatada de 14 lados e 4 anéis): a borda fica em `reach` em todas as
  * direções (≥ 96% entre os vértices), então a pegada não depende do giro. Em cima, bolhas macias (a altura de cada
  * ponto varia com o ruído da direção) e manchas da segunda cor onde a bolha sobe — a moita parece folhagem, não um
  * pedestal. Era um domo de 10 lados com quatro tufos de icosaedro de 20 faces (quinas à mostra; 130 triângulos, 60
  * agora).
  */
 function mound(reach: number, h: number, colors: string[], seed: number): Geo[] {
-  const dome = new THREE.SphereGeometry(1, 12, 3, hash2(seed, 71) * 0.6, Math.PI * 2, 0, Math.PI / 2);
+  const dome = new THREE.SphereGeometry(1, 14, 4, hash2(seed, 71) * 0.6, Math.PI * 2, 0, Math.PI / 2);
   const p = dome.attributes.position as THREE.BufferAttribute;
   const bump = new Float32Array(p.count);
   for (let i = 0; i < p.count; i++) {
@@ -119,6 +120,9 @@ function soil(reach: number, h: number, colors: string[], seed: number): Geo[] {
   const g = paint(new THREE.LatheGeometry(prof, 14), colors[0], tf(0, 0, 0, 1, 1, 1, 0, hash2(seed, 71) * 0.4, 0));
   return [mottle(g, 0.12, seed, 1.4)];
 }
+
+/** Cone aberto (sem a tampa de baixo, que ninguém vê): folha em espinho, 16 lados = 16 triângulos e 13° de faceta. */
+function spike(r: number, h: number, seg: number): Geo { return new THREE.ConeGeometry(r, h, seg, 1, true); }
 
 /** Samambaia/folhagem rasteira: `n` folhas que alcançam `reach` a partir do centro. */
 function fernRing(n: number, reach: number, w: number, colors: string[], seed: number, rise = 0.55, droop = 0.45, pieces = 3): Geo[] {
@@ -279,14 +283,14 @@ export function acacia(seed: number): Model {
 export function baobab(seed: number): Model {
   const bark = '#9d8a78';
   // O tronco é a pegada: 12 lados (o mínimo entre vértices é 97% do raio), sem tampas (a de cima fica a 5,6 m).
-  const parts: Geo[] = [paint(cyl(1.12, TREE_R, 5.6, 12, true), bark, tf(0, 2.8, 0))];
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + hash2(seed, k) * 0.5;
+  const parts: Geo[] = [paint(cyl(1.12, TREE_R, 5.6, 16, true), bark, tf(0, 2.8, 0))];
+  for (let k = 0; k < 4; k++) { // quatro galhos grossos com tufo de 180 faces (eram seis de 80)
+    const a = (k / 4) * Math.PI * 2 + hash2(seed, k) * 0.5;
     const tilt = 0.55 + hash2(seed, k + 3) * 0.4;
     const len = 1.8 + hash2(seed, k + 6) * 1.0;
     const x = Math.cos(a) * 0.7; const z = Math.sin(a) * 0.7;
     // Galho aberto: o pé dentro do tronco, a ponta dentro do tufo.
-    parts.push(paint(cyl(0.16, 0.36, len, 8, true), bark, lean(x + Math.cos(a) * Math.sin(tilt) * len * 0.5, 5.5 + Math.cos(tilt) * len * 0.5, z + Math.sin(a) * Math.sin(tilt) * len * 0.5, a, tilt)));
+    parts.push(paint(cyl(0.16, 0.36, len, 10, true), bark, lean(x + Math.cos(a) * Math.sin(tilt) * len * 0.5, 5.5 + Math.cos(tilt) * len * 0.5, z + Math.sin(a) * Math.sin(tilt) * len * 0.5, a, tilt)));
     parts.push(blob(0.8, x + Math.cos(a) * Math.sin(tilt) * len, 5.6 + Math.cos(tilt) * len, z + Math.sin(a) * Math.sin(tilt) * len, k % 2 ? '#7a9a3c' : '#6a8a36', seed + k, 0.7));
   }
   return flat(finish(merge(parts), 8, 0.78, 1.08, 0.05, seed), 2.6);
@@ -296,7 +300,7 @@ export function baobab(seed: number): Model {
 export function poplar(seed: number, R = TREE_R): Model {
   const parts: Geo[] = [trunk(0.14, 0.22, 2.0, '#6b5a44')];
   // Coluna esticada 3,4×: esfera de 10 × 8 (o icosaedro esticado mostrava faces compridas).
-  parts.push(paint(lumpy(sphere(1.25, 10, 8), 0.08, seed), '#3f8a3a', tf(0, 5.6, 0, 1, 3.4, 1)));
+  parts.push(paint(lumpy(sphere(1.25, 14, 12), 0.08, seed), '#3f8a3a', tf(0, 5.6, 0, 1, 3.4, 1)));
   parts.push(blob(0.9, 0.25, 8.8, 0.1, '#4f9a40', seed + 1, 1.6, 0.1));
   parts.push(...mound(R, 0.8, ['#3b7a35', '#4a8a3a'], seed));
   return flat(finish(merge(parts), 10.5, 0.66, 1.12, 0.05, seed), 1.6);
@@ -309,7 +313,7 @@ export function aspen(seed: number, leaves: string[], R = TREE_R): Model {
     const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.8;
     const x = Math.cos(a) * 0.45; const z = Math.sin(a) * 0.45;
     const h = 5.2 + hash2(seed, k + 3) * 1.8;
-    parts.push(paint(cyl(0.08, 0.13, h, 8, true), '#e9e5da', tf(x, h / 2, z, 1, 1, 1, Math.sin(a) * 0.06, 0, -Math.cos(a) * 0.06)));
+    parts.push(paint(cyl(0.08, 0.13, h, 12, true), '#e9e5da', tf(x, h / 2, z, 1, 1, 1, Math.sin(a) * 0.06, 0, -Math.cos(a) * 0.06)));
     parts.push(paint(box(0.2, 0.1, 0.2), '#3a3a3a', tf(x, 1.3 + k * 0.5, z)));
     parts.push(blob(1.15, x * 1.4, h - 0.6, z * 1.4, leaves[k % leaves.length], seed + k, 1.5));
   }
@@ -319,13 +323,13 @@ export function aspen(seed: number, leaves: string[], R = TREE_R): Model {
 
 /** Eucalipto (Austrália): tronco claro e alto, copa rala caindo em tufos. */
 export function eucalyptus(seed: number, R = TREE_R): Model {
-  const parts: Geo[] = [trunk(0.18, 0.34, 6.5, '#d8d2c4', 8, 0.05, seed)];
+  const parts: Geo[] = [trunk(0.18, 0.34, 6.5, '#d8d2c4', 14, 0.05, seed)];
   parts.push(branch(0.12, 0.07, 2.6, '#d0c8b8', tf(0.7, 6.0, 0.2, 1, 1, 1, 0, 0, -0.6)));
   const g = ['#7f9a6a', '#8fa877', '#6f8a60'];
   const crown: Puff[] = [];
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * Math.PI * 2 + hash2(seed, k) * 0.7;
-    crown.push({ r: 1.1, x: Math.cos(a) * 1.2, y: 6.6 + hash2(seed, k + 3) * 1.4, z: Math.sin(a) * 1.2, color: g[k % 3], seed: seed + k, sy: 0.75 });
+  for (let k = 0; k < 4; k++) { // quatro bolhas de 180 faces (eram cinco de 80)
+    const a = (k / 4) * Math.PI * 2 + hash2(seed, k) * 0.7;
+    crown.push({ r: 1.2, x: Math.cos(a) * 1.3, y: 6.6 + hash2(seed, k + 3) * 1.4, z: Math.sin(a) * 1.3, color: g[k % 3], seed: seed + k, sy: 0.75 });
   }
   parts.push(...puffs(crown));
   parts.push(...mound(R, 0.6, ['#9a8a5a', '#8a8a55'], seed + 9));
@@ -335,12 +339,12 @@ export function eucalyptus(seed: number, R = TREE_R): Model {
 /** Oliveira: tronco torto e grosso, copa baixa prateada que desce até a altura do carro. */
 export function olive(seed: number, R = TREE_R): Model {
   // Tronco baixo e torto (a ponta aparece entre as bolhas: fechado).
-  const parts: Geo[] = [trunk(0.26, 0.4, 1.6, '#6a5a48', 8, 0.12, seed, true)];
+  const parts: Geo[] = [trunk(0.26, 0.4, 1.6, '#6a5a48', 12, 0.12, seed, true)];
   parts.push(branch(0.2, 0.12, 1.4, '#6a5a48', tf(0.4, 1.9, 0, 1, 1, 1, 0, 0, -0.5)));
   const g = ['#8ea56a', '#7f9860', '#9ab478'];
   const crown: Puff[] = [{ r: 1.5, x: 0, y: 2.9, z: 0, color: g[0], seed, sy: 0.62 }];
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * Math.PI * 2 + hash2(seed, k) * 0.6;
+  for (let k = 0; k < 3; k++) { // três bolhas baixas de 180 faces (eram cinco de 80)
+    const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.6;
     crown.push({ r: 0.72, x: Math.cos(a) * (R - 0.95), y: 1.75 + hash2(seed, k + 2) * 0.3, z: Math.sin(a) * (R - 0.95), color: g[k % 3], seed: seed + k + 1, sy: 0.7 });
   }
   parts.push(...puffs(crown));
@@ -352,8 +356,8 @@ export function olive(seed: number, R = TREE_R): Model {
 export function cypress(seed: number, R = TREE_R): Model {
   const parts: Geo[] = [trunk(0.1, 0.16, 1.0, '#5a4a36', 6)];
   // Chama esticada 4×: esfera de 10 × 8 (o icosaedro esticado mostrava faces compridas).
-  parts.push(paint(lumpy(sphere(1.0, 10, 8), 0.06, seed), '#2f5a36', tf(0, 4.3, 0, 1, 4.0, 1)));
-  parts.push(paint(cone(0.55, 1.6, 10), '#2a5232', tf(0, 8.1, 0)));
+  parts.push(paint(lumpy(sphere(1.0, 14, 12), 0.06, seed), '#2f5a36', tf(0, 4.3, 0, 1, 4.0, 1)));
+  parts.push(paint(cone(0.55, 1.6, 14), '#2a5232', tf(0, 8.1, 0)));
   parts.push(...mound(R, 0.6, ['#4a6a3a', '#5a7a40'], seed));
   return flat(finish(merge(parts), 9, 0.68, 1.12, 0.04, seed), 1.3);
 }
@@ -428,14 +432,14 @@ export function conifer(seed: number, color: string, tiers = 5, slim = 1, snow =
     const c = t % 2 ? dark : color;
     // Camada de 10 lados (a de 7 mostrava a quina na borda), cada uma com o próprio degradê: a saia mais escura
     // embaixo, o bico claro — as camadas leem como volumes macios empilhados, não como cones de trânsito.
-    const tier = paint(lumpy(cone(t === 0 ? R : r, h, 10), 0.03, seed + t, 2.2), c, tf(0, y + h / 2, 0, 1, 1, 1, (hash2(seed, t) - 0.5) * 0.08, t * 0.45, (hash2(seed, t + 9) - 0.5) * 0.08));
+    const tier = paint(lumpy(cone(t === 0 ? R : r, h, 16), 0.03, seed + t, 2.2), c, tf(0, y + h / 2, 0, 1, 1, 1, (hash2(seed, t) - 0.5) * 0.08, t * 0.45, (hash2(seed, t + 9) - 0.5) * 0.08));
     shadeY(tier, y, y + h, 0.84, 1.1);
     // Neve: o bico de cada camada branco, degradê até o verde da borda.
     if (snow) topTint(tier, y + h * 0.62, y + h * 0.95, '#f4f8ff');
     parts.push(tier);
     y += step;
   }
-  parts.push(paint(cone(0.25, step * 1.2, 8), snow ? '#f2f6ff' : color, tf(0, y + step * 0.6, 0)));
+  parts.push(paint(cone(0.25, step * 1.2, 12), snow ? '#f2f6ff' : color, tf(0, y + step * 0.6, 0)));
   return flat(finish(merge(parts), y + step, 0.7, 1.16, 0.04, seed), 1.9);
 }
 
@@ -459,7 +463,7 @@ export function coconutPalm(seed: number, lean: number, baseColors = ['#3f9a3c',
     const ang = Math.atan2(o1 - o0, y1 - y0);
     const r = 0.26 - 0.1 * t0;
     const mx = ((o0 + o1) / 2) * cd; const mz = ((o0 + o1) / 2) * sd;
-    parts.push(paint(cyl(r - 0.02, r, (y1 - y0) / Math.cos(ang) + 0.04, 8, true), k % 2 ? '#8a6a3f' : '#7a5c36', tf(mx, (y0 + y1) / 2, mz, 1, 1, 1, sd * ang, 0, -cd * ang)));
+    parts.push(paint(cyl(r - 0.02, r, (y1 - y0) / Math.cos(ang) + 0.04, 12, true), k % 2 ? '#8a6a3f' : '#7a5c36', tf(mx, (y0 + y1) / 2, mz, 1, 1, 1, sd * ang, 0, -cd * ang)));
     topX = o1 * cd; topZ = o1 * sd;
   }
   const n = 9;
@@ -495,7 +499,7 @@ export function cartoonPalm(seed: number, kind: 0 | 1 | 2 | 3): Model {
   const H = c.H + hash2(seed, 1) * 0.6;
   const dir = hash2(seed, 2) * Math.PI * 2;
   const cd = Math.cos(dir); const sd = Math.sin(dir);
-  const SEG = 7; const SIDES = 8;
+  const SEG = 7; const SIDES = 12;
   // Tronco: anéis ao longo da curva (x = tomba · t²), o raio afina e alarga no pé; normal radial, cor em degradê do pé ao topo.
   const centre = (t: number): [number, number, number] => [c.tilt * t * t * cd, H * t, c.tilt * t * t * sd];
   const ring = (t: number): Array<{ p: [number, number, number]; n: [number, number, number] }> => {
@@ -542,7 +546,7 @@ export function cartoonPalm(seed: number, kind: 0 | 1 | 2 | 3): Model {
     crownColor.setXYZ(i, crownColor.getX(i) * f, crownColor.getY(i) * f, crownColor.getZ(i) * f);
   }
   const bits: Geo[] = [paint(sphere(0.36, 6, 4), '#3f8f38', tf(topX, topY + 0.05, topZ))]; // palmito
-  if (c.shaft) bits.push(paint(cyl(0.22, 0.27, 1.5, 8, true), '#5a9a3a', tf(topX, topY - 0.7, topZ)));
+  if (c.shaft) bits.push(paint(cyl(0.22, 0.27, 1.5, 12, true), '#5a9a3a', tf(topX, topY - 0.7, topZ)));
   else for (let k = 0; k < 3; k++) bits.push(paint(sphere(0.2, 5, 3), '#6b4a22', tf(topX + Math.cos(k * 2.1) * 0.3, topY - 0.45, topZ + Math.sin(k * 2.1) * 0.3)));
   const base = smoothNormals(merge(palmBase(seed, ['#3f9a3c', '#58ad44'])), CREASE.plant);
   const g = mergeRound([trunkGeo, crown, ...bits, base]);
@@ -553,8 +557,8 @@ export function cartoonPalm(seed: number, kind: 0 | 1 | 2 | 3): Model {
 /** Palmeira-imperial: tronco reto cinza, palmito verde, folhas em arco. */
 export function royalPalm(seed: number, baseColors = ['#3f9a3c', '#58ad44']): Model {
   const H = 9.5 + hash2(seed, 1) * 2;
-  const parts: Geo[] = [paint(cyl(0.24, 0.36, H, 10, true), '#b8b0a4', tf(0, H / 2, 0))];
-  parts.push(paint(cyl(0.2, 0.27, 1.6, 10), '#5a9a3a', tf(0, H + 0.8, 0)));
+  const parts: Geo[] = [paint(cyl(0.24, 0.36, H, 14, true), '#b8b0a4', tf(0, H / 2, 0))];
+  parts.push(paint(cyl(0.2, 0.27, 1.6, 14), '#5a9a3a', tf(0, H + 0.8, 0)));
   for (let k = 0; k < 10; k++) {
     const a = (k / 10) * Math.PI * 2 + hash2(seed, k) * 0.3;
     parts.push(paint(frond(3.4, 0.8, a, 1.6, 2.4, 4), k % 2 ? '#3a8f38' : '#48a040', tf(0, H + 1.5, 0)));
@@ -566,8 +570,8 @@ export function royalPalm(seed: number, baseColors = ['#3f9a3c', '#58ad44']): Mo
 /** Tamareira baixa e cheia: as folhas de baixo caem até a altura do carro, na pegada. */
 export function datePalm(seed: number): Model {
   const H = 2.6 + hash2(seed, 1) * 1.2;
-  const parts: Geo[] = [paint(cyl(0.34, 0.42, H, 10), '#8a6e48', tf(0, H / 2, 0))];
-  for (let k = 0; k < 4; k++) parts.push(paint(cyl(0.44, 0.44, 0.12, 10, true), '#7a603e', tf(0, 0.3 + k * H / 4, 0, 1, 1, 1, 0, k * 0.4, 0)));
+  const parts: Geo[] = [paint(cyl(0.34, 0.42, H, 14), '#8a6e48', tf(0, H / 2, 0))];
+  for (let k = 0; k < 4; k++) parts.push(paint(cyl(0.44, 0.44, 0.12, 14, true), '#7a603e', tf(0, 0.3 + k * H / 4, 0, 1, 1, 1, 0, k * 0.4, 0)));
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2 + hash2(seed, k) * 0.3;
     const low = k % 2 === 0;
@@ -581,11 +585,11 @@ export function datePalm(seed: number): Model {
 /** Palmeira-de-leque (washingtonia): tronco fino e alto, saia de folhas secas, copa de leques. */
 export function fanPalm(seed: number, baseColors = ['#6a9a3c', '#8aa84a']): Model {
   const H = 10 + hash2(seed, 1) * 2.5;
-  const parts: Geo[] = [paint(cyl(0.2, 0.3, H, 10, true), '#8f7a5c', tf(0, H / 2, 0))];
-  parts.push(paint(cyl(0.62, 0.34, 2.0, 10), '#a88a5a', tf(0, H - 0.8, 0)));
+  const parts: Geo[] = [paint(cyl(0.2, 0.3, H, 14, true), '#8f7a5c', tf(0, H / 2, 0))];
+  parts.push(paint(cyl(0.62, 0.34, 2.0, 14), '#a88a5a', tf(0, H - 0.8, 0)));
   for (let k = 0; k < 9; k++) {
     const a = (k / 9) * Math.PI * 2;
-    parts.push(paint(cone(0.85, 0.12, 7), '#4f9a44', lean(Math.cos(a) * 0.9, H + 0.35 + hash2(seed, k) * 0.3, Math.sin(a) * 0.9, a, 0.5, 1.6, 1, 1)));
+    parts.push(paint(cone(0.85, 0.12, 10), '#4f9a44', lean(Math.cos(a) * 0.9, H + 0.35 + hash2(seed, k) * 0.3, Math.sin(a) * 0.9, a, 0.5, 1.6, 1, 1)));
   }
   parts.push(...palmBase(seed, baseColors));
   return flat(finish(merge(parts), H + 1, 0.78, 1.1, 0.04, seed), 1.6);
@@ -619,17 +623,17 @@ export function saguaro(seed: number, arms: 2 | 3): Model {
   const R = CACTUS_R; const tr = 0.3; const ar = 0.19;
   const H = 4.2 + hash2(seed, 1) * 1.2;
   // Coluna de 12 lados com a ponta em cúpula; braços de 8 (eram 8 e 6: quinas na silhueta).
-  const parts: Geo[] = [paint(cyl(tr, tr + 0.05, H, 12, true), green, tf(0, H / 2, 0)), paint(sphere(tr, 12, 2, 0, Math.PI * 2, 0, Math.PI / 2), green, tf(0, H, 0, 1, 0.8, 1))];
+  const parts: Geo[] = [paint(cyl(tr, tr + 0.05, H, 16, true), green, tf(0, H / 2, 0)), paint(sphere(tr, 16, 3, 0, Math.PI * 2, 0, Math.PI / 2), green, tf(0, H, 0, 1, 0.8, 1))];
   // Cotovelos baixos: mesmo o saguaro mais alto (escala × variação de altura) encosta os braços na altura do carro.
   const specs: Array<[number, number, number]> = [[1, 0.72, 1.9], [-1, 0.8, 2.4], [1, 2.3, 1.2]];
   for (let k = 0; k < arms; k++) {
     const [side, elbow, up] = specs[k];
     const reach = k === 2 ? R * 0.72 : R;
     const x = side * (reach - ar);
-    parts.push(paint(cyl(ar, ar, Math.abs(x) - tr * 0.5, 8, true), green, tf(side * (Math.abs(x) + tr * 0.5) / 2, elbow, 0, 1, 1, 1, 0, 0, Math.PI / 2)));
-    parts.push(paint(sphere(ar, 8, 3), green, tf(x, elbow, 0))); // cotovelo: quase todo dentro do braço
-    parts.push(paint(cyl(ar * 0.92, ar, up, 8, true), green, tf(x, elbow + up / 2, 0)));
-    parts.push(paint(sphere(ar * 0.92, 8, 2, 0, Math.PI * 2, 0, Math.PI / 2), green, tf(x, elbow + up, 0, 1, 0.8, 1)));
+    parts.push(paint(cyl(ar, ar, Math.abs(x) - tr * 0.5, 12, true), green, tf(side * (Math.abs(x) + tr * 0.5) / 2, elbow, 0, 1, 1, 1, 0, 0, Math.PI / 2)));
+    parts.push(paint(sphere(ar, 12, 5), green, tf(x, elbow, 0))); // cotovelo: quase todo dentro do braço
+    parts.push(paint(cyl(ar * 0.92, ar, up, 12, true), green, tf(x, elbow + up / 2, 0)));
+    parts.push(paint(sphere(ar * 0.92, 12, 3, 0, Math.PI * 2, 0, Math.PI / 2), green, tf(x, elbow + up, 0, 1, 0.8, 1)));
   }
   parts.push(paint(new THREE.OctahedronGeometry(0.1, 0), '#f4f0e0', tf(0.1, H + 0.2, 0)), paint(new THREE.OctahedronGeometry(0.09, 0), '#f2a0c0', tf(-0.12, H + 0.18, 0.06)));
   return flat(finish(merge(parts), H, 0.8, 1.1, 0.03, seed), 1.1);
@@ -646,8 +650,8 @@ export function barrelCluster(seed: number): Model {
     const d = center ? 0 : R - r;
     const h = center ? 1.0 : 0.6 + hash2(seed, k + 3) * 0.3;
     const x = Math.cos(a) * d; const z = Math.sin(a) * d;
-    parts.push(paint(cyl(r * 0.85, r, h, 10, true), '#5a8f45', tf(x, h / 2, z)));
-    parts.push(paint(sphere(r * 0.85, 10, 2, 0, Math.PI * 2, 0, Math.PI / 2), '#5a8f45', tf(x, h, z, 1, 0.75, 1)));
+    parts.push(paint(cyl(r * 0.85, r, h, 14, true), '#5a8f45', tf(x, h / 2, z)));
+    parts.push(paint(sphere(r * 0.85, 14, 3, 0, Math.PI * 2, 0, Math.PI / 2), '#5a8f45', tf(x, h, z, 1, 0.75, 1)));
     parts.push(paint(new THREE.OctahedronGeometry(0.08, 0), k % 2 ? '#f2c33a' : '#e8506a', tf(x, h + r * 0.6, z)));
   }
   parts.push(...mound(R, 0.3, ['#b8a07a', '#a89070'], seed + 9));
@@ -659,7 +663,7 @@ export function pricklyPear(seed: number): Model {
   const parts: Geo[] = [];
   const R = CACTUS_R;
   const pad = (x: number, y: number, z: number, s: number, yaw: number, roll: number, k: number) => {
-    parts.push(paint(lumpy(sphere(0.42 * s, 8, 5), 0.05, seed + k), k % 3 ? '#5f9a4a' : '#6aa650', tf(x, y, z, 1, 1.25, 0.28, 0, yaw, roll)));
+    parts.push(paint(sphere(0.42 * s, 10, 6), k % 3 ? '#5f9a4a' : '#6aa650', tf(x, y, z, 1, 1.25, 0.28, 0, yaw, roll)));
   };
   pad(0, 0.5, 0, 1.1, 0, 0, 0);
   pad(0.5, 0.95, 0, 1, 0, -0.5, 1); pad(-0.5, 0.9, 0.05, 1, 0, 0.5, 2);
@@ -674,15 +678,15 @@ export function termiteMound(seed: number): Model {
   // Catedral de terra: corpo arredondado e irregular (nada de cone liso de trânsito), torres baixas grudadas.
   const H = 2.2 + hash2(seed, 1) * 0.9;
   // Corpo de 12 lados em bolhas macias (o jitter por vértice lascava), torres de 8 com ponta redonda.
-  const body = new THREE.CylinderGeometry(0.34, CACTUS_R, H, 12, 4, true);
+  const body = new THREE.CylinderGeometry(0.34, CACTUS_R, H, 14, 4, true);
   const earth = ['#a8653a', '#b8744a', '#96583a'];
   const parts: Geo[] = [paint(lumpy(body, 0.1, seed, 1.3, true), earth[0], tf(0, H / 2, 0))];
-  parts.push(paint(lumpy(sphere(0.36, 9, 5), 0.08, seed + 3), earth[1], tf(0, H, 0, 1, 0.8, 1)));
+  parts.push(paint(lumpy(sphere(0.36, 14, 6), 0.08, seed + 3), earth[1], tf(0, H, 0, 1, 0.8, 1)));
   for (let k = 0; k < 4; k++) {
     const a = (k / 4) * Math.PI * 2 + hash2(seed, k);
     const hh = 0.9 + hash2(seed, k + 5) * 1.0;
-    parts.push(paint(lumpy(cyl(0.12, 0.3, hh, 8, true), 0.1, seed + k, 1.3, true), earth[(k + 1) % 3], tf(Math.cos(a) * 0.45, 0.6 + hh / 2, Math.sin(a) * 0.45)));
-    parts.push(paint(sphere(0.14, 8, 3), earth[(k + 1) % 3], tf(Math.cos(a) * 0.45, 0.6 + hh, Math.sin(a) * 0.45)));
+    parts.push(paint(lumpy(cyl(0.12, 0.3, hh, 12, true), 0.1, seed + k, 1.3, true), earth[(k + 1) % 3], tf(Math.cos(a) * 0.45, 0.6 + hh / 2, Math.sin(a) * 0.45)));
+    parts.push(paint(sphere(0.14, 12, 4), earth[(k + 1) % 3], tf(Math.cos(a) * 0.45, 0.6 + hh, Math.sin(a) * 0.45)));
   }
   return flat(finish(merge(parts), H + 0.5, 0.78, 1.1, 0.08, seed), 1.2);
 }
@@ -695,25 +699,25 @@ export function spinifex(seed: number): Model {
     const d = k === 0 ? 0 : CACTUS_R * 0.55;
     parts.push(paint(tuft(9, 0.9, 0.45, seed + k), k % 2 ? '#c9b25a' : '#b5a050', tf(Math.cos(a) * d, 0, Math.sin(a) * d)));
   }
-  parts.push(...mound(CACTUS_R, 0.55, ['#a89a4a', '#b8a850'], seed + 20));
+  parts.push(...soil(CACTUS_R, 0.32, ['#a89a4a', '#b8a850'], seed + 20));
   return flat(finish(merge(parts), 1.1, 0.8, 1.1, 0.05, seed), 1.1);
 }
 
 /** Eufórbia-candelabro (Karoo): braços que sobem de um cálice baixo, pegada nos cotovelos. */
 export function euphorbia(seed: number): Model {
   const g = '#5a8a4a';
-  // Braços de 10 lados com a ponta redonda (eram de 6 com tampa chata).
-  const parts: Geo[] = [paint(cyl(0.22, 0.28, 0.7, 10), '#6a6a4a', tf(0, 0.35, 0))];
-  const tip = (x: number, y: number, z: number, r: number) => paint(sphere(r, 10, 2, 0, Math.PI * 2, 0, Math.PI / 2), g, tf(x, y, z, 1, 0.8, 1));
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + hash2(seed, k) * 0.3;
+  // Braços de 14 lados com a ponta redonda (eram de 6 com tampa chata).
+  const parts: Geo[] = [paint(cyl(0.22, 0.28, 0.7, 14), '#6a6a4a', tf(0, 0.35, 0))];
+  const tip = (x: number, y: number, z: number, r: number) => paint(sphere(r, 14, 3, 0, Math.PI * 2, 0, Math.PI / 2), g, tf(x, y, z, 1, 0.8, 1));
+  for (let k = 0; k < 5; k++) { // cinco braços (eram seis de 10 lados: a faceta de 15° pede 14 lados, e os 900 triângulos do modelo, um braço a menos)
+    const a = (k / 5) * Math.PI * 2 + hash2(seed, k) * 0.3;
     const d = CACTUS_R - 0.13;
     const up = 1.6 + hash2(seed, k + 4) * 1.4;
-    parts.push(paint(cyl(0.12, 0.12, d, 10, true), g, lean(Math.cos(a) * d / 2, 0.62, Math.sin(a) * d / 2, a, Math.PI / 2)));
-    parts.push(paint(cyl(0.11, 0.13, up, 10, true), g, tf(Math.cos(a) * d, 0.62 + up / 2, Math.sin(a) * d)));
+    parts.push(paint(cyl(0.12, 0.12, d, 14, true), g, lean(Math.cos(a) * d / 2, 0.62, Math.sin(a) * d / 2, a, Math.PI / 2)));
+    parts.push(paint(cyl(0.11, 0.13, up, 14, true), g, tf(Math.cos(a) * d, 0.62 + up / 2, Math.sin(a) * d)));
     parts.push(tip(Math.cos(a) * d, 0.62 + up, Math.sin(a) * d, 0.11));
   }
-  parts.push(paint(cyl(0.14, 0.14, 3.1, 10, true), g, tf(0, 2.15, 0))); // aberto: o pé dentro do cálice
+  parts.push(paint(cyl(0.14, 0.14, 3.1, 14, true), g, tf(0, 2.15, 0))); // aberto: o pé dentro do cálice
   parts.push(tip(0, 3.7, 0, 0.14));
   return flat(finish(merge(parts), 3.5, 0.8, 1.1, 0.04, seed), 1.1);
 }
@@ -726,10 +730,10 @@ export function rosette(seed: number, leaf: string, flower: string, stalk: numbe
     const inner = k % 2 === 1;
     const tilt = inner ? 0.55 : 1.05;
     const L = inner ? 0.95 : CACTUS_R / Math.sin(tilt) * 0.98;
-    parts.push(paint(cone(0.13, L, 7), leaf, lean(Math.cos(a) * Math.sin(tilt) * L / 2, 0.12 + Math.cos(tilt) * L / 2, Math.sin(a) * Math.sin(tilt) * L / 2, a, tilt, 1, 1, 0.5)));
+    parts.push(paint(spike(0.13, L, 16), leaf, lean(Math.cos(a) * Math.sin(tilt) * L / 2, 0.12 + Math.cos(tilt) * L / 2, Math.sin(a) * Math.sin(tilt) * L / 2, a, tilt, 1, 1, 0.5)));
   }
   parts.push(paint(cyl(0.035, 0.05, stalk, 4), '#7a6a3a', tf(0, stalk / 2, 0)));
-  for (let k = 0; k < 4; k++) parts.push(paint(cone(0.14, 0.5, 7), flower, tf(Math.cos(k * 1.6) * 0.18, stalk - 0.2 - k * 0.35, Math.sin(k * 1.6) * 0.18)));
+  for (let k = 0; k < 4; k++) parts.push(paint(spike(0.14, 0.5, 16), flower, tf(Math.cos(k * 1.6) * 0.18, stalk - 0.2 - k * 0.35, Math.sin(k * 1.6) * 0.18)));
   return flat(finish(merge(parts), stalk, 0.82, 1.1, 0.04, seed), 1.1);
 }
 
@@ -812,18 +816,19 @@ export function palma(seed: number): Model {
 /** Moita baixa (≤ 1,1 m: o carro passa por cima dela sem parecer atravessar uma parede). */
 export function shrub(seed: number, colors: string[], flowers: string | null, r = 1.2, h = 0.95): Model {
   const parts: Geo[] = [];
-  // Três bolhas de icosaedro subdividido (eram quatro de 20 faces, de quinas à mostra bem na beira da pista).
+  // Três domos de esfera de 14 × 4 (a metade de baixo, que o chão esconde, nem existe: o domo nasce no chão), achatados até a altura `h`.
+  // Eram bolhas de icosaedro de 80 faces (faceta 20°); o domo faz 14° com 98 triângulos.
   const bunch: Puff[] = [];
   for (let k = 0; k < 3; k++) {
     const a = (k / 3) * Math.PI * 2 + hash2(seed, k);
     const d = k === 0 ? 0 : r * 0.42;
     const rr = (k === 0 ? 0.62 : 0.52) * r;
-    bunch.push({ r: rr, x: Math.cos(a) * d, y: rr * 0.55, z: Math.sin(a) * d, color: colors[k % colors.length], seed: seed + k, sy: h / (rr * 1.9), amount: 0.1 });
+    bunch.push({ r: rr, x: Math.cos(a) * d, y: 0, z: Math.sin(a) * d, color: colors[k % colors.length], seed: seed + k, sy: (h * (k === 0 ? 0.95 : 0.8)) / rr, amount: 0.1 });
   }
-  // O chão também esconde: o que fica inteiro abaixo dele sai.
-  parts.push(...puffs(bunch, [{ x: 0, y: -50, z: 0, rx: 60, ry: 50, rz: 60 }]));
+  const cores = bunch.map(puffCore);
+  bunch.forEach((b, i) => parts.push(cullInside(paint(lumpy(sphere(b.r, 14, 4, 0, Math.PI * 2, 0, Math.PI / 2), b.amount ?? 0.1, b.seed), b.color, tf(b.x, b.y, b.z, 1, b.sy ?? 0.8, 1, 0, hash2(b.seed, 3) * 6.28, 0)), cores.filter((_, j) => j !== i))));
   if (flowers) {
-    // Cada flor na pele de uma bolha (na metade de cima), não solta no ar entre elas.
+    // Cada flor na pele de um domo (na metade de cima), não solta no ar entre eles.
     for (let k = 0; k < 9; k++) {
       const b = bunch[k % bunch.length];
       const a = hash2(seed, k + 50) * 6.28; const e = 0.45 + hash2(seed, k + 70) * 0.9;
@@ -837,8 +842,8 @@ export function shrub(seed: number, colors: string[], flowers: string | null, r 
 
 /** Moita de samambaias. */
 export function fernClump(seed: number, colors = ['#3f9a3c', '#2f8a38', '#58ad44']): Model {
-  const parts = fernRing(7, 1.4, 0.5, colors, seed, 0.9, 0.7, 2);
-  parts.push(...fernRing(4, 0.9, 0.4, colors, seed + 3, 1.0, 0.5, 2));
+  const parts = fernRing(7, 1.4, 0.5, colors, seed, 0.9, 0.7, 4);
+  parts.push(...fernRing(4, 0.9, 0.4, colors, seed + 3, 1.0, 0.5, 3));
   return flat(finish(merge(parts), 1, 0.75, 1.12, 0.05, seed), 1.2);
 }
 
@@ -865,7 +870,7 @@ export function rocks(seed: number, style: RockStyle, R = ROCK_R): Model {
     for (let k = 0; k < 4; k++) {
       const rr = R * (1.04 - k * 0.2);
       const h = 0.85 - k * 0.1;
-      const g = k === 0 ? cyl(rr * 0.86, rr, h, 12) : lumpy(cyl(rr * 0.86, rr, h, 12), 0.05, seed + k, 1.3, true);
+      const g = k === 0 ? cyl(rr * 0.86, rr, h, 16) : lumpy(cyl(rr * 0.86, rr, h, 16), 0.05, seed + k, 1.3, true);
       const off = k === 0 ? 0 : (hash2(seed, k) - 0.5) * R * 0.3;
       parts.push(paint(g, strata[k], tf(off, y + h / 2, off * 0.6, 1, 1, k === 0 ? 1 : 0.85, 0, k * 0.7 + seed, 0)));
       y += h * 0.92;
@@ -875,13 +880,13 @@ export function rocks(seed: number, style: RockStyle, R = ROCK_R): Model {
     // macias (era o icosaedro de 80 faces achatado: gomos na silhueta) —, e duas pedras menores por cima, também
     // redondas (eram blocos de 20 e 12 faces: lascas). A silhueta deixa de ser um ovo por elas, não pelas quinas.
     // A parte de cada uma enterrada na outra sai (os sólidos encolhidos pela deformação e pela corda das faces).
-    const main: Ellipsoid = { x: 0, y: R * 0.2, z: 0, rx: R * 1.04 * 0.86, ry: R * 0.42 * 0.86, rz: R * 0.86 };
+    const main: Ellipsoid = { x: 0, y: R * 0.2, z: 0, rx: R * 1.0 * 0.86, ry: R * 0.42 * 0.86, rz: R * 0.86 };
     const s1 = R * 0.55 * 0.75 * 0.8; const s2 = R * 0.4 * 0.75 * 0.8;
     const b1: Ellipsoid = { x: R * 0.1, y: R * 0.55, z: -R * 0.08, rx: s1, ry: s1, rz: s1 };
     const b2: Ellipsoid = { x: -R * 0.36, y: R * 0.44, z: R * 0.22, rx: s2, ry: s2, rz: s2 };
-    parts.push(cullInside(paint(lumpy(sphere(1, 14, 7), 0.08, seed, 1.5), base, tf(0, R * 0.2, 0, R * 1.04, R * 0.42, R * 1.0)), [b1, b2]));
-    parts.push(cullInside(paint(lumpy(ico(R * 0.55, 1), 0.12, seed + 1), base, tf(R * 0.1, R * 0.55, -R * 0.08, 1, 0.8, 0.9, 0.3, seed, 0.2)), [main, b2]));
-    parts.push(cullInside(paint(lumpy(ico(R * 0.4, 1), 0.12, seed + 2), base, tf(-R * 0.36, R * 0.44, R * 0.22, 1, 0.75, 1, 0, seed * 2, 0.3)), [main, b1]));
+    parts.push(cullInside(paint(lumpy(sphere(1, 16, 8), 0.06, seed, 1.5), base, tf(0, R * 0.2, 0, R * 1.0, R * 0.42, R * 1.0)), [b1, b2]));
+    parts.push(cullInside(paint(lumpy(sphere(R * 0.55, 12, 6), 0.09, seed + 1), base, tf(R * 0.1, R * 0.55, -R * 0.08, 1, 0.8, 0.9, 0.3, seed, 0.2)), [main, b2]));
+    parts.push(cullInside(paint(lumpy(sphere(R * 0.4, 12, 6), 0.09, seed + 2), base, tf(-R * 0.36, R * 0.44, R * 0.22, 1, 0.75, 1, 0, seed * 2, 0.3)), [main, b1]));
   }
   const g = merge(parts);
   // Neve, musgo e o topo lavado de sol por ponto (rampa macia), não face sim, face não.
@@ -919,10 +924,11 @@ export function flowerPatch(seed: number, green: string, flowers: string[]): Mod
 /** Pedrinhas espalhadas. */
 export function pebbles(seed: number, color: string): Model {
   const parts: Geo[] = [];
-  for (let k = 0; k < 4; k++) {
+  // Três pedrinhas em domo achatado de 12 × 4 (84 triângulos cada, faceta 13°; eram octaedros de 8 faces, 25°; a metade de baixo nem existe): a forração só vale até 34 segmentos.
+  for (let k = 0; k < 3; k++) {
     const a = hash2(seed, k) * 6.28; const d = hash2(seed, k + 5) * 0.8;
     const r = 0.14 + hash2(seed, k + 7) * 0.16;
-    parts.push(paint(jitter(new THREE.OctahedronGeometry(r, 0), 0.15, seed + k), color, tf(Math.cos(a) * d, r * 0.3, Math.sin(a) * d, 1, 0.6, 1)));
+    parts.push(paint(lumpy(sphere(r, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2), 0.05, seed + k), color, tf(Math.cos(a) * d, 0, Math.sin(a) * d, 1, 0.55, 1)));
   }
   return { parts: [{ geometry: tintUpSoft(merge(parts), '#ffffff', 0.7, 0.18), mat: 'flat' }] };
 }
@@ -981,11 +987,11 @@ export function mesa(seed: number, colors: string[], w: number, h: number): Mode
     const lh = h / layers;
     const top = k === layers - 1;
     const rb = w * (1.12 - k * 0.07); const rt = top ? w * 0.86 : w * (1.05 - k * 0.07);
-    parts.push(paint(lumpy(cyl(rt, rb, lh, 12), 0.06, seed + k, 1.3, true), colors[k % colors.length], tf(0, y + lh / 2, 0, 1, 1, 0.75, 0, seed, 0)));
+    parts.push(paint(lumpy(cyl(rt, rb, lh, 16), 0.06, seed + k, 1.3, true), colors[k % colors.length], tf(0, y + lh / 2, 0, 1, 1, 0.75, 0, seed, 0)));
     y += lh;
   }
   // Tálus: rampa de detritos no pé.
-  parts.push(paint(lumpy(cyl(w * 1.1, w * 1.5, h * 0.22, 12), 0.08, seed + 9, 1.3, true), colors[0], tf(0, h * 0.11, 0, 1, 1, 0.8)));
+  parts.push(paint(lumpy(cyl(w * 1.1, w * 1.5, h * 0.22, 16), 0.08, seed + 9, 1.3, true), colors[0], tf(0, h * 0.11, 0, 1, 1, 0.8)));
   return { parts: [{ geometry: shadeY(merge(parts), 0, h, 0.72, 1.1), mat: 'flat' }] };
 }
 
@@ -998,10 +1004,10 @@ export function seaStack(seed: number, h: number): Model {
   for (let k = 0; k < n; k++) {
     const lh = (h + 4) / n;
     const r = 3.4 - k * 0.45 + hash2(seed, k) * 0.5;
-    parts.push(paint(lumpy(cyl(r * 0.9, r, lh, 10), 0.08, seed + k, 1.3, true), colors[k % 3], tf(0, y + lh / 2, 0, 1, 1, 0.8)));
+    parts.push(paint(lumpy(cyl(r * 0.9, r, lh, 16), 0.08, seed + k, 1.3, true), colors[k % 3], tf(0, y + lh / 2, 0, 1, 1, 0.8)));
     y += lh;
   }
-  parts.push(paint(lumpy(ico(2.3, 1), 0.1, seed), '#8a9a4a', tf(0, y, 0, 1, 0.3, 0.8)));
+  parts.push(paint(lumpy(sphere(2.3, 14, 5), 0.1, seed), '#8a9a4a', tf(0, y, 0, 1, 0.3, 0.8)));
   return { parts: [{ geometry: shadeY(merge(parts), -4, h, 0.75, 1.1), mat: 'flat' }] };
 }
 
