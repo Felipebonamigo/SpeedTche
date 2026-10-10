@@ -192,6 +192,15 @@ describe('as linhas no Effects', () => {
     expect(subida[0]).toBeLessThan(fxPlan('high', false).speedLines * 0.5);
   });
 
+  it('clear() (troca de pista, fundo dos menus) apaga as linhas e o túnel: nada fica pintado no menu depois de uma corrida', () => {
+    const s = cena('high');
+    expect(corre(s, 120, 1)).toBeGreaterThan(10);
+    s.fx.clear();
+    s.fx.pose(buildRoadFrame(s.track, s.mine[0].z, 30, 200), s.track, 1);
+    expect(s.fx.counts().streaks).toBe(0);
+    expect(s.fx.counts()).toMatchObject({ puffs: 0, sparks: 0, marks: 0, waves: 0, pows: 0 });
+  });
+
   it('o túnel acende no vácuo (computeModifiers.draft), some ao sair dele, e não existe sem carro à frente', () => {
     const s = cena('high');
     const me = s.mine[0]; const lead = s.state.cars.find((c) => c.seat < 0)!;

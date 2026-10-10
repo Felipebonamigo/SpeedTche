@@ -26,6 +26,13 @@ const forceSkid = q.get('skid') === '1';
 // jogador "bate" (queda de 40% da velocidade e collisionCooldown = 20), para ver o rodopio, o quique e as estrelinhas; frames=<n> escolhe o instante.
 const forceDrift = Number(q.get('drift') ?? 0);
 const hitFrame = q.get('hit') === null ? -1 : Number(q.get('hit'));
+// M5 (efeitos): driftlevel=1|2|3 dá carga ao drift=… (faíscas azul, laranja, roxa); top=<fração> prende a velocidade do jogador (top=1: pé no fundo, linhas de
+// velocidade; 0.95: tremor); draft=1 põe um carro rápido logo à frente (túnel de ar do vácuo); reduce=1 liga "reduzir efeitos"; ticks=<n> escolhe quando a
+// corrida está (ticks=205: a largada vai acontecer nos primeiros quadros).
+const driftLevelForced = Number(q.get('driftlevel') ?? 0);
+const topForced = Number(q.get('top') ?? 0);
+const draftForced = q.get('draft') === '1';
+const reduceFx = q.get('reduce') === '1';
 // carview=side|rear34|front34|rear: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
 // showroom=1: os 13 estilos em grade na pista (carview escolhe o lado, padrão front34);
 // sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros;
@@ -163,7 +170,7 @@ function raceFrame() {
   const paints = racePaints(state.cars, humans);
   if (sheetPaint !== undefined && paintSheet) paints[state.cars.indexOf(me)] = sheetPaint;
   const ghost = ghostOn ? { pose: { z: me.z + 420, x: Math.max(-0.9, Math.min(0.9, me.x + 0.35)), speed: me.speed, steerPose: 0, nitro: false }, carId: me.carId, delta: 0.4 } : undefined;
-  return { state, track, viewports, options: { quality, showMinimap: q.get('map') !== '0', screenShake: true }, time, paused: forcePause, coop: humanCount >= 2, showHud: q.get('hud') !== '0' && !extraCam, ghost, paints };
+  return { state, track, viewports, options: { quality, showMinimap: q.get('map') !== '0', screenShake: true, reduceEffects: reduceFx }, time, paused: forcePause, coop: humanCount >= 2, showHud: q.get('hud') !== '0' && !extraCam, ghost, paints };
 }
 
 /** Folha de contato: cada estilo (e o 2º GT) desenhado com a mesma câmera e copiado para um quadro. */
@@ -210,7 +217,9 @@ function loop(now) {
     for (const c of state.cars) if (c.seat >= 0) { if (forceNitro) c.nitroTicks = 100; if (forceSkid) { c.x = 1.35; c.skidTicks = 6; } }
     // brake=1: o carro do jogador "freia" a cada quadro (só a velocidade cai; parado no lugar) — lanternas de freio.
     if (q.get('brake') === '1') { me.speed = Math.max(400, 5000 - frames * 250); me.collisionCooldown = 0; }
-    if (forceDrift) { me.driftDir = forceDrift; me.driftTicks = 30; }
+    if (forceDrift) { me.driftDir = forceDrift; me.driftTicks = 30; if (driftLevelForced > 0) me.driftCharge = [45, 100, 160][driftLevelForced - 1]; }
+    if (topForced > 0) me.speed = me.stats.topSpeed * topForced;
+    if (draftForced) { const lead = state.cars.find((c) => c !== me); if (lead) { lead.z = (me.z + 700) % track.length; lead.x = me.x; lead.speed = lead.stats.topSpeed; } }
     if (hitFrame >= 0) { const top = me.stats.topSpeed; if (frames < hitFrame) { me.speed = top * 0.8; me.collisionCooldown = 0; } else if (frames === hitFrame) { me.speed = top * 0.4; me.collisionCooldown = 20; } else me.collisionCooldown = Math.max(0, 20 - (frames - hitFrame)); }
     ageMessages(dt);
     renderer.render(raceFrame());

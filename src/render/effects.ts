@@ -317,6 +317,7 @@ export class Effects {
     this.streaks.begin(); this.streaks.end();
     this.marks.buffer.clear(); this.marks.mesh.visible = false;
     this.waves.clear(); this.pows.clear();
+    for (const v of this.views) { v.lineS = 0; v.draftI = 0; }
   }
 
   /** As linhas de velocidade e o túnel do vácuo do viewport, no lote de traços (coordenada de pista em volta do carro dele). */
