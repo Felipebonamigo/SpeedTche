@@ -12,7 +12,7 @@ import { bandPoints } from '../src/render/scenery/geom';
 import { columnDistance, columnHeight, groundAt, TERRAIN_COLS } from '../src/render/scenery/ground';
 import { CAR_REACH_M, sceneryLayout, type Placement } from '../src/render/scenery/layout';
 import { modelTriangles } from '../src/render/scenery/vegetation';
-import { HEADING_PER_CURVE, ROAD_HALF_WIDTH_M, SEGMENT_M } from '../src/render/units';
+import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve } from '../src/render/units';
 
 const SOLID_PART = new Set(['flat', 'office', 'apartment', 'classic', 'house', 'panel']);
 
@@ -183,10 +183,11 @@ describe('cenário: decoração só visual', () => {
     const bad: string[] = [];
     for (const track of tracks) {
       const n = track.segments.length;
-      // Linha central desenrolada em duas voltas (a pista do DSL não fecha: só vale a vizinhança).
+      const turn = turnPerCurve(track);
+      // Linha central desenrolada em duas voltas (a pista do DSL não fecha em posição: só vale a vizinhança).
       const px = new Float64Array(2 * n + 1); const pz = new Float64Array(2 * n + 1); const hd = new Float64Array(2 * n + 1);
       for (let k = 0; k < 2 * n; k++) {
-        const d = track.segments[k % n].curve * HEADING_PER_CURVE;
+        const d = track.segments[k % n].curve * turn;
         const a = hd[k] + d / 2;
         px[k + 1] = px[k] + SEGMENT_M * Math.sin(a); pz[k + 1] = pz[k] - SEGMENT_M * Math.cos(a); hd[k + 1] = hd[k] + d;
       }
@@ -246,6 +247,7 @@ describe('cenário: chão igual ao do terreno', () => {
         const p = palette(track.def.scenery, track.def.timeOfDay);
         terrain.setTrack(track, p, `${track.def.id}:test`);
         const frame = buildRoadFrame(track, track.length * 0.37, 30, 200);
+        const turn = turnPerCurve(track);
         terrain.update(frame, track, 0, new THREE.Vector3(0, 1, 0), 0);
         const strips = terrain.group.children.slice(0, 2) as THREE.Mesh[];
         const lanes = TERRAIN_COLS.length;
@@ -259,8 +261,8 @@ describe('cenário: chão igual ao do terreno', () => {
               const mine = frame.py[j] + columnHeight(track, seg, side, c);
               expect(Math.abs(y - mine), `${track.def.id} ponto ${j} lado ${side} coluna ${c}`).toBeLessThan(1e-3);
               // Entre colunas, a interpolação (só onde a curva não empilhou colunas na mesma distância).
-              const d = columnDistance(seg, side, c);
-              if (c === 0 || d > columnDistance(seg, side, c - 1) + 1e-3) {
+              const d = columnDistance(seg, side, c, turn);
+              if (c === 0 || d > columnDistance(seg, side, c - 1, turn) + 1e-3) {
                 expect(Math.abs(frame.py[j] + groundAt(track, seg, side, d) - y), `interp ${track.def.id} ${j} ${side} ${c}`).toBeLessThan(1e-3);
               }
             }

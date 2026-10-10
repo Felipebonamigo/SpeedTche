@@ -155,7 +155,8 @@ describe('a visada do núcleo (core/track/sightline.ts) é a conta do renderizad
   it('a linha central sem trigonometria é a do renderizador (≤ 1 cm em duas voltas de pistas de verdade)', () => {
     for (const id of ['monaco_noite', 'roma', 'sampa_noite', 'maceio']) {
       const track = getTrack(id);
-      const a = centerline(track); const b = unrollTrack(track);
+      // O núcleo repete a escala legada (SIGHT_MODEL.headingPerCurve): a conta é a mesma, na mesma escala.
+      const a = centerline(track); const b = unrollTrack(track, HEADING_PER_CURVE);
       let worst = 0;
       for (let k = 0; k < a.px.length; k++) {
         worst = Math.max(worst, Math.abs(a.px[k] - b.px[k]), Math.abs(a.pz[k] - b.pz[k]));

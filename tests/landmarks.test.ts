@@ -14,7 +14,7 @@ import { LANDMARKS_BRASIL_CENTRO_SUL } from '../src/render/scenery/landmarks/bra
 import type { LandmarkDef } from '../src/render/scenery/landmarks/types';
 import { innerCurve, LANDMARK_CLEAR_M, sceneryLayout, type Layout, type Placement } from '../src/render/scenery/layout';
 import { modelTriangles } from '../src/render/scenery/vegetation';
-import { HEADING_PER_CURVE, SEGMENT_M, Y_SCALE } from '../src/render/units';
+import { SEGMENT_M, turnPerCurve, Y_SCALE } from '../src/render/units';
 
 /**
  * Pista do mesmo bioma para um lugar sem pista em TRACKS (hoje todos têm: a linha só vale se uma pista sair).
@@ -79,9 +79,10 @@ function landmarkPlacements(layout: Layout): Array<{ seg: number; p: Placement; 
 /** Linha central desenrolada em três voltas (a pista do DSL não fecha: só vale a vizinhança). */
 function unrolled(track: Track): { px: Float64Array; pz: Float64Array; hd: Float64Array } {
   const n = track.segments.length;
+  const turn = turnPerCurve(track);
   const px = new Float64Array(3 * n + 1); const pz = new Float64Array(3 * n + 1); const hd = new Float64Array(3 * n + 1);
   for (let k = 0; k < 3 * n; k++) {
-    const d = track.segments[k % n].curve * HEADING_PER_CURVE;
+    const d = track.segments[k % n].curve * turn;
     const a = hd[k] + d / 2;
     px[k + 1] = px[k] + SEGMENT_M * Math.sin(a); pz[k + 1] = pz[k] - SEGMENT_M * Math.cos(a); hd[k + 1] = hd[k] + d;
   }

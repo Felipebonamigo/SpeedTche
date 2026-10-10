@@ -14,7 +14,7 @@ import { CHASE_CAMERA } from '../camera-base';
 import { palette } from '../palette';
 import { FRAME_AHEAD } from '../roadframe';
 import { FOG_DENSITY } from '../sky';
-import { HEADING_PER_CURVE, SEGMENT_M, Y_SCALE } from '../units';
+import { SEGMENT_M, turnPerCurve, Y_SCALE } from '../units';
 
 /**
  * Marcos no horizonte (skyline: Cristo, Pão de Açúcar, vulcão): a névoa deles conta a distância × HAZE_FOG_SCALE (lote
@@ -78,14 +78,14 @@ export interface SightRoad {
   readonly blockCum: Int32Array;
 }
 
-/** Linha central desenrolada em três voltas: a pista do DSL não fecha, só a vizinhança vale. */
-export function unrollTrack(track: Track): { px: Float64Array; pz: Float64Array; hd: Float64Array; py: Float64Array } {
+/** Linha central desenrolada em três voltas: a pista do DSL não fecha em posição (o rumo fecha em 360°, M6), só a vizinhança vale. */
+export function unrollTrack(track: Track, turn: number = turnPerCurve(track)): { px: Float64Array; pz: Float64Array; hd: Float64Array; py: Float64Array } {
   const segs = track.segments; const n = segs.length;
   const px = new Float64Array(3 * n + 1); const pz = new Float64Array(3 * n + 1); const hd = new Float64Array(3 * n + 1);
   const py = new Float64Array(3 * n + 1);
   for (let k = 0; k < 3 * n; k++) {
     const s = segs[k % n];
-    const d = s.curve * HEADING_PER_CURVE;
+    const d = s.curve * turn;
     const a = hd[k] + d / 2;
     px[k + 1] = px[k] + SEGMENT_M * Math.sin(a); pz[k + 1] = pz[k] - SEGMENT_M * Math.cos(a); hd[k + 1] = hd[k] + d;
     py[k] = s.y0 * Y_SCALE;
@@ -98,9 +98,9 @@ export function unrollTrack(track: Track): { px: Float64Array; pz: Float64Array;
  * A pista pronta para a conta: linha desenrolada, a névoa do período dela na qualidade alta (a padrão) e a grade do
  * que tapa a vista (`hasBlock(seg)`: o segmento tem algo alto em algum lado).
  */
-export function sightRoad(track: Track, block: BlockHeight, blockLat: number, hasBlock: (seg: number) => boolean): SightRoad {
+export function sightRoad(track: Track, block: BlockHeight, blockLat: number, hasBlock: (seg: number) => boolean, turn: number = turnPerCurve(track)): SightRoad {
   const n = track.segments.length;
-  const { px, pz, hd, py } = unrollTrack(track);
+  const { px, pz, hd, py } = unrollTrack(track, turn);
   const hs = new Float64Array(hd.length); const hc = new Float64Array(hd.length);
   for (let k = 0; k < hd.length; k++) { hs[k] = Math.sin(hd[k]); hc[k] = Math.cos(hd[k]); }
   const rho = FOG_DENSITY.high * palette(track.def.scenery, track.def.timeOfDay).fogDensity;

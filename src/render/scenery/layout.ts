@@ -10,11 +10,12 @@ import { FIRST_WINDOW, startZoneEnd } from '../../core/track/startzone';
 import { SPRITE_HALF_WIDTH } from '../../core/track/sprites';
 import type { SpriteRef, Track } from '../../core/types';
 import { hash2, hash3, valueNoise } from '../noise';
-import { HEADING_PER_CURVE, ROAD_HALF_WIDTH_M, SEGMENT_M, Y_SCALE } from '../units';
+import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve, Y_SCALE } from '../units';
 import { dressingRecipe, farModelFor, LANDMARK_PREFIX, landmarkOf, modelBandRadius, modelBounds, modelFrontX, modelHeight, spriteVisual, type DressingRecipe } from './catalog';
 import { setClearings, type Clearing } from './clearings';
 import { groundOffset, isSeaSide, seaLevelOffset } from './ground';
 import type { LandmarkDef } from './landmarks/types';
+import { cullCrossings } from './overlap';
 import { LANDMARK_SIGHT_MIN, SIGHT_TAN_H, sightRoad, sightSeconds, type SightRoad } from './sight';
 import { sways, windPhase } from './wind';
 
@@ -51,6 +52,8 @@ export interface Placement {
   r: number; g: number; b: number;
   /** Sprite do núcleo: vai para o lote com sombra de verdade. */
   sprite: boolean;
+  /** Sprite que COLIDE no núcleo (a física o quer onde está): a limpeza do cenário que cai em outro trecho (overlap.ts) não o move. */
+  solid: boolean;
   /** Fios: segmentos até o próximo poste (0 = não é fio) e o ponto dele. */
   linkSeg: number; linkF: number; linkX: number; linkY: number;
   /**
@@ -89,7 +92,7 @@ class ModelTable {
 function base(model: number): Placement {
   return {
     model, far: -1, farFrom: 1e9, maxAhead: 1e9, f: 0.5, x: 0, y: 0, yaw: 0, pitch: 0, yawC: 1, yawS: 0, sx: 1, sy: 1, sz: 1,
-    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
+    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, solid: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
   };
 }
 
@@ -183,7 +186,7 @@ function placeSprites(track: Track, table: ModelTable, out: Placement[][], occ: 
       const small = vis.mode === 'round' && !farId && sp.kind !== 'tower';
       for (const m of vis.models) {
         const p = base(table.of(m.id));
-        p.x = x; p.y = gy; p.yaw = yaw; p.sx = s; p.sy = sy; p.sz = s; p.sprite = true;
+        p.x = x; p.y = gy; p.yaw = yaw; p.sx = s; p.sy = sy; p.sz = s; p.sprite = true; p.solid = sp.solid;
         if (farId && m === vis.models[0]) { p.far = table.of(farId); p.farFrom = 90; }
         if (small) p.maxAhead = 110;
         p.ox = m.dx ?? 0; p.oy = m.dy ?? 0; p.oz = m.dz ?? 0; p.spin = m.spin ?? 0; p.spinY = m.spinY ?? 0;
@@ -561,6 +564,7 @@ function footprintOf(id: string): number {
 
 function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Placement[][], occ: Occupancy): void {
   const segs = track.segments; const n = segs.length;
+  const turn = turnPerCurve(track);
   const biome = track.def.scenery;
   const seed = hashString(track.def.id) & 0xffff;
   const startIndex = track.startIndex;
@@ -597,7 +601,7 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         const mid = BOARDWALK_LAT_M + BOARDWALK_WIDTH_M / 2;
         const y0 = groundOffset(track, i, 0, side, BOARDWALK_LAT_M + 0.3);
         const y1 = groundOffset(track, i, 1, side, BOARDWALK_LAT_M + 0.3);
-        const len = (SEGMENT_M - side * mid * s.curve * HEADING_PER_CURVE) / SEGMENT_M;
+        const len = (SEGMENT_M - side * mid * s.curve * turn) / SEGMENT_M;
         put(i, 'boardwalk', side * mid, 0.5, { pitch: Math.atan2(y1 - y0, SEGMENT_M), sz: len, y: (y0 + y1) / 2, maxAhead: 90 });
         occ.mark(i, side, BOARDWALK_LAT_M - 0.2, BOARDWALK_LAT_M + BOARDWALK_WIDTH_M + 0.2, 0);
       }
@@ -624,7 +628,7 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         const y0 = groundOffset(track, i, 0, side, FENCE_M + 0.3);
         const y1 = groundOffset(track, i, 1, side, FENCE_M + 0.3);
         // Comprimento do lance acompanha a curva (do lado de fora o arco é mais longo).
-        const len = (SEGMENT_M - side * (FENCE_M + 0.3) * s.curve * HEADING_PER_CURVE) / SEGMENT_M;
+        const len = (SEGMENT_M - side * (FENCE_M + 0.3) * s.curve * turn) / SEGMENT_M;
         put(i, `fence:${recipe.fence}`, side * (FENCE_M + 0.3), 0.5, { yaw: side > 0 ? Math.PI : 0, pitch: side > 0 ? -Math.atan2(y1 - y0, SEGMENT_M) : Math.atan2(y1 - y0, SEGMENT_M), sz: len, y: (y0 + y1) / 2, maxAhead: 70 });
       }
       if (sea) {
@@ -727,9 +731,10 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
  * Layout do cenário da pista. Sem cache aqui de propósito: são ~10 mil posições por pista, e guardar as
  * 32 pistas pesaria no heap da sessão inteira — quem desenha (runtime.ts) guarda só o da pista atual.
  * `landmarks`: ids dos marcos turísticos (padrão: os da pista em places.ts; os testes passam outros). `keepSight`: guarda
- * no layout a pista da conta de enquadramento (`Layout.sight`), para a legenda dos marcos (o runtime pede).
+ * no layout a pista da conta de enquadramento (`Layout.sight`), para a legenda dos marcos (o runtime pede). `keepCrossings`: não descarta o
+ * cenário que cai em outro trecho da pista fechada (`overlap.ts`; só os testes pedem, para medir o que a limpeza tirou).
  */
-export function sceneryLayout(track: Track, landmarks: readonly string[] = placeOf(track.def.id)?.landmarks ?? [], keepSight = false): Layout {
+export function sceneryLayout(track: Track, landmarks: readonly string[] = placeOf(track.def.id)?.landmarks ?? [], keepSight = false, opts: { keepCrossings?: boolean } = {}): Layout {
   const table = new ModelTable();
   const bySeg: Placement[][] = track.segments.map(() => []);
   const occ = new Occupancy(track.segments.length);
@@ -738,6 +743,8 @@ export function sceneryLayout(track: Track, landmarks: readonly string[] = place
   placeSprites(track, table, bySeg, occ, tall, block);
   const sight = placeLandmarks(track, landmarks, table, bySeg, occ, tall, block);
   dress(track, dressingRecipe(track.def), table, bySeg, occ);
+  // M6: a pista fecha em 360° e cruza a si mesma; o cenário de um trecho não fica na pista de outro nem se empilha nele (overlap.ts). `keepCrossings`: só os testes.
+  if (!opts.keepCrossings) cullCrossings(track, table.ids, bySeg, CAR_REACH_M);
   bySeg.forEach((list, i) => {
     for (const p of list) {
       p.yawC = Math.cos(p.yaw); p.yawS = Math.sin(p.yaw);

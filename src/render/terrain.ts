@@ -17,7 +17,7 @@ import { applyGrade, applyStylize } from './stylize';
 import type { RoadFrame } from './roadframe';
 import { inClearing } from './scenery/clearings';
 import { windowTextures } from './textures';
-import { HEADING_PER_CURVE, SEGMENT_M, Y_SCALE } from './units';
+import { HEADING_PER_CURVE, SEGMENT_M, turnPerCurve, Y_SCALE } from './units';
 
 /**
  * Distância lateral (m) de cada coluna da faixa, a partir do centro da pista. As três primeiras
@@ -108,9 +108,12 @@ export function columnHeightAboveRoad(biome: SceneryId, seg: number, roadH: numb
   return -roadH * columnDrop(biome, side, c) + columnRelief(biome, seg, side, c);
 }
 
-/** Distância real (m) da coluna `c`: do lado de dentro da curva ela é presa, senão dobraria para trás. */
-export function columnDistance(curve: number, side: number, c: number): number {
-  const delta = curve * HEADING_PER_CURVE;
+/**
+ * Distância real (m) da coluna `c`: do lado de dentro da curva ela é presa, senão dobraria para trás. `turn` = o giro por unidade de curva da
+ * pista (`turnPerCurve`, M6; o padrão é a escala legada).
+ */
+export function columnDistance(curve: number, side: number, c: number, turn: number = HEADING_PER_CURVE): number {
+  const delta = curve * turn;
   const inside = (side > 0) === (delta > 0) && delta !== 0;
   return inside ? Math.min(COLS[c], 0.9 * SEGMENT_M / (Math.abs(delta) + 1e-6)) : COLS[c];
 }
@@ -677,6 +680,7 @@ export class Terrain {
     const seaY = floorY - SEA_DEPTH_M;
     const rt = this.reliefTable; const ct = this.colorTable; const gt = this.gradTable;
     const ys = this.ys;
+    const turn = turnPerCurve(track);
     let foamPoints = 0;
     for (let j = 0; j < n; j++) {
       const si = frame.segIndex[j];
@@ -684,7 +688,7 @@ export class Terrain {
       const h = frame.heading[j];
       const cx = Math.cos(h); const sz = Math.sin(h);
       const px = frame.px[j]; const py = frame.py[j]; const pz = frame.pz[j];
-      const delta = s.curve * HEADING_PER_CURVE;
+      const delta = s.curve * turn;
       // Do lado de dentro da curva, colunas longe demais dobrariam para trás: prende a distância.
       const clampD = 0.9 * SEGMENT_M / (Math.abs(delta) + 1e-6);
       for (let sIdx = 0; sIdx < 2; sIdx++) {
@@ -749,11 +753,12 @@ export class Terrain {
     const counts = [0, 0, 0];
     const d = this.dummy;
     const segs = track.segments;
+    const turn = turnPerCurve(track);
     for (let j = 0; j < frame.count; j += 2) {
       const s = segs[frame.segIndex[j]];
       const h = frame.heading[j];
       const cx = Math.cos(h); const sz = Math.sin(h);
-      const delta = s.curve * HEADING_PER_CURVE;
+      const delta = s.curve * turn;
       for (const side of [-1, 1] as const) {
         const r = hash2(s.index, side + 10);
         if (r < 0.25) continue;

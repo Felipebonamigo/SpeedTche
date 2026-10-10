@@ -5,7 +5,7 @@
 // Puro e por índice de segmento: não depende do quadro, então a altura de cada objeto é calculada uma vez.
 import type { SceneryId, Segment, Track } from '../../core/types';
 import { COLS, columnDistance as terrainColumnDistance, columnHeightAboveRoad, SEA_DEPTH_M } from '../terrain';
-import { Y_SCALE } from '../units';
+import { turnPerCurve, Y_SCALE } from '../units';
 
 /** Distância lateral (m) de cada coluna da faixa de terreno (terrain.ts). */
 export const TERRAIN_COLS = COLS;
@@ -33,9 +33,9 @@ export function seaLevelOffset(track: Track, seg: Segment): number {
   return minRoadY(track) - SEA_DEPTH_M - seg.y0 * Y_SCALE;
 }
 
-/** Distância real da coluna `c` no ponto do segmento: do lado de dentro da curva ela é presa (terrain.ts). */
-export function columnDistance(seg: Segment, side: number, c: number): number {
-  return terrainColumnDistance(seg.curve, side, c);
+/** Distância real da coluna `c` no ponto do segmento: do lado de dentro da curva ela é presa (terrain.ts). `turn` = `turnPerCurve(pista)` (M6). */
+export function columnDistance(seg: Segment, side: number, c: number, turn: number): number {
+  return terrainColumnDistance(seg.curve, side, c, turn);
 }
 
 /** Altura do terreno na coluna `c` do ponto do segmento, relativa à pista nesse ponto. */
@@ -49,9 +49,10 @@ export function columnHeight(track: Track, seg: Segment, side: number, c: number
  */
 export function groundAt(track: Track, seg: Segment, side: number, d: number): number {
   const n = TERRAIN_COLS.length;
+  const turn = turnPerCurve(track);
   let prevD = 0; let prevH = 0;
   for (let c = 0; c < n; c++) {
-    const cd = columnDistance(seg, side, c);
+    const cd = columnDistance(seg, side, c, turn);
     const ch = columnHeight(track, seg, side, c);
     if (d <= cd) {
       if (c === 0) return ch;

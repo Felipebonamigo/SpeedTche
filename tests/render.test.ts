@@ -166,7 +166,7 @@ describe('palette', () => {
 
 // ───────────────────────────── Referencial local da pista ─────────────────────────────
 import { absoluteHeading, buildRoadFrame, frameYAt, locateOnFrame, type RoadFrame } from '../src/render/roadframe';
-import { HEADING_PER_CURVE, ROAD_HALF_WIDTH_M, SEGMENT_M, xToMeters, yToMeters, Y_SCALE, zToMeters } from '../src/render/units';
+import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve, xToMeters, yToMeters, Y_SCALE, zToMeters } from '../src/render/units';
 import { SEGMENT_LENGTH } from '../src/core/constants';
 
 describe('units', () => {
@@ -200,7 +200,7 @@ describe('buildRoadFrame', () => {
     const track = syntheticTrack([{ op: 'curve', length: 400, curve: 4 }]);
     // Trecho de sustentação: segmentos 100..299 têm curve = 4.
     const f = buildRoadFrame(track, 150 * SEGMENT_LENGTH, 10, 40);
-    const step = 4 * HEADING_PER_CURVE;
+    const step = 4 * turnPerCurve(track);
     for (let j = 10; j < f.count; j++) {
       expect(f.heading[j]).toBeCloseTo((j - 10) * step, 6); // float32
       if (j > 10) expect(f.px[j]).toBeGreaterThan(f.px[j - 1]);
@@ -281,14 +281,15 @@ describe('locateOnFrame', () => {
 });
 
 describe('absoluteHeading', () => {
-  it('reta é zero; curva acumula curve × HEADING_PER_CURVE por segmento', () => {
+  it('reta é zero; curva acumula curve × turnPerCurve (a escala da pista) por segmento', () => {
     expect(absoluteHeading(syntheticTrack(), 12345)).toBe(0);
     const track = syntheticTrack([{ op: 'curve', length: 400, curve: 4 }]);
+    const turn = turnPerCurve(track);
     let sum = 0;
-    for (let i = 0; i < 200; i++) sum += track.segments[i].curve * HEADING_PER_CURVE;
+    for (let i = 0; i < 200; i++) sum += track.segments[i].curve * turn;
     expect(absoluteHeading(track, 200 * SEGMENT_LENGTH)).toBeCloseTo(sum, 9);
     // Meio do segmento 200: metade do giro dele.
-    expect(absoluteHeading(track, 200.5 * SEGMENT_LENGTH)).toBeCloseTo(sum + 0.5 * track.segments[200].curve * HEADING_PER_CURVE, 9);
+    expect(absoluteHeading(track, 200.5 * SEGMENT_LENGTH)).toBeCloseTo(sum + 0.5 * track.segments[200].curve * turn, 9);
     const frame: RoadFrame = buildRoadFrame(track, 0, 1, 1);
     expect(frame.count).toBe(3);
   });

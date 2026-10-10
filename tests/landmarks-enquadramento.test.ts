@@ -10,6 +10,7 @@ import { getTrack, TRACKS } from '../src/core/track';
 import type { Segment, Track } from '../src/core/types';
 import { landmarkSight, sceneryLayout } from '../src/render/scenery/layout';
 import { LANDMARK_SIGHT_MIN, SIGHT_SPEED_MS, sightRoad, sightSeconds, type BlockHeight } from '../src/render/scenery/sight';
+import { HEADING_PER_CURVE } from '../src/render/units';
 
 /** Pista sintética: `n` segmentos com a curvatura de `curve(i)`, plana, savana de dia (névoa: 504 m). */
 function fakeTrack(n: number, curve: (i: number) => number = () => 0): Track {
@@ -58,7 +59,8 @@ describe('enquadramento: a conta', () => {
 
   it('do lado de fora de uma curva que vem, o marco fica mais tempo na tela que na reta', () => {
     // Curva à direita (curve 4) nos 150 segmentos antes do marco: o de fora é o da esquerda.
-    const curvy = sightRoad(fakeTrack(n, (i) => (i >= 330 && i < 480 ? 4 : 0)), nothing, 0, () => false);
+    // Pista de brinquedo com uma curva só: a escala é a legada (a da pista de verdade faria dela uma volta inteira, units.ts `turnPerCurve`).
+    const curvy = sightRoad(fakeTrack(n, (i) => (i >= 330 && i < 480 ? 4 : 0)), nothing, 0, () => false, HEADING_PER_CURVE);
     const straight = sightSeconds(road, k, 0.5, -200, 0, 0, box(80, 60, 80), false);
     expect(sightSeconds(curvy, k, 0.5, -200, 0, 0, box(80, 60, 80), false)).toBeGreaterThan(straight + 1);
   });

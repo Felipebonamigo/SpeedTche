@@ -4,6 +4,7 @@
 // os pontos já normalizados.
 import { SEGMENT_LENGTH } from '../core/constants';
 import type { Track } from '../core/types';
+import { turnPerCurve } from './units';
 
 export type Outline = Array<[number, number]>;
 
@@ -14,7 +15,7 @@ export function outlineStep(track: Track): number {
 
 /**
  * Contorno da pista, normalizado para caber em `size`×`size` com margem, começando no
- * segmento 0. `k` é escolhido para a soma das curvas fechar exatamente uma volta (±2π); o
+ * segmento 0. `k` (`turnPerCurve`) faz a soma das curvas fechar exatamente uma volta (±2π); o
  * erro de posição que sobra é distribuído ao longo dos pontos (como `closeElevation` faz
  * com a altura), para o traçado fechar sem dente. Determinístico.
  */
@@ -22,9 +23,8 @@ export function trackOutline(track: Track, size: number): Outline {
   const segs = track.segments;
   const n = segs.length;
   if (n === 0 || size <= 0) return [];
-  let total = 0;
-  for (const s of segs) total += s.curve;
-  const k = Math.abs(total) > 1e-9 ? (2 * Math.PI) / Math.abs(total) : 0;
+  // A escala é a do 3D (units.ts, M6): a curva da pista é a curva do mapa. (Pista sem curva líquida cai na escala legada: sem curva, nada gira.)
+  const k = turnPerCurve(track);
   const step = outlineStep(track);
 
   const raw: Array<[number, number]> = [];
@@ -34,9 +34,11 @@ export function trackOutline(track: Track, size: number): Outline {
   let y = 0;
   for (let i = 0; i < n; i++) {
     if (i % step === 0) { raw.push([x, y]); at.push(i); }
-    heading += segs[i].curve * k;
-    x += Math.cos(heading);
-    y += Math.sin(heading);
+    // Anda pelo rumo do MEIO do segmento e gira o rumo inteiro para o próximo: a mesma corda do 3D (roadframe.ts), então o contorno é a vista de cima da pista.
+    const d = segs[i].curve * k;
+    x += Math.cos(heading + d / 2);
+    y += Math.sin(heading + d / 2);
+    heading += d;
   }
   // Fecha o laço: o fim deveria voltar a (0, 0).
   const driftX = x;

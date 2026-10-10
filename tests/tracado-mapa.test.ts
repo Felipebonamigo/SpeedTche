@@ -43,7 +43,7 @@ describe('M6 (a): o 3D gira a escala do mapa', () => {
     expect(bad.slice(0, 12), `${bad.length} fora de 360° ± 2°`).toEqual([]);
   }, 60000);
 
-  it('o ângulo de cada curva do 3D é o do contorno do minimapa (a virada entre cordas vizinhas, ± 1,5°)', () => {
+  it('o ângulo de cada curva do 3D é o do contorno do minimapa (cada corda, ± 0,5°, com o fechamento de posição que o minimapa faz)', () => {
     const bad: string[] = [];
     let compared = 0;
     for (const track of tracks) {
@@ -51,20 +51,22 @@ describe('M6 (a): o 3D gira a escala do mapa', () => {
       const step = Math.max(1, Math.floor(n / 400));
       const outline = trackOutline(track, 1000);
       const frame = buildRoadFrame(track, 0, 0, n);
-      // Corda j do 3D: do início do segmento j·step ao de (j+1)·step; a do contorno: do ponto j ao j+1. Mesmos ângulos, só que o
-      // contorno é normalizado (escala e translação iguais nos dois eixos), então a direção de cada corda é a do 3D (x = direita, z = trás).
-      const chord3 = (j: number): number => Math.atan2(-(frame.pz[(j + 1) * step] - frame.pz[j * step]), frame.px[(j + 1) * step] - frame.px[j * step]);
+      // O contorno é a vista de cima do 3D (x = direita, y = trás) com duas mudanças: a escala e a translação iguais nos dois eixos (não mexem em
+      // ângulo) e o erro de posição da volta (a pista do DSL não fecha em posição), distribuído ao longo dos pontos (minimap.ts, "Fecha o laço").
+      // Tirando o mesmo fechamento das cordas do 3D, as direções são as mesmas.
+      const driftX = frame.px[n]; const driftZ = frame.pz[n];
+      const chord3 = (j: number): number => {
+        const dx = frame.px[(j + 1) * step] - frame.px[j * step] - (driftX * step) / n;
+        const dz = frame.pz[(j + 1) * step] - frame.pz[j * step] - (driftZ * step) / n;
+        return Math.atan2(dz, dx);
+      };
       const chordMap = (j: number): number => Math.atan2(outline[j + 1][1] - outline[j][1], outline[j + 1][0] - outline[j][0]);
-      const m = outline.length;
       let worst = 0;
-      for (let j = 0; j + 2 < m && (j + 2) * step <= n; j++) {
-        // As cordas do 3D têm o eixo de cima = frente (−z); as do contorno têm o de cima = −y (y cresce para baixo): o mesmo giro, sinal trocado no y.
-        const turn3 = wrap(chord3(j + 1) - chord3(j));
-        const turnMap = wrap(-(chordMap(j + 1) - chordMap(j)));
+      for (let j = 0; j + 1 < outline.length && (j + 1) * step <= n; j++) {
         compared++;
-        worst = Math.max(worst, Math.abs(wrap(turn3 - turnMap)) * DEG);
+        worst = Math.max(worst, Math.abs(wrap(chord3(j) - chordMap(j))) * DEG);
       }
-      if (worst > 1.5) bad.push(`${track.def.id}: a pior curva difere ${worst.toFixed(1)}° do mapa`);
+      if (worst > 0.5) bad.push(`${track.def.id}: a pior corda difere ${worst.toFixed(1)}° do mapa`);
     }
     expect(compared).toBeGreaterThan(40000);
     expect(bad.slice(0, 12), `${bad.length} pistas com uma curva que não é a do mapa`).toEqual([]);

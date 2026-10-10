@@ -4,10 +4,11 @@
 // viewport: origem exatamente no ponto da linha central em `baseZ`, eixo −Z para a frente,
 // rumo integrado segmento a segmento (para trás e para a frente). Com a câmera de perseguição
 // alinhada à pista, o resultado é indistinguível de um mundo fixo. Puro: sem Three, testável.
+// O rumo gira a escala da pista (`turnPerCurve`, M6): a mesma do minimapa, então a pista fecha em 360° e a curva é a do mapa.
 import { SEGMENT_LENGTH } from '../core/constants';
 import type { Track } from '../core/types';
 import type { Quality } from '../game/contracts';
-import { HEADING_PER_CURVE, ROAD_HALF_WIDTH_M, SEGMENT_M, Y_SCALE } from './units';
+import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve, Y_SCALE } from './units';
 
 /**
  * Janela que o renderizador monta por viewport (segmentos atrás e à frente do carro, por qualidade): o que está além dela
@@ -59,6 +60,7 @@ function wrapZ(z: number, length: number): number {
 export function buildRoadFrame(track: Track, baseZ: number, behind: number, ahead: number, out?: RoadFrame): RoadFrame {
   const segs = track.segments;
   const n = segs.length;
+  const turn = turnPerCurve(track);
   const count = behind + ahead + 1;
   const frame = out && out.px.length >= count ? out : allocate(count, behind);
   frame.count = count;
@@ -74,7 +76,7 @@ export function buildRoadFrame(track: Track, baseZ: number, behind: number, ahea
   const originY = (base.y0 + (base.y1 - base.y0) * f) * Y_SCALE;
 
   // Segmento base: rumo no início tal que, após a fração f, o rumo seja 0 (o carro olha −Z).
-  const dBase = base.curve * HEADING_PER_CURVE;
+  const dBase = base.curve * turn;
   const hBase = -f * dBase;
   const aBase = hBase + dBase / 2;
   px[behind] = -f * SEGMENT_M * Math.sin(aBase);
@@ -87,7 +89,7 @@ export function buildRoadFrame(track: Track, baseZ: number, behind: number, ahea
   for (let j = behind + 1; j < count; j++) {
     const s = segIndex[j - 1];
     const seg = segs[s];
-    const d = seg.curve * HEADING_PER_CURVE;
+    const d = seg.curve * turn;
     const a = heading[j - 1] + d / 2;
     px[j] = px[j - 1] + SEGMENT_M * Math.sin(a);
     pz[j] = pz[j - 1] - SEGMENT_M * Math.cos(a);
@@ -99,7 +101,7 @@ export function buildRoadFrame(track: Track, baseZ: number, behind: number, ahea
   for (let j = behind - 1; j >= 0; j--) {
     const s = (segIndex[j + 1] - 1 + n) % n;
     const seg = segs[s];
-    const d = seg.curve * HEADING_PER_CURVE;
+    const d = seg.curve * turn;
     heading[j] = heading[j + 1] - d;
     const a = heading[j] + d / 2;
     px[j] = px[j + 1] - SEGMENT_M * Math.sin(a);
@@ -156,9 +158,10 @@ export function absoluteHeading(track: Track, z: number): number {
   let table = headingTables.get(track);
   if (!table) {
     const segs = track.segments;
+    const turn = turnPerCurve(track);
     table = new Float64Array(segs.length + 1);
     let h = 0;
-    for (let i = 0; i < segs.length; i++) { table[i] = h; h += segs[i].curve * HEADING_PER_CURVE; }
+    for (let i = 0; i < segs.length; i++) { table[i] = h; h += segs[i].curve * turn; }
     table[segs.length] = h;
     headingTables.set(track, table);
   }
@@ -166,5 +169,5 @@ export function absoluteHeading(track: Track, z: number): number {
   const zz = wrapZ(z, track.length);
   const si = Math.floor(zz / SEGMENT_LENGTH) % n;
   const f = (zz - si * SEGMENT_LENGTH) / SEGMENT_LENGTH;
-  return table[si] + f * track.segments[si].curve * HEADING_PER_CURVE;
+  return table[si] + f * track.segments[si].curve * turnPerCurve(track);
 }
