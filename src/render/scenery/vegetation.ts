@@ -34,7 +34,9 @@ function flat(geometry: Geo, blob: number, shadow = true): Model {
  * achatado. Bolha pequena (< 0,45 m, poucos pixels) fica com o de 20 faces.
  */
 function blob(r: number, x: number, y: number, z: number, color: string, seed: number, sy = 0.8, amount = 0.12, detail?: 0 | 1 | 2): Geo {
-  return paint(lumpy(ico(r, detail ?? cloudDetail(r)), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
+  const g = paint(lumpy(ico(r, detail ?? cloudDetail(r)), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
+  // Vegetação-nuvem (M3): cada bolha escurece embaixo, onde a vizinha e a própria copa a tapam (oclusão assada na cor, por ponto: sem salto entre faces).
+  return shadeY(g, y - r * sy * 1.05, y + r * sy * 1.05, 0.84, 1.1);
 }
 
 /**
