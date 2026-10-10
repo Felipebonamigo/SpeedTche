@@ -11,12 +11,21 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 | Frear | ↓ | S | X / B / LT (2, 1, 6) |
 | Virar à esquerda | ← | A | D-pad ← (14) |
 | Virar à direita | → | D | D-pad → (15) |
-| Nitro | Espaço | F | RB (5) |
-| Marcha acima | M | E | Y (3) |
-| Marcha abaixo | N | Q | LB (4) |
+| Nitro | Espaço | F | LB / Y (4, 3) |
+| Marcha acima | M | E | D-pad ↑ (12) |
+| Marcha abaixo | N | Q | D-pad ↓ (13) |
+| **Derrapar** | **Shift direito** | **Shift esquerdo** | **RB (5)** |
+| **Olhar para trás** | **B** | **R** | **R3 (11)** |
 | Pausar | Esc | Esc | Start (9) |
 
-- O padrão é o mapeamento que existia antes (o antigo `KEY_LAYOUTS` de `src/ui/input.ts`).
+- **10 ações** desde a M1 (a onda M passou de 8 para 10: `drift` e `lookBack`, antes de `pause`, que segue a última).
+  Derrapar é nível (segurado), não borda, e vai na rede como o bit 32 (`docs/ONLINE.md`). Olhar para trás só existe
+  como ação (a câmera é que a usa; o núcleo não a lê).
+- As ações antigas mantêm as teclas de sempre (o antigo `KEY_LAYOUTS` de `src/ui/input.ts`). No controle, o nitro saiu do
+  RB, que passou a derrapar, e foi para LB e Y; as marchas, que eram Y e LB, foram para o D-pad ↑/↓ (o câmbio automático
+  é o padrão, então a manual é a exceção).
+- **Shift direito e esquerdo são códigos físicos diferentes**, então os dois teclados não colidem no padrão
+  (`keyboardConflicts(DEFAULT_BINDINGS) == []`, com teste).
 - **Controles** é um mapeamento só para todos os gamepads. O analógico esquerdo sempre vira: o
   remapeamento mexe nos botões, não no eixo.
 - **Fixo, fora do remapeamento**, para ninguém se trancar fora: setas, Enter, Espaço, Esc e
@@ -62,10 +71,16 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 - **Mesma tecla nos dois teclados** não é bloqueada (quem joga sozinho não se importa com o
   teclado 2): a tela marca as células com "!" e explica que, com os dois em uso, a tecla comanda os dois.
 - **Restaurar padrão** é por dispositivo (botão "Padrão" embaixo de cada coluna).
+- **Migração dos mapas salvos** (`sanitizeBindings`): um dispositivo gravado **sem `drift` nem `lookBack`** é de antes
+  da M1. Nele, só as ações que ainda estavam no padrão antigo trocam para o novo: no controle, nitro `[5]`, marcha
+  acima `[3]` e marcha abaixo `[4]` viram `[4,3]`, `[12]` e `[13]`; o que o jogador personalizou fica como está, e
+  `drift` e `lookBack` ganham o padrão. Nos teclados nada das ações antigas muda (só entram as duas novas). Um mapa
+  que já tem `drift` não migra (o RB no nitro ali é escolha do jogador). Idempotente; nunca deixa ação vazia nem
+  código repetido.
 
 ## Tela de controles
 
-- Grade 8 ações × 3 colunas. Setas/d-pad andam; Enter, A ou clique abrem a captura da célula.
+- Grade 10 ações × 3 colunas (30 células, mais um "Padrão" por coluna), compacta para caber com o VOLTAR em 1024×640 e 1280×800, também com texto grande. Setas/d-pad andam; Enter, A ou clique abrem a captura da célula.
 - Captura: a próxima tecla (colunas de teclado) ou botão (coluna Controles) vira o comando.
   Esc ou Start cancelam; sem nada em **5 s** ela desiste. O relógio anda com o `dt` da sessão,
   limitado a 0,25 s por quadro: a 60 Hz são 5 s de verdade, e um travamento não come a janela. Tecla proibida é recusada com aviso e a captura continua. Clique fora cancela.
@@ -112,11 +127,11 @@ na largada, nada com a Vibração desligada ou com o assento no teclado — e a 
 que fica aberta.
 
 Fluxo real no Chromium: `node scripts/playtest-controls.mjs [url] [prefixo]` (com `npm run preview`
-em outro terminal), 48 conferências: grade, captura por teclado, mouse e controle falso (com motor
+em outro terminal), 51 conferências: grade de 10 × 3 que cabe na janela, foco que percorre as linhas novas (Derrapar, Olhar para trás), captura por teclado, mouse e controle falso (com motor
 de vibração que registra as chamadas), troca, conflito entre teclados, recusa de tecla e de botão,
 Esc/Start/clique fora cancelam, tempo limite, teste de entrada, restaurar, menus ainda nas setas,
 opção Vibração, corrida com o teclado remapeado (e a pausa do teclado 2 sem assento que não pausa),
-vibração na largada, nitro e grama, vibração desligada, pausa gravada no A que fica aberta e
+vibração na largada, nitro (no LB; o RB é o derrapar) e grama, vibração desligada, pausa gravada no A que fica aberta e
 remapeamento que sobrevive ao recarregar.
 
 Dica para roteiros: no swiftshader o fundo 3D dos menus custa ~1 s por quadro; o roteiro troca

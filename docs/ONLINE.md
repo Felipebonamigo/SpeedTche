@@ -32,10 +32,16 @@ um snapshot. O servidor é um relay burro (`server/relay.mjs`) que não entende 
 ## Como funciona
 
 **Entrada por tick.** Cada registro é `[tick, assento, bits, volante]`: bits de acelerar (1),
-frear (2), nitro (4), subir marcha (8), descer marcha (16) e o volante quantizado em int8
+frear (2), nitro (4), subir marcha (8), descer marcha (16), **derrapar (32)** e o volante quantizado em int8
 (−127..127). Todas as máquinas simulam a entrada **decodificada** — inclusive a que a gerou —, então
 a quantização não quebra o determinismo. Nitro e marchas são bordas: se o jogador aperta enquanto a
-rede está travada, a borda fica guardada e sai no próximo envio.
+rede está travada, a borda fica guardada e sai no próximo envio. **Derrapar é nível** (segurado), não borda: vale o
+que está apertado no tick, sem guardar nada.
+
+**Versão do protocolo.** O bit 32 entrou com o `PROTOCOL_VERSION` **2** (onda M, M1); o 64 está livre e o 128 é o
+`TAKEOVER_BIT` (comando "a IA assume este assento", nunca do jogador). O relay aceita a faixa **1..2**
+(`MIN_PROTOCOL_VERSION … PROTOCOL_VERSION` em `server/relay.mjs`); quem separa um cliente v1 de um v2 numa sala é a
+impressão do conteúdo (`b`), que já carrega a versão: os dois nunca dividem sala.
 
 **Atraso de entrada.** O que o jogador aperta agora vale para o tick `atual + atraso` (padrão 3
 ticks = 50 ms; o anfitrião escolhe de 1 a 12 no lobby). O tick N só roda quando há entrada de

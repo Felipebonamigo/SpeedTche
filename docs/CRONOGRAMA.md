@@ -345,6 +345,10 @@ o que der para interligar), com uma RTX 4070 Ti no PC dele.
 
 ### Onda M: "Derrapar, e o visual em todas as pistas"
 
+> **M1 (Núcleo da derrapagem) concluída em 10/10/2026**, mesclada no `main` (0b85122; detalhes e medições em `docs/ondas/M/M1.md`, §11). Entregue: derrapagem no núcleo (centrífuga ×0,55, três níveis de carga, impulso de 0,5, 1,0 e 1,5 s), IA e assistência `steer`/`full` derrapando em trechos fortes de ≥ 18 segmentos, bit 32 na rede com `PROTOCOL_VERSION` 2 (o relay aceita 1..2), remapeamento de 10 ações com migração dos mapas salvos, `PHYSICS_REVISION` 2.
+>
+> **A meta "disputa e ultrapassagens sobem" NÃO foi atingida.** No `npm run balance -- corrida profissional 11 12 13` (109 pistas, média das sementes) ficaram no ruído: ultrapassagens/min 6,63 → 6,61, disputa 145,8 → 145,3 s; só as batidas traseiras caíram, 7,08 → 6,42 (−9,3%). A causa é medida: quanto menos a IA freia, mais o grid se comprime e o handling deixa de separar os carros (com `AI_DRIFT_CORNER_GAIN` 0,6 a disputa caía 17%). Por isso o ganho ficou em **0** (provisório) e a derrapagem da IA é só o impulso na saída. **A calibragem final do ganho da IA é da O2.**
+
 **Objetivo.** Pôr o laço de habilidade de Mario Kart 8 e CTR em cada curva. Ao mesmo tempo, levar o visual aprovado na fatia às 109 pistas, ao cenário inteiro, aos **161 marcos** e aos 13 carros procedurais.
 
 **Antes de abrir:**
@@ -369,7 +373,7 @@ Capturas: M2, M3, M4 e M5 capturam, então entram numa **fila, com no máximo 3 
 **Pronto quando:**
 - Testes do núcleo escritos antes: a carga sobe nos 3 níveis em curva acima do limiar e não sobe em reta; soltar dá o impulso certo; o resultado é determinístico; o bit atravessa a rede (`net-lockstep`). Mais os testes de conflito do remapeamento e de migração.
 - O relay aceita a v2 e o `playtest-online` passa.
-- `npm run balance`: a IA usa a derrapagem nas curvas fortes. O termômetro, comparado à linha de base, mostra os segundos em disputa e as ultrapassagens subindo, sem aumento de batidas traseiras.
+- `npm run balance`: a IA usa a derrapagem nas curvas fortes. O termômetro, comparado à linha de base, mostra os segundos em disputa e as ultrapassagens subindo, sem aumento de batidas traseiras. **(Resultado da M1: não subiram, só as batidas traseiras caíram; ver a nota no topo da onda.)**
 - Testes de faceta e de flora vistos falhar e agora verdes; vento zero entre 0,05 e 1,3 m; `scenery-forma` ≤ 900 por segmento; leitura dos marcos verde; `landmark-sight` ≥ 2,5 s; o `estilo-carro` cumpre a meta da bíblia.
 - Folha das 34 copas. Gate e bench do Deck dentro do orçamento. O `playtest-memoria` não mostra crescimento.
 - Teste cego visual nº 2, com capturas de 6 pistas: mesma meta da L.

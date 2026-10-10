@@ -168,3 +168,43 @@ Todos escritos antes da correção e vistos falhar pelo motivo certo.
 - `tests/race.test.ts`: o grid deixa pelo menos 1,5 m de vão na tela entre as filas.
 - Ajustados à pegada nova (a intenção é a mesma): os contatos das estatísticas (`tests/stats.test.ts`, com
   `CAR_HALF_WIDTH` em vez de 0,43/0,44) e o piloto do tutorial (`tests/tutorial.test.ts`).
+
+## Derrapagem (onda M, frente M1)
+
+Segurar o botão de derrapar com o volante para um lado, numa velocidade boa, faz o carro deslizar; carregar em curva
+forte e soltar dá um impulso menor que o nitro. Código: `stepCarPhysics` em `src/core/sim/physics.ts`; constantes em
+`src/core/constants.ts` (bloco "Derrapagem"); o desenho completo, a razão de cada número e as medições estão em
+`docs/ondas/M/M1.md` (§4 e §11). Nada mudou em `collisions.ts`, `CAR_LENGTH` ou `CAR_HALF_WIDTH`.
+
+**Estado por carro** (os quatro entram no `hashRace`): `driftDir` (−1, 0, 1: o lado, fixo da entrada à saída),
+`driftTicks`, `driftCharge` e `driftBoostTicks`.
+
+| Regra | Valor |
+|---|---|
+| Entrar | botão apertado, correndo, fora do box e da grama, sem `collisionCooldown`, velocidade ≥ 0,45 da máxima e \|volante\| ≥ 0,3. Botão com o volante no meio não entra |
+| Centrífuga enquanto derrapa | × **0,55** (`DRIFT_CENTRIFUGAL_MULT`) |
+| Volante efetivo | `volante + driftDir · 0,4` (`DRIFT_PULL`), limitado a ±1: largar o volante vira para dentro; esterçar contra anula o puxão |
+| Custo | **0,04 da velocidade máxima por segundo** (`DRIFT_DRAG_PER_SECOND`, ≈ 12 km/h/s num carro de 300 km/h) |
+| Carga | sobe 1 por tick só com o segmento em curva de \|curva\| ≥ **1,0** (`DRIFT_CHARGE_MIN_CURVE`) **do mesmo lado** da derrapagem; reta, curva fraca ou o lado oposto não carregam |
+| Níveis (azul, laranja, roxa) | **45 / 100 / 160** ticks de carga (0,75 / 1,67 / 2,67 s); cada nível emite `drift_charge` |
+| Impulso ao soltar | **30 / 60 / 90** ticks (0,5 / 1,0 / 1,5 s) e evento `drift_boost`; nível 0 não dá nada |
+| Durante o impulso | velocidade máxima × **1,12** e aceleração × **1,8** (o nitro: 1,28 e 2,2). Com o nitro aceso, vale o maior dos dois, não a soma |
+| Cancela **sem impulso** | box, grama, batida (`collisionCooldown`), velocidade < **0,35** da máxima (histerese: entra com 0,45), fim de corrida. O raspão lateral não cancela |
+
+O carro que não derrapa anda exatamente como antes (`× 1` e volante puro): corrida em que ninguém derrapa tem o mesmo `hashRace` de antes da M1 (o `sim-golden` do contra-relógio, de Copacabana e de Noite em Sampa).
+
+**A IA e a direção assistida.** A IA e a assistência `steer`/`full` derrapam em trechos fortes do mesmo lado de
+**≥ 18 segmentos** (`AI_DRIFT_MIN_SEGMENTS`) longe do box, e soltam quando faltam menos de 3 segmentos
+(`AI_DRIFT_RELEASE_SEGMENTS`) ou a curva troca de lado: o impulso sai na saída da curva. Com 10 segmentos, 20% das
+derrapagens da IA acabavam sem impulso. `AI_DRIFT_CORNER_GAIN` = **0** (**provisório, até a onda O2**): é o quanto da
+aderência extra da derrapagem a IA usa para decidir a velocidade das curvas. Com 0 ela freia como sem derrapar e a
+derrapagem dela é só o impulso na saída; com 0,6 ela ficava ~7% mais rápida e a disputa caía 17% (todo carro segura a
+curva forte, e o handling deixa de separar o grid). A calibragem final do ganho é da O2.
+
+**Medido** (`npm run balance -- corrida profissional 11 12 13`, 109 pistas, antes → depois): volta da IA 80,45 → 80,28 s;
+ultrapassagens/min 6,63 → 6,61; disputa 145,8 → 145,3 s; batidas traseiras 7,08 → 6,42 (−9,3%). A meta "disputa e
+ultrapassagens sobem" **não foi atingida** (ficaram no ruído); ver `docs/CRONOGRAMA.md`.
+
+**Testes**: `tests/drift.test.ts` (núcleo, determinismo, cancelamentos, IA e assistência), `tests/drift-wiring.test.ts`
+(entrada e textos), `tests/retro-drift-sprite.test.ts` (pose do Retrô) e `tests/sim-golden.test.ts` (8 impressões novas; contra-relógio, Copacabana e Noite
+em Sampa com o hash legado idêntico).
