@@ -27,6 +27,7 @@ export const GATE_SCENES: ReadonlyArray<{ id: string; track: string; humans: num
  * Deck é o `--bench` do dono. Cena nova ou degrau novo: medir (`node tools/render-harness.collect.mjs`, docs/ondas/L/L2.md §11) e escrever aqui.
  */
 // 10/10/2026: chamadas da copa subiram +1 a +5 com o lote `cutout` da L4 e os lotes de LOD1 da M4 (deliberado; triângulos dentro). Provisório até o bench do dono.
+// 10/10/2026 (M5): +1 chamada em Média com 2 e 4 jogadores (copa-2p 77 → 78, copa-4p 79 → 80): a malha de traços das linhas de velocidade 3D (fx/streaks.ts) acende acima de 85% da máxima, e o piso medido já estava no limite. Deliberado e medido (tools/render-harness.lab.ts, com e sem o grupo de efeitos); os outros degraus ficam dentro.
 export const GATE_LIMITS: GateLimits = {
   'copa-1p': {
     low: { calls: 38, triangles: 173000, passes: 0, postPxRatio: 0 },
@@ -36,13 +37,13 @@ export const GATE_LIMITS: GateLimits = {
   },
   'copa-2p': {
     low: { calls: 39, triangles: 174000, passes: 0, postPxRatio: 0 },
-    medium: { calls: 77, triangles: 315000, passes: 5, postPxRatio: 5.8 },
+    medium: { calls: 78, triangles: 315000, passes: 5, postPxRatio: 5.8 },
     high: { calls: 83, triangles: 340000, passes: 5, postPxRatio: 7.1 },
     ultra: { calls: 84, triangles: 340000, passes: 5, postPxRatio: 8.7 },
   },
   'copa-4p': {
     low: { calls: 42, triangles: 174000, passes: 0, postPxRatio: 0 },
-    medium: { calls: 79, triangles: 316000, passes: 5, postPxRatio: 5.8 },
+    medium: { calls: 80, triangles: 316000, passes: 5, postPxRatio: 5.8 },
     high: { calls: 81, triangles: 340000, passes: 4, postPxRatio: 5.4 },
     ultra: { calls: 85, triangles: 340000, passes: 5, postPxRatio: 8.7 },
   },
