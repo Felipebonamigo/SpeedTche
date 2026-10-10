@@ -7,6 +7,7 @@
 // estado (largada, nitro, batida, impulso) vêm de fx/cues.ts, que não perde a batida num quadro
 // de tela que cobre vários ticks.
 import * as THREE from 'three';
+import { TICK_RATE } from '../core/constants';
 import { driftLevel } from '../core/sim/physics';
 import type { RaceState, Track } from '../core/types';
 import type { RenderFrame } from '../game/contracts';
@@ -16,6 +17,7 @@ import { fxPlan } from './fx/plan';
 import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
 import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
+import { markStrength, TireMarks, type MarkCarState } from './fx/marks';
 import { hash2 } from './noise';
 import type { Palette } from './palette';
 import { scrapeSparks } from './scrape-sparks';
@@ -148,6 +150,9 @@ class Pool {
   dispose(): void { this.points.geometry.dispose(); this.material.dispose(); }
 }
 
+/** Teto de pontos do anel das marcas de pneu (o do Ultra, `fxPlan`); o degrau escolhe quantos usa. */
+const MARKS_MAX = 2048;
+
 export interface Shake { x: number; y: number; roll: number }
 
 export class Effects {
@@ -156,6 +161,10 @@ export class Effects {
   /** Faíscas esticadas: o pool anda em coordenada de pista e cada viewport as escreve no lote de traços. */
   private readonly sparks = new SparkPool(700);
   readonly streaks = new Streaks(900);
+  /** Marcas de pneu: o buffer é em coordenada de pista (teto por degrau) e cada viewport o reprojeta. */
+  private readonly marks = new TireMarks(MARKS_MAX);
+  private readonly markCar: MarkCarState = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, collisionCooldown: 0, launch: 0 };
+  private markClock = 0;
   private readonly cues: FxCue[] = [];
   private readonly cueMemory = newCueMemory();
   private readonly sparkCar: SparkCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0 };
@@ -170,7 +179,7 @@ export class Effects {
   private lastTime = -1;
   private seed = 0;
 
-  constructor() { this.group.add(this.dust.points, this.streaks.mesh); }
+  constructor() { this.group.add(this.marks.mesh, this.dust.points, this.streaks.mesh); }
 
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
@@ -199,6 +208,8 @@ export class Effects {
     const state: RaceState = frame.state;
     const reduce = frame.options.reduceEffects === true;
     const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length);
+    this.marks.buffer.setCapacity(plan.marks);
+    this.markClock += dt;
     this.dustRgb[0] = this.dustColor.r; this.dustRgb[1] = this.dustColor.g; this.dustRgb[2] = this.dustColor.b;
     const rnd = () => this.rnd();
     for (let i = 0; i < state.cars.length && i < 20; i++) {
@@ -208,6 +219,14 @@ export class Effects {
       emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff);
       emitBrakeSmoke(pc, (this.prevSpeed[i] - c.speed) / dt, c.stats.brake, c.collisionCooldown, plan.smoke, rnd, this.emitPuff);
       if (state.phase !== 'countdown') emitTireSmoke(pc, dt, plan.smoke, rnd, this.emitPuff);
+      // Marca de pneu nas duas rodas traseiras (derrapagem, freada forte, arranque da largada-foguete).
+      const mc = this.markCar;
+      mc.z = c.z; mc.x = c.x; mc.speed = c.speed; mc.driftDir = c.driftDir; mc.driftTicks = c.driftTicks; mc.driftCharge = c.driftCharge; mc.collisionCooldown = c.collisionCooldown; mc.launch = c.launch;
+      const strength = state.phase === 'countdown' ? 0 : markStrength(mc, (this.prevSpeed[i] - c.speed) / dt, c.stats.brake, (state.tick - state.startTick) / TICK_RATE);
+      for (let w = 0; w < 2; w++) {
+        if (strength > 0) this.marks.buffer.push(i * 2 + w, c.z - 67, c.x + (w === 0 ? -0.112 : 0.112), strength, this.markClock);
+        else this.marks.buffer.breakStrip(i * 2 + w);
+      }
       this.prevSpeed[i] = c.speed;
       // Faíscas das rodas na derrapagem, na cor da carga (azul, laranja, roxa).
       if (plan.wheelSparks && state.phase !== 'countdown') emitWheelSparks(this.sparkCarOf(c), driftLevel(c.driftCharge), dt, plan.sparks, rnd, this.emitSpark);
@@ -247,14 +266,16 @@ export class Effects {
     st.begin();
     this.sparks.pose(rf, track, st);
     st.end();
+    this.marks.pose(rf, track, this.markClock);
   }
 
   /** Contagens vivas (relatório e testes): bolhas, faíscas e traços escritos na última pose. */
-  counts(): { puffs: number; sparks: number; streaks: number } { return { puffs: this.dust.alive(), sparks: this.sparks.alive(), streaks: this.streaks.count }; }
+  counts(): { puffs: number; sparks: number; streaks: number; marks: number } { return { puffs: this.dust.alive(), sparks: this.sparks.alive(), streaks: this.streaks.count, marks: this.marks.buffer.count() }; }
 
   clear(): void {
     this.dust.clear(); this.sparks.clear(); this.shakeAmp.fill(0); this.lastTime = -1; this.cueMemory.tick = -1;
     this.streaks.begin(); this.streaks.end();
+    this.marks.buffer.clear(); this.marks.mesh.visible = false;
   }
 
   /** Deslocamento da câmera pelo chacoalho do assento (zero se desligado nas opções). */
@@ -266,5 +287,5 @@ export class Effects {
     return out;
   }
 
-  dispose(): void { this.dust.dispose(); this.streaks.dispose(); }
+  dispose(): void { this.dust.dispose(); this.streaks.dispose(); this.marks.dispose(); }
 }
