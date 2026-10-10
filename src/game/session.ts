@@ -26,6 +26,8 @@ import { trackOutline } from '../render/minimap';
 import { createInput } from '../ui/input';
 import { createMenus } from '../ui/menus';
 import { createOnlineHud } from '../ui/screens/online';
+import { addBalloon, ageBalloons, audibleFor, createVoiceRace, hornGain, newWheel, observeVoice, stepWheel, tauntCooldownTicks, tauntText, TAUNT_SHOW_SECONDS, type VoiceCue, type VoiceRace } from '../voice/voice';
+import { isMuted } from '../voice/prefs';
 import { createTutorialPanel } from '../ui/screens/tutorial';
 import { newTelemetry, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
@@ -86,7 +88,9 @@ interface ActiveRace {
   /** Raspão de lado derivado do estado (race-feel.ts: observeScrapes) e a conversa do rival (rival-talk.ts; null sem rival). Só visual: fora do estado. */
   scrapes: ScrapeMemory;
   talk: RivalTalk | null;
-  heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown'> | undefined>;
+  /** Voz do carro (N6): buzina, roda de frases e balões. Só visual e sonoro: fora do estado da corrida (voice.ts). */
+  voice: VoiceRace;
+  heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown' | 'taunt'> | undefined>;
 }
 
 export interface Session {
@@ -184,7 +188,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       if (r.driver) { r.driver.force(ticks, inputs, (i) => stepOnce(r, i)); for (const list of r.messages.values()) list.length = 0; return; }
       for (let i = 0; i < ticks && r.state.phase !== 'finished'; i++) {
         stepOnce(r, inputs);
-        for (const h of r.humans) { const inp = inputs[h.seat]; if (inp && inp !== NEUTRAL_INPUT) inputs[h.seat] = { ...inp, nitro: false, gearUp: false, gearDown: false }; }
+        for (const h of r.humans) { const inp = inputs[h.seat]; if (inp && inp !== NEUTRAL_INPUT) inputs[h.seat] = { ...inp, nitro: false, gearUp: false, gearDown: false, taunt: undefined }; }
       }
       for (const list of r.messages.values()) list.length = 0;
     },
@@ -260,7 +264,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       state, track, mode, humans, messages, telemetry: newTelemetry(), overFor: 0, seed: config.seed, outcome: null, driver: net?.driver ?? null, localSeats, ghost,
       paints: racePaints(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
-      scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null,
+      scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null, voice: createVoiceRace(),
     };
     getActivePlaylog()?.raceStarted({ mode, trackId: config.trackId, humans: localSeats.length });
     session.paused = false;
@@ -456,8 +460,41 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
 
   function readInputs(r: ActiveRace): PlayerInput[] {
     const inputs: PlayerInput[] = [];
-    for (const seat of r.localSeats) inputs[seat] = session.paused ? NEUTRAL_INPUT : input.readSeat(seat);
+    for (const seat of r.localSeats) inputs[seat] = session.paused ? NEUTRAL_INPUT : withVoice(r, seat, input.readSeat(seat));
     return inputs;
+  }
+
+  /**
+   * A roda de frases (voice.ts) já deu o passo deste quadro (`stepVoice`): aqui só se LÊ o que ela decidiu — a frase escolhida
+   * (borda, só neste quadro) e as marchas que são dela e não da física. Não anda estado: `readInputs` roda 2× por quadro com driver.
+   */
+  function withVoice(r: ActiveRace, seat: number, base: PlayerInput): PlayerInput {
+    const v = r.voice.seatInput[seat];
+    if (!v || base === NEUTRAL_INPUT || (!v.consume && v.taunt === undefined)) return base;
+    return { ...base, ...(v.consume ? { gearUp: false, gearDown: false } : {}), ...(v.taunt !== undefined ? { taunt: v.taunt } : {}) };
+  }
+
+  /** Um passo da roda de cada jogador local, UMA vez por quadro de tela (logo depois do `poll`). Fechada na pausa e atrás de qualquer menu. */
+  function stepVoice(r: ActiveRace, dt: number): void {
+    const blocked = session.paused || menus.current() !== null;
+    for (const seat of r.localSeats) {
+      const wheel = (r.voice.wheels[seat] ??= newWheel());
+      if (blocked) { Object.assign(wheel, newWheel()); r.voice.seatInput[seat] = undefined; continue; }
+      const raw = input.readSeat(seat);
+      const can = tauntCooldownTicks(r.voice.mem, seat, r.state.tick) === 0;
+      const step = stepWheel(wheel, { horn: raw.horn === true, gearUp: raw.gearUp, gearDown: raw.gearDown }, dt, can);
+      r.voice.seatInput[seat] = { taunt: step.taunt ?? undefined, consume: step.consumeGears };
+    }
+  }
+
+  /** Uma buzinada ou frase que contou neste tick (voice.ts: observeVoice): o mesmo tick em todos os computadores. */
+  function handleVoiceCue(r: ActiveRace, cue: VoiceCue): void {
+    const local = r.localSeats.includes(cue.seat);
+    const human = r.humans.find((h) => h.seat === cue.seat);
+    const name = human?.name ?? r.state.cars[cue.carIndex]?.name ?? '';
+    if (!audibleFor(local, name, isMuted)) return;
+    if (cue.type === 'horn') { audio.horn?.(cue.carId, hornGain(local)); return; } // dublês de teste podem não ter
+    addBalloon(r.voice, { seat: cue.seat, name, color: seatColor(cue.seat, settings.colorPalette), text: tauntText(cue.index), ttl: TAUNT_SHOW_SECONDS, own: local });
   }
 
   function stepOnce(r: ActiveRace, inputs: PlayerInput[]): void {
@@ -469,6 +506,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     const scrapes = observeScrapes(r.scrapes, r.state);
     for (const sc of scrapes) if (involvesLocalSeat(r, sc)) audio.scrape?.(sc.strength); // dublês de teste podem não ter
     for (const c of rumbleCues(r.state, rumbleMemory, scrapes)) input.rumble(c.seat, c.strength, c.ms);
+    for (const cue of observeVoice(r.voice.mem, r.state, inputs)) handleVoiceCue(r, cue);
     if (r.talk && r.state.config.rival) {
       const rival = rivalByName(r.state.config.rival);
       for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind), 'info', RIVAL_LINE_TTL);
@@ -517,6 +555,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
         else { session.paused = true; menus.show('pause'); }
       }
     }
+    if (r) stepVoice(r, dtRaw); // a roda de frases anda uma vez por quadro, antes de qualquer leitura das entradas
 
     if (r && !session.paused) {
       // Online, o lockstep decide quantos ticks rodam (e espera a rede); o acumulador local fica parado.
@@ -527,21 +566,22 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       // O monitor rápido tem quadros sem passo (144 Hz: 2,4 quadros por passo): sem isto o aperto do nitro morria ali.
       for (const h of r.humans) {
         const held = r.heldEdges?.[h.seat]; const i = inputs[h.seat];
-        if (held && i && i !== NEUTRAL_INPUT) inputs[h.seat] = { ...i, nitro: i.nitro || held.nitro, gearUp: i.gearUp || held.gearUp, gearDown: i.gearDown || held.gearDown };
+        if (held && i && i !== NEUTRAL_INPUT) inputs[h.seat] = { ...i, nitro: i.nitro || held.nitro, gearUp: i.gearUp || held.gearUp, gearDown: i.gearDown || held.gearDown, taunt: i.taunt ?? held.taunt };
       }
       while (accumulator >= DT && steps < MAX_STEPS_PER_FRAME * session.speed) {
         stepOnce(r, inputs);
-        // As bordas (nitro, marcha) valem só no primeiro passo do quadro.
-        for (const h of r.humans) { const i = inputs[h.seat]; if (i && i !== NEUTRAL_INPUT) inputs[h.seat] = { ...i, nitro: false, gearUp: false, gearDown: false }; }
+        // As bordas (nitro, marcha, frase) valem só no primeiro passo do quadro.
+        for (const h of r.humans) { const i = inputs[h.seat]; if (i && i !== NEUTRAL_INPUT) inputs[h.seat] = { ...i, nitro: false, gearUp: false, gearDown: false, taunt: undefined }; }
         accumulator -= DT;
         steps++;
       }
       if (steps === MAX_STEPS_PER_FRAME * session.speed) accumulator = 0; // não tenta recuperar quadros perdidos
       r.heldEdges = [];
-      if (steps === 0 && !r.driver) for (const h of r.humans) { const i = inputs[h.seat]; if (i && i !== NEUTRAL_INPUT && (i.nitro || i.gearUp || i.gearDown)) r.heldEdges[h.seat] = { nitro: i.nitro, gearUp: i.gearUp, gearDown: i.gearDown }; }
+      if (steps === 0 && !r.driver) for (const h of r.humans) { const i = inputs[h.seat]; if (i && i !== NEUTRAL_INPUT && (i.nitro || i.gearUp || i.gearDown || i.taunt !== undefined)) r.heldEdges[h.seat] = { nitro: i.nitro, gearUp: i.gearUp, gearDown: i.gearDown, taunt: i.taunt }; }
       for (const list of r.messages.values()) {
         for (let i = list.length - 1; i >= 0; i--) { list[i].ttl -= dtRaw; if (list[i].ttl <= 0) list.splice(i, 1); }
       }
+      ageBalloons(r.voice, dtRaw);
       if (r.state.phase === 'finished' && menus.current() === null) {
         r.overFor += dtRaw;
         r.afterFlag = advanceAfterFlag(r.afterFlag, r.state, r.track, dtRaw * session.speed);
