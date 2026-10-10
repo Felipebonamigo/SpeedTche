@@ -21,6 +21,9 @@ import { LANDMARK_SIGHT_MIN, SIGHT_TAN_H, sightRoad, sightSeconds, type SightRoa
 export const CAR_REACH_M = 3.2 * ROAD_HALF_WIDTH_M + 0.95;
 /** Face da cerca de divisa (m do centro): logo além de onde o carro consegue chegar. */
 export const FENCE_M = CAR_REACH_M + 0.25;
+/** Calçadão em ondas (Copacabana): onde começa (m do centro, na areia) e a largura da tira; o carro passa por cima (4 cm de altura). */
+export const BOARDWALK_LAT_M = 9.6;
+export const BOARDWALK_WIDTH_M = 4.4;
 
 export interface Placement {
   /** Índice em `Layout.models`. */
@@ -582,6 +585,16 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
       const sea = isSeaSide(biome, side);
       const pitSide = s.pit && side > 0;
       const inner = innerCurve(track, i, side);
+      // Calçadão em ondas na areia, do lado do mar: uma tira de 4 m por segmento (a onda emenda), assentada na altura da areia da
+      // beira da pista (o meio-fio de 0,9 m cobre a descida para o mar). A forração não nasce em cima dele.
+      if (sea && recipe.boardwalk && !nearStart && !pitSide) {
+        const mid = BOARDWALK_LAT_M + BOARDWALK_WIDTH_M / 2;
+        const y0 = groundOffset(track, i, 0, side, BOARDWALK_LAT_M + 0.3);
+        const y1 = groundOffset(track, i, 1, side, BOARDWALK_LAT_M + 0.3);
+        const len = (SEGMENT_M - side * mid * s.curve * HEADING_PER_CURVE) / SEGMENT_M;
+        put(i, 'boardwalk', side * mid, 0.5, { pitch: Math.atan2(y1 - y0, SEGMENT_M), sz: len, y: (y0 + y1) / 2, maxAhead: 90 });
+        occ.mark(i, side, BOARDWALK_LAT_M - 0.2, BOARDWALK_LAT_M + BOARDWALK_WIDTH_M + 0.2, 0);
+      }
       // Forração na faixa em que o carro anda (baixa: passa-se por cima).
       if (!pitSide && !nearStart && recipe.cover.length) {
         const count = Math.floor(recipe.coverDensity + h(1));
@@ -637,6 +650,14 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         lastPole = p; lastPoleSeg = i;
       }
       if (nearStart) continue;
+      // Quiosque da orla (Copacabana): do lado de terra, além do gradil, de frente para a pista, onde há folga entre os prédios.
+      if (recipe.kiosks.length && h(75) < 0.07) {
+        const lat = 28 + h(76) * 6; const r = 3.8;
+        if (!inner && occ.free(i, side, lat - r, lat + r, 1)) {
+          put(i, recipe.kiosks[Math.floor(h(77) * recipe.kiosks.length)], side * lat, h(78), { yaw: side > 0 ? Math.PI : 0, maxAhead: 130 });
+          occ.mark(i, side, lat - r, lat + r, 1);
+        }
+      }
       // Mata/bosque com clareiras (ruído baixo ao longo da pista) além da cerca.
       const forest = valueNoise(seed + (side > 0 ? 17 : 29), i * 0.022) * 0.5 + 0.5;
       const inForest = forest > recipe.clearing;

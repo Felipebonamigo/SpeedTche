@@ -149,6 +149,9 @@ describe('cenário redondo: forma', () => {
     const bad: string[] = [];
     for (const id of ids) {
       if (id.startsWith('far:')) continue; // silhueta de longe: poucos pixels, ≤ 60 triângulos
+      // Palmeira de cartum (L4): a copa tem a normal ESFERIZADA de propósito (lê como uma bola de luz), então a normal se afasta da face;
+      // o que se trava nela é o teste da copa em tests/scenery-copacabana.test.ts (aponta para fora) e a cor lisa aqui em cima.
+      if (id.startsWith('palm:cartoon:')) continue;
       const lie = normalLie(getModel(id).parts);
       const cap = /^(rock|searock):/.test(id) ? 18 : 22;
       if (lie > cap) bad.push(`${id}: ${lie.toFixed(1)}° (máx. ${cap}°)`);

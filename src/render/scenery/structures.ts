@@ -5,7 +5,8 @@
 // Puro: só Three, sem DOM.
 import * as THREE from 'three';
 import { hash2 } from '../noise';
-import { box, cone, cyl, gable, hip, ico, jitter, lean, lumpy, merge, mottle, paint, roundedBar, shadeY, sphere, tf, tintUp, tintUpSoft, tris, type Geo, type MatKey, type Model, type ModelPart } from './geom';
+import { bakeAO, bevelBox, box, cone, cyl, gable, hip, ico, jitter, lean, lumpy, merge, mergeRound, mottle, paint, roundedBar, shadeY, sphere, tf, tintUp, tintUpSoft, tris, type Geo, type MatKey, type Model, type ModelPart } from './geom';
+import { smoothNormals } from '../normals';
 
 /** Tamanho (m) de uma repetição de cada textura de fachada (4 colunas de janela × 4 andares). */
 export const FACADE_TILE: Record<'office' | 'apartment' | 'classic' | 'house', [number, number]> = {
@@ -93,6 +94,39 @@ export function apartmentBlock(seed: number, floors: number, tint: string, L = 1
   p.flat.push(paint(cyl(1, 1, 1.8, 8), '#6a8aa8', tf(-D / 2 + 2, H + 1.7, L / 4)));
   p.glow.push(paint(box(0.06, 0.4, 1.8), '#fff0c0', tf(0.08, 3.6, L / 2 - 2.5)));
   return toModel(p, H + 3);
+}
+
+/**
+ * Prédio de apartamentos da orla (aptbeach: Copacabana e o litoral brasileiro), do kit redondo (geom.ts): torre de caixa com bisel
+ * (cantos verticais e topo arredondados, fachada com as janelas que acendem à noite), embasamento escuro com toldo, uma laje de
+ * sacada arredondada por andar (saem ~1 m da fachada), três nervuras, cornija e a casa de máquinas recuada, com a oclusão assada
+ * na cor (o pé e as frestas das sacadas escurecem). A fachada reta fica em x = 0, na borda de colisão: o bisel só pega os cantos e o
+ * topo, então a faixa do carro continua enxergando a face plana. ~480 triângulos + 22 por andar (o `apartmentBlock` tinha ~12 por andar).
+ */
+export function beachApartment(seed: number, floors: number, tint: string, L = 20, D = 14): Model {
+  const H = 4 + floors * 3;
+  const round = (g: Geo): Geo => smoothNormals(g, 50);
+  const flat: Geo[] = [];
+  const glow: Geo[] = [];
+  flat.push(paint(box(D, 5, L), '#8f8a82', tf(-D / 2, -2.4, 0))); // fundação: prédio em declive não flutua
+  flat.push(paint(bevelBox(D, 4, L, 0.45), '#5a5e66', tf(-D / 2, 2, 0))); // embasamento, a fachada reta em x = 0
+  flat.push(paint(box(0.1, 2.6, L - 2), '#2c3e55', tf(0.02, 1.6, 0))); // portaria e vitrines
+  flat.push(paint(round(roundedBar(1.3, 0.22, L - 1.6, 0.1, 1)), ['#d63a3a', '#1e88e5', '#ffd23f', '#3ddc84'][seed % 4], tf(0.6, 3.2, 0, 1, 1, 1, 0, 0, -0.15))); // toldo
+  // Uma laje de sacada por andar, de borda arredondada, e as nervuras: o relevo da fachada.
+  for (let f = 1; f < floors; f++) flat.push(paint(round(roundedBar(1.1, 0.22, L - 1.4, 0.1, 1)), '#ece9e2', tf(0.5, 4 + f * 3, 0)));
+  for (const z of [-L / 3, 0, L / 3]) flat.push(paint(box(0.5, H - 4.4, 0.5), '#e2dfd8', tf(0.2, 4 + (H - 4.4) / 2, z)));
+  flat.push(paint(round(roundedBar(D + 0.6, 0.9, L + 0.6, 0.3, 1)), '#d8d4cc', tf(-D / 2, H, 0))); // cornija
+  flat.push(paint(bevelBox(D - 4, 2.8, L - 6, 0.5), '#b8b2a8', tf(-D / 2 - 1, H + 0.9 + 1.4, -L / 5))); // casa de máquinas
+  flat.push(paint(cyl(1.1, 1.1, 1.8, 8), '#6a8aa8', tf(-D / 2 + 2, H + 1.8, L / 4))); // caixa-d'água
+  glow.push(paint(box(0.06, 0.4, 1.8), '#fff0c0', tf(0.08, 3.6, L / 2 - 2.5)));
+  const body = paint(bevelBox(D, H - 4, L, 0.7, FACADE_TILE.apartment), tint, tf(-D / 2, 4 + (H - 4) / 2, 0), true);
+  const base = mergeRound(flat);
+  const wall = mergeRound([body]);
+  bakeAO(base, { occluders: [wall], reach: 2.4, strength: 0.6, rays: 12 });
+  bakeAO(wall, { occluders: [base], reach: 2.4, strength: 0.6, rays: 12 });
+  shadeY(base, -1, H + 3, 0.78, 1.06);
+  const parts: ModelPart[] = [{ geometry: base, mat: 'flat', shadow: true }, { geometry: wall, mat: 'apartment', shadow: true }, { geometry: merge(glow), mat: 'glow' }];
+  return { parts, blob: 0 };
 }
 
 /** Prédio clássico (bulevar europeu): térreo de lojas com toldos, cornija, telhado mansarda com lucarnas. */

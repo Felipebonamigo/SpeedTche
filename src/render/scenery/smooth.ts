@@ -34,6 +34,7 @@ export function sceneryShading(id: string): SceneryShading {
 /** Aplica a normal suave nas partes iluminadas do modelo (no lugar) e devolve o próprio modelo. */
 export function smoothModel(id: string, model: Model): Model {
   const shading = sceneryShading(id);
-  for (const p of model.parts) if (LIT.has(p.mat) && !p.geometry.index) smoothNormals(p.geometry, shading.crease, shading);
+  // `userData.keepNormals` (geom.ts, `mergeRound`): a parte do kit redondo traz a normal própria (bisel esférico, copa esferizada).
+  for (const p of model.parts) if (LIT.has(p.mat) && !p.geometry.index && !p.geometry.userData.keepNormals) smoothNormals(p.geometry, shading.crease, shading);
   return model;
 }

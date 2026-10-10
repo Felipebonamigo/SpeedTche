@@ -58,6 +58,8 @@ const BUILDERS: Record<string, () => Model> = {
   // Palmeiras (R de `palm`) e o que as substitui fora dos trópicos (mesma pegada).
   'palm:coco-lean': () => V.coconutPalm(41, 1.6), 'palm:coco': () => V.coconutPalm(42, 0.6), 'palm:royal': () => V.royalPalm(43),
   'palm:date': () => V.datePalm(44), 'palm:fan': () => V.fanPalm(45),
+  // Palmeiras de cartum do litoral brasileiro (kit redondo, L4): coqueiro tombado, coqueiro reto, imperial e baixa; mesma pegada.
+  'palm:cartoon:0': () => V.cartoonPalm(241, 0), 'palm:cartoon:1': () => V.cartoonPalm(242, 1), 'palm:cartoon:2': () => V.cartoonPalm(243, 2), 'palm:cartoon:3': () => V.cartoonPalm(244, 3),
   'palm:spruce': () => V.conifer(46, '#1f5a3a', 5, 0.9, false, 0.5, V.collisionHalfM('palm')),
   'palm:snowspruce': () => V.conifer(47, '#23603c', 5, 0.9, true, 0.5, V.collisionHalfM('palm')),
   'palm:birch': () => V.aspen(48, ['#6aa84f', '#e8c84a', '#7ab85a'], V.collisionHalfM('palm')),
@@ -89,6 +91,8 @@ const BUILDERS: Record<string, () => Model> = {
   ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:green:${k}`, () => V.grassTuft(100 + k, ['#3f8f36', '#4f9a3a', '#2f7f34'][k])])),
   ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:dry:${k}`, () => V.grassTuft(110 + k, ['#c9b25a', '#b5a050', '#d8c070'][k], 0.8, 9)])),
   ...Object.fromEntries([0, 1].map((k) => [`tuft:sage:${k}`, () => V.grassTuft(120 + k, ['#9aa67a', '#8a9a68'][k], 0.45)])),
+  // Capim de cartão com recorte alfa (L4): o pé escuro e a ponta clara; o lote `cutout` do runtime.
+  ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:cut:${k}`, () => V.cutoutTuft(150 + k, ['#2f7f34', '#3a8a38', '#4a9a3a'][k], ['#7fd05a', '#92d85c', '#a8e062'][k], 0.62 + 0.08 * k)])),
   'flowers:meadow': () => V.flowerPatch(130, '#4f9a3a', ['#ffffff', '#ffd23f', '#e8502a']),
   'flowers:alpine': () => V.flowerPatch(131, '#4f8a3a', ['#b86ac8', '#ffffff', '#6a8aff']),
   'flowers:tropical': () => V.flowerPatch(132, '#2f8a38', ['#e8402a', '#ffb000', '#ff5fb0']),
@@ -114,6 +118,8 @@ const BUILDERS: Record<string, () => Model> = {
   'fishboat:0': () => S.fishingBoat(0), 'fishboat:1': () => S.fishingBoat(1), 'fishboat:2': () => S.fishingBoat(2),
   'umbrella:0': () => S.beachUmbrella(0), 'umbrella:1': () => S.beachUmbrella(1), 'umbrella:2': () => S.beachUmbrella(2),
   'windmill': () => S.stoneWindmill(), 'pier': () => S.pier(),
+  // Orla de Copacabana (L4): quiosques além do gradil, do lado de terra, e o calçadão em ondas na areia.
+  'kiosk:0': () => P.kiosk(0), 'kiosk:1': () => P.kiosk(1), 'kiosk:2': () => P.kiosk(2), 'boardwalk': () => P.boardwalk(),
   'mesa:0': () => V.mesa(1, ['#c8683a', '#e08a50', '#b35a32', '#d97a45'], 40, 55), 'mesa:1': () => V.mesa(2, ['#b85a32', '#d97a45', '#c8683a'], 26, 70),
   'mesa:karoo': () => V.mesa(3, ['#9a7a5a', '#b08a62', '#8a6a4a'], 60, 30), 'mesa:etna': () => V.mesa(4, ['#4a4446', '#5a5254', '#3a3638'], 70, 40),
   'stack:0': () => V.seaStack(1, 22), 'stack:1': () => V.seaStack(2, 30),
@@ -255,7 +261,7 @@ function dynamicBuilder(id: string): (() => Model) | undefined {
       case 'glass': return () => S.glassTower(seed, n, ['#a8c8e8', '#8fb0d0', '#c8d8e8', '#b8c8d0'][seed % 4]);
       case 'glassgold': return () => S.glassTower(seed, n, '#ffe6a8');
       case 'apt': return () => S.apartmentBlock(seed, n, ['#f2efe8', '#e8d8c0', '#d8e0e8', '#f0d8c8'][seed % 4]);
-      case 'aptbeach': return () => S.apartmentBlock(seed, n, ['#ffffff', '#f4ecd8', '#e8f0f4', '#f8e0d0'][seed % 4], 20, 14);
+      case 'aptbeach': return () => S.beachApartment(seed, n, ['#ffffff', '#f4ecd8', '#e8f0f4', '#f8e0d0'][seed % 4], 20, 14);
       case 'classic': return () => S.classicBuilding(seed, n, ['#f2e8d4', '#ecdcc0', '#f4ead8', '#e8d4b8'][seed % 4]);
       case 'classicwarm': return () => S.classicBuilding(seed, n, ['#e8b888', '#f0c8a0', '#e0a878', '#f2d0a8'][seed % 4]);
       case 'brick': return () => S.brickMidrise(seed, n, ['#b8705a', '#a86a58', '#c8886a', '#9a6050'][seed % 4], ['#ff3fd0', '#3fe8ff', '#ffd23f', '#ff5a3a'][seed % 4]);
@@ -332,6 +338,9 @@ const TREES: Record<SceneryId, Partial<Record<Region, string[]>> & { _: string[]
   desert: { _: ['tree:marula', 'tree:acacia:0', 'tree:marula', 'tree:acacia:1'], au: ['tree:eucalyptus', 'tree:eucalyptus', 'tree:acacia:0', 'tree:eucalyptus'], med: ['tree:olive', 'tree:olive', 'tree:cypress', 'tree:olive'] },
   city_night: { _: ['tree:street', 'tree:street', 'tree:linden', 'tree:street'] },
 };
+
+/** Palmeiras do litoral brasileiro (kit redondo, L4): as quatro de cartum, na ordem das variantes do núcleo. */
+const CARTOON_PALMS = ['palm:cartoon:0', 'palm:cartoon:1', 'palm:cartoon:2', 'palm:cartoon:3'];
 
 const PINES: Partial<Record<Region, string[]>> & { _: string[] } = {
   _: ['pine:spruce', 'pine:fir', 'pine:snow', 'pine:slim'], jp: ['pine:cedar', 'pine:spruce', 'pine:cedar', 'pine:snow'], no: ['pine:snow', 'pine:spruce', 'pine:larch', 'pine:snow'],
@@ -435,7 +444,7 @@ export function spriteVisual(kind: SpriteKind, variant: number, scale: number, d
   switch (kind) {
     case 'tree': { const t = TREES[biome]; return round(pickV(t[region] ?? t._, variant)); }
     case 'pine': return round(pickV(PINES[region] ?? PINES._, variant));
-    case 'palm': return round(pickV(PALMS[region] ?? PALMS._, variant));
+    case 'palm': return round(pickV(biome === 'coast' && region === 'br' ? CARTOON_PALMS : PALMS[region] ?? PALMS._, variant));
     case 'cactus': {
       const id = pickV(CACTI[region] ?? CACTI._, variant);
       // Saguaro e palma têm braços em X: giro pequeno, para a largura na pista continuar a de colisão.
@@ -487,7 +496,13 @@ export interface DressingRecipe {
   /** Litoral: barcos no mar (lado direito) e guarda-sóis na areia. */
   boats: string[];
   umbrellas: boolean;
+  /** Orla com calçadão em ondas na areia do lado do mar (uma tira por segmento) e os quiosques de terra (ids; vazio = nenhum). */
+  boardwalk: boolean;
+  kiosks: string[];
 }
+
+/** Pistas com o calçadão em ondas e os quiosques da orla (a Q/M estende a lista). */
+const ORLA_COM_CALCADAO: ReadonlySet<string> = new Set(['copacabana']);
 
 const green3 = ['tuft:green:0', 'tuft:green:1', 'tuft:green:2'];
 
@@ -495,7 +510,7 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
   const region = regionOf(def);
   const base: DressingRecipe = {
     fence: null, poles: false, cover: green3.map((id) => [id, 1] as [string, number]), coverDensity: 2.2, groves: [], groveDensity: 0.8, clearing: 0.35,
-    scatter: [], scatterDensity: 0.15, landmarks: [], landmarkEvery: 160, boats: [], umbrellas: false,
+    scatter: [], scatterDensity: 0.15, landmarks: [], landmarkEvery: 160, boats: [], umbrellas: false, boardwalk: false, kiosks: [],
   };
   switch (def.scenery) {
     case 'tropical':
@@ -538,12 +553,14 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
         : region === 'no' ? [{ near: ['pine:spruce', 'pine:snow'], far: 'far:cone-dark', weight: 3 }, { near: ['tree:aspen-green'], far: 'far:round-green', weight: 1 }]
           : region === 'au' ? [{ near: ['tree:eucalyptus'], far: 'far:round-olive', weight: 2 }, { near: ['bush:green'], far: 'far:round-green', weight: 1 }]
             : region === 'jp' ? [{ near: ['palm:blackpine'], far: 'far:round-dark', weight: 2 }]
-              : [{ near: ['palm:coco', 'palm:coco-lean'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0'], far: 'far:round-green', weight: 1 }];
+              : region === 'br' ? [{ near: ['palm:cartoon:0', 'palm:cartoon:1', 'palm:cartoon:2'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0'], far: 'far:round-green', weight: 1 }]
+                : [{ near: ['palm:coco', 'palm:coco-lean'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0'], far: 'far:round-green', weight: 1 }];
       const lm: Array<[string, number, number, number]> = region === 'med' ? [['house:cubes-white', 3, 32, 70], ['house:cubes-pastel', 3, 32, 80], ['windmill', 1, 40, 90]]
         : region === 'no' ? [['house:red', 3, 30, 70], ['house:yellow', 2, 30, 70]] : region === 'au' ? [['house:white', 1, 35, 80]] : region === 'jp' ? [['torii', 1, 30, 40], ['house:japan', 1, 35, 70]] : region === 'za' ? [['house:white', 2, 35, 80]] : [['house:white', 1, 35, 80]];
-      return { ...base, fence: region === 'med' ? 'stone' : 'railing', cover: [['tuft:green:0', 2], ['bush:agapanthus', 1], ['tuft:green:1', 1], ['flowers:meadow', 1]], coverDensity: 2.0,
+      const cut = region === 'br'; // capim de recorte alfa no litoral brasileiro (L4)
+      return { ...base, fence: region === 'med' ? 'stone' : 'railing', cover: [[cut ? 'tuft:cut:0' : 'tuft:green:0', 2], ['bush:agapanthus', 1], [cut ? 'tuft:cut:1' : 'tuft:green:1', 1], ['flowers:meadow', 1]], coverDensity: 2.0,
         groves, groveDensity: 0.9, clearing: 0.35, scatter: [['bush:bougainvillea', 1], ['rock:basalt', 1], ['bush:green', 1]], scatterDensity: 0.2, landmarks: lm, landmarkEvery: region === 'med' || region === 'no' ? 40 : 150,
-        boats, umbrellas: region === 'br' || region === 'med' };
+        boats, umbrellas: region === 'br' || region === 'med', boardwalk: ORLA_COM_CALCADAO.has(def.id), kiosks: ORLA_COM_CALCADAO.has(def.id) ? ['kiosk:0', 'kiosk:1', 'kiosk:2'] : [] };
     }
     case 'city_night':
       return { ...base, fence: 'railing', cover: [], coverDensity: 0, groves: [{ near: ['tree:street'], far: 'far:round-green', weight: 1 }], groveDensity: 0.25, clearing: 0.5,
