@@ -1,0 +1,31 @@
+/* Fonte de exibição do Speed Tchê (onda L, L5): números e rótulos do HUD, títulos de tela e o logo. As três candidatas
+   são OFL e estão embutidas (src/assets/fonts/; licença, autor e URL em docs/ARTE.md). O dono escolhe UMA, trocando
+   a família que vem primeiro na única linha de `--font-display` abaixo: "Fredoka" (a padrão: redonda, de brinquedo),
+   "Baloo 2" (mais larga e macia) ou "Lilita One" (pesada, de cartaz). Sem o arquivo, cai nas fontes de sistema
+   arredondadas e depois nas comuns. Só o subconjunto latino (PT e EN) foi embutido. */
+@font-face {
+  font-family: "Fredoka";
+  src: url("../assets/fonts/Fredoka-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Baloo 2";
+  src: url("../assets/fonts/Baloo2-latin.woff2") format("woff2");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+/* Peso único (400): onde ela for a escolhida, o negrito do CSS não deve ser sintetizado (ver font-synthesis em hud.css). */
+@font-face {
+  font-family: "Lilita One";
+  src: url("../assets/fonts/LilitaOne-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-display: "Fredoka", ui-rounded, "Arial Rounded MT Bold", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}

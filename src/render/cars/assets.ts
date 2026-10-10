@@ -1,19 +1,24 @@
-// Os carros da arte no jogo (passo 2.4): cada `src/assets/cars/<estilo>.glb` (ex.: gt.glb, pickup.glb)
-// substitui o modelo procedural daquele estilo. Carrega antes de o renderizador nascer (main.ts e o
-// harness); arquivo recusado pelo validador fica de fora com o motivo e o estilo segue procedural.
-// Sem arquivo nenhum, nada muda.
-import { CAR_BODIES } from '../../core/data/cars';
+// Os carros da arte no jogo: cada `src/assets/cars/<nome>.glb` substitui um modelo procedural. O nome é o **id de um carro**
+// (`falcao.glb`: o modelo é só daquele carro — os outros GT seguem procedurais) ou um **estilo** de carroceria (`gt.glb`: vale para o
+// estilo todo, como no passo 2.4). Carrega antes de o renderizador nascer (main.ts e o harness); arquivo recusado pelo validador
+// (docs/CONTRATO-DO-ASSET.md) fica de fora com o motivo e o modelo segue procedural. Sem arquivo nenhum, nada muda.
+import { CAR_BODIES, CARS } from '../../core/data/cars';
 import type { CarBody } from '../../core/types';
 import { parseCarGlb } from './gltf';
 import { setModelOverride } from './models';
 
-// atalho: o .glb vai embutido no build como data URL (um pedaço de JS por arquivo, carregado sob demanda),
-// porque o Electron abre o jogo por file:// e o fetch de file:// não funciona. Teto: os 13 carros (~200 KB
-// cada). Saída quando o cenário também vier em .glb: servir os arquivos por um protocolo próprio do Electron.
-const FILES = import.meta.glob<string>('../../assets/cars/*.glb', { query: '?inline', import: 'default' });
+/** Esquema do protocolo próprio do Electron (desktop/assets.cjs, o mesmo texto): a página é `file://` e o `fetch` de `file:` não funciona. */
+export const ASSET_SCHEME = 'speedtche-asset';
+
+// O .glb é um ARQUIVO do build (`?no-inline`: o Vite o copia para `dist/assets/` com hash e entrega a URL). No navegador, `fetch`;
+// no Electron, `fetch` pelo protocolo próprio (assetUrl). A data URL de antes (embutida no JS) acabou: dobrava o tamanho do pacote
+// e o JS carregava os modelos inteiros para decodificar base64.
+const URLS = import.meta.glob<string>('../../assets/cars/*.glb', { query: '?no-inline', import: 'default', eager: true });
+const FILES: Record<string, () => Promise<string>> = Object.fromEntries(Object.entries(URLS).map(([path, url]) => [path, async () => url]));
 
 export interface CarAssetReport {
-  loaded: CarBody[];
+  /** Chaves aceitas: ids de carro (`falcao`) e estilos (`gt`). */
+  loaded: string[];
   rejected: { file: string; problems: string[] }[];
   warnings: string[];
 }
@@ -31,20 +36,40 @@ export function dataUrlToArrayBuffer(url: string): ArrayBuffer {
   return out.buffer;
 }
 
-/** Carrega os arquivos e registra os aceitos. `files` = caminho → função que devolve a data URL. */
+/**
+ * Onde buscar o arquivo. Página `file://` (Electron): o caminho dentro de `app/` vai pelo protocolo `speedtche-asset://app/…`
+ * (desktop/assets.cjs); em `http:` (navegador, Vite) e em `data:` a URL fica como está.
+ */
+export function assetUrl(url: string, page: string | null = typeof location === 'undefined' ? null : location.href): string {
+  if (!page || !page.startsWith('file:')) return url;
+  const base = new URL('./', page).href;
+  return url.startsWith(base) ? `${ASSET_SCHEME}://app/${url.slice(base.length)}` : url;
+}
+
+/** Lê o arquivo: data URL decodifica na hora; o resto vem por `fetch` (pelo protocolo, no Electron). */
+export async function readAsset(url: string): Promise<ArrayBuffer> {
+  if (url.startsWith('data:')) return dataUrlToArrayBuffer(url);
+  const res = await fetch(assetUrl(url));
+  if (!res.ok) throw new Error(`${res.status} ao buscar ${url}`);
+  return res.arrayBuffer();
+}
+
+/** Carrega os arquivos e registra os aceitos. `files` = caminho → função que devolve a URL (ou data URL) do .glb. */
 export async function loadCarAssets(files: Record<string, () => Promise<string>> = FILES): Promise<CarAssetReport> {
   const report: CarAssetReport = { loaded: [], rejected: [], warnings: [] };
   for (const [path, load] of Object.entries(files)) {
     const file = path.slice(path.lastIndexOf('/') + 1);
-    const body = file.replace(/\.glb$/i, '') as CarBody;
-    if (!CAR_BODIES.includes(body)) {
-      report.rejected.push({ file, problems: [`"${body}" não é um estilo de carroceria (${CAR_BODIES.join(', ')})`] });
+    const name = file.replace(/\.glb$/i, '');
+    const car = CARS.find((c) => c.id === name);
+    const body = (car ? car.body : name) as CarBody;
+    if (!car && !CAR_BODIES.includes(body)) {
+      report.rejected.push({ file, problems: [`"${name}" não é um carro nem um estilo (carros: ${CARS.map((c) => c.id).join(', ')}; estilos: ${CAR_BODIES.join(', ')})`] });
       continue;
     }
     try {
-      const { model, problems, warnings } = await parseCarGlb(body, dataUrlToArrayBuffer(await load()));
+      const { model, problems, warnings } = await parseCarGlb(body, await readAsset(await load()), car ? { carId: car.id } : {});
       report.warnings.push(...warnings.map((w) => `${file}: ${w}`));
-      if (model && problems.length === 0) { setModelOverride(body, model); report.loaded.push(body); } else report.rejected.push({ file, problems });
+      if (model && problems.length === 0) { setModelOverride(car ? car.id : body, model); report.loaded.push(car ? car.id : body); } else report.rejected.push({ file, problems });
     } catch (e) {
       report.rejected.push({ file, problems: [`não carregou: ${e instanceof Error ? e.message : String(e)}`] });
     }

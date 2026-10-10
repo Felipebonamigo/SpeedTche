@@ -2,7 +2,7 @@
 
 Briefing de arte (direção, paleta, carros, cenário, especificação, lotes): https://claude.ai/code/artifact/049e138a-cb57-4adb-baef-d3084b4f0d03
 
-Contrato do asset (convenção do carro e do marco-herói, nós `kit_*`, `seat`, `lod0`/`lod1`, tetos; **proposta**, o dono aprova no Marco 1): `docs/CONTRATO-DO-ASSET.md`.
+Contrato do asset (convenção do carro e do marco-herói, nós `kit_*`, `seat`, `lod0`/`lod1`, tetos; a parte do carro é **conferida** pelo `check.ts` desde a L3, o resto é **proposta** até o dono aprovar no Marco 1): `docs/CONTRATO-DO-ASSET.md`.
 
 **Decisão (dono, 04/10/2026): não gerar 3D por IA neste jogo; baixar o orgânico pronto.** O alvo é cartunesco de última geração (`docs/DIRECAO-DE-ARTE.md`); hoje (até a L3) o estilo em código é low-poly
 e o código dá conta dele — prédios, pontes, torres, relevo. As formas orgânicas
@@ -18,25 +18,46 @@ ponto `seat`, conferidos por `npm run check-car`). A frase "nada de gerar pela A
 
 ## Carros — pronto
 1. **Modelo-base**: `art/templates/cars/<estilo>.glb` (13), o carro atual do jogo na convenção. `npm run car-templates` regera.
-2. **Redesenhar no Blender** mantendo a convenção: metros, +Y para cima, frente em +Z; nós `body`, `wheel_fl`,
-   `wheel_fr`, `wheel_rl`, `wheel_rr`, vazios `exhaust_l`/`exhaust_r`; materiais pelo nome:
+2. **Redesenhar no Blender** mantendo a convenção (`docs/CONTRATO-DO-ASSET.md`): metros, +Y para cima, frente em +Z; nós `body`, `wheel_fl`,
+   `wheel_fr`, `wheel_rl`, `wheel_rr` (cada roda com a malha dela, **eixo em x**: o desenho da roda do arquivo é o do `wheel_fr`), vazios
+   `exhaust_l`/`exhaust_r` e `seat`; materiais pelo nome:
    - `paint*`, `accent*`, `stripe_a*`, `stripe_b*`, `stripe_ab*`: recebem a cor do carro; a cor do material é o tom
      (branco = cor pura, cinza = um tom abaixo);
    - `headlight*`, `taillight*`: acendem; força = emissivo ÷ cor (sem emissivo = 1);
    - "popup" no nome: sobe com o farol escamoteável;
-   - qualquer outro nome: peça fixa com a cor, rugosidade e metal do material. **Hoje (até a L3): sem textura** nos carros;
-     o alvo é o atlas de paleta 256² (`docs/CONTRATO-DO-ASSET.md`).
+   - qualquer outro nome: peça fixa com a cor, rugosidade e metal do material.
+   Cor por **atlas de paleta 256²** (`map`, uma imagem só no arquivo; a face pintável aponta para um swatch branco) ou, como os 13 modelos-base,
+   cor chapada por material. LOD: nós de topo `lod0` e `lod1` (≤ metade dos triângulos). Opcionais conferidos: `kit_<peça>_<nível>`, `decal_*`.
 3. **Conferir**: `npm run check-car -- arquivo.glb` (mesmo validador do jogo: pegada, rodas, luzes, escape, ≤ 3.500
-   triângulos no casco — eram 2.000 até a onda I, que arredondou os carros do jogo para 2.600–3.400 —, faixas que os
-   carros do estilo usam).
-4. **Pôr no jogo**: copiar para `src/assets/cars/<estilo>.glb`. Entra no navegador, no build e no Electron
-   (embutido como data URL: `src/render/cars/assets.ts`, atalho com teto anotado). Recusado = fica procedural, motivo no console.
+   triângulos no casco, faixas, atlas, LOD, `seat`, `kit_*`, `decal_*`). O nome do arquivo é o ID de um **carro** (`falcao.glb`) ou um **estilo** (`gt.glb`).
+4. **Pôr no jogo**: copiar para `src/assets/cars/<carro>.glb` (só aquele carro; os outros do estilo seguem procedurais) ou `<estilo>.glb` (o estilo
+   todo). O arquivo vai como **arquivo do build** (`dist/assets/<nome>-<hash>.glb`): no navegador por `fetch`, no Electron pelo protocolo
+   `speedtche-asset://app/assets/…` (`desktop/assets.cjs`; a página é `file://`). Recusado = fica procedural, motivo no console. **Registre a licença**
+   na tabela abaixo (um teste cobra).
+5. **Carro de kit de paleta (Kenney Car Kit, CC0)**: `npm run convert-car -- "<kit>/Models/GLB format/sedan-sports.glb" falcao` — o conversor
+   (`scripts/lib/car-convert.ts`) faz a limpeza que o Blender faria: troca o material único do kit por um material por papel (`paint`, `accent`,
+   `headlight`, `taillight`, `glass`, `trim`, `tire`, `rim`, `plate`) pela tabela `KENNEY_ROLES` (swatch → papel; swatch desconhecido vira `trim` e
+   entra no relatório), escala o casco por eixo até a pegada (o kit é estreito), faz rodas redondas e maiores no chão, acrescenta `exhaust_*`,
+   `seat`, `lod0`/`lod1` (meshoptimizer do three) e reduz o `colormap` de 512² para 256². Depois: `npm run check-car` e as capturas.
+   Prova sem baixar nada: `npx tsx scripts/make-test-car.ts` grava o carro de caixas do contrato (`scratch/car-caixas.glb`).
 
-Por ora a malha das rodas do .glb só dá posição e tamanho; o desenho continua o do estilo.
+Código: `src/render/cars/gltf.ts` (leitura: UV, atlas, roda, LOD, contrato), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga),
+`models.ts` (um modelo por carro ou por estilo). O `Cars` (`src/render/cars.ts`) agrupa por **modelo**: um lote por modelo (mais um para o LOD1) e
+um material com o atlas para cada modelo que o tem.
+Testes: `tests/car-gltf*.test.ts`, `car-contrato-asset`, `car-por-modelo`, `car-pipeline`, `desktop-assets` — os 13 modelos-base voltam idênticos
+com e sem os extras (como saem do Blender).
+Provado em 02/10: `gt.glb` no navegador (0 pixels diferentes do procedural), no build (`vite preview`) e no Electron (`file://`); em 10/10 (L3):
+`falcao.glb` (Kenney) na corrida e no estúdio do harness, e no Electron de verdade pelo protocolo (`window.nc.carAssets.loaded = ["falcao"]`).
 
-Código: `src/render/cars/gltf.ts` (leitura), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga).
-Testes: `tests/car-gltf.test.ts` — os 13 modelos-base voltam idênticos com e sem os extras (como saem do Blender).
-Provado em 02/10: `gt.glb` no navegador (0 pixels diferentes do procedural), no build (`vite preview`) e no Electron (`file://`).
+### Licenças dos carros baixados
+
+Uma linha por arquivo de `src/assets/cars/` (conferida por `tests/car-pipeline.test.ts`: arquivo sem linha aqui reprova a suíte).
+O CC0 cobre o arquivo, **não** marca nem direito de imagem; o nome do arquivo do jogo é o do **carro** (`falcao.glb`), e o `.glb` é a
+saída do conversor (`scripts/convert-car.ts`), não o original.
+
+| Arquivo no jogo | Origem (página, arquivo, autor) | Licença | Data |
+|---|---|---|---|
+| `art/cars/falcao-kenney.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
 
 ## Cenário e horizonte — falta (os marcos turísticos já têm o caminho: abaixo)
 Mesmo caminho (convenção na seção Especificação do briefing); para árvores, prédios e horizonte o carregador ainda não existe.
@@ -199,3 +220,64 @@ indexada, cor chapada por face (COLOR_0; **hoje (até a L3)**, com o atlas de pa
    instaladas e tiradas depois.
 7. Testes: `tests/landmark-parts.test.ts` (validador, carregador, os 9 construtores com e sem a peça, orçamento,
    caches, sombreado; no conversor, o modo peça, `--length`, `--paint` e `--by-light`).
+
+## Fontes de exibição (onda L, frente L5, 10/10/2026)
+
+O HUD, os títulos de tela e o logo provisório usam uma fonte de exibição **embutida** (nada de fonte externa em tempo de
+jogo). São três candidatas, todas com a **SIL Open Font License 1.1** (uso comercial e redistribuição livres, com a licença
+junto; o texto completo de cada uma está ao lado do arquivo, em `src/assets/fonts/OFL-*.txt`). **O dono escolhe uma**:
+a escolha é **uma linha**, o `--font-display` em `src/ui/fonts.css` (a família que vem primeiro; hoje **Fredoka**). O
+`tests/fonts-hud.test.ts` confere que os arquivos, as licenças e este registro existem.
+
+Origem de todas: o repositório `github.com/google/fonts` (pasta `ofl/<fonte>/`, ramo `main`), baixadas em 10/10/2026.
+
+| Família | Arquivo em `src/assets/fonts/` | Autor (direito autoral) | Licença | URL de origem | O que foi feito |
+|---|---|---|---|---|---|
+| **Fredoka** (padrão) | `Fredoka-latin.woff2` (29 KB) | Milena Brandão, Hafontia — "Copyright 2016 The Fredoka Project Authors (github.com/hafontia/Fredoka-One)" | SIL Open Font License 1.1 (`OFL-Fredoka.txt`) | `github.com/google/fonts/tree/main/ofl/fredoka` (`Fredoka[wdth,wght].ttf`) | Variável fixada em largura normal (eixo `wdth` = 100), peso 400–700 mantido; subconjunto latino (PT e EN, `U+0020–017F`, aspas, travessões, `×`, `−`, `€`, `•`, `…`); woff2. Sem Reserved Font Name. |
+| **Baloo 2** | `Baloo2-latin.woff2` (36 KB) | Ek Type (EkType) — "Copyright 2019 The Baloo 2 Project Authors (github.com/EkType/Baloo2)" | SIL Open Font License 1.1 (`OFL-Baloo2.txt`) | `github.com/google/fonts/tree/main/ofl/baloo2` (`Baloo2[wght].ttf`) | Peso 400–800 mantido; subconjunto latino como acima, com os números tabulares (`tnum`); woff2. Sem Reserved Font Name. |
+| **Lilita One** | `LilitaOne-Regular.ttf` (28 KB) | Juan Montoreano — "Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Name Lilita" | SIL Open Font License 1.1 (`OFL-LilitaOne.txt`) | `github.com/google/fonts/tree/main/ofl/lilitaone` (`LilitaOne-Regular.ttf`) | **Nada**: o arquivo original, sem subconjunto nem renomear, porque a licença reserva o nome "Lilita" e uma versão modificada não pode usá-lo. Peso único (400): o CSS desliga o negrito sintetizado (`font-synthesis: none`). |
+
+Como o subconjunto foi feito (fora do repositório, com `fonttools` e `brotli` numa venv descartável — não é dependência do
+projeto): `fonttools varLib.instancer` para fixar os eixos e `pyftsubset --unicodes=… --flavor=woff2` para o subconjunto.
+Para outro idioma (por exemplo, caracteres fora do latino) é preciso refazer o subconjunto; hoje o jogo só tem PT e EN.
+
+Os números do HUD usam essas fontes de dígito **proporcional** (o "1" é mais estreito): os painéis dos tempos têm largura
+mínima (`min-width: 7ch`) para não balançar. Se o dono preferir dígito de largura fixa, o Baloo 2 embutido tem `tnum`
+(`font-variant-numeric: tabular-nums` já está ligado no `.nc-hud`).
+
+**Para trocar a fonte:** abra `src/ui/fonts.css` e deixe a família escolhida primeiro em `--font-display`; nada mais muda.
+**Para tirar uma candidata do pacote** (depois que o dono escolher): apague o arquivo, o `@font-face` dela e a linha da
+tabela acima (e ajuste `tests/fonts-hud.test.ts`).
+
+## Efeitos sonoros em amostra (onda L, frente L5, 10/10/2026)
+
+Os efeitos principais tocam uma gravação CC0 por `decodeAudioData` (`src/audio/samples.ts`, `sample-assets.ts`); **a síntese
+de `src/audio/sfx.ts` continua sendo a reserva** e cobre tudo o que a amostra não cobre (carregando, formato que o navegador
+não decodifica, arquivo ausente: o `play` devolve `false` e o efeito sai sintetizado, como antes). Os arquivos entram como
+data URL (`?inline`), pelo mesmo motivo dos `.glb`: o Electron carrega a página por `file://`, onde `fetch` de arquivo é
+bloqueado. Todos pequenos (≤ 12 KB, 69 KB no total). O `tests/audio-samples.test.ts` confere que cada arquivo existe, é Ogg,
+é pequeno, e **está listado aqui** com a licença junto (`LICENSE-Kenney-*-CC0.txt` ao lado dos arquivos).
+
+Origem: **Kenney** (www.kenney.nl), pacotes "Impact Sounds 1.0" (19/12/2019, `kenney.nl/assets/impact-sounds`) e "Interface
+Sounds 1.0" (11/02/2020, `kenney.nl/assets/interface-sounds`). Licença: **Creative Commons Zero (CC0 1.0)**
+(`creativecommons.org/publicdomain/zero/1.0/`): uso livre, inclusive comercial; o crédito a Kenney é gentileza, não
+obrigação. Baixados do site do autor em 10/10/2026 e copiados **sem alteração**.
+
+| Arquivo em `src/assets/audio/` | Pacote (autor) | Licença | Papel no jogo (`SampleId`) |
+|---|---|---|---|
+| `impactPlate_medium_000.ogg` (11 KB) | Impact Sounds (Kenney) | CC0 | batida entre carros, fraca e média (`collisionMed`) |
+| `impactPlate_heavy_000.ogg` (10 KB) | Impact Sounds (Kenney) | CC0 | batida entre carros, forte (`collisionHeavy`) |
+| `impactPunch_heavy_000.ogg` (12 KB) | Impact Sounds (Kenney) | CC0 | batida no cenário: árvore, pedra, mureta (`crashSoft`) |
+| `impactGlass_heavy_000.ogg` (7 KB) | Impact Sounds (Kenney) | CC0 | batida no cenário: prédio, torre, poste, placa (`crashGlass`) |
+| `impactMetal_light_000.ogg` (8 KB) | Impact Sounds (Kenney) | CC0 | raspão de lado, o metal arrastando (`scrape`) |
+| `tick_001.ogg` (4 KB) | Interface Sounds (Kenney) | CC0 | interface: mover o foco (`uiMove`) |
+| `confirmation_001.ogg` (9 KB) | Interface Sounds (Kenney) | CC0 | interface: confirmar (`uiConfirm`) |
+| `back_001.ogg` (7 KB) | Interface Sounds (Kenney) | CC0 | interface: voltar (`uiBack`) |
+
+**O que não veio em amostra e fica na síntese (pedido registrado).** O pedido do cronograma lista impacto, pneu, zum,
+interface, metal e torcida. Os pacotes de Kenney acima cobrem impacto, metal e interface; **pneu** (derrapagem e freada),
+**"zum"** da ultrapassagem colada (e o `whoosh` do nitro) e **torcida** não existem nesses pacotes, e a rede deste ambiente só
+alcançou o site do Kenney (sem conta, não se baixa do Freesound). Ficam sintéticos (`sfx.ts`: `nitro`, `gravel`, `tow`…);
+candidatas a procurar em CC0/royalty-free: pacotes de som de corrida do OpenGameArt e do Freesound com licença CC0 (conferir
+a licença **de cada arquivo**) para pneu e torcida. Também continuam sintéticos o motor (`engine.ts`) e a música
+(`music.ts`).

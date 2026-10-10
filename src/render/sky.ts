@@ -8,16 +8,18 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { TimeOfDay } from '../core/types';
 import type { Quality } from '../game/contracts';
+import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
 import type { Palette } from './palette';
+import { applyGrade } from './stylize';
 
 const SKY_RADIUS = 1400;
 /**
  * Densidade da névoa (FogExp2, por metro) por qualidade, antes do multiplicador do período (palette.ts, `fogDensity`):
  * a baixa desenha menos pista. Exportada para a conta de enquadramento dos marcos (scenery/sight.ts).
  */
-export const FOG_DENSITY: Readonly<Record<Quality, number>> = { low: 0.003, medium: 0.0023, high: 0.0019 };
+export const FOG_DENSITY: Readonly<Record<Quality, number>> = { low: 0.003, medium: 0.0023, high: 0.0019, ultra: 0.0019 };
 
 const SKY_VERT = /* glsl */ `
 varying vec3 vDir;
@@ -131,6 +133,7 @@ function buildStars(): THREE.Points {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.PointsMaterial({ vertexColors: true, size: 2.6, sizeAttenuation: false, transparent: true, opacity: 1, fog: false, depthWrite: false });
+  applyGrade(m);
   const pts = new THREE.Points(g, m);
   pts.frustumCulled = false;
   return pts;
@@ -220,6 +223,7 @@ export class Sky {
         uSunSize: { value: 0.03 }, uHalo: { value: 9 }, uGlowAmt: { value: 0.3 }, uDisc: { value: 6 }, uMoon: { value: 0 },
       },
     });
+    applyGrade(mat);
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 48, 24), mat);
     this.dome.renderOrder = -10;
     this.dome.frustumCulled = false;
@@ -233,6 +237,7 @@ export class Sky {
         uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal },
       },
     });
+    applyGrade(cloudMat);
     this.clouds = new THREE.Mesh(this.cloudGeo[1], cloudMat);
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = -9;
@@ -259,8 +264,8 @@ export class Sky {
 
   /** Tamanho do mapa de sombra por qualidade (0 = sem sombra) e a névoa (a baixa desenha menos pista). */
   setQuality(q: Quality): void {
-    this.clouds.geometry = this.cloudGeo[q === 'high' ? 1 : 0];
-    const size = q === 'high' ? 2048 : q === 'medium' ? 1024 : 0;
+    this.clouds.geometry = this.cloudGeo[atLeast(q, 'high') ? 1 : 0];
+    const size = atLeast(q, 'high') ? 2048 : atLeast(q, 'medium') ? 1024 : 0;
     this.sun.castShadow = size > 0;
     if (size > 0 && this.sun.shadow.mapSize.x !== size) {
       this.sun.shadow.mapSize.set(size, size);

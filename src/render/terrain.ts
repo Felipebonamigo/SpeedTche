@@ -12,6 +12,7 @@ import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
 import { smoothNormals } from './normals';
 import { type Palette } from './palette';
+import { applyGrade, applyStylize } from './stylize';
 import type { RoadFrame } from './roadframe';
 import { inClearing } from './scenery/clearings';
 import { windowTextures } from './textures';
@@ -406,11 +407,13 @@ export class Terrain {
 
   constructor(capacity: number) {
     this.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6 });
+    applyStylize(this.material, 'ground');
     this.left = new Strip(capacity, NC, this.material);
     this.right = new Strip(capacity, NC, this.material);
     this.group.add(this.left.mesh, this.right.mesh);
 
     this.ground = new THREE.Mesh(new THREE.CircleGeometry(1500, 48), new THREE.MeshStandardMaterial({ color: '#333333', roughness: 1 }));
+    applyStylize(this.ground.material, 'ground');
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.position.y = -14;
     this.ground.receiveShadow = false;
@@ -423,6 +426,7 @@ export class Terrain {
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color('#fff3a0') }, uTime: { value: 0 }, uSpec: { value: 180 },
       }]),
     });
+    applyGrade(seaMat);
     this.sea = new THREE.Mesh(new THREE.PlaneGeometry(3200, 3200), seaMat);
     this.sea.rotation.x = -Math.PI / 2;
     this.sea.frustumCulled = false;
@@ -451,6 +455,7 @@ export class Terrain {
       vertexShader: FOAM_VERT, fragmentShader: FOAM_FRAG, fog: true, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uFoam: { value: new THREE.Color('#ffffff') }, uShallow: { value: new THREE.Color('#2fd0c4') }, uTime: { value: 0 } }]),
     }));
+    applyGrade(this.foam.material);
     this.foam.frustumCulled = false;
     this.foam.visible = false;
     this.foam.renderOrder = 1;
@@ -458,6 +463,7 @@ export class Terrain {
 
     const win = windowTextures();
     this.cityMaterial = new THREE.MeshStandardMaterial({ map: win.wall, emissiveMap: win.win, emissive: '#ffd27a', emissiveIntensity: 1.3, color: '#5a6478', roughness: 0.7 });
+    applyStylize(this.cityMaterial, 'facade');
     for (const [w, h, d] of [[18, 22, 18], [16, 42, 16], [22, 70, 22]] as const) {
       const im = new THREE.InstancedMesh(meteredBox(w, h, d), this.cityMaterial, 160);
       im.frustumCulled = false; im.castShadow = false; im.visible = false;
@@ -475,6 +481,7 @@ export class Terrain {
       vertexShader: RING_VERT, fragmentShader: RING_FRAG, vertexColors: true, fog: false,
       uniforms: { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uFacet: { value: 0.3 } },
     });
+    applyGrade(this.ringMaterial);
     this.group.add(this.farGroup);
   }
 

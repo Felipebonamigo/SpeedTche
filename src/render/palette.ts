@@ -3,7 +3,8 @@
 // Lapônia); o resto sai de uma base diurna por bioma e de uma "gradação" por hora (entardecer
 // esquenta e puxa para o roxo; noite azula e escurece sem virar preto). Referência de arte:
 // Horizon Chase Turbo — cor saturada, céu em gradiente forte, sombra colorida, névoa com cor.
-// Funções puras; sem DOM. Calibrado para o tone mapping ACES do renderer.ts.
+// Funções puras; sem DOM. Calibrado para o ACES; desde a L1 o tone mapping é o Neutral com gradação por paleta (stylize.ts:
+// `gradingFor` parte destes valores — a `exposure` ganha o ajuste da curva nova).
 import type { SceneryId, TimeOfDay } from '../core/types';
 
 export interface Palette {

@@ -26,9 +26,9 @@ import {
 import { CAR_WORLD_WIDTH, SpriteAtlas, spriteAspect, spriteWorldWidth } from './sprites';
 
 /** Linhas da tela pequena por qualidade (a largura acompanha a proporção do viewport). */
-const LINES: Record<Quality, number> = { low: 180, medium: 224, high: 270 };
+const LINES: Record<Quality, number> = { low: 180, medium: 224, high: 270, ultra: 270 };
 /** Segmentos desenhados à frente por qualidade. */
-const DRAW_DISTANCE: Record<Quality, number> = { low: 120, medium: 170, high: 220 };
+const DRAW_DISTANCE: Record<Quality, number> = { low: 120, medium: 170, high: 220, ultra: 220 };
 /** Largura (px da tela pequena) de um "azulejo" do fundo; uma volta completa de rumo = um azulejo. */
 const BG_TILE = 640;
 /** Faixas de rodagem desenhadas (as marcações ficam entre elas). */

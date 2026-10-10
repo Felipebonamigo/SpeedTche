@@ -54,23 +54,31 @@ export class MeshBuilder {
   private readonly col: number[] = [];
   private readonly pnt: number[] = [];
   private readonly mat: number[] = [];
+  /** UV (2 por vértice; 0,0 onde ninguém deu). Só vira atributo se algum triângulo trouxe UV (modelos de .glb com atlas). */
+  private readonly uv: number[] = [];
+  private hasUv = false;
 
   get triangles(): number { return this.pos.length / 9; }
 
-  private vertex(p: P3, b: Brush): void {
+  private vertex(p: P3, b: Brush, uv?: P2): void {
     this.pos.push(p[0], p[1], p[2]);
     this.col.push(b.rgb[0], b.rgb[1], b.rgb[2]);
     this.pnt.push(b.paint, b.accent, b.layer / 3, b.popup);
     this.mat.push(b.rough, b.metal, b.head, b.tail);
+    this.uv.push(uv ? uv[0] : 0, uv ? uv[1] : 0);
+    if (uv) this.hasUv = true;
   }
 
-  /** Triângulo com a frente no sentido anti-horário visto de fora. Degenerado (área ~0) é descartado. */
-  tri(a: P3, b: P3, c: P3, br: Brush): void {
+  /**
+   * Triângulo com a frente no sentido anti-horário visto de fora. Degenerado (área ~0) é descartado.
+   * `uv` (opcional, um par por vértice, na mesma ordem) é a coordenada no atlas de paleta do .glb (docs/CONTRATO-DO-ASSET.md).
+   */
+  tri(a: P3, b: P3, c: P3, br: Brush, uv?: readonly [P2, P2, P2]): void {
     const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2];
     const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2];
     const nx = uy * vz - uz * vy; const ny = uz * vx - ux * vz; const nz = ux * vy - uy * vx;
     if (nx * nx + ny * ny + nz * nz < 1e-14) return;
-    this.vertex(a, br); this.vertex(b, br); this.vertex(c, br);
+    this.vertex(a, br, uv?.[0]); this.vertex(b, br, uv?.[1]); this.vertex(c, br, uv?.[2]);
   }
 
   /** Quadrilátero a-b-c-d (anti-horário visto de fora); a diagonal mais curta vira a dobra. */
@@ -107,6 +115,7 @@ export class MeshBuilder {
     this.pos.push(flipX ? -this.pos[i * 3] : this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]);
     for (let k = 0; k < 3; k++) this.col.push(this.col[i * 3 + k]);
     for (let k = 0; k < 4; k++) { this.pnt.push(this.pnt[i * 4 + k]); this.mat.push(this.mat[i * 4 + k]); }
+    this.uv.push(this.uv[i * 2], this.uv[i * 2 + 1]);
   }
 
   /** Posições cruas (para testes e medidas). */
@@ -123,6 +132,7 @@ export class MeshBuilder {
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
     g.setAttribute('aPaint', new THREE.BufferAttribute(pnt, 4, true));
     g.setAttribute('aMat', new THREE.BufferAttribute(mat, 4, true));
+    if (this.hasUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     smoothNormals(g, crease);
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;

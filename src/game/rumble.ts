@@ -1,8 +1,9 @@
 // Vibração a partir da corrida: batida entre carros (força pela intensidade), batida no cenário
-// (forte), nitro (curto), grama (fraco, pulsando com limite de frequência) e largada. Puro: devolve
+// (forte), raspão de lado (curto e fraco), nitro (curto), grama (fraco, pulsando com limite de frequência) e largada. Puro: devolve
 // pedidos que a sessão entrega a `input.rumble`, que ignora quem não tem gamepad, controle sem
 // motor e a opção de vibração desligada. Chamado uma vez por tick, depois de `stepRace`.
 import type { RaceState } from '../core/types';
+import type { ScrapeCue } from './race-feel';
 
 export interface RumbleCue { seat: number; strength: number; ms: number }
 
@@ -11,6 +12,8 @@ export const RUMBLE_CRASH = { strength: 1, ms: 320 };
 export const RUMBLE_NITRO = { strength: 0.35, ms: 110 };
 /** Batida entre carros: força = min + intensidade × faixa (a intensidade do evento vai de 0 a 1). */
 export const RUMBLE_COLLISION = { min: 0.3, range: 0.6, ms: 110, msRange: 170 };
+/** Raspão de lado (race-feel.ts: observeScrapes): um toque curto e fraco, um pouco mais forte com a velocidade. */
+export const RUMBLE_SCRAPE = { min: 0.12, range: 0.2, ms: 90 };
 /**
  * Grama: um pulso a cada `everyTicks` (≈ 7 por segundo a 60 Hz) enquanto o carro humano estiver fora
  * do asfalto e andando; a duração cobre o intervalo, então o tremor é contínuo sem inundar a API.
@@ -30,7 +33,8 @@ function clamp01(v: number): number {
   return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0;
 }
 
-export function rumbleCues(state: RaceState, mem: RumbleMemory): RumbleCue[] {
+/** `scrapes`: os raspões novos deste tick (observeScrapes), derivados do estado; ausente = só os eventos do núcleo. */
+export function rumbleCues(state: RaceState, mem: RumbleMemory, scrapes: readonly ScrapeCue[] = []): RumbleCue[] {
   const out: RumbleCue[] = [];
   const seatOf = (carId: number) => state.cars[carId]?.seat ?? -1;
   const push = (carId: number, cue: { strength: number; ms: number }) => {
@@ -52,6 +56,13 @@ export function rumbleCues(state: RaceState, mem: RumbleMemory): RumbleCue[] {
       case 'crash': push(e.carId, RUMBLE_CRASH); break;
       case 'nitro': push(e.carId, RUMBLE_NITRO); break;
       default: break;
+    }
+  }
+  for (const sc of scrapes) {
+    const strength = RUMBLE_SCRAPE.min + RUMBLE_SCRAPE.range * clamp01(sc.strength);
+    for (const id of [sc.a, sc.b]) {
+      const car = state.cars.find((c) => c.id === id);
+      if (car && car.seat >= 0) out.push({ seat: car.seat, strength, ms: RUMBLE_SCRAPE.ms });
     }
   }
   for (const car of state.cars) {

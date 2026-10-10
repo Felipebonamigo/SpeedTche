@@ -133,3 +133,62 @@ export function meanFeel(list: readonly RaceFeel[]): RaceFeel | null {
     rearHits: avg((f) => f.rearHits),
   };
 }
+
+// ───────────────────────────── Raspão de lado, por episódio (onda L, L5) ─────────────────────────────
+// O núcleo resolve o contato de lado (`sideContact`, core/sim/collisions.ts) sem evento nem cooldown. A faísca, a
+// vibração e o som do raspão precisam de um sinal por encontrão, então ele é DERIVADO aqui, só do estado depois de cada
+// `stepRace`: o `sideContact` deixa os dois carros separados exatamente por `2 × CAR_HALF_WIDTH + COLLISION_SLOP_X`
+// no eixo lateral, com as caixas ainda sobrepostas no eixo da pista — a assinatura de um contato de lado. A batida em
+// fila deixa os carros separados no eixo da pista, então nunca casa. (`observeFeel` tem o seu próprio `scrapes`, que
+// também conta encostar sem evento por trás: é a linha de base do termômetro e não mudou.)
+
+/** Sobra aceita na assinatura (empurrões de outros pares no mesmo tick). */
+const SCRAPE_SIGNATURE_TOLERANCE = COLLISION_SLOP_X / 20;
+const SIDE_GAP = CAR_HALF_WIDTH * 2 + COLLISION_SLOP_X;
+
+export interface ScrapeCue {
+  /** Os dois carros (`CarState.id`), `a < b`. */
+  a: number;
+  b: number;
+  /** De que lado de `a` está `b` (+1 = à direita). */
+  sideOfA: -1 | 1;
+  /** 0..1, pela velocidade do mais rápido (para a vibração e o som). */
+  strength: number;
+}
+
+export interface ScrapeMemory {
+  /** Último tick em que o par (`a-b`) estava encostado de lado. */
+  last: Record<string, number>;
+  tick: number;
+}
+
+export function createScrapeMemory(): ScrapeMemory {
+  return { last: {}, tick: -1 };
+}
+
+/**
+ * Chamar logo depois de cada `stepRace`. Devolve um sinal por EPISÓDIO de raspão: o contato que continua, ou que volta
+ * dentro do cooldown da batida (`COLLISION_COOLDOWN_TICKS`), é o mesmo episódio. Só lê `state`; fora da corrida não dá nada.
+ */
+export function observeScrapes(mem: ScrapeMemory, state: RaceState): ScrapeCue[] {
+  if (state.tick < mem.tick) mem.last = {}; // tick que volta atrás: corrida nova
+  mem.tick = state.tick;
+  if (state.phase !== 'racing') return [];
+  const out: ScrapeCue[] = [];
+  const cars = state.cars;
+  for (let i = 0; i < cars.length; i++) {
+    for (let j = i + 1; j < cars.length; j++) {
+      const p = cars[i]; const q = cars[j];
+      if (Math.abs(wrappedDelta(p.z, q.z, state.trackLength)) >= CAR_LENGTH) continue;
+      const dx = q.x - p.x;
+      if (Math.abs(Math.abs(dx) - SIDE_GAP) > SCRAPE_SIGNATURE_TOLERANCE) continue;
+      const a = p.id < q.id ? p : q; const b = a === p ? q : p;
+      const key = `${a.id}-${b.id}`;
+      const last = mem.last[key];
+      mem.last[key] = state.tick;
+      if (last !== undefined && state.tick - last <= COLLISION_COOLDOWN_TICKS) continue;
+      out.push({ a: a.id, b: b.id, sideOfA: b.x >= a.x ? 1 : -1, strength: Math.min(1, Math.max(a.speed, b.speed) / REFERENCE_SPEED) });
+    }
+  }
+  return out;
+}

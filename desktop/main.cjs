@@ -1,9 +1,10 @@
 // Processo principal do Electron: janela do jogo, tela cheia, arquivos e integração opcional com Steamworks.
 // O jogo em si é a pasta ../dist (Vite). Gamepads: nada a fazer aqui — a Gamepad API funciona no Chromium.
-const { app, BrowserWindow, ipcMain, shell, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, clipboard, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const storage = require('./storage.cjs');
+const assets = require('./assets.cjs');
 
 // ───────────────────────────── Pasta de dados (Steam Cloud) ─────────────────────────────
 // Fixa o userData em "<appData>/SpeedTche" — %APPDATA%\SpeedTche no Windows, ~/.config/SpeedTche no Linux,
@@ -29,6 +30,13 @@ if (bench) {
 function logProcessEvent(kind, details) {
   storage.appendLog(logsDir(), `[${new Date().toISOString()}] ${kind} ${JSON.stringify(details)}\n`);
 }
+
+// ───────────────────────────── Arquivos do jogo por protocolo próprio ─────────────────────────────
+// O jogo abre por file:// e o `fetch` de file: não funciona: os .glb dos carros (src/assets/cars/) chegam pelo esquema
+// `speedtche-asset://app/assets/<arquivo>.glb` (assets.cjs: só assets/*.glb sob a raiz do jogo). O esquema privilegiado tem de
+// ser registrado antes do `ready`; o handler entra no `ready`. Mesmo caminho do `loadFile` abaixo.
+const GAME_ROOT = path.join(__dirname, app.isPackaged ? 'app' : '../dist');
+protocol.registerSchemesAsPrivileged([assets.privilegedScheme]);
 
 // ───────────────────────────── Instância única ─────────────────────────────
 // Um segundo clique no atalho só traz a janela existente para a frente (a Steam também abre o jogo assim).
@@ -81,7 +89,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !bench },
   });
   win.once('ready-to-show', () => { win.show(); if (bench) win.setFullScreen(true); });   // tela cheia é decidida pelo jogo (opções salvas); no bench, sempre
-  win.loadFile(path.join(__dirname, app.isPackaged ? 'app/index.html' : '../dist/index.html'), bench ? { query: bench } : undefined);
+  win.loadFile(path.join(GAME_ROOT, 'index.html'), bench ? { query: bench } : undefined);
 
   // Links externos abrem no navegador do sistema; a janela do jogo nunca navega para fora do próprio HTML.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -166,6 +174,7 @@ app.on('child-process-gone', (_e, details) => { if (details.type === 'GPU') logP
 
 // ───────────────────────────── Ciclo de vida ─────────────────────────────
 app.whenReady().then(() => {
+  protocol.handle(assets.SCHEME, (req) => assets.serveAsset(GAME_ROOT, req.url));
   initSteam();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

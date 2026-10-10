@@ -1,9 +1,10 @@
 # Contrato do asset — como um carro e um marco-herói chegam ao jogo
 
 Este contrato é o que o `npm run check-car` (carro) e o `tools/convert-landmark.mjs` (marco e peça) conferem, mais o que
-a bíblia de estilo (`docs/DIRECAO-DE-ARTE.md`) pede de acabamento. **O dono aprova no Marco 1, e a L3 o leva ao
-`src/render/cars/check.ts`.** Tudo o que **não vem do código de hoje** está marcado **proposta**: ainda não é conferido
-por nenhum validador e pode mudar na aprovação.
+a bíblia de estilo (`docs/DIRECAO-DE-ARTE.md`) pede de acabamento. **O dono aprova no Marco 1.** A **L3 levou a parte do carro ao
+`src/render/cars/check.ts`** (marcada **conferido**: atlas, UV, LOD, `seat`, `kit_*`, `decal_*`, roda do arquivo, um modelo por carro);
+o que continua só **proposta** não é conferido por nenhum validador e pode mudar na aprovação. **Conferido não é mostrado:** `kit_*`,
+`decal_*` e `seat` são lidos e validados, mas quem os desenha no jogo são a P3, a N3/U4 e a câmera interna.
 
 **Independente do motor.** O contrato descreve um arquivo glTF (metros, eixos, nomes de nós e de materiais, tetos), não
 uma API. O motor — Unity 6 URP ou Three.js Ultra — será decidido pelo duelo antes da L (decisão nº 27 de
@@ -35,9 +36,21 @@ Vem de `docs/ARTE.md`, "Carros — pronto", e do `src/render/cars/check.ts`.
   - comprimento > 4,2 (micro: > 3,2) e largura > 1,8;
   - raio da roda ≥ 0,26.
 - **Casco:** ≤ 3.500 triângulos (`CAR_LIMITS.maxShellTriangles`), até a M4 subir de propósito, com teste.
-- **Validação:** `npm run check-car -- x.glb` (o mesmo validador do jogo, procedural ou glTF).
+- **Validação:** `npm run check-car -- x.glb` (o mesmo validador do jogo, procedural ou glTF; `x` é o id de um carro ou um estilo).
+  O carro de caixas `npx tsx scripts/make-test-car.ts` usa todos os nós do contrato e passa sem aviso: é a fixture dos testes.
+- **Conversor** de carro de kit de paleta (Kenney): `npm run convert-car -- <kit/GLB format/sedan-sports.glb> falcao` (receita do colormap,
+  escala por eixo, rodas, LOD, atlas 256², nós do contrato). O que entrou: `docs/ARTE.md`, "Licenças dos carros baixados".
 - A **proporção** do carro (a roda ≥ meta da bíblia; mesma pegada × curto e gordo) sai da decisão nº 7, no Marco 2, pela
   folha da L3. Até lá, a roda é **provisória** (bíblia, seção 4).
+
+### Nome do arquivo: um modelo por carro (conferido, L3)
+
+- `src/assets/cars/<carro>.glb` (ex.: `falcao.glb`): o modelo é **só daquele carro**; o instanciamento agrupa por modelo, e o Falcão
+  deixa de dividir a forma com o Boitatá (que segue com o GT procedural até ter o seu).
+- `src/assets/cars/<estilo>.glb` (ex.: `gt.glb`): vale para o estilo todo, como no passo 2.4. O arquivo do carro vence o do estilo.
+- Arquivo de **um carro**: o `seat` é obrigatório (problema se faltar) e o arquivo decide as próprias faixas (as camadas `stripe_*` que a malha
+  tem). Arquivo de **estilo**: `seat` faltando é só aviso, e as faixas seguem a ordem dos carros do estilo.
+- No Electron o arquivo chega pelo protocolo `speedtche-asset://app/assets/<arquivo>.glb` (`desktop/assets.cjs`), no navegador por `fetch`.
 
 ### Materiais (pelo nome)
 
@@ -54,20 +67,31 @@ Vem de `docs/ARTE.md`, "Carros — pronto", e do `src/render/cars/check.ts`.
 
 ### Pontos e nós novos
 
-- **Vazio `seat`** — onde o piloto senta (a cabeça do piloto e o ponto de câmera interna) — **proposta**.
+- **Vazio `seat`** — onde o piloto senta (a cabeça do piloto e o ponto de câmera interna). **Conferido** (L3): um só (dois = problema);
+  faltando é problema em arquivo de um carro e aviso em arquivo de estilo. A câmera interna ainda não o usa — **proposta** de uso.
 - **Nós `kit_<peça>_<nível>`** — peças que aparecem no carro conforme a melhoria comprada (`docs/CARROS.md`).
-  - `peça` ∈ `engine | turbo | tires | brakes | tank | nitro` (`UpgradePart`, `src/core/types.ts`);
+  - `peça` ∈ `engine | turbo | tires | brakes | tank | nitro` (`UpgradePart`, `UPGRADE_PARTS` em `src/core/career.ts`);
   - `nível` de 1 a 3 (`UPGRADE_MAX_LEVEL`, `src/core/constants.ts`);
-  - o jogo mostra o nó do nível comprado e esconde os outros — **proposta** (o código só tem as peças e os níveis; os
-    nós ainda não são lidos).
-- **`decal_<nome>`** — malha plana, com UV, para número, placa e adesivos (N3, U4) — **proposta**.
+  - **Conferido** (L3): o nome (peça e nível) e que **não entram no casco**. O jogo mostrar o nó do nível comprado e esconder os
+    outros é a P3 — **proposta**.
+- **`decal_<nome>`** — malha plana (até 2 cm de espessura), com UV, para número, placa e adesivos (N3, U4). **Conferido** (L3): UV,
+  planicidade e que **não entra no casco**; desenhá-lo é N3/U4 — **proposta**.
 
 ### Textura, UV e LOD
 
-- **Textura:** atlas de paleta **256 × 256** (`map`), com normal map opcional — **proposta**. **Hoje (até a L3)** o carro
-  não tem textura: cor chapada por material.
-- **UV:** a malha leva UV no atlas de paleta; a 2ª UV é reservada para a luz assada (bíblia, seção 3) — **proposta**.
-- **LOD:** nós de topo `lod0` e `lod1`; o `lod1` com no máximo **metade** dos triângulos do `lod0` — **proposta**.
+- **Textura:** atlas de paleta **256 × 256** (`map`, sRGB, **uma imagem só** por carro — o casco, o LOD e as rodas dividem o mesmo atlas),
+  com normal map opcional. **Conferido e lido** (L3): o `gltf.ts` leva o `map` e o `normalMap` ao modelo, e o `Cars` dá a ele um material
+  próprio (o `map` multiplica a cor de vértice e a pintura). Sem atlas, a cor chapada por material de sempre (os 13 modelos-base).
+  - **A face pintável aponta para um swatch BRANCO** (o jogo multiplica pela cor do carro); o degradê do swatch é a luz assada do arquivo.
+  - O `GLTFLoader` engole a falha de textura: no Node o `check-car` instala um `createImageBitmap` que lê só o cabeçalho do PNG.
+- **UV:** a malha leva UV no atlas de paleta. **Conferido** (L3): material com atlas e malha sem UV é problema. A 2ª UV, reservada
+  para a luz assada (bíblia, seção 3), continua **proposta**.
+- **LOD:** nós de topo `lod0` e `lod1`; o `lod1` com no máximo **metade** dos triângulos do `lod0`. **Conferido** (L3): sem `lod0`, ou com
+  mais da metade, é problema. Roda e escape ficam na raiz (o `lod1` só leva casco). O `Cars` desenha o `lod1` nos carros a mais de
+  30 m à frente do carro do viewport e na qualidade Baixa (o mesmo critério da roda simples).
+- **Roda do arquivo:** o desenho da roda é a malha do nó `wheel_fr`, **eixo em x** (deitada = problema), reescalada para raio 1 e largura 1;
+  as quatro rodas usam essa malha (posição e tamanho vêm de cada nó). `extras.spokes` no nó diz quantos raios (o giro por quadro é limitado
+  por `360°/spokes × 40%`); sem ele, 6. **Conferido** (L3).
 - **Faceta:** nenhuma faceta visível acima de 15° na distância de jogo (bíblia, seção 4).
 
 ---

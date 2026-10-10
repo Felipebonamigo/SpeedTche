@@ -8,6 +8,9 @@
 // - reflexo do céu (env map da cena) reforçado nas peças metálicas e no vidro;
 // - farol escamoteável (`aPaint.w`) sobe à noite.
 import * as THREE from 'three';
+import type { Quality } from '../../game/contracts';
+import { atLeast } from '../../game/quality';
+import { applyStylize } from '../stylize';
 
 export interface CarUniforms {
   uSelfLight: { value: number };
@@ -95,12 +98,14 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
           #endif
         #endif`);
   };
-  // Um programa para todos os carros: a chave não muda por instância.
-  material.customProgramCacheKey = () => 'nitro-car-v1';
+  // Um programa para todos os carros: a chave não muda por instância. (Era 'nitro-car-v1': o jogo mudou de nome.)
+  material.customProgramCacheKey = () => 'speed-tche-car-v1';
+  // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
+  applyStylize(material, 'car');
   return { material, uniforms };
 }
 
-/** Verniz só na qualidade alta (o programa troca uma vez, na troca de qualidade). */
-export function setCarQuality(material: THREE.MeshPhysicalMaterial, high: boolean): void {
-  material.clearcoat = high ? 1 : 0;
+/** Verniz só na qualidade alta ou melhor (o programa troca uma vez, na troca de qualidade). */
+export function setCarQuality(material: THREE.MeshPhysicalMaterial, q: Quality): void {
+  material.clearcoat = atLeast(q, 'high') ? 1 : 0;
 }
