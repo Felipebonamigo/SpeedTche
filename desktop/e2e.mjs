@@ -2,7 +2,7 @@
 // Uso, dentro de desktop/ e depois de `npm run dist:linux`:
 //   xvfb-run -a node e2e.mjs [prefixo-das-capturas]      (sem Xvfb, numa máquina com tela: node e2e.mjs)
 // userData isolado numa pasta temporária (XDG_CONFIG_HOME) — nunca toca o ~/.config de verdade.
-// Confere: app/index.html de dentro do asar, preload, pasta "Speed Tchê", erro → aviso + log em arquivo,
+// Confere: app/index.html de dentro do asar, preload, pasta "SpeedTche", erro → aviso + log em arquivo,
 // "Copiar relatório" → área de transferência, telemetria → saves/*.json, arquivo trocado "pela nuvem"
 // vencendo um localStorage DIFERENTE na volta (conflito de verdade), o mesmo erro na 2ª abertura voltando ao log,
 // e a tela de erro fatal quando o WebGL não existe — com a opção num <code> e operada por um controle simulado.
@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shots = process.argv[2] ?? join(here, 'release', 'e2e');
-const exe = join(here, 'release', 'linux-unpacked', 'speed-tche');
+const exe = join(here, 'release', 'linux-unpacked', 'speedtche');
 const xdg = mkdtempSync(join(tmpdir(), 'nc-xdg-'));
-const userData = join(xdg, 'Speed Tchê');
+const userData = join(xdg, 'SpeedTche');
 const fails = [];
 const check = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails.push(msg); };
 const shot = (name) => page.screenshot({ path: `${shots}-${name}.png`, timeout: 120000 });

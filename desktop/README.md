@@ -235,18 +235,18 @@ Com o `localStorage` cheio (cota), toda gravação vai para o arquivo mesmo assi
 
    | Raiz | Subpasta | Padrão | SO | Recursivo |
    |---|---|---|---|---|
-   | `WinAppDataRoaming` | `Speed Tchê/saves` | `*.json` | **[All OSes]** | não |
+   | `WinAppDataRoaming` | `SpeedTche/saves` | `*.json` | **[All OSes]** | não |
 
    Substituições (Root Overrides):
 
    | Raiz original | SO | Nova raiz | Acrescentar/substituir caminho | Substituir caminho |
    |---|---|---|---|---|
    | `WinAppDataRoaming` | Linux | `LinuxHome` | `.config/SpeedTche/saves` | marcado |
-   | `WinAppDataRoaming` | macOS | `MacAppSupport` | `Speed Tchê/saves` | marcado |
+   | `WinAppDataRoaming` | macOS | `MacAppSupport` | `SpeedTche/saves` | marcado |
 
    🔧 **CONFERIR no painel** (a documentação da Steamworks não abre desta rede; o texto acima veio de citações
    dela): os nomes exatos das raízes na lista, e se "Substituir caminho" troca a subpasta inteira
-   (`Speed Tchê/saves` → `.config/SpeedTche/saves`) — a do Linux é diferente das outras por causa do
+   (`SpeedTche/saves` → `.config/SpeedTche/saves`) — a do Linux é diferente das outras por causa do
    `.config`. Se houver uma raiz própria para o `XDG_CONFIG_HOME`, prefira-a no Linux: quem mudou essa variável
    tem os saves fora de `~/.config` (raro; o Steam Deck usa o padrão).
 
