@@ -21,7 +21,7 @@ import {
   carToWorld, CONFETTI_COUNT, confettiPiece, fitDistance, focusPose, MAX_PANELS, PLATE_TOP, podiumSlots, revealPlan,
   stageQuality, stageViewport, STAGE_FOV, TURN_SPEED, workshopPlan, type ConfettiPiece, type PodiumSlot, type Rect, type RevealPlan, type WorkshopPlan,
 } from './stage-plan';
-import { applyGrade, setStylizePalette, stylizeUniforms } from './stylize';
+import { applyGrade, applyStylize, setStylizePalette, stylizeUniforms } from './stylize';
 import { canvas2d, texture } from './textures';
 
 export { mountPodium, mountShowroom, type ShowroomOptions, type StageHandle } from './stage-mount';
@@ -158,7 +158,7 @@ export class Stage {
 
     const radial = this.own(radialTexture());
     const floorMat = this.own(new THREE.MeshStandardMaterial({ color: '#0c101c', roughness: 0.55, metalness: 0.15, alphaMap: radial, transparent: true, depthWrite: false }));
-    applyGrade(floorMat);
+    applyStylize(floorMat, 'ground');
     this.floor = new THREE.Mesh(this.own(new THREE.CircleGeometry(26, 48).rotateX(-Math.PI / 2)), floorMat);
     this.floor.name = 'stage:floor'; this.floor.position.y = -0.002;
     scene.add(this.floor);
@@ -166,7 +166,7 @@ export class Stage {
     // ── O prato giratório: corpo de cilindro baixo, o anel na cor do assento e a sombra de contato (disco escuro macio) ──
     this.plate = new THREE.Group(); this.plate.name = 'stage:plate';
     const plateMat = this.own(new THREE.MeshStandardMaterial({ color: '#242b3d', roughness: 0.32, metalness: 0.55 }));
-    applyGrade(plateMat);
+    applyStylize(plateMat, 'scenery'); // a rampa de luz e a luz de borda do jogo no prato também
     const body = new THREE.Mesh(this.own(new THREE.CylinderGeometry(PLATE_R, PLATE_R + 0.06, PLATE_TOP, 72)), plateMat);
     body.position.y = PLATE_TOP / 2;
     this.plate.add(body);
@@ -203,7 +203,7 @@ export class Stage {
     scene.add(this.pool);
     this.cover = new THREE.Mesh(this.own(coverGeometry()), this.own(new THREE.MeshStandardMaterial({ color: '#c8432c', roughness: 0.92, metalness: 0, transparent: true })));
     this.cover.name = 'stage:cover'; this.cover.visible = false;
-    applyGrade(this.cover.material);
+    applyStylize(this.cover.material, 'scenery');
     scene.add(this.cover);
     const confettiMat = this.own(new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, toneMapped: false }));
     this.confetti = new THREE.InstancedMesh(this.own(new THREE.PlaneGeometry(1, 0.55)), confettiMat, CONFETTI_COUNT);
@@ -225,7 +225,7 @@ export class Stage {
     const blockGeo = this.own(new THREE.BoxGeometry(2.2, 1, 2.2));
     for (const s of podiumSlots(3)) {
       const m = this.own(new THREE.MeshStandardMaterial({ color: PODIUM_COLORS[s.place - 1], roughness: 0.28, metalness: 0.75 }));
-      applyGrade(m);
+      applyStylize(m, 'scenery');
       const block = new THREE.Mesh(blockGeo, m);
       block.name = `stage:block${s.place}`;
       block.scale.y = s.top; block.position.set(s.x, s.top / 2, s.z);
