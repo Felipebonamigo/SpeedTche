@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hash2, hash3, valueNoise3 } from '../noise';
-import { smoothNormals } from '../normals';
+import { CREASE, ROOF_TURN_DEG, smoothNormals } from '../normals';
 
 export type Geo = THREE.BufferGeometry;
 
@@ -36,6 +36,68 @@ export interface Model {
   blob?: number;
 }
 
+/** Descrição de uma bolha de pedra ou de copa que o `paint` refina quando a matriz a faz grande (`roundBlob`). */
+interface RoundBlob { amount: number; seed: number; detail: number }
+
+/**
+ * Bolha de pedra, de morro ou de copa (esfera de raio 1, deformada): `detail` 0 ou 1 é o que a bolha de poucos metros precisa. O `paint` olha a matriz
+ * que a leva ao lugar: a bolha com um semieixo de 3 m ou mais vira icosaedro de detalhe 2 (180 faces) em bolhas macias (`lumpy`), e a de 1,5 a 3 m, de
+ * detalhe 1 (valores do nível pleno e do lugar "longe"; `roundScale`); a pequena fica como está (poucos pixels a 300 m). Assim o marco paga os triângulos só onde a faceta aparece (M3, a faceta da bíblia).
+ */
+export function roundBlob(amount: number, seed: number, detail: number): Geo {
+  const g = jitter(ico(1, detail), amount, seed);
+  g.userData.roundBlob = { amount, seed, detail } satisfies RoundBlob;
+  return g;
+}
+
+/** O maior semieixo (m) da matriz: o comprimento da maior coluna da parte linear. */
+function matrixScale(m: THREE.Matrix4): number {
+  const e = m.elements;
+  return Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
+}
+
+/**
+ * Nível de arredondamento do marco (M3): 3 é o pleno (bolha de 5 m já vai a 180 faces, caixa de 2,5 m ganha bisel, cilindro de 1,2 m de raio tem 14 lados);
+ * cada nível abaixo exige o dobro do tamanho; 0 é a geometria de antes da M3. O marco é montado no 3 e, se estoura o orçamento do lugar
+ * (`LANDMARK_LIMITS`), de novo no 2, no 1 e no 0 (`fitted`, landmarks/kit.ts): ele paga os triângulos onde cabem, sem ninguém tirar um objeto à mão.
+ */
+let roundLevel = 3;
+/** Quanto o lugar do marco (perto 30–80 m, longe 120–400 m, horizonte 400 m+) estica o limite de tamanho: de perto a faceta aparece em peça pequena. */
+let roundPlace = 1;
+export function setRoundLevel(level: number, placeFactor = 1): void { roundLevel = level; roundPlace = placeFactor; }
+export function getRoundLevel(): number { return roundLevel; }
+export function getRoundPlace(): number { return roundPlace; }
+/** Fator pelo qual o limite de tamanho (m) cresce: 1 no nível pleno; 2, 4, ∞ nos de baixo; vezes o do lugar (perto 0,4; longe 1; horizonte 3). */
+export function roundScale(): number { return (roundLevel >= 3 ? 1 : roundLevel === 2 ? 2 : roundLevel === 1 ? 4 : Infinity) * roundPlace; }
+
+/** Detalhe do icosaedro por tamanho (m), nível e lugar: ≥ 12 m (no nível pleno e no lugar "longe"), 320 faces; ≥ 3 m, 180; ≥ 1,5 m, 80; menos, o que o autor pediu. */
+function icoDetailFor(base: number, size: number): number {
+  const s = size / roundScale();
+  return s >= 12 ? 3 : s >= 3 ? 2 : s >= 1.5 ? Math.max(base, 1) : base;
+}
+
+/**
+ * A bolha deformada de um morro ou de uma pedra grande: `detail`/`amount`/`seed` do autor (a bolha rugosa, `jitter`), refinada pelo tamanho (m) do que ela vai ser — de
+ * 3 m em diante (no nível pleno e no lugar "longe") o icosaedro vai a 180 faces e a deformação vira macia (`lumpy`): o morro de 200 m deixa de ser um poliedro.
+ */
+export function roundHill(detail: number, amount: number, seed: number, size: number): Geo {
+  const d = icoDetailFor(detail, size);
+  return d === detail ? jitter(ico(1, detail), amount, seed) : lumpy(ico(1, d), amount * 0.7, seed);
+}
+
+/** Icosaedro de raio `r` que o `paint` refina pelo tamanho que a matriz lhe dá (ver `roundBlob`); passado a `jitter`/`lumpy` antes do `paint`, não é refinado. */
+export function blobIco(r: number, detail = 0): Geo {
+  const g = ico(r, detail);
+  g.userData.roundIco = { r, detail };
+  return g;
+}
+
+function blobFor(b: RoundBlob, m: THREE.Matrix4): Geo {
+  const detail = icoDetailFor(b.detail, matrixScale(m));
+  if (detail === b.detail) return jitter(ico(1, detail), b.amount, b.seed);
+  return lumpy(ico(1, detail), b.amount * 0.7, b.seed);
+}
+
 const tmpQ = new THREE.Quaternion();
 const tmpE = new THREE.Euler();
 const tmpP = new THREE.Vector3();
@@ -57,6 +119,10 @@ export function lean(x: number, y: number, z: number, a: number, tilt: number, s
 
 /** Cópia não indexada com cor por vértice (e a transformação aplicada). Descarta a uv, salvo `keepUv`. */
 export function paint(geo: Geo, color: THREE.ColorRepresentation, m?: THREE.Matrix4, keepUv = false): Geo {
+  const blob = geo.userData.roundBlob as RoundBlob | undefined;
+  if (blob && m) { const up = blobFor(blob, m); geo.dispose(); geo = up; }
+  const ri = geo.userData.roundIco as { r: number; detail: number } | undefined;
+  if (ri && m) { const up = ico(ri.r, icoDetailFor(ri.detail, ri.r * matrixScale(m))); geo.dispose(); geo = up; }
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
   geo.dispose();
   if (!keepUv) g.deleteAttribute('uv');
@@ -68,6 +134,19 @@ export function paint(geo: Geo, color: THREE.ColorRepresentation, m?: THREE.Matr
   for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   return g;
+}
+
+/**
+ * Fusão do liso de um marco (M3): as peças do kit redondo (caixa com bisel, `userData.roundNormals`) guardam a normal própria (`mergeRound`) e o
+ * resto recebe o vinco do marco (45° e a regra do telhado), como o catálogo faria; sem peça do kit, é o `merge` de sempre (o catálogo suaviza depois).
+ */
+export function mergeFlat(parts: Geo[]): Geo {
+  const round = parts.filter((p) => p.userData.roundNormals);
+  if (round.length === 0) return merge(parts);
+  const plain = parts.filter((p) => !p.userData.roundNormals);
+  const lisas: Geo[] = round.map((p) => { delete p.userData.roundNormals; return p; });
+  if (plain.length) lisas.unshift(smoothNormals(merge(plain), CREASE.landmark, { roofTurnDeg: ROOF_TURN_DEG }));
+  return mergeRound(lisas);
 }
 
 /** Funde as partes (e libera cada uma). Normais por face (a malha não compartilha vértices); o catálogo suaviza depois. */
@@ -263,8 +342,15 @@ export function cullInside(geo: Geo, solids: readonly Ellipsoid[]): Geo {
 }
 
 export function box(w: number, h: number, d: number): Geo { return new THREE.BoxGeometry(w, h, d); }
-export function cyl(rt: number, rb: number, h: number, seg: number, open = false): Geo { return new THREE.CylinderGeometry(rt, rb, h, seg, 1, open); }
-export function cone(r: number, h: number, seg: number): Geo { return new THREE.ConeGeometry(r, h, seg); }
+export function cyl(rt: number, rb: number, h: number, seg: number, open = false): Geo { return new THREE.CylinderGeometry(rt, rb, h, roundSides(seg, 14), 1, open); }
+export function cone(r: number, h: number, seg: number): Geo { return new THREE.ConeGeometry(r, h, roundSides(seg, 16)); }
+
+/**
+ * Lados de um sólido de revolução (M3, a faceta da bíblia): de 8 a 13 lados o vinco do marco (45°) e, de 9 em diante, o de construção (40°) deixam as arestas LISAS, e a luz lisa sobre
+ * uma malha tão grossa desenha um polígono (faceta de 18–22°); de 3 a 7 lados as arestas ficam vivas (coluna quadrada, pirâmide, torre de 6 lados: forma
+ * de projeto, a quina é a forma). Quem pede de 8 a 13 quer redondo: sobe para `to` (14 lados = 12,9°; cone de 16 = 13,1°).
+ */
+export function roundSides(seg: number, to: number): number { return seg >= 8 && seg < to ? to : seg; }
 export function ico(r: number, detail = 0): Geo { return new THREE.IcosahedronGeometry(r, detail); }
 export function dodeca(r: number): Geo { return new THREE.DodecahedronGeometry(r, 0); }
 export function sphere(r: number, w: number, h: number, phi0 = 0, phiLen = Math.PI * 2, theta0 = 0, thetaLen = Math.PI): Geo { return new THREE.SphereGeometry(r, w, h, phi0, phiLen, theta0, thetaLen); }

@@ -10,9 +10,9 @@
 // tests/landmarks-leitura-norte-nordeste-1.test.ts.
 import * as THREE from 'three';
 import { hash2, hash3 } from '../../noise';
-import { box, cone, cyl, frond, gable, hip, ico, jitter, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type MatKey, type Model, type ModelPart } from '../geom';
+import { frond, gable, hip, jitter, roundBlob, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type MatKey, type Model, type ModelPart, mergeFlat } from '../geom';
 import { FACADE_TILE } from '../structures';
-import { cliff, dune as duneShape } from './kit';
+import { box, cliff, cone, cyl, dune as duneShape, extrudeRound, fitted } from './kit';
 import type { LandmarkDef, LandmarkRegistry } from './types';
 
 // ───────────────────────────── Kit ─────────────────────────────
@@ -66,7 +66,7 @@ class Kit {
   /** Monta o Model: sombreado por altura no `flat`; sombra projetada só para os de perto. */
   model(height: number, shadow: boolean, shade: [number, number] = [0.8, 1.06]): Model {
     const parts: ModelPart[] = [];
-    if (this.flat.length) parts.push({ geometry: shadeY(merge(this.flat), 0, height, shade[0], shade[1]), mat: 'flat', shadow });
+    if (this.flat.length) parts.push({ geometry: shadeY(mergeFlat(this.flat), 0, height, shade[0], shade[1]), mat: 'flat', shadow });
     for (const [mat, list] of this.facade) parts.push({ geometry: merge(list), mat, shadow });
     if (this.glow.length) parts.push({ geometry: merge(this.glow), mat: 'glow' });
     if (this.beacon.length) parts.push({ geometry: merge(this.beacon), mat: 'beacon' });
@@ -86,7 +86,7 @@ function segMatrix(a: V3, b: V3): THREE.Matrix4 {
 function extrude(pts: Array<[number, number]>, depth: number, holes: Array<Array<[number, number]>> = [], steps = 1): Geo {
   const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
   for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
-  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 1, steps });
+  return extrudeRound(shape, depth, Math.min(1.2, Math.max(0.15, depth * 0.04)), { steps, curveSegments: 1 });
 }
 
 /** Planta (x, z) erguida de y = 0 a `h` (paredes verticais), com furos (pátios). */
@@ -299,7 +299,7 @@ function mesa(k: Kit, o: { rx: number; rz: number; H: number; talus: number; see
 function cloud(k: Kit, x: number, y: number, z: number, s: number, seed: number): void {
   for (let q = 0; q < 4; q++) {
     const dz = (q - 1.5) * s * 0.9; const r = s * (0.6 + hash2(seed, q) * 0.5);
-    k.add(jitter(ico(1, 0), 0.15, seed + q), '#f4f6fa', tf(x, y + hash2(seed, q + 9) * s * 0.2, z + dz, r * 1.2, r * 0.55, r));
+    k.add(roundBlob(0.15, seed + q, 0), '#f4f6fa', tf(x, y + hash2(seed, q + 9) * s * 0.2, z + dz, r * 1.2, r * 0.55, r));
   }
 }
 
@@ -469,7 +469,7 @@ function elevadorLacerda(): Model {
     if (Math.abs(z) < 12) continue;
     const y = 10 + hash2(25, i) * (esc.topAt(z) - 18);
     const r = 3.5 + hash2(26, i) * 3;
-    k.raw(speckle(paint(jitter(ico(1, 0), 0.2, 260 + i), i % 3 ? '#3f7f34' : '#4f9a3c', tf(-14 + cliffFaceX(esc, talus, z, y) + r * 0.4, y, z, r * 0.9, r * 0.75, r * 1.2)), 0.08, 260 + i));
+    k.raw(speckle(paint(roundBlob(0.2, 260 + i, 0), i % 3 ? '#3f7f34' : '#4f9a3c', tf(-14 + cliffFaceX(esc, talus, z, y) + r * 0.4, y, z, r * 0.9, r * 0.75, r * 1.2)), 0.08, 260 + i));
   }
   // Cidade Alta: sobrados coloridos recuados da borda, baixos (a torre manda na silhueta).
   for (let i = 0; i < 12; i++) {
@@ -623,7 +623,7 @@ function coqueiral(): Model {
     palm(k, x, z, 17 + hash2(63, i) * 10, 600 + i, 0, true);
   }
   // Coqueiros novos e moitas no pé (a mata baixa da restinga).
-  for (let i = 0; i < 10; i++) k.add(jitter(ico(1, 0), 0.2, 70 + i), i % 3 ? '#4f9a3c' : '#5aa846', tf((hash2(64, i) - 0.5) * 18, 1.0, (i - 4.5) * 5, 3.2, 2.4, 3.2));
+  for (let i = 0; i < 10; i++) k.add(roundBlob(0.2, 70 + i, 0), i % 3 ? '#4f9a3c' : '#5aa846', tf((hash2(64, i) - 0.5) * 18, 1.0, (i - 4.5) * 5, 3.2, 2.4, 3.2));
   // Barraca de palha na frente.
   for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]] as const) k.add(box(0.25, 2.6, 0.25), '#7a5c36', tf(13 + dx, 1.3, 6 + dz));
   k.raw(speckle(paint(cone(4.2, 2.6, 6), '#c9a86a', tf(13, 3.9, 6)), 0.06, 66));
@@ -842,7 +842,7 @@ function pedraFuradaJeri(): Model {
     color: (z, y) => rocks[((Math.floor((y + 1.2 * Math.sin(z / 4)) / 2.6) % rocks.length) + rocks.length) % rocks.length].clone().multiplyScalar(0.92 + 0.16 * hash2(122, Math.floor((z + 17) * 0.5) * 31 + Math.floor(y))),
   }));
   // Blocos caídos e a espuma no pé.
-  for (let i = 0; i < 6; i++) k.add(jitter(ico(1, 0), 0.25, 122 + i), '#6e4a36', tf(4 + (hash2(123, i) - 0.5) * 10, 0.4, -20 + i * 8, 1.8 + hash2(124, i) * 1.4, 1.2, 2.0));
+  for (let i = 0; i < 6; i++) k.add(roundBlob(0.25, 122 + i, 0), '#6e4a36', tf(4 + (hash2(123, i) - 0.5) * 10, 0.4, -20 + i * 8, 1.8 + hash2(124, i) * 1.4, 1.2, 2.0));
   return k.model(Ht, true);
 }
 
@@ -857,7 +857,7 @@ function dunaPorDoSol(): Model {
   const sand = '#f6dca4'; const slip = '#f0d29a';
   k.raw(duneShape({ len: 270, H: 50, back: 110, seed: 131, sand, slip, rows: 8, ripple: 0.05, horns: 30, sinuous: 14 }, tf(-10, 0, -10)).geo);
   k.raw(duneShape({ len: 120, H: 24, back: 60, seed: 132, sand: '#f4dca6', slip: '#eed29c', rows: 6, ripple: 0.05, horns: 10 }, tf(-60, 0, 100)).geo);
-  for (let i = 0; i < 10; i++) k.add(jitter(ico(1, 0), 0.25, 133 + i), '#7a9a4a', tf(82 + hash2(134, i) * 12, 0.6, -110 + i * 24, 3, 1.4, 3));
+  for (let i = 0; i < 10; i++) k.add(roundBlob(0.25, 133 + i, 0), '#7a9a4a', tf(82 + hash2(134, i) * 12, 0.6, -110 + i * 24, 3, 1.4, 3));
   return k.model(50, false, [0.95, 1.04]);
 }
 
@@ -900,9 +900,9 @@ function pedraFuradaCapivara(): Model {
     },
   }));
   // Caatinga no alto e no pé, e os blocos caídos no talude.
-  for (let i = 0; i < 9; i++) k.add(jitter(ico(1, 0), 0.25, 142 + i), '#9a6a50', tf(12 + hash2(143, i) * 6, 1, -60 + i * 15, 4 + hash2(144, i) * 3, 3, 5));
-  for (let i = 0; i < 12; i++) k.add(jitter(ico(1, 0), 0.2, 150 + i), i % 3 ? '#7a8a4a' : '#8a7a4a', tf(22 + hash2(151, i) * 14, 1.4, -66 + i * 12, 2.4, 1.8, 2.4));
-  for (let i = 0; i < 8; i++) { const z = (i < 4 ? -1 : 1) * (34 + (i % 4) * 9); k.add(jitter(ico(1, 0), 0.2, 146 + i), '#7a8a4a', tf(-6 + hash2(147, i) * 6, wall.topAt(z) + 0.5, z, 3, 1.6, 3)); }
+  for (let i = 0; i < 9; i++) k.add(roundBlob(0.25, 142 + i, 0), '#9a6a50', tf(12 + hash2(143, i) * 6, 1, -60 + i * 15, 4 + hash2(144, i) * 3, 3, 5));
+  for (let i = 0; i < 12; i++) k.add(roundBlob(0.2, 150 + i, 0), i % 3 ? '#7a8a4a' : '#8a7a4a', tf(22 + hash2(151, i) * 14, 1.4, -66 + i * 12, 2.4, 1.8, 2.4));
+  for (let i = 0; i < 8; i++) { const z = (i < 4 ? -1 : 1) * (34 + (i % 4) * 9); k.add(roundBlob(0.2, 146 + i, 0), '#7a8a4a', tf(-6 + hash2(147, i) * 6, wall.topAt(z) + 0.5, z, 3, 1.6, 3)); }
   return k.model(92, false, [0.8, 1.06]);
 }
 
@@ -951,7 +951,7 @@ function pinturasRupestres(): Model {
   k.add(box(3, 0.3, 50), '#8a6a42', tf(6.5, 0.9, 0));
   for (let z = -24; z <= 24; z += 4) k.add(box(0.15, 1.9, 0.15), '#6a4a2a', tf(7.9, 1.6, z));
   k.add(box(0.12, 0.12, 50), '#6a4a2a', tf(7.9, 2.4, 0));
-  for (let i = 0; i < 8; i++) k.add(jitter(ico(1, 0), 0.2, 165 + i), '#7a8a4a', tf(11 + hash2(166, i) * 6, 1, -26 + i * 7.4, 1.8, 1.4, 1.8));
+  for (let i = 0; i < 8; i++) k.add(roundBlob(0.2, 165 + i, 0), '#7a8a4a', tf(11 + hash2(166, i) * 6, 1, -26 + i * 7.4, 1.8, 1.4, 1.8));
   return k.model(27, true);
 }
 
@@ -986,7 +986,7 @@ function farolPreguicas(): Model {
   const top = lightTower(k, 0, 0, 1, 34, 2.8, 1.7, ['#f6f6f2', '#d63a2a'], 8, '#d63a2a');
   k.add(box(9, 4, 6), '#f6f2e8', tf(-7, 2, 8)).add(gable(9, 2, 6, 0.3), '#d63a2a', tf(-7, 4, 8));
   k.add(box(0.1, 1, 1.2), '#2a3442', tf(-2.45, 2.2, 8));
-  for (let i = 0; i < 5; i++) k.add(jitter(ico(1, 0), 0.2, 191 + i), '#6a9a44', tf(6 + hash2(192, i) * 6, 0.6, -10 + i * 5, 2, 1.2, 2));
+  for (let i = 0; i < 5; i++) k.add(roundBlob(0.2, 191 + i, 0), '#6a9a44', tf(6 + hash2(192, i) * 6, 0.6, -10 + i * 5, 2, 1.2, 2));
   return k.model(top, false);
 }
 
@@ -1234,7 +1234,7 @@ function maloca(): Model {
     };
     one(0, 0, 9, 12, 211);
     one(-6, 20, 5, 7.5, 215);
-    for (let i = 0; i < 5; i++) k.add(jitter(ico(1, 0), 0.2, 220 + i), '#5f8f3c', tf(-12 + hash2(221, i) * 10, 0.8, -16 + i * 6, 2, 1.4, 2));
+    for (let i = 0; i < 5; i++) k.add(roundBlob(0.2, 220 + i, 0), '#5f8f3c', tf(-12 + hash2(221, i) * 10, 0.8, -16 + i * 6, 2, 1.4, 2));
     k.add(cyl(0.5, 0.7, 0.4, 6), '#3a2a20', tf(14, 0.2, 4)).light(cone(0.4, 0.8, 5), '#ffb040', tf(14, 0.8, 4));
   });
   return k.model(19, true);
@@ -1287,7 +1287,7 @@ function locomotivaMamore(): Model {
   // Fumaça: rolos brancos subindo da chaminé (em z = 6,6 × 1,5) e indo para trás, crescendo.
   for (let q = 0; q < 5; q++) {
     const t = q / 4; const r = 1.0 + t * 1.6;
-    k.raw(speckle(paint(jitter(ico(1, 1), 0.16, 280 + q), '#f2f2ee', tf(0, 9.0 + t * 4.2, 9.6 - t * 9, r, r * 0.85, r * 1.2)), 0.03, 280 + q));
+    k.raw(speckle(paint(roundBlob(0.16, 280 + q, 1), '#f2f2ee', tf(0, 9.0 + t * 4.2, 9.6 - t * 9, r, r * 0.85, r * 1.2)), 0.03, 280 + q));
   }
   return k.model(14, true);
 }
@@ -1357,11 +1357,11 @@ function gameleira(): Model {
   }
   // Copa: massas achatadas de verdes diferentes — a de cima, as dos galhos e o anel de fora, baixo.
   const greens = ['#3f7f34', '#4a8f3a', '#356f2e', '#58a044'];
-  tops.forEach(([x, y, z], q) => k.raw(speckle(paint(jitter(ico(1, 1), 0.14, 234 + q), greens[q % 4], tf(x, y + 3, z, 12, 6.5, 12)), 0.08, 234 + q)));
-  k.raw(speckle(paint(jitter(ico(1, 1), 0.12, 240), '#4a8f3a', tf(0, 32, 0, 16, 7, 16)), 0.08, 240));
+  tops.forEach(([x, y, z], q) => k.raw(speckle(paint(roundBlob(0.14, 234 + q, 1), greens[q % 4], tf(x, y + 3, z, 12, 6.5, 12)), 0.08, 234 + q)));
+  k.raw(speckle(paint(roundBlob(0.12, 240, 1), '#4a8f3a', tf(0, 32, 0, 16, 7, 16)), 0.08, 240));
   for (let q = 0; q < 8; q++) {
     const a = (q / 8) * PI * 2 + 0.2;
-    k.raw(speckle(paint(jitter(ico(1, 0), 0.15, 241 + q), greens[(q + 1) % 4], tf(Math.cos(a) * 22, 22, Math.sin(a) * 22, 8, 4.5, 8)), 0.08, 241 + q));
+    k.raw(speckle(paint(roundBlob(0.15, 241 + q, 0), greens[(q + 1) % 4], tf(Math.cos(a) * 22, 22, Math.sin(a) * 22, 8, 4.5, 8)), 0.08, 241 + q));
   }
   // Grade da praça em volta do tronco.
   for (let q = 0; q < 14; q++) { const a = (q / 14) * PI * 2; k.add(box(0.12, 0.9, 0.12), '#3a3d42', tf(Math.cos(a) * 12, 0.45, Math.sin(a) * 12)); }
@@ -1428,7 +1428,7 @@ function dunasJalapao(): Model {
   k.raw(duneShape({ len: 120, H: 28, back: 60, seed: 262, sand: '#f8dcaa', slip: '#f2cc94', rows: 6, ripple: 0.05, horns: 10 }, tf(-40, 0, -150)).geo);
   k.raw(duneShape({ len: 110, H: 26, back: 56, seed: 263, sand: '#fae0b0', slip: '#f2ce98', rows: 6, ripple: 0.05, horns: 10 }, tf(-34, 0, 145)).geo);
   // A vereda: o capim verde e as moitas ao longo do pé das dunas, e os buritis.
-  for (let i = 0; i < 20; i++) k.add(jitter(ico(1, 0), 0.25, 264 + i), i % 3 ? '#4f9a3c' : '#6aa846', tf(76 + hash2(265, i) * 12, 1.0, -180 + i * 19, 5, 3.0, 6.5));
+  for (let i = 0; i < 20; i++) k.add(roundBlob(0.25, 264 + i, 0), i % 3 ? '#4f9a3c' : '#6aa846', tf(76 + hash2(265, i) * 12, 1.0, -180 + i * 19, 5, 3.0, 6.5));
   for (let i = 0; i < 7; i++) palm(k, 80 + hash2(266, i) * 12, -150 + i * 50, 15 + hash2(267, i) * 5, 2660 + i, 0, true);
   return k.model(46, false, [0.92, 1.04]);
 }
@@ -1437,7 +1437,7 @@ function dunasJalapao(): Model {
 
 const def = (build: () => Model, place: LandmarkDef['place'], side: LandmarkDef['side'], perLap: number): LandmarkDef => ({ build, place, side, perLap });
 
-export const LANDMARKS_BRASIL_NORTE_NORDESTE: LandmarkRegistry = {
+export const LANDMARKS_BRASIL_NORTE_NORDESTE: LandmarkRegistry = fitted({
   // Bahia
   farol_da_barra: def(farolDaBarra, 'far', 'sea', 1),
   elevador_lacerda: def(elevadorLacerda, 'far', 'land', 1),
@@ -1489,4 +1489,4 @@ export const LANDMARKS_BRASIL_NORTE_NORDESTE: LandmarkRegistry = {
   // Tocantins
   serra_espirito_santo: def(serraEspiritoSanto, 'skyline', 'land', 1),
   dunas_jalapao: def(dunasJalapao, 'far', 'any', 2),
-};
+});

@@ -83,18 +83,59 @@ export function normalLie(parts: ReadonlyArray<{ geometry: Geo; mat: string }>, 
 /** As partes iluminadas de um modelo (a normal conta): o liso e as quatro fachadas. `glow`, `beacon` e `cone` são luz pintada. */
 export const LIT_MATS = ['flat', 'office', 'apartment', 'classic', 'house'] as const;
 
+/** Fração mínima da área iluminada do modelo para uma peça contar na faceta: o que é menor que isso são poucos pixels na distância de jogo (o botão, a pedrinha, o olho). */
+export const FACET_MIN_PART = 0.015;
+
+/** Peças (sólidos) de uma malha não indexada: os triângulos ligados por pontos em comum (soldados a 1 mm), cada grupo é uma peça. */
+export function solids(g: Geo): number[][] {
+  const pos = g.getAttribute('position');
+  const key = (i: number): string => `${Math.round(pos.getX(i) * 1e3)},${Math.round(pos.getY(i) * 1e3)},${Math.round(pos.getZ(i) * 1e3)}`;
+  const parent = new Map<string, string>();
+  const find = (k: string): string => { let r = k; while (parent.get(r) !== r) r = parent.get(r) as string; let c = k; while (c !== r) { const nx = parent.get(c) as string; parent.set(c, r); c = nx; } return r; };
+  for (let i = 0; i < pos.count; i++) { const k = key(i); if (!parent.has(k)) parent.set(k, k); }
+  for (let t = 0; t + 2 < pos.count; t += 3) { const a = find(key(t)); for (let j = 1; j < 3; j++) { const b = find(key(t + j)); if (a !== b) parent.set(b, a); } }
+  const groups = new Map<string, number[]>();
+  for (let t = 0; t + 2 < pos.count; t += 3) { const r = find(key(t)); const l = groups.get(r); if (l) l.push(t); else groups.set(r, [t]); }
+  return [...groups.values()];
+}
+
+function areaOf(g: Geo, tris: readonly number[]): number {
+  const pos = g.getAttribute('position');
+  const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
+  let s = 0;
+  for (const t of tris) { a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2); s += b.sub(a).cross(c.sub(a)).length() / 2; }
+  return s;
+}
+
+function subGeometry(g: Geo, tris: readonly number[]): Geo {
+  const pos = g.getAttribute('position'); const nor = g.getAttribute('normal');
+  const p: number[] = []; const n: number[] = [];
+  for (const t of tris) for (let j = 0; j < 3; j++) { p.push(pos.getX(t + j), pos.getY(t + j), pos.getZ(t + j)); n.push(nor.getX(t + j), nor.getY(t + j), nor.getZ(t + j)); }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+  return out as Geo;
+}
+
 /**
- * A faceta de um modelo do catálogo (a régua da bíblia, `scenery-faceta.test.ts`): o `normalLie` das partes iluminadas. A parte do kit redondo
- * (`userData.keepNormals`: a normal dela é esferizada ou de bisel de propósito, e mentiria à vontade) é medida pela GEOMETRIA: as normais são
- * recalculadas com o vinco da família do modelo (`sceneryShading`), como o catálogo faria. Assim a palmeira de cartum (copa de normal esferizada)
- * não escapa pelo truque da normal, e o chanfro de 45° do bisel (vinco de construção 40°) continua sendo bisel, não faceta.
+ * A faceta de um modelo do catálogo (a régua da bíblia, `scenery-faceta.test.ts`): o `normalLie` das partes iluminadas, só das PEÇAS que contam — cada sólido
+ * (cilindro, bolha, cúpula, casca) com pelo menos `FACET_MIN_PART` da área iluminada do modelo. Um modelo que é só caixa e tem 80 bolinhas de 1 m não tem faceta
+ * visível a 300 m; um com uma cúpula de 20 m tem. A parte do kit redondo (`userData.keepNormals`: a normal dela é esferizada ou de bisel de propósito, e mentiria
+ * à vontade) é medida pela GEOMETRIA: as normais são recalculadas com o vinco da família do modelo (`sceneryShading`), no máximo 44°, como o catálogo faria. Assim
+ * a palmeira de cartum (copa de normal esferizada) não escapa pelo truque da normal, e o chanfro de 45° do bisel (um gomo) continua sendo bisel, não faceta.
  */
-export function facetOf(id: string, model: Model): number {
+export function facetOf(id: string, model: Model, minPart = FACET_MIN_PART): number {
   const shading = sceneryShading(id);
-  const parts = model.parts.map((p) => (p.geometry.userData.keepNormals && !p.geometry.index
-    ? { mat: p.mat, geometry: smoothNormals(p.geometry.clone(), shading.crease, shading) }
-    : p));
-  return normalLie(parts, LIT_MATS);
+  const lit: Array<{ geometry: Geo; mat: string }> = [];
+  for (const p of model.parts) {
+    if (!(LIT_MATS as readonly string[]).includes(p.mat) || p.geometry.index) continue;
+    const g = p.geometry.userData.keepNormals ? smoothNormals(p.geometry.clone(), Math.min(shading.crease, 44), shading) : p.geometry;
+    lit.push({ geometry: g, mat: p.mat });
+  }
+  const pieces: Array<{ geometry: Geo; a: number; mat: string }> = [];
+  let total = 0;
+  for (const p of lit) for (const tris of solids(p.geometry)) { const a = areaOf(p.geometry, tris); total += a; pieces.push({ geometry: subGeometry(p.geometry, tris), a, mat: p.mat }); }
+  return normalLie(pieces.filter((q) => q.a >= minPart * total).map((q) => ({ geometry: q.geometry, mat: 'flat' })), ['flat']);
 }
 
 /** A janela de quadro da qualidade Alta (renderer.ts: BEHIND 30 + AHEAD 260) que o orçamento do cenário mede. */
