@@ -103,6 +103,7 @@ class Pool {
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
     this.points.renderOrder = 3;
+    if (bubble) this.points.name = 'fx-dust';
   }
 
   emit(z: number, x: number, h: number, vz: number, vx: number, vh: number, life: number, size: number, grow: number, gravity: number, r: number, g: number, b: number): void {
