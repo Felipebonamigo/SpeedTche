@@ -30,6 +30,22 @@ export interface CarContract {
   lodNodes: { lod0: boolean; lod1: boolean };
 }
 
+/** Nível de detalhe do casco procedural: 0 = completo, 1 = o casco simples dos carros longe e da qualidade Baixa (M4). */
+export type Lod = 0 | 1;
+
+/** Caixa no referencial do carro (metros), para o teste conferir a peça contra a malha. */
+export interface Box3Like { min: P3; max: P3 }
+
+/**
+ * A traseira-vitrine (M4, cars/rear.ts): onde ficam os escapes (com o raio da ponteira), o difusor e o aerofólio de brinquedo.
+ * É o descritor do que o `buildRear` construiu; o teste confere a malha DENTRO destas caixas, então ele não pode mentir.
+ */
+export interface RearKit {
+  exhausts: Array<{ x: number; y: number; z: number; r: number }>;
+  diffuser: Box3Like;
+  wing: Box3Like | null;
+}
+
 export interface CarModel {
   body: CarBody;
   /** Id do carro quando o modelo é de um carro só (`src/assets/cars/<carId>.glb`); sem ele, vale para o estilo todo. */
@@ -54,6 +70,8 @@ export interface CarModel {
   /** Ordem das pinturas (bits LIVERY_A/LIVERY_B) para o 1º, 2º... carro do estilo. */
   liveries: readonly number[];
   triangles: number;
+  /** Só no procedural (M4): a traseira-vitrine, para o teste conferir. */
+  rear?: RearKit;
 }
 
 export interface ModelParts {
@@ -61,6 +79,7 @@ export interface ModelParts {
   axles: readonly [Axle, Axle];
   exhausts: readonly P3[];
   liveries: readonly number[];
+  rear?: RearKit;
 }
 
 /** Fecha o modelo: mede a altura, conta triângulos, monta a geometria. */

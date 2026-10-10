@@ -2,7 +2,7 @@
 // reserva (estilo sem construtor é erro, e o teste confere que as 13 malhas são diferentes). O modelo de
 // um .glb da arte (assets.ts, passo 2.4) tem precedência sobre o construtor — por carro (`falcao.glb`) ou por estilo (`gt.glb`).
 import type { CarBody, CarDef } from '../../core/types';
-import type { CarModel } from './model';
+import type { CarModel, Lod } from './model';
 import { buildClassic } from './styles/classic';
 import { buildElectric } from './styles/electric';
 import { buildGt } from './styles/gt';
@@ -17,7 +17,7 @@ import { buildRoadster } from './styles/roadster';
 import { buildSedan } from './styles/sedan';
 import { buildWedge } from './styles/wedge';
 
-export const MODEL_BUILDERS: Readonly<Record<CarBody, () => CarModel>> = {
+export const MODEL_BUILDERS: Readonly<Record<CarBody, (lod?: Lod) => CarModel>> = {
   gt: buildGt,
   muscle: buildMuscle,
   hatch: buildHatch,

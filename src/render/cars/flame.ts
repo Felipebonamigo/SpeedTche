@@ -72,3 +72,7 @@ void main() {
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
+
+/** (Esqueleto da M4: a malha de verdade vem depois do teste vermelho.) */
+export function buildFlameGeometry(): THREE.BufferGeometry { return new THREE.PlaneGeometry(1, 1); }
+export function flameColorFor(_accent: string | THREE.Color): THREE.Color { return new THREE.Color('#58b6ff'); }
