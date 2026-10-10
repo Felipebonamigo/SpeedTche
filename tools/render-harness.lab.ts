@@ -141,8 +141,19 @@ function collect(): { samples: GateSample[]; frames: Array<{ scene: string; qual
   return { samples, frames, programs: reports, forced };
 }
 
+/** A mancha de contato sob os carros (`Cars.blob`, cars.ts): a malha instanciada, translúcida, com textura, visível e com instâncias. */
+function blob(): { found: boolean; count: number } {
+  let count = 0; let found = false;
+  scene.traverse((o) => {
+    const m = o as import('three').InstancedMesh;
+    const mat = m.material as import('three').MeshBasicMaterial | undefined;
+    if (m.isInstancedMesh && mat && mat.isMeshBasicMaterial && mat.transparent && mat.map && !mat.depthWrite && m.visible) { found = true; count = Math.max(count, m.count); }
+  });
+  return { found, count };
+}
+
 const lab = {
-  renderer, setup, render, idle, programs, collect,
+  renderer, setup, render, idle, programs, collect, blob,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),
   dynamic: (on: boolean, pin: number | null) => { renderer.setDynamicResolution(on); renderer.pinDynamicScale(pin); },

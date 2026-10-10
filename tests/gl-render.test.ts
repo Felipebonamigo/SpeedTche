@@ -35,6 +35,7 @@ interface LabApi {
   resize(w: number, h: number, dpr: number): void;
   info(): DebugInfo;
   dynamic(on: boolean, pin: number | null): void;
+  blob(): { found: boolean; count: number };
 }
 declare global { interface Window { lab: LabApi; labReady: boolean } }
 
@@ -145,6 +146,14 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500
     expect(r.fixo.post.builds).toBe(r.mBase);
     expect(r.volta.viewports[0]).toMatchObject({ targetW: 640, targetH: 360 });
     expect(r.volta.post.builds).toBe(r.builds);
+  });
+
+  it('a Baixa tem a sombra de contato sob o carro (e os outros degraus também)', async () => {
+    const r = await page.evaluate(() => {
+      const L = window.lab; L.setup('copacabana', 1, 300); L.dynamic(false, null);
+      return (['low', 'medium', 'high', 'ultra'] as const).map((q) => { L.render(q, 1); return { q, ...L.blob() }; });
+    });
+    for (const x of r) { expect(x.found, `${x.q}: a malha da mancha`).toBe(true); expect(x.count, `${x.q}: instâncias`).toBeGreaterThanOrEqual(1); }
   });
 
   it('a Baixa não usa resolução dinâmica (desenha direto na tela)', async () => {
