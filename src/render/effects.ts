@@ -13,6 +13,7 @@ import type { RenderFrame } from '../game/contracts';
 import { createScrapeMemory, observeScrapes } from '../game/race-feel';
 import { newCueMemory, observeCues, type FxCue } from './fx/cues';
 import { fxPlan } from './fx/plan';
+import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
 import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
 import { hash2 } from './noise';
@@ -42,6 +43,25 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
+/** Fragmento da BOLHA (M5): borda nítida, contorno escuro, brilho no canto de cima à esquerda e a metade de baixo um pouco mais escura. */
+const FRAG_BUBBLE = /* glsl */ `
+// bolha
+varying float vAlpha; varying vec3 vColor;
+void main() {
+  vec2 p = (gl_PointCoord - 0.5) * 2.0;
+  float d = length(p);
+  float edge = 1.0 - smoothstep(0.86, 1.0, d);
+  if (edge < 0.01) discard;
+  float rim = smoothstep(0.66, 0.92, d);
+  float shade = mix(0.72, 1.06, clamp(0.5 + 0.5 * dot(p, vec2(-0.45, 0.89)), 0.0, 1.0));
+  float glint = smoothstep(0.42, 0.0, length(p - vec2(-0.34, 0.4)));
+  vec3 col = vColor * shade;
+  col = mix(col, vColor * 0.5, rim * 0.55) + glint * 0.16;
+  gl_FragColor = vec4(col, vAlpha * edge);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
 /** Pool de partículas em coordenadas de pista. */
 class Pool {
   readonly points: THREE.Points;
@@ -58,7 +78,7 @@ class Pool {
   private next = 0;
   private readonly pt: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
 
-  constructor(readonly max: number, additive: boolean) {
+  constructor(readonly max: number, additive: boolean, private readonly bubble = false) {
     const f = () => new Float32Array(max);
     this.z = f(); this.x = f(); this.h = f(); this.vz = f(); this.vx = f(); this.vh = f();
     this.life = f(); this.maxLife = f(); this.size = f(); this.grow = f(); this.gravity = f(); this.r = f(); this.g = f(); this.b = f();
@@ -70,7 +90,7 @@ class Pool {
     geo.setAttribute('position', this.position); geo.setAttribute('aSize', this.aSize); geo.setAttribute('aAlpha', this.aAlpha); geo.setAttribute('aColor', this.aColor);
     geo.setDrawRange(0, 0);
     this.material = new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false,
+      vertexShader: VERT, fragmentShader: bubble ? FRAG_BUBBLE : FRAG, transparent: true, depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, uniforms: { uScale: { value: 400 } },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -84,6 +104,13 @@ class Pool {
     this.life[i] = life; this.maxLife[i] = life; this.size[i] = size; this.grow[i] = grow; this.gravity[i] = gravity;
     this.r[i] = r; this.g[i] = g; this.b[i] = b;
   }
+
+  emitSpec(s: PuffSpec): void {
+    this.emit(s.z, s.x, s.h, s.vz, s.vx, s.vh, s.life, s.size, s.grow, s.gravity, s.r, s.g, s.b);
+  }
+
+  /** Quantas partículas estão vivas. */
+  alive(): number { let n = 0; for (let i = 0; i < this.max; i++) if (this.life[i] > 0) n++; return n; }
 
   step(dt: number): void {
     for (let i = 0; i < this.max; i++) {
@@ -108,7 +135,7 @@ class Pool {
       const t = this.life[i] / this.maxLife[i];
       this.position.setXYZ(n, this.pt.x, this.pt.y + this.h[i], this.pt.z);
       this.aSize.setX(n, this.size[i] + this.grow[i] * (1 - t));
-      this.aAlpha.setX(n, Math.min(1, t * 2.5) * (0.25 + 0.55 * t));
+      this.aAlpha.setX(n, this.bubble ? Math.min(1, t * 3) * 0.88 : Math.min(1, t * 2.5) * (0.25 + 0.55 * t));
       this.aColor.setXYZ(n, this.r[i], this.g[i], this.b[i]);
       n++;
     }
@@ -125,7 +152,7 @@ export interface Shake { x: number; y: number; roll: number }
 
 export class Effects {
   readonly group = new THREE.Group();
-  private readonly dust = new Pool(900, false);
+  private readonly dust = new Pool(900, false, true);
   /** Faíscas esticadas: o pool anda em coordenada de pista e cada viewport as escreve no lote de traços. */
   private readonly sparks = new SparkPool(700);
   readonly streaks = new Streaks(900);
@@ -133,6 +160,9 @@ export class Effects {
   private readonly cueMemory = newCueMemory();
   private readonly sparkCar: SparkCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0 };
   private readonly emitSpark = (s: SparkSpec): void => this.sparks.emit(s);
+  private readonly emitPuff = (s: PuffSpec): void => this.dust.emitSpec(s);
+  private readonly puffCar: PuffCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, skidTicks: 0 };
+  private readonly dustRgb: [number, number, number] = [0.54, 0.48, 0.35];
   private readonly prevSpeed = new Float32Array(20);
   private readonly shakeAmp = new Float32Array(4);
   private readonly dustColor = new THREE.Color('#8a7a5a');
@@ -149,6 +179,12 @@ export class Effects {
 
   private rnd(): number { this.seed++; return hash2(this.seed, 77); }
 
+  private puffCarOf(c: PuffCar): PuffCar {
+    const o = this.puffCar;
+    o.z = c.z; o.x = c.x; o.speed = c.speed; o.driftDir = c.driftDir; o.driftTicks = c.driftTicks; o.driftCharge = c.driftCharge; o.skidTicks = c.skidTicks;
+    return o;
+  }
+
   private sparkCarOf(c: { z: number; x: number; speed: number; driftDir: number; driftTicks: number }): SparkCar {
     const o = this.sparkCar;
     o.z = c.z; o.x = c.x; o.speed = c.speed; o.driftDir = c.driftDir; o.driftTicks = c.driftTicks;
@@ -163,23 +199,15 @@ export class Effects {
     const state: RaceState = frame.state;
     const reduce = frame.options.reduceEffects === true;
     const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length);
-    const dc = this.dustColor;
+    this.dustRgb[0] = this.dustColor.r; this.dustRgb[1] = this.dustColor.g; this.dustRgb[2] = this.dustColor.b;
     const rnd = () => this.rnd();
     for (let i = 0; i < state.cars.length && i < 20; i++) {
       const c = state.cars[i];
-      // Poeira na grama.
-      if (c.skidTicks > 0 && c.speed > 250) {
-        for (let k = 0; k < 2; k++) {
-          const side = k % 2 === 0 ? -0.16 : 0.16;
-          this.dust.emit(c.z - 50 + this.rnd() * 30, c.x + side * (1 + this.rnd()), 0.3, c.speed * (0.5 + this.rnd() * 0.2), (this.rnd() - 0.5) * 0.4 + side * 0.8, 1.2 + this.rnd() * 1.6, 0.6 + this.rnd() * 0.5, 0.5, 1.4, 0.5, dc.r, dc.g, dc.b);
-        }
-      }
-      // Fumaça leve na frenagem forte.
-      const decel = (this.prevSpeed[i] - c.speed) / dt;
-      if (c.speed > 2500 && decel > c.stats.brake * 0.55 && c.collisionCooldown === 0 && this.rnd() < 0.6) {
-        const side = this.rnd() < 0.5 ? -0.14 : 0.14;
-        this.dust.emit(c.z - 60, c.x + side, 0.15, c.speed * 0.6, side * 0.3, 0.8, 0.5, 0.5, 1.6, 0.2, 0.75, 0.75, 0.78);
-      }
+      // Poeira na grama, fumaça da freada forte e fumaça do pneu na derrapagem: bolhas.
+      const pc = this.puffCarOf(c);
+      emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff);
+      emitBrakeSmoke(pc, (this.prevSpeed[i] - c.speed) / dt, c.stats.brake, c.collisionCooldown, plan.smoke, rnd, this.emitPuff);
+      if (state.phase !== 'countdown') emitTireSmoke(pc, dt, plan.smoke, rnd, this.emitPuff);
       this.prevSpeed[i] = c.speed;
       // Faíscas das rodas na derrapagem, na cor da carga (azul, laranja, roxa).
       if (plan.wheelSparks && state.phase !== 'countdown') emitWheelSparks(this.sparkCarOf(c), driftLevel(c.driftCharge), dt, plan.sparks, rnd, this.emitSpark);
@@ -220,6 +248,9 @@ export class Effects {
     this.sparks.pose(rf, track, st);
     st.end();
   }
+
+  /** Contagens vivas (relatório e testes): bolhas, faíscas e traços escritos na última pose. */
+  counts(): { puffs: number; sparks: number; streaks: number } { return { puffs: this.dust.alive(), sparks: this.sparks.alive(), streaks: this.streaks.count }; }
 
   clear(): void {
     this.dust.clear(); this.sparks.clear(); this.shakeAmp.fill(0); this.lastTime = -1; this.cueMemory.tick = -1;
