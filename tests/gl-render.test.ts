@@ -40,7 +40,8 @@ declare global { interface Window { lab: LabApi; labReady: boolean } }
 
 if (REQUIRED) it('o Chromium existe (NC_REQUIRE_GL=1)', () => { expect(available, `sem ${CHROME}`).toBe(true); });
 
-describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
+// Tempo-limite próprio: a medição sob carga de CPU (swiftshader) passa dos 180 s que a suíte dá aos outros testes.
+describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500_000 }, () => {
   let server: ViteDevServer; let browser: Browser; let page: Page;
   const errors: string[] = [];
   let collected: Promise<Collected> | null = null;
