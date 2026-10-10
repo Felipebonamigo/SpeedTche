@@ -69,7 +69,8 @@ export interface DevicePeek {
 
 // ───────────────────────────── Opções e progresso ─────────────────────────────
 
-export type Quality = 'low' | 'medium' | 'high';
+/** Níveis gráficos. `ultra` (RTX) desenha hoje o mesmo que `high`; a L2 liga os efeitos. Compare com `atLeast` (quality.ts), nunca com `===`. */
+export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 /** Estilo visual: o 3D moderno (src/render) ou o pseudo-3D Retrô (src/render-pseudo3d). */
 export type RenderStyle = 'modern' | 'retro';
 

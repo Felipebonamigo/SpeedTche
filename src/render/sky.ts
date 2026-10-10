@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { TimeOfDay } from '../core/types';
 import type { Quality } from '../game/contracts';
+import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
 import type { Palette } from './palette';
@@ -17,7 +18,7 @@ const SKY_RADIUS = 1400;
  * Densidade da névoa (FogExp2, por metro) por qualidade, antes do multiplicador do período (palette.ts, `fogDensity`):
  * a baixa desenha menos pista. Exportada para a conta de enquadramento dos marcos (scenery/sight.ts).
  */
-export const FOG_DENSITY: Readonly<Record<Quality, number>> = { low: 0.003, medium: 0.0023, high: 0.0019 };
+export const FOG_DENSITY: Readonly<Record<Quality, number>> = { low: 0.003, medium: 0.0023, high: 0.0019, ultra: 0.0019 };
 
 const SKY_VERT = /* glsl */ `
 varying vec3 vDir;
@@ -259,8 +260,8 @@ export class Sky {
 
   /** Tamanho do mapa de sombra por qualidade (0 = sem sombra) e a névoa (a baixa desenha menos pista). */
   setQuality(q: Quality): void {
-    this.clouds.geometry = this.cloudGeo[q === 'high' ? 1 : 0];
-    const size = q === 'high' ? 2048 : q === 'medium' ? 1024 : 0;
+    this.clouds.geometry = this.cloudGeo[atLeast(q, 'high') ? 1 : 0];
+    const size = atLeast(q, 'high') ? 2048 : atLeast(q, 'medium') ? 1024 : 0;
     this.sun.castShadow = size > 0;
     if (size > 0 && this.sun.shadow.mapSize.x !== size) {
       this.sun.shadow.mapSize.set(size, size);

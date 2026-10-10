@@ -13,6 +13,7 @@ import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
 import type { Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer } from '../game/contracts';
+import { atLeast } from '../game/quality';
 import { ChaseCamera, IdleCamera } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
 import { Cars } from './cars';
@@ -29,7 +30,7 @@ import { Terrain } from './terrain';
 
 const BEHIND = FRAME_BEHIND;
 const AHEAD = FRAME_AHEAD;
-const MAX_POINTS = BEHIND + AHEAD.high + 1;
+const MAX_POINTS = BEHIND + Math.max(AHEAD.high, AHEAD.ultra) + 1;
 /** Velocidade da câmera automática dos menus (unidades de pista por segundo). */
 const IDLE_SPEED = 2600;
 
@@ -246,7 +247,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       captions[i].update(captionsOn ? captionSceneFor(track) : null, captionView, Math.max(1, car.lap), frame.state.tick / TICK_RATE,
         frame.state.phase === 'racing' && !car.finished);
       setViewport(rect);
-      drawViewport(i, rect, cam.camera, q === 'high');
+      drawViewport(i, rect, cam.camera, atLeast(q, 'high'));
     }
     if (frame.showHud) hud.update(frame, width, height, captions); else hud.hide();
     debug.calls = renderer.info.render.calls;
@@ -273,7 +274,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     setViewport(rect);
     renderer.info.reset();
     vpCount = 0;
-    drawViewport(0, rect, idleCamera.camera, quality === 'high');
+    drawViewport(0, rect, idleCamera.camera, atLeast(quality ?? 'high', 'high'));
     hud.hide();
     debug.calls = renderer.info.render.calls;
     debug.triangles = renderer.info.render.triangles;

@@ -8,6 +8,8 @@
 // - reflexo do céu (env map da cena) reforçado nas peças metálicas e no vidro;
 // - farol escamoteável (`aPaint.w`) sobe à noite.
 import * as THREE from 'three';
+import type { Quality } from '../../game/contracts';
+import { atLeast } from '../../game/quality';
 
 export interface CarUniforms {
   uSelfLight: { value: number };
@@ -100,7 +102,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
   return { material, uniforms };
 }
 
-/** Verniz só na qualidade alta (o programa troca uma vez, na troca de qualidade). */
-export function setCarQuality(material: THREE.MeshPhysicalMaterial, high: boolean): void {
-  material.clearcoat = high ? 1 : 0;
+/** Verniz só na qualidade alta ou melhor (o programa troca uma vez, na troca de qualidade). */
+export function setCarQuality(material: THREE.MeshPhysicalMaterial, q: Quality): void {
+  material.clearcoat = atLeast(q, 'high') ? 1 : 0;
 }

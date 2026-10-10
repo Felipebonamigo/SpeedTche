@@ -169,7 +169,7 @@ export class Cars {
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
-    setCarQuality(this.material, q === 'high');
+    setCarQuality(this.material, q);
     this.lowQuality = q === 'low';
   }
 
