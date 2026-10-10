@@ -8,6 +8,7 @@
 // de tela que cobre vários ticks.
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
+import { wrappedDelta } from '../core/sim/collisions';
 import { computeModifiers } from '../core/sim/coop';
 import { driftLevel } from '../core/sim/physics';
 import type { RaceState, Track } from '../core/types';
@@ -156,6 +157,8 @@ class Pool {
 
 /** Teto de pontos do anel das marcas de pneu (o do Ultra, `fxPlan`); o degrau escolhe quantos usa. */
 const MARKS_MAX = 2048;
+/** A que distância (unidades de pista) de um viewport uma batida ainda ganha o quadrinho POW: 8.000 = 160 m. */
+const NEAR_VIEWER = 8000;
 
 /** O que cada viewport guarda entre quadros para as linhas: intensidades suavizadas e a posição do carro dele. */
 interface ViewFx { lineS: number; draftI: number; z: number; x: number; travel: number; speedMs: number; time: number }
@@ -212,6 +215,15 @@ export class Effects {
     return o;
   }
 
+  /** O ponto `z` está a menos de `NEAR_VIEWER` unidades (160 m) de algum viewport? Batida de rival lá longe não ganha quadrinho. */
+  private nearViewer(frame: RenderFrame, z: number): boolean {
+    for (const vp of frame.viewports) {
+      const v = frame.state.cars[vp.carIndex];
+      if (v && Math.abs(wrappedDelta(z, v.z, frame.track.length)) < NEAR_VIEWER) return true;
+    }
+    return false;
+  }
+
   /** Emissores + física, uma vez por quadro. */
   update(frame: RenderFrame): void {
     const dt = this.lastTime < 0 ? 1 / 60 : Math.min(0.1, Math.max(0, frame.time - this.lastTime));
@@ -221,6 +233,7 @@ export class Effects {
     const reduce = frame.options.reduceEffects === true;
     const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length);
     this.plan = plan;
+    this.marks.buffer.setTrackLength(frame.track.length);
     this.marks.buffer.setCapacity(plan.marks);
     this.markClock += dt;
     this.dustRgb[0] = this.dustColor.r; this.dustRgb[1] = this.dustColor.g; this.dustRgb[2] = this.dustColor.b;
@@ -253,9 +266,10 @@ export class Effects {
       if (cue.kind === 'go' && plan.shockwave) {
         this.waves.spawn(cue.perfect ? 'perfect' : 'ground', c.z, c.x, 0.05);
       } else if (cue.kind === 'nitro' && plan.shockwave) {
-        this.waves.spawn('halo', c.z - 70, c.x, 0.55);
+        // O halo é do carro de quem joga: o dos rivais (até 19) tomaria as 8 vagas dos anéis que se veem.
+        if (c.seat >= 0) this.waves.spawn('halo', c.z - 70, c.x, 0.55);
       } else if (cue.kind === 'hit') {
-        if (plan.pow) this.pows.spawn(c.z + 20, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5);
+        if (plan.pow && this.nearViewer(frame, c.z)) this.pows.spawn(c.z + 20, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5);
         emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);
         if (c.seat >= 0 && c.seat < 4) this.shakeAmp[c.seat] = Math.min(1, this.shakeAmp[c.seat] + 0.6 + 0.4 * (c.speed / c.stats.topSpeed));
       } else if (cue.kind === 'boost') {

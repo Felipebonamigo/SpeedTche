@@ -196,6 +196,21 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     expect(waves(s.fx)).toBe(antes + 1);
   });
 
+  it('só os carros dos humanos ganham o halo do nitro, e só a batida perto de um viewport ganha POW (o anel e o quadrinho dos rivais longe não tomam a vaga dos que se veem)', () => {
+    const s = cena('high'); s.state.phase = 'racing'; s.state.tick = 600; tick(s);
+    const ia = s.state.cars.filter((c) => c.seat < 0);
+    const humano = s.car;
+    ia.forEach((c, i) => { c.z = (humano.z + 40_000 + i * 2000) % s.state.trackLength; }); // longe: 800 m+
+    tick(s);
+    const antes = waves(s.fx);
+    ia[0].nitroTicks = 150; tick(s);
+    expect(waves(s.fx)).toBe(antes); // nitro de rival: sem halo
+    ia[0].speed = 5000; tick(s); ia[0].speed = 2000; ia[0].collisionCooldown = 20; tick(s);
+    expect(pows(s.fx)).toBe(0); // batida longe: sem POW
+    ia[1].z = (humano.z + 3000) % s.state.trackLength; tick(s); ia[1].speed = 5000; tick(s); ia[1].speed = 2000; ia[1].collisionCooldown = 20; tick(s);
+    expect(pows(s.fx)).toBe(1); // batida a 60 m do jogador: POW
+  });
+
   it('a batida acende um POW (mesmo num quadro de 3 ticks); reduzir efeitos não; o anel/POW passam de idade e somem', () => {
     const s = cena('high'); s.state.phase = 'racing'; s.state.tick = 600; tick(s); s.car.speed = 5000; tick(s);
     s.car.speed = 3000; s.car.collisionCooldown = 17; tick(s);

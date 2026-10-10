@@ -208,6 +208,20 @@ describe('marcas no Effects', () => {
     expect(alto).toBeLessThanOrEqual(1280); expect(alto).toBeGreaterThan(baixo);
   });
 
+  it('a marca atravessa a linha de chegada (a volta da pista) sem quebrar: o Effects diz o comprimento da pista ao buffer', () => {
+    const s = cena('high');
+    const buf = (s.fx as unknown as { marks: { buffer: MarkBuffer } }).marks.buffer;
+    s.car.z = s.track.length - 5 * 50 * 1.7; // 8,5 m antes da linha: o carro anda 1,67 m por quadro
+    let pushes = 0;
+    for (let i = 0; i < 12; i++) {
+      s.car.speed = 5000; s.car.z = (s.car.z + 5000 / 60) % s.track.length;
+      s.car.driftDir = 1; s.car.driftTicks = 40; s.car.driftCharge = 120;
+      s.frame.time += 1 / 60; s.fx.update(s.frame); pushes++;
+    }
+    let n = 0; buf.forEachSegment(s.frame.time, () => { n++; });
+    expect(n).toBe(2 * (pushes - 1)); // duas rodas, cada uma uma faixa só de ponta a ponta
+  });
+
   it('a malha de marcas entra no grupo do Effects e fica oculta sem marca', () => {
     const s = cena('high');
     expect(s.fx.group.children.some((o) => o.name === 'fx-marks')).toBe(true);

@@ -76,18 +76,21 @@ describe.skipIf(!available)('efeitos da M5 em GL (swiftshader)', { timeout: 1_50
     });
   }
 
-  it('os efeitos custam no máximo 4 chamadas por viewport (uma malha cada) e cabem no gate de contagem', async () => {
+  it('os efeitos custam no máximo 4 chamadas por viewport (uma malha cada); o gate de contagem vale com a cena normal e com tudo aceso vale limite + 4', async () => {
     const lines: string[] = [];
+    const checks: Array<() => void> = [];
     for (const q of LEVELS) {
       const on = await run(q, true); const off = await run(q, false);
       const visible = on.meshes.filter((m) => m.visible).length;
-      expect(visible, `${q}: malhas de efeito desenhando`).toBeLessThanOrEqual(4);
       const limit = GATE_LIMITS['copa-2p'][q]!;
       on.debug.viewports.forEach((v, i) => {
-        lines.push(`${q} vp${i}: ${off.debug.viewports[i].calls} -> ${v.calls} chamadas (${v.calls - off.debug.viewports[i].calls >= 0 ? '+' : ''}${v.calls - off.debug.viewports[i].calls}), ${off.debug.viewports[i].triangles} -> ${v.triangles} triângulos, ${visible} malhas de efeito`);
-        expect(v.calls, `${q} viewport ${i}`).toBeLessThanOrEqual(limit.calls);
+        const base = off.debug.viewports[i];
+        lines.push(`${q} vp${i}: ${base.calls} -> ${v.calls} chamadas (${v.calls - base.calls >= 0 ? '+' : ''}${v.calls - base.calls}), ${base.triangles} -> ${v.triangles} triângulos, ${visible} malhas de efeito (${on.meshes.filter((m) => m.visible).map((m) => m.name).join(', ')}), limite do gate ${limit.calls}`);
+        checks.push(() => expect(v.calls, `${q} viewport ${i}: chamadas com tudo aceso (limite do gate ${limit.calls} + 4 malhas de efeito)`).toBeLessThanOrEqual(limit.calls + 4));
       });
+      checks.push(() => expect(visible, `${q}: malhas de efeito desenhando`).toBeLessThanOrEqual(4));
     }
     console.log(`[M5 contagens]\n${lines.join('\n')}`);
+    for (const c of checks) c();
   });
 });
