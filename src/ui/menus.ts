@@ -5,6 +5,7 @@ import { isKeyboard, isEditableTarget } from './input';
 import { type LobbyState, type ScreenApi, type ScreenData, type ScreenFactory, type ScreenInstance } from './screens/common';
 import { accessScreen } from '../access/screen';
 import { controlsScreen } from './screens/controls';
+import { dealershipScreen } from './screens/dealership';
 import { careerScreen, garageScreen } from './screens/garage';
 import { recordsScreen } from './screens/info';
 import { lobbyScreen } from './screens/lobby';
@@ -68,6 +69,7 @@ const FACTORIES: Readonly<Record<MenuScreen, ScreenFactory>> = {
   loading: loadingScreen,
   career: careerScreen,
   garage: garageScreen,
+  dealership: dealershipScreen,
   online: onlineScreen,
   party: partyScreen,
   tournament: tournamentScreen,

@@ -131,6 +131,24 @@ const SCREENS = [
     // preço e "faltam" na coluna estreita.
     for (let i = 0; i < 2; i++) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
   }],
+  // Onda N, N2: a Garagem com um piloto só (o painel único, onde a janela do palco é maior) e a Concessionária (tela nova) com 1 e com 4 pilotos.
+  ['garage-1', () => {
+    const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1');
+    s.handleMenuEvent({ type: 'startCareer', humans: [{ seat: 0, name: 'Piloto 1', carId: 'falcao', teamId: 0, color: '#fff' }], resume: false });
+  }],
+  ['dealership-1', () => {
+    const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1');
+    s.handleMenuEvent({ type: 'startCareer', humans: [{ seat: 0, name: 'Piloto 1', carId: 'falcao', teamId: 0, color: '#fff' }], resume: false });
+    s.menus.show('dealership');
+  }],
+  // Quatro pilotos na vitrine do carro mais caro (a volta do ← do primeiro): preço e "faltam" na coluna estreita.
+  ['dealership-4', () => {
+    const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));
+    const hs = [0, 1, 2, 3].map((i) => ({ seat: i, name: `Piloto ${i + 1}`, carId: ['trovao', 'tornado', 'saci', 'boto'][i], teamId: 0, color: '#fff' }));
+    s.handleMenuEvent({ type: 'startCareer', humans: hs, resume: false });
+    s.menus.show('dealership');
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
+  }],
   ['party', () => window.nc.session.menus.show('party')],
   ['tournament-8', () => {
     const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));

@@ -1,0 +1,12 @@
+/* Selos DOM da janela do palco (src/render/stage-mount.ts): o "NOVO!" da revelação e o clarão do estouro. Quem os anima é o palco, por
+   quadro (opacidade e escala inline), não uma animation de CSS: refazer o DOM da tela no meio da revelação não a reinicia. */
+.gp-stage, .stage-window { position: relative; overflow: hidden; background: transparent; pointer-events: none; }
+.stage-novo {
+  position: absolute; left: 50%; top: 50%; z-index: 2; pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-8deg) scale(0.55); opacity: 0;
+  padding: calc(4 * var(--u)) calc(20 * var(--u)); border-radius: calc(10 * var(--u));
+  font-family: var(--font-display, var(--font)); font-size: calc(40 * var(--u)); font-weight: 900; letter-spacing: 0.06em; line-height: 1; white-space: nowrap;
+  color: #1a1c22; background: #ffd23f; border: calc(3 * var(--u)) solid #fff;
+  box-shadow: 0 calc(6 * var(--u)) calc(24 * var(--u)) rgba(0, 0, 0, 0.45), 0 0 calc(30 * var(--u)) rgba(255, 210, 63, 0.6);
+}
+.stage-flash { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 55%, rgba(255, 255, 255, 0.95), rgba(255, 244, 200, 0.55) 45%, rgba(255, 255, 255, 0) 75%); }

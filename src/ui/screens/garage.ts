@@ -1,13 +1,15 @@
-// Tela "Carreira" (continuar / nova) e a Garagem. A garagem tem um painel por piloto, cada um
-// navegado pelo próprio dispositivo (como no lobby): carro (←→ troca, Enter compra ou escolhe),
-// atributos com antes → depois do item em foco, as seis melhorias e PRONTO. As compras chamam as
-// regras puras de src/core/career.ts e gravam o save na hora; com todos prontos, a sessão corre.
+// Tela "Carreira" (continuar / nova), a Garagem e a base da Concessionária. A garagem tem um painel por piloto, cada um
+// navegado pelo próprio dispositivo (como no lobby): os carros que o piloto TEM (←→ troca e escolhe), atributos com antes → depois
+// do item em foco, as seis melhorias e PRONTO. A Concessionária (dealership.ts) é a mesma fábrica de painel no outro modo: os carros
+// à venda, com a compra. As compras chamam as regras puras de src/core/career.ts e gravam o save na hora; com todos prontos, a sessão corre.
+// Onda N, N2: o carro de cada painel é o modelo 3D do palco (src/render/stage.ts), numa janela transparente; o SVG só no Retrô.
 import '../../career/strings';
+import '../../dealership/strings';
 import './garage.css';
 import './passport.css';
 import {
   buyCar, buyUpgrade, cupIndexOf, levelsOf, NO_UPGRADES, ownsCar, partMaxLevel, selectCar, UPGRADE_PARTS, upgradePrice, walletOf,
-  type CareerState, type PurchaseResult,
+  type CareerGarage, type CareerState, type PurchaseResult,
 } from '../../core/career';
 import { nextTrackId } from '../../core/championship';
 import { SPEED_TO_KMH, UPGRADE_MAX_LEVEL } from '../../core/constants';
@@ -16,10 +18,12 @@ import { effectiveStats } from '../../core/sim/stats';
 import type { CarDef, CarStats, UpgradeLevels, UpgradePart } from '../../core/types';
 import type { DeviceId, MenuContext, MenuNav } from '../../game/contracts';
 import { unlockCar } from '../../game/career-save';
-import { paintedCar, seatPaint, stepSeatPaint } from '../../game/paints';
+import { paintColors, paintedCar, seatPaint, stepSeatPaint } from '../../game/paints';
 import { saveSave } from '../../game/save';
 import { getLanguage, t } from '../../i18n';
-import { arrowButton, button, carCount, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type FocusList, type ScreenApi, type ScreenInstance } from './common';
+import { mountShowroom, type StageHandle } from '../../render/stage';
+import type { StageFocus } from '../../render/stage-plan';
+import { arrowButton, button, carCount, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type FocusList, type ScreenApi, type ScreenFactory, type ScreenInstance } from './common';
 import { carSilhouette, icon } from './icons';
 import { startCursor } from './lobby';
 import { paintSelector } from './paint';
@@ -154,10 +158,10 @@ export function careerScreen(api: ScreenApi): ScreenInstance {
   return { el, nav: (nav) => listNav(list, nav, api.sfx, () => api.back()) };
 }
 
-// ───────────────────────────── Garagem ─────────────────────────────
+// ───────────────────────────── Garagem e Concessionária ─────────────────────────────
 
 interface SeatUi {
-  /** Índice em ctx.cars do carro à mostra (dono: é o escolhido; à venda: vitrine). */
+  /** Índice em ctx.cars do carro à mostra (garagem: um dos do piloto; Concessionária: um dos à venda). */
   view: number;
   ready: boolean;
   cursor: number;
@@ -168,24 +172,60 @@ interface SeatUi {
 
 const MSG_SECONDS = 1.8;
 
-export function garageScreen(api: ScreenApi): ScreenInstance {
+/** `garage` = os carros que o piloto tem, as peças e a pintura; `dealership` = os carros à venda, a pintura e a compra. */
+export type CarScreenMode = 'garage' | 'dealership';
+
+export const garageScreen: ScreenFactory = (api) => carScreen(api, 'garage');
+
+/** O que o painel guarda do palco: a janela (DOM) e a alça do registro. */
+interface PanelParts {
+  el: HTMLElement;
+  items: FocusItem[];
+  preview: () => void;
+  msgEl: HTMLElement;
+  /** A janela transparente onde o palco desenha o carro (nula no Retrô). */
+  stageEl: HTMLElement | null;
+  /** A peça cujo detalhe a câmera deve mostrar, pelo item em foco. */
+  focusOf: () => StageFocus;
+}
+
+export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
   const { ctx } = api;
   const cars = ctx.cars;
+  const dealer = mode === 'dealership';
   const ranges = statRanges(cars);
   const careerOrNull = ctx.save.career;
-  if (!careerOrNull) {
+  if (!careerOrNull && !dealer) {
     const back = button(t('ui.common.back'), () => api.emit({ type: 'toMain' }));
     const list = createFocusList([back], { sfx: api.sfx });
     return { el: screenFrame('garage', t('career.garage.title'), h('p', { class: 'hint', text: t('career.hub.none') }), back.el), nav: (nav) => listNav(list, nav, api.sfx) };
   }
-  const career: CareerState = careerOrNull;
-  const n = career.drivers.length;
+  // Concessionária sem carreira: vitrine só de ver (um painel, sem dinheiro, nada para comprar).
+  const career: CareerState | null = careerOrNull;
+  const n = career ? career.drivers.length : 1;
+  /** Palco 3D no lugar da silhueta (o Retrô não tem palco). */
+  const use3d = ctx.settings.renderStyle !== 'retro';
+  const stageId = (seat: number) => `${mode}:P${seat + 1}`;
+  const garageOf = (seat: number): CareerGarage | null => career?.drivers[seat]?.garage ?? null;
   const carIndex = (id: string) => Math.max(0, cars.findIndex((c) => c.id === id));
-  // Carreira concluída: não há o que comprar; o foco começa no MENU (o último item).
-  const uis: SeatUi[] = career.drivers.map((d) => ({ view: carIndex(d.garage.carId), ready: false, cursor: career.completed ? Number.MAX_SAFE_INTEGER : 0, msg: '', msgKind: 'good', msgTtl: 0 }));
+  /** Os carros que ←→ percorre neste painel (índices em `cars`, na ordem da lista): os do piloto ou os à venda. Nunca vazio. */
+  const pool = (seat: number): number[] => {
+    const g = garageOf(seat);
+    const out: number[] = [];
+    cars.forEach((c, i) => { if (dealer ? c.price > 0 : !!g && ownsCar(g, c.id)) out.push(i); });
+    return out.length ? out : [0];
+  };
+  // Carreira concluída: não há o que comprar na garagem; o foco começa no MENU (o último item).
+  const lockedCareer = !dealer && !!career?.completed;
+  const uis: SeatUi[] = Array.from({ length: n }, (_, seat) => ({
+    view: dealer ? pool(seat)[0] : carIndex(garageOf(seat)?.carId ?? ''), ready: false, cursor: lockedCareer ? Number.MAX_SAFE_INTEGER : 0, msg: '', msgKind: 'good', msgTtl: 0,
+  }));
   let lists: Array<FocusList | null> = [];
   let previews: Array<() => void> = [];
   let msgEls: HTMLElement[] = [];
+  let panelEls: HTMLElement[] = [];
+  let stageEls: Array<HTMLElement | null> = [];
+  const stages: Array<StageHandle | null> = Array.from({ length: n }, () => null);
   let started = false;
 
   const persist = () => saveSave(ctx.save);
@@ -199,6 +239,7 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
     if (r === 'ok') return [t('career.garage.msg.bought'), 'good'];
     if (r === 'noMoney') return [t('career.garage.msg.noMoney'), 'bad'];
     if (r === 'maxLevel') return [t('career.garage.msg.maxLevel'), 'bad'];
+    if (r === 'owned') return [t('dealership.msg.owned'), 'good'];
     return [t('career.garage.msg.notOwned'), 'bad'];
   };
 
@@ -207,6 +248,7 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
   }
 
   function toggleReady(seat: number): void {
+    if (!career) return;
     if (career.completed) { api.sfx('confirm'); api.emit({ type: 'toMain' }); return; }
     const ui = uis[seat];
     ui.ready = !ui.ready;
@@ -223,28 +265,32 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
 
   function changeView(seat: number, dir: -1 | 1): void {
     const ui = uis[seat];
-    if (career.completed) { api.sfx('back'); return; }
+    if (lockedCareer) { api.sfx('back'); return; }
     if (ui.ready) { say(seat, t('career.garage.msg.locked'), 'bad'); render(); return; }
-    ui.view = (ui.view + dir + cars.length) % cars.length;
-    // Passear pelos carros da garagem já escolhe o carro; os à venda ficam só na vitrine.
-    if (selectCar(career, seat, cars[ui.view].id)) persist();
+    const p = pool(seat);
+    ui.view = p[(Math.max(0, p.indexOf(ui.view)) + dir + p.length) % p.length];
+    // Garagem: passear pelos carros do piloto já escolhe o carro. Concessionária: só a vitrine (não troca o carro da pista).
+    if (!dealer && career && selectCar(career, seat, cars[ui.view].id)) persist();
     render();
   }
 
+  /** Enter na linha do carro: na garagem escolhe o carro (já é dele); na Concessionária compra. */
   function activateCar(seat: number): void {
     const ui = uis[seat];
-    if (career.completed) { api.sfx('back'); return; }
+    if (lockedCareer) { api.sfx('back'); return; }
     if (ui.ready) { say(seat, t('career.garage.msg.locked'), 'bad'); render(); return; }
     const car = cars[ui.view];
+    if (!career) { api.sfx('back'); return; }
     const g = career.drivers[seat].garage;
-    if (ownsCar(g, car.id)) {
-      selectCar(career, seat, car.id);
-      persist();
-      render();
+    if (!dealer) {
+      if (ownsCar(g, car.id)) { selectCar(career, seat, car.id); persist(); render(); }
       return;
     }
     const r = buyCar(career, seat, car.id);
-    if (r === 'ok') { unlockCar(ctx.save, car.id); persist(); }
+    if (r === 'ok') {
+      unlockCar(ctx.save, car.id); persist();
+      stages[seat]?.reveal(); // a compra vira revelação: holofote, capa, faróis, confete e "NOVO!"
+    }
     const [text, kind] = purchaseMessage(r);
     say(seat, text, kind);
     api.sfx(r === 'ok' ? 'confirm' : 'back');
@@ -254,7 +300,7 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
   /** Pintura do carro à mostra (o escolhido ou o da vitrine): gravada para o piloto (assento) e o carro. */
   function changePaint(seat: number, dir: -1 | 1): void {
     const ui = uis[seat];
-    if (career.completed) { api.sfx('back'); return; }
+    if (lockedCareer) { api.sfx('back'); return; }
     if (ui.ready) { say(seat, t('career.garage.msg.locked'), 'bad'); render(); return; }
     stepSeatPaint(ctx.save, seat, cars[ui.view].id, dir);
     persist();
@@ -263,10 +309,11 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
 
   function activatePart(seat: number, part: UpgradePart): void {
     const ui = uis[seat];
+    if (!career) return;
     if (career.completed) { api.sfx('back'); return; }
     if (ui.ready) { say(seat, t('career.garage.msg.locked'), 'bad'); render(); return; }
     const r = buyUpgrade(career, seat, part, cars[ui.view].id);
-    if (r === 'ok') persist();
+    if (r === 'ok') { persist(); stages[seat]?.workshop(); } // a peça vira oficina: faísca e o carro afundando como mola
     const [text, kind] = purchaseMessage(r);
     say(seat, text, kind);
     api.sfx(r === 'ok' ? 'confirm' : 'back');
@@ -303,39 +350,42 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
     return h('div', { class: 'gs' }, rows);
   }
 
-  function panel(seat: number): { el: HTMLElement; items: FocusItem[]; preview: () => void; msgEl: HTMLElement } {
-    const d = career.drivers[seat];
-    const g = d.garage;
+  function panel(seat: number): PanelParts {
+    const driver = career?.drivers[seat];
+    const g = garageOf(seat);
     const ui = uis[seat];
     const car = cars[ui.view];
-    const owned = ownsCar(g, car.id);
-    const selected = owned && g.carId === car.id;
-    const levels = owned ? levelsOf(g, car.id) : { ...NO_UPGRADES };
-    const money = walletOf(career, seat);
+    const owned = g ? ownsCar(g, car.id) : false;
+    const selected = owned && g?.carId === car.id;
+    const levels = g && owned ? levelsOf(g, car.id) : { ...NO_UPGRADES };
+    const money = career ? walletOf(career, seat) : 0;
     const shown = effectiveStats(car, levels);
-    const mineDef = cars.find((c) => c.id === g.carId) ?? cars[0];
-    const mine = effectiveStats(mineDef, levelsOf(g, mineDef.id));
-    const locked = ui.ready || career.completed;
+    const mineDef = (g ? cars.find((c) => c.id === g.carId) : undefined) ?? cars[0];
+    const mine = g ? effectiveStats(mineDef, levelsOf(g, mineDef.id)) : shown;
+    const locked = ui.ready || lockedCareer;
+    const carList = pool(seat).map((i) => cars[i]);
 
     // Carro
     let status: HTMLElement;
     if (selected) status = h('span', { class: 'gp-tag ok' }, icon('check'), h('span', { text: t('career.garage.selected') }));
     else if (owned) status = h('span', { class: 'gp-tag', text: t('career.garage.owned') });
     else {
-      const short = car.price - money;
+      const short = career ? car.price - money : 0;
       status = h('span', { class: `gp-tag sale${short > 0 ? ' cant' : ''}` },
         h('span', { class: 'gp-tag-line' }, h('small', { class: 'gp-tag-k', text: t('career.garage.forSale') }), h('b', { class: 'mono', text: formatMoney(car.price) })),
-        h('small', { class: 'gp-tag-need', text: short > 0 ? t('career.garage.need', { price: formatMoney(short) }) : t('career.garage.buyHint') }));
+        h('small', { class: 'gp-tag-need', text: !career ? '' : short > 0 ? t('career.garage.need', { price: formatMoney(short) }) : t('career.garage.buyHint') }));
     }
+    // `data-color`: a cor da pintura à mostra (o playtest confere a prévia por ela: no 3D não há SVG para ler).
+    const stageEl = use3d ? h('div', { class: 'gp-stage', attrs: { 'data-car': car.id, 'data-color': paintColors(seatPaint(ctx.save, seat, car.id))?.color ?? car.color } }) : null;
     const carItem: FocusItem = {
       el: h('div', { class: `gp-car${locked ? ' locked' : ''}` },
         arrowButton(-1, () => { changeView(seat, -1); api.sfx('move'); }),
         h('div', { class: 'gp-car-body', attrs: { 'data-car': car.id } },
           h('div', { class: 'gp-car-name' },
             h('span', { class: 'gp-car-name-text', text: car.name }),
-            h('span', { class: 'gp-car-count mono', text: carCount(car, cars) }),
+            h('span', { class: 'gp-car-count mono', text: carCount(car, carList) }),
           ),
-          h('div', { class: 'gp-car-visual' }, carSilhouette(paintedCar(car, seatPaint(ctx.save, seat, car.id)))),
+          stageEl ?? h('div', { class: 'gp-car-visual' }, carSilhouette(paintedCar(car, seatPaint(ctx.save, seat, car.id)))),
           status,
         ),
         arrowButton(1, () => { changeView(seat, 1); api.sfx('move'); }),
@@ -345,7 +395,7 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
     };
 
     // Pintura do carro à mostra, na linha do PRONTO (a coluna de 2–4 pilotos não tem altura para mais uma linha);
-    // o desenho do carro, em cima, é a prévia. Confirmar avança uma, como ←→.
+    // o carro, em cima, é a prévia. Confirmar avança uma, como ←→.
     const paintItem = paintSelector({
       current: () => seatPaint(ctx.save, seat, car.id),
       car: () => car,
@@ -354,8 +404,8 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
       cls: `gp-paint${locked ? ' locked' : ''}`,
     });
 
-    // Melhorias
-    const partItems: FocusItem[] = UPGRADE_PARTS.map((part) => {
+    // Melhorias (só na garagem)
+    const partItems: FocusItem[] = dealer ? [] : UPGRADE_PARTS.map((part) => {
       const level = levels[part];
       const cap = partMaxLevel(car.id, part);
       const price = upgradePrice(part, level, car.id);
@@ -372,59 +422,80 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
       };
     });
 
-    const readyLabel = career.completed ? t('career.garage.menu') : n === 1 ? t('career.garage.race') : t('career.garage.ready');
-    const ready = button(readyLabel, () => toggleReady(seat), `btn-ready gp-ready${ui.ready ? ' on' : ''}${n === 1 || career.completed ? ' btn-primary' : ''}`);
-    if (ui.ready) ready.el.prepend(icon('check'));
+    // A linha de baixo: PRONTO (garagem) ou COMPRAR (Concessionária).
+    let ready: FocusItem | null = null;
+    if (dealer) {
+      if (career) {
+        ready = button(owned ? t('career.garage.owned') : t('dealership.buy'), () => activateCar(seat), `btn-ready gp-ready${owned ? ' on' : ' btn-primary'}`);
+        if (owned) ready.el.prepend(icon('check'));
+      }
+    } else {
+      const readyLabel = career?.completed ? t('career.garage.menu') : n === 1 ? t('career.garage.race') : t('career.garage.ready');
+      ready = button(readyLabel, () => toggleReady(seat), `btn-ready gp-ready${ui.ready ? ' on' : ''}${n === 1 || career?.completed ? ' btn-primary' : ''}`);
+      if (ui.ready) ready.el.prepend(icon('check'));
+    }
 
     const statsHost = h('div', { class: 'gp-stats' });
-    const msgEl = h('div', { class: `gp-msg ${ui.msgTtl > 0 ? ui.msgKind : ''}`, text: ui.msgTtl > 0 ? ui.msg : (ui.ready && !allReady() ? t('career.garage.waiting') : '') });
-    const items = [carItem, ...partItems, paintItem, ready];
+    const waiting = !dealer && ui.ready && !allReady() ? t('career.garage.waiting') : '';
+    const msgEl = h('div', { class: `gp-msg ${ui.msgTtl > 0 ? ui.msgKind : ''}`, text: ui.msgTtl > 0 ? ui.msg : waiting });
+    const items = [carItem, ...partItems, paintItem, ...(ready ? [ready] : [])];
+
+    const focusOf = (): StageFocus => {
+      const list = lists[seat];
+      const idx = list ? list.index : -1;
+      const k = idx >= 0 ? partItems.indexOf(items[idx]) : -1;
+      return k >= 0 ? UPGRADE_PARTS[k] : null;
+    };
 
     const preview = () => {
-      const list = lists[seat];
-      const focus = list ? list.index : -1;
+      const focus = lists[seat] ? lists[seat]?.index ?? -1 : -1;
       const partIndex = focus >= 0 ? partItems.indexOf(items[focus]) : -1;
       let base = shown;
       let after: CarStats | null = null;
-      if (focus === 0 && !owned) { base = mine; after = shown; }
+      // Carro à venda (ou, sem ele, qualquer carro que não é o da pista): o antes → depois é contra o carro que o piloto usa hoje.
+      if (focus === 0 && !selected && (dealer || !owned)) { base = mine; after = shown; }
       else if (partIndex >= 0 && owned && !locked) {
         const part = UPGRADE_PARTS[partIndex];
         if (levels[part] < partMaxLevel(car.id, part)) after = effectiveStats(car, levelsPlus(levels, part));
       }
       statsHost.replaceChildren(statsBlock(base, after));
+      stages[seat]?.set({ focus: focusOf() });
     };
 
-    const walletLabel = career.coop ? t('career.garage.teamWallet') : t('career.garage.wallet');
+    const walletLabel = career?.coop ? t('career.garage.teamWallet') : t('career.garage.wallet');
+    const go = h('div', { class: 'gp-go' }, paintItem.el, ready ? ready.el : h('span', { class: 'gp-note', text: t('dealership.viewOnly') }));
+    const blurb = h('p', { class: 'gp-car-blurb', text: t(`core.car.${car.id}.blurb`) });
     const el = h('div', { class: `gp glass${ui.ready ? ' ready' : ''}`, style: `--seat:${seatColor(seat, ctx.settings.colorPalette)}` },
       h('div', { class: 'gp-head' },
         h('span', { class: 'seat-badge', text: `P${seat + 1}` }),
-        h('span', { class: 'gp-name', text: d.name }),
-        h('span', { class: 'gp-money' }, h('small', { text: walletLabel }), h('b', { class: 'mono', text: formatMoney(money) })),
+        h('span', { class: 'gp-name', text: driver?.name ?? t('dealership.title') }),
+        career ? h('span', { class: 'gp-money' }, h('small', { text: walletLabel }), h('b', { class: 'mono', text: formatMoney(money) })) : null,
       ),
       // A frase do carro diz a troca (o que ganha, o que perde): cabe com um piloto só (garage.css).
-      h('div', { class: 'gp-left' }, carItem.el, statsHost, h('p', { class: 'gp-car-blurb', text: t(`core.car.${car.id}.blurb`) })),
-      h('div', { class: 'gp-right' },
-        h('div', { class: 'gp-parts' }, h('h2', { class: 'sub-title', text: t('career.garage.upgrades') }), partItems.map((p) => p.el)),
-        h('div', { class: 'gp-go' }, paintItem.el, ready.el),
-        msgEl,
-      ),
+      dealer
+        ? [h('div', { class: 'gp-left' }, carItem.el), h('div', { class: 'gp-right' }, statsHost, blurb, go, msgEl)]
+        : [h('div', { class: 'gp-left' }, carItem.el, statsHost, blurb),
+          h('div', { class: 'gp-right' },
+            h('div', { class: 'gp-parts' }, h('h2', { class: 'sub-title', text: t('career.garage.upgrades') }), partItems.map((p) => p.el)),
+            go, msgEl)],
     );
-    return { el, items, preview, msgEl };
+    return { el, items, preview, msgEl, stageEl, focusOf };
   }
 
-  // ── Cabeçalho e relatório da última corrida ──
+  // ── Cabeçalho e relatório da última corrida (garagem) ──
 
-  const cupIdx = cupIndexOf(career, ctx.cups);
+  const cupIdx = career ? cupIndexOf(career, ctx.cups) : 0;
   const cup = ctx.cups[cupIdx];
 
   function headInfo(): string {
-    if (career.completed || !cup) return '';
+    if (!career || career.completed || !cup) return '';
     const raceIndex = career.champ?.raceIndex ?? 0;
     const trackId = career.champ ? nextTrackId(career.champ) : cup.trackIds[0];
     return t('career.garage.next', { track: trackName(trackId ?? cup.trackIds[0]), n: raceIndex + 1, m: cup.trackIds.length });
   }
 
   function reportBlock(): HTMLElement | null {
+    if (!career) return null;
     const r = career.lastReport;
     if (career.completed) {
       return h('div', { class: 'garage-report glass' }, h('div', { class: 'verdict good' }, icon('trophy'), h('span', { text: t('career.garage.report.careerDone') })));
@@ -445,39 +516,72 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
 
   const panelsEl = h('div', { class: `garage-panels n-${n}` });
   const reportHost = h('div', { class: 'garage-report-host' });
-  const el = screenFrame('garage', null,
+  const el = screenFrame(mode, null,
     h('div', { class: 'garage-head' },
-      h('h1', { class: 'screen-title', text: t('career.garage.title') }),
-      cup && !career.completed ? h('span', { class: 'chip', text: `${cup.flag} ${cupName(cup.id)}` }) : null,
-      h('span', { class: 'garage-progress muted-inline', text: career.completed ? '' : t('career.garage.progress', { i: cupIdx + 1, n: ctx.cups.length }) }),
-      h('span', { class: 'garage-next', text: headInfo() }),
+      h('h1', { class: 'screen-title', text: dealer ? t('dealership.title') : t('career.garage.title') }),
+      !dealer && career && cup && !career.completed ? h('span', { class: 'chip', text: `${cup.flag} ${cupName(cup.id)}` }) : null,
+      h('span', { class: 'garage-progress muted-inline', text: !dealer && career && !career.completed ? t('career.garage.progress', { i: cupIdx + 1, n: ctx.cups.length }) : '' }),
+      h('span', { class: 'garage-next', text: dealer ? '' : headInfo() }),
     ),
     reportHost,
     panelsEl,
-    h('p', { class: 'hint', text: t('career.garage.hint') }),
+    h('p', { class: 'hint', text: dealer ? t('dealership.hint') : t('career.garage.hint') }),
   );
+  // A Concessionária divide o CSS da garagem (`.scr-garage`); `stage3d` tira o degradê da tela e fura o vidro onde está a janela do palco.
+  if (dealer) el.classList.add('scr-garage');
+  if (use3d) el.classList.add('stage3d');
+
+  /** Põe o painel do palco de cada assento na janela nova (a tela refaz o DOM a cada ação; o painel e o estado dele continuam). */
+  function bindStages(built: PanelParts[]): void {
+    built.forEach((b, seat) => {
+      if (!b.stageEl) return;
+      const car = cars[uis[seat].view];
+      stages[seat] = mountShowroom(b.stageEl, {
+        id: stageId(seat), carId: car.id, paint: paintColors(seatPaint(ctx.save, seat, car.id)), focus: b.focusOf(),
+        quality: ctx.settings.quality, reduceEffects: ctx.settings.reduceEffects, ring: seatColor(seat, ctx.settings.colorPalette),
+      });
+    });
+  }
 
   function render(): void {
     lists.forEach((l, i) => { if (l && l.index >= 0) uis[i].cursor = l.index; });
-    const built = career.drivers.map((_, seat) => panel(seat));
+    const built = Array.from({ length: n }, (_, seat) => panel(seat));
     lists = built.map((b, seat) => createFocusList(b.items, { start: Math.min(uis[seat].cursor, b.items.length - 1), sfx: api.sfx }));
     previews = built.map((b) => b.preview);
     msgEls = built.map((b) => b.msgEl);
+    panelEls = built.map((b) => b.el);
+    stageEls = built.map((b) => b.stageEl);
+    bindStages(built);
     built.forEach((b, seat) => {
       for (const it of b.items) it.el.addEventListener('mousemove', () => { uis[seat].cursor = lists[seat]?.index ?? 0; previews[seat](); });
       b.preview();
     });
-    const report = reportBlock();
-    const rival = garageRivalBlock(career);
+    const report = dealer ? null : reportBlock();
+    const rival = !dealer && career ? garageRivalBlock(career) : null;
     reportHost.replaceChildren(...[report, rival].filter((x): x is HTMLElement => x !== null));
     panelsEl.replaceChildren(...built.map((b) => b.el));
   }
 
-  /** Assento do dispositivo; sem ninguém ligado ao P1 (garagem aberta direto), o teclado 1 comanda o P1. */
+  /** O buraco no vidro de cada painel (máscara CSS): onde está a janela do palco o painel não cobre o canvas. Só mexe no estilo se mudou. */
+  function syncHoles(): void {
+    if (!use3d) return;
+    panelEls.forEach((p, seat) => {
+      const win = stageEls[seat];
+      if (!win || typeof p.getBoundingClientRect !== 'function' || typeof win.getBoundingClientRect !== 'function') return;
+      const a = p.getBoundingClientRect(); const b = win.getBoundingClientRect();
+      const x = Math.round(b.left - a.left - (p.clientLeft || 0)); const y = Math.round(b.top - a.top - (p.clientTop || 0));
+      const key = `${x},${y},${Math.round(b.width)},${Math.round(b.height)}`;
+      if (p.getAttribute('data-hole') === key) return;
+      p.setAttribute('data-hole', key);
+      p.style.setProperty('--hx', `${x}px`); p.style.setProperty('--hy', `${y}px`);
+      p.style.setProperty('--hw', `${Math.round(b.width)}px`); p.style.setProperty('--hh', `${Math.round(b.height)}px`);
+    });
+  }
+
+  /** Assento do dispositivo; sem ninguém ligado ao P1 (tela aberta direto), o teclado 1 comanda o P1. */
   function seatFor(device: DeviceId | null): number {
     if (!device) return -1;
-    const seat = career.drivers.findIndex((_, i) => ctx.input.seatDevice(i) === device);
-    if (seat >= 0) return seat;
+    for (let i = 0; i < n; i++) if (ctx.input.seatDevice(i) === device) return i;
     return ctx.input.seatDevice(0) === null && device === 'kb1' ? 0 : -1;
   }
 
@@ -490,11 +594,12 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
       const seat = seatFor(nav.device);
       if (seat < 0) return;
       if (nav.back) {
+        if (dealer) { if (seat === 0) { api.sfx('back'); api.back(); } return; }
         if (uis[seat].ready) toggleReady(seat);
         else if (seat === 0) { api.sfx('back'); api.emit({ type: 'toMain' }); }
         return;
       }
-      if (nav.start) { toggleReady(seat); return; }
+      if (nav.start) { if (!dealer) toggleReady(seat); return; }
       const list = lists[seat];
       if (!list) return;
       // Confirmar: cada ação toca o próprio som (compra recusada soa diferente de compra feita).
@@ -509,9 +614,14 @@ export function garageScreen(api: ScreenApi): ScreenInstance {
         ui.msgTtl -= dt;
         if (ui.msgTtl <= 0) {
           const m = msgEls[seat];
-          if (m) { m.textContent = ui.ready && !allReady() ? t('career.garage.waiting') : ''; m.className = 'gp-msg'; }
+          if (m) { m.textContent = !dealer && ui.ready && !allReady() ? t('career.garage.waiting') : ''; m.className = 'gp-msg'; }
         }
       });
+      syncHoles();
+    },
+    destroy() {
+      for (const s of stages) s?.release();
+      stages.fill(null);
     },
   };
 }

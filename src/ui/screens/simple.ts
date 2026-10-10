@@ -1,5 +1,6 @@
 // Telas simples: título, menu principal, pausa, créditos e carregando.
 import '../../career/strings';
+import '../../dealership/strings';
 import type { DeviceId, MenuScreen, RaceMode } from '../../game/contracts';
 import { t } from '../../i18n';
 import '../../net/strings';
@@ -62,6 +63,7 @@ export function mainScreen(api: ScreenApi): ScreenInstance {
   entries.push(
     { label: t('ui.main.cup'), hint: t('ui.main.hint.cup'), run: mode('cup') },
     { label: t('ui.main.career'), hint: t('ui.main.hint.career'), run: open('career') },
+    { label: t('dealership.menu'), hint: t('dealership.menu.hint'), run: open('dealership') },
     { label: t('ui.main.quick'), hint: t('ui.main.hint.quick'), run: mode('quick') },
     { label: t('ui.main.timetrial'), hint: t('ui.main.hint.timetrial'), run: mode('timetrial') },
     { label: t('ui.main.party'), hint: t('ui.main.hint.party'), run: open('party') },

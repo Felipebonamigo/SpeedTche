@@ -120,7 +120,8 @@ await press('KeyW', 2);
 await press('KeyA', 2);
 garage = await garagePaints();
 const savedG = await savedPaints();
-const gsvg = await page.evaluate(() => [...document.querySelectorAll('.gp .gp-car-visual .car-svg path')].map((p) => p.getAttribute('fill'))[0]);
+// No 3D (onda N, N2) a prévia é o carro do palco: a janela leva a cor da pintura em `data-color`; no Retrô, a silhueta SVG.
+const gsvg = await page.evaluate(() => [...document.querySelectorAll('.gp .gp-car-visual .car-svg path')].map((p) => p.getAttribute('fill'))[0] ?? document.querySelector('.gp .gp-stage')?.dataset.color);
 check(garage[0] === 'limao' && savedG?.[0]?.falcao === 'limao' && gsvg === '#9bd61f', `P1 pinta o Falcão na garagem (${garage[0]}, desenho ${gsvg})`);
 check(garage[1] === 'grafite' && savedG?.[1]?.saci === 'grafite', `P2 pinta o Saci na garagem (${garage[1]}, save ${JSON.stringify(savedG?.[1])})`);
 await settle();
