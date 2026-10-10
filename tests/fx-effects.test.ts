@@ -33,7 +33,7 @@ const streaksOf = (fx: Effects): Streaks => (fx as unknown as { streaks: Streaks
 /** Anda `n` quadros de 1/60 s com `mutate` antes de cada um; devolve os traços do viewport no fim (passa por `pose`). */
 function frames(s: Scene, n: number, mutate: (i: number) => void = () => undefined) {
   const car = s.state.cars[s.idx];
-  let peak = 0; const rgb: number[][] = [];
+  let peak = 0; let sparksPeak = 0; const rgb: number[][] = [];
   for (let i = 0; i < n; i++) {
     mutate(i);
     s.frame.time += 1 / 60;
@@ -42,10 +42,11 @@ function frames(s: Scene, n: number, mutate: (i: number) => void = () => undefin
     s.fx.pose(rf, s.frame.track, 600, 0);
     const st = streaksOf(s.fx);
     peak = Math.max(peak, st.count);
+    sparksPeak = Math.max(sparksPeak, s.fx.counts().sparks);
     const col = st.mesh.geometry.getAttribute('aColor');
     for (let q = 0; q < st.count; q++) rgb.push([col.getX(q * 4), col.getY(q * 4), col.getZ(q * 4)]);
   }
-  return { peak, rgb, visible: streaksOf(s.fx).mesh.visible };
+  return { peak, sparksPeak, rgb, visible: streaksOf(s.fx).mesh.visible };
 }
 
 const drift = (s: Scene, level: number) => {
@@ -108,14 +109,24 @@ describe('faíscas da batida e do escape (Effects)', () => {
   });
 
   it('o nitro solta o rastro de traços azul-brancos; sem nitro, nada; reduzir efeitos, nada', () => {
+    // (conta as faíscas vivas: a 6000 u/s o carro já passa de 85% da máxima e as linhas de velocidade também entram no lote)
     const s = scene(); const c = s.state.cars[s.idx]; c.speed = 6000;
     const r = frames(s, 40, () => { c.nitroTicks = 100; c.speed = 6000; });
-    expect(r.peak).toBeGreaterThan(0);
-    const m = dominant(r.rgb); expect(m[2]).toBeGreaterThan(m[0]);
+    expect(r.sparksPeak).toBeGreaterThan(0);
     const q = scene(); q.state.cars[q.idx].speed = 6000;
-    expect(frames(q, 40, () => { q.state.cars[q.idx].speed = 6000; }).peak).toBe(0);
+    expect(frames(q, 40, () => { q.state.cars[q.idx].speed = 6000; }).sparksPeak).toBe(0);
     const red = scene('high', true); const rc = red.state.cars[red.idx];
-    expect(frames(red, 40, () => { rc.nitroTicks = 100; rc.speed = 6000; }).peak).toBe(0);
+    expect(frames(red, 40, () => { rc.nitroTicks = 100; rc.speed = 6000; }).sparksPeak).toBe(0);
+  });
+
+  it('a cor do rastro do nitro é azul-branca (traços com mais azul que vermelho)', () => {
+    const s = scene('high'); const c = s.state.cars[s.idx];
+    // o nitro acende metade das linhas de velocidade (azul 1,1) além do rastro (azul 1,8): fica só o que tem azul acima de 1,5, o rastro
+    c.speed = 1200;
+    const r = frames(s, 40, () => { c.nitroTicks = 100; c.speed = 1200; });
+    const rgb = r.rgb.filter((v) => v[2] > 1.5);
+    expect(rgb.length).toBeGreaterThan(0);
+    const m = dominant(rgb); expect(m[2]).toBeGreaterThan(m[0]);
   });
 
   it('pausado não emite nem anda', () => {
