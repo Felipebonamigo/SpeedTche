@@ -3,8 +3,8 @@
 // metros reais (skyline: escala grande), lido de longe pela silhueta; frente para +X, comprimento em Z.
 import * as THREE from 'three';
 import { hash2 } from '../../noise';
-import { box, cone, cyl, gable, hip, ico, jitter, paint, sphere, tf, tintUp, tris, type Geo, type Model } from '../geom';
-import { beam, cable, cliff, dune, facadeBox, hill, Kit, landmarkPart, lathe } from './kit';
+import { gable, hip, blobIco, ico, jitter, roundBlob, paint, sphere, tf, tintUp, tris, type Geo, type Model } from '../geom';
+import { beam, box, cable, cliff, cone, cyl, dune, facadeBox, fitted, hill, Kit, landmarkPart, lathe } from './kit';
 import type { LandmarkRegistry } from './types';
 
 type V3 = [number, number, number];
@@ -113,7 +113,7 @@ function rock(seed: number, color: string, m: THREE.Matrix4, seg: [number, numbe
 
 /** Moita/copa: icosaedro deformado. */
 function blob(seed: number, color: string, x: number, y: number, z: number, sx: number, sy: number, sz: number): Geo {
-  return paint(jitter(ico(1, 0), 0.2, seed), color, tf(x, y, z, sx, sy, sz));
+  return paint(roundBlob(0.2, seed, 0), color, tf(x, y, z, sx, sy, sz));
 }
 
 // ───────────────────────────── Sudeste ─────────────────────────────
@@ -147,7 +147,7 @@ function casarioParaty(): Model {
   // Pé de moleque na frente (pedras grandes irregulares) e o meio-fio.
   const L = n * W + 22;
   k.add(paint(box(7, 0.3, L), '#8a8072', tf(D / 2 + 3.5, 0.15, z0 + L / 2)));
-  for (let s = 0; s < 10; s++) k.add(paint(jitter(ico(1, 0), 0.25, 300 + s), '#a39a8a', tf(D / 2 + 1.5 + hash2(s, 301) * 5, 0.25, z0 + 2 + s * 6.4, 0.9, 0.25, 0.9)));
+  for (let s = 0; s < 10; s++) k.add(paint(roundBlob(0.25, 300 + s, 0), '#a39a8a', tf(D / 2 + 1.5 + hash2(s, 301) * 5, 0.25, z0 + 2 + s * 6.4, 0.9, 0.25, 0.9)));
   // Igreja de Santa Rita: nave, frontão com volutas e cantaria, a torre recuada do lado.
   const zc = 28; const fx = 6;
   k.add(paint(box(26, 0.6, 15), STONE, tf(fx - 9, 0.3, zc)));
@@ -242,7 +242,7 @@ function farolIlhabela(): Model {
   const k = new Kit();
   k.add(paint(cyl(30, 30, 0.25, 14), '#e6f0f2', tf(0, 0.05, 0)));
   k.add(hill(27, 10, 23, 211, '#5d5850', '#4f7a3a', 1, 0.2, 0.8));
-  for (let i = 0; i < 6; i++) k.add(paint(jitter(ico(1, 0), 0.25, 212 + i), '#4f4a44', tf(Math.cos(i * 1.1) * 24, 0.5, Math.sin(i * 1.1) * 21, 3, 2, 3)));
+  for (let i = 0; i < 6; i++) k.add(paint(roundBlob(0.25, 212 + i, 0), '#4f4a44', tf(Math.cos(i * 1.1) * 24, 0.5, Math.sin(i * 1.1) * 21, 3, 2, 3)));
   // Mata rala no alto da pedra.
   for (let i = 0; i < 5; i++) k.add(blob(218 + i, i % 2 ? '#3f7a3a' : '#4f8a40', -8 + hash2(i, 219) * 6, 8.5, -10 + i * 5, 3, 2.2, 3));
   const y0 = 8.5;
@@ -424,7 +424,7 @@ function cascaDanta(): Model {
   for (let i = 0; i < 4; i++) k.light(paint(jitter(ico(1, 1), 0.14, 230 + i), MIST, tf(fx + (i % 2) * 6, 7 + (i >> 1) * 6, (i - 1.5) * 16, 18, 11, 18)));
   k.add(paint(cyl(30, 32, 0.6, 12), '#3f8ab0', tf(fx + 20, 0.3, 0, 1, 1, 1.3)));
   k.add(paint(box(40, 0.5, 14), '#4a90b4', tf(fx + 60, 0.25, 4)));
-  for (let i = 0; i < 6; i++) k.add(paint(jitter(ico(1, 0), 0.25, 234 + i), '#6a6458', tf(fx + 45 + i * 6, 0.8, (i % 2 ? 11 : -3) + hash2(i, 228) * 3, 3, 1.6, 3)));
+  for (let i = 0; i < 6; i++) k.add(paint(roundBlob(0.25, 234 + i, 0), '#6a6458', tf(fx + 45 + i * 6, 0.8, (i % 2 ? 11 : -3) + hash2(i, 228) * 3, 3, 1.6, 3)));
   // Mata no pé da escarpa, dos dois lados do poço.
   for (let i = 0; i < 10; i++) {
     const z = (i < 5 ? -1 : 1) * (48 + (i % 5) * 30);
@@ -443,8 +443,8 @@ function pedraAzul(): Model {
   k.add(p);
   // O Lagarto: a saliência alongada subindo pela face, mais escura. O azul é saturado (a cor do nome): com 0,15 de
   // saturação a pedra lia cinza na névoa.
-  k.add(paint(jitter(ico(1, 1), 0.08, 234), '#46628e', tf(60, 200, -46, 12, 50, 16, 0, 0, 0.3)));
-  k.add(paint(jitter(ico(1, 0), 0.08, 235), '#46628e', tf(45, 246, -48, 10, 13, 12)));
+  k.add(paint(roundBlob(0.08, 234, 1), '#46628e', tf(60, 200, -46, 12, 50, 16, 0, 0, 0.3)));
+  k.add(paint(roundBlob(0.08, 235, 0), '#46628e', tf(45, 246, -48, 10, 13, 12)));
   // Mata no pé do domo.
   k.add(tintUp(hill(150, 55, 130, 236, '#2f6a33', '#3f7a3a', 1, 0.16, 0.4, tf(20, 0, -40)), '#3f7a3a', 0.3, 1));
   return k.model([0, 330], 0.04, 231);
@@ -564,14 +564,14 @@ function cataratasIguacu(): Model {
     }
     if (narrow) {
       const [bx, bz] = at(R - 4, a + (chord * 0.32) / R);
-      k.add(paint(jitter(ico(1, 1), 0.18, 292 + i), greens[i % 4], tf(bx, H2 + 14, bz, 9, 16, chord * 0.25)));
+      k.add(paint(roundBlob(0.18, 292 + i, 1), greens[i % 4], tf(bx, H2 + 14, bz, 9, 16, chord * 0.25)));
     }
     // Mata fechada no alto da borda: copas redondas acima do lábio (a silhueta de cima é floresta).
     const [tx, tz] = at(R + 20, a); // atrás do lábio: a copa não cobre o alto da queda
-    k.add(paint(jitter(ico(1, 1), 0.16, 340 + i), greens[i % 4], tf(tx, H1 + 3, tz, 18, 9, chord * 0.62)));
+    k.add(paint(roundBlob(0.16, 340 + i, 1), greens[i % 4], tf(tx, H1 + 3, tz, 18, 9, chord * 0.62)));
     if (!center) { // e no degrau do meio, entre as duas quedas
       const [mx, mz] = at(R - 22, a);
-      k.add(paint(jitter(ico(1, 0), 0.2, 380 + i), greens[(i + 2) % 4], tf(mx, H2 + 0.5, mz, 7, 2.5, chord * 0.5)));
+      k.add(paint(roundBlob(0.2, 380 + i, 0), greens[(i + 2) % 4], tf(mx, H2 + 0.5, mz, 7, 2.5, chord * 0.5)));
     }
   }
   // As pontas da ferradura, que se veem de lado: a encosta de mata desce do planalto até o rio (sem paredão à mostra).
@@ -899,7 +899,7 @@ function canionItaimbezinho(): Model {
     const top = new THREE.Vector3(c.lipAt(zl) + 1.5, c.topAt(zl) - 1, zl).applyMatrix4(m);
     const foot = new THREE.Vector3(c.footAt(zl) + 14, 40, zl).applyMatrix4(m);
     k.light(beam([top.x, top.y, top.z], [foot.x, foot.y, foot.z], w, WATER_FALL, 2));
-    k.add(paint(jitter(ico(1, 0), 0.2, 415 + j), '#eef4f6', tf(foot.x, foot.y - 4, foot.z, 14, 9, 14)));
+    k.add(paint(roundBlob(0.2, 415 + j, 0), '#eef4f6', tf(foot.x, foot.y - 4, foot.z, 14, 9, 14)));
   };
   fall(0, -back * 0.22, 9); fall(1, back * 0.1, 6);
   // Mata atlântica no pé da escarpa.
@@ -1082,7 +1082,7 @@ function cavalhada(): Model {
     // Cavaleiro.
     k.add(paint(box(0.55, 0.9, 0.45), color, tf(...P(0, 2.75, -0.1), S, S, S)));
     k.add(paint(box(0.7, 0.5, 0.5), GOLD, tf(...P(0, 2.4, -0.1), S, S, S)));
-    k.add(paint(ico(0.24, 0), '#e0b090', tf(...P(0, 3.4, -0.1), S, S, S)));
+    k.add(paint(blobIco(0.24, 0), '#e0b090', tf(...P(0, 3.4, -0.1), S, S, S)));
     k.add(paint(cyl(0.38, 0.38, 0.12, 6), color, tf(...P(0, 3.62, -0.1), S, S, S)), paint(cone(0.12, 0.6, 4), '#f4f2ea', tf(...P(0, 3.95, -0.25), S, S, S)));
     L(P(0.35, 2.6, -1.2), P(0.35, 3.6, 3.2), 0.08, '#d8d0c0');
     k.add(paint(box(0.04, 0.4, 0.6), color, tf(...P(0.35, 3.5, 2.8), S, S, S)));
@@ -1098,7 +1098,7 @@ function cavalhada(): Model {
     k.add(paint(cone(0.8, 1.9, 6), c, tf(x, 0.95, z)), paint(box(0.5, 0.8, 0.5), c, tf(x, 2.2, z)));
     k.add(paint(box(0.8, 0.7, 0.7), '#f4f2ea', tf(x + 0.1, 2.9, z)), paint(box(0.5, 0.4, 0.5), '#f4f2ea', tf(x + 0.5, 2.75, z)));
     k.add(beam([x, 3.2, z - 0.35], [x - 0.1, 3.8, z - 0.8], 0.12, '#f2e6c8'), beam([x, 3.2, z + 0.35], [x - 0.1, 3.8, z + 0.8], 0.12, '#f2e6c8'));
-    k.add(paint(ico(0.18, 0), '#e8402a', tf(x + 0.45, 3.3, z - 0.2)), paint(ico(0.18, 0), '#f2c230', tf(x + 0.45, 3.3, z + 0.2)));
+    k.add(paint(blobIco(0.18, 0), '#e8402a', tf(x + 0.45, 3.3, z - 0.2)), paint(blobIco(0.18, 0), '#f2c230', tf(x + 0.45, 3.3, z + 0.2)));
   }
   // Mastros com bandeirolas triangulares ao longo do campo.
   for (const z of [-28, 0, 28]) k.add(paint(cyl(0.14, 0.16, 9, 5), '#e8e4da', tf(-15, 4.5, z)));
@@ -1185,7 +1185,7 @@ function jacare(): Model {
   for (const dz of [-0.45, 0.45]) k.add(sg(paint(box(0.16, 0.36, 0.12), '#1a1a1a', tf(25.25, 3.6, 30 + dz))));
   for (let i = 0; i < 8; i++) {
     const x = -16 + hash2(i, 481) * 16; const z = -26 + i * 7.5;
-    k.add(paint(jitter(ico(1, 0), 0.2, 482 + i), i % 2 ? '#5aa040' : '#4f9238', tf(x, 0.4, z, 3.2, 0.32, 2.6)));
+    k.add(paint(roundBlob(0.2, 482 + i, 0), i % 2 ? '#5aa040' : '#4f9238', tf(x, 0.4, z, 3.2, 0.32, 2.6)));
     if (i % 4 === 1) k.add(paint(box(0.6, 0.5, 0.6), '#c890d8', tf(x + 0.6, 0.8, z)));
   }
   // Jacaré de 2,7 m na escala `S`: corpo, ventre claro, cauda em três gomos com a crista, patas abertas, cabeça
@@ -1195,7 +1195,7 @@ function jacare(): Model {
     const M = tf(x, y0, z, S, S, S, 0, yaw, 0);
     const at = (m: THREE.Matrix4): THREE.Matrix4 => M.clone().multiply(m);
     const back = '#3a4430'; const flank = '#5a5e3e'; const belly = '#a89c6c';
-    k.add(paint(ico(1, 0), back, at(tf(0, 0.2, 0, 0.3, 0.19, 0.58))));
+    k.add(paint(blobIco(1, 0), back, at(tf(0, 0.2, 0, 0.3, 0.19, 0.58))));
     k.add(paint(box(0.5, 0.08, 0.95), belly, at(tf(0, 0.05, 0))));
     const tail: V3[] = [[0, 0.2, -0.48], [0.06, 0.16, -0.95], [0.18, 0.11, -1.35], [0.34, 0.06, -1.7]];
     for (let i = 0; i < 3; i++) k.add(beam(tail[i], tail[i + 1], 0.34 - i * 0.09, i ? flank : back, 0.24 - i * 0.055).applyMatrix4(M));
@@ -1253,7 +1253,7 @@ function jacare(): Model {
   const branches: Array<[V3, V3]> = [[[tx, H - 0.5, tz], [tx + 3.2, H + 2.2, tz + 0.8]], [[tx, H - 0.3, tz], [tx - 2.6, H + 2.6, tz - 1.4]], [[tx, H, tz], [tx + 0.5, H + 3.4, tz + 2.2]], [[tx, H * 0.6, tz], [tx + 3.4, H * 0.6 + 1.6, tz - 1.8]]];
   for (const [a, b] of branches) k.add(beam(a, b, 0.25, bark));
   const egret = (p: V3, c: string): void => {
-    k.add(paint(ico(1, 0), c, tf(p[0], p[1] + 0.55, p[2], 0.4, 0.38, 0.7)));
+    k.add(paint(blobIco(1, 0), c, tf(p[0], p[1] + 0.55, p[2], 0.4, 0.38, 0.7)));
     k.add(beam([p[0], p[1] + 0.75, p[2] + 0.45], [p[0], p[1] + 1.55, p[2] + 0.55], 0.13, c));
     k.add(beam([p[0], p[1] + 1.55, p[2] + 0.55], [p[0], p[1] + 1.5, p[2] + 1.15], 0.08, c === '#1e1e22' ? '#3a3a3a' : '#e0b030'));
   };
@@ -1261,7 +1261,7 @@ function jacare(): Model {
   egret([tx, H + 0.1, tz], '#1e1e22');
   // Garças na lama da prainha.
   for (const [x, z] of [[21, -13], [22, 3], [20, 19]] as Array<[number, number]>) {
-    k.add(paint(ico(1, 0), '#f6f6f2', tf(x, 2.2, z, 0.6, 0.55, 1.0)));
+    k.add(paint(blobIco(1, 0), '#f6f6f2', tf(x, 2.2, z, 0.6, 0.55, 1.0)));
     k.add(beam([x, 2.5, z + 0.6], [x, 3.7, z + 0.75], 0.18, '#f6f6f2'), beam([x, 3.7, z + 0.75], [x, 3.6, z + 1.6], 0.11, '#e0b030'));
     for (const b of [-0.15, 0.15]) k.add(beam([x + b, 1.9, z], [x + b, 1.1, z], 0.08, '#2a2a2a'));
   }
@@ -1378,6 +1378,7 @@ function centroGeodesico(): Model {
   // O globo é o que diz "centro da América do Sul": ainda maior que o resto (raio 2,3 × 1,45).
   const G = (m: THREE.Matrix4): THREE.Matrix4 => tf(gx, 3.9, 0, 1.21, 1.21, 1.21).multiply(m);
   k.add(up(paint(sphere(1.9, 14, 10), '#2f6fc0', G(tf(0, 0, 0)))));
+  // Os continentes são decalques na pele do globo: icosaedro de 20 faces, sem o refino por tamanho (180 faces cobririam o azul que a leitura mede).
   k.add(up(paint(jitter(ico(1, 0), 0.15, 551), '#4f9a48', G(tf(1.55, -0.2, 0.1, 0.5, 1.2, 0.75, 0, 0, 0.2)))));
   k.add(up(paint(jitter(ico(1, 0), 0.15, 552), '#4f9a48', G(tf(1.35, 1.1, -0.4, 0.45, 0.6, 0.8)))));
   // O anel do equador é luz: Cuiabá corre à noite, e o globo azul sumia no escuro — o anel aceso o desenha.
@@ -1395,7 +1396,7 @@ function centroGeodesico(): Model {
   return k.model([0, 27], 0.02, 551);
 }
 
-export const LANDMARKS_BRASIL_2_CENTRO_SUL: LandmarkRegistry = {
+export const LANDMARKS_BRASIL_2_CENTRO_SUL: LandmarkRegistry = fitted({
   // Sudeste
   casario_paraty: { build: casarioParaty, place: 'near', side: 'any', perLap: 3, turn: 0.15 },
   escuna: { build: escuna, place: 'near', side: 'sea', perLap: 2 },
@@ -1426,4 +1427,4 @@ export const LANDMARKS_BRASIL_2_CENTRO_SUL: LandmarkRegistry = {
   monumento_campo_grande: { build: monumentoCampoGrande, place: 'near', side: 'any', perLap: 2 },
   veu_de_noiva: { build: veuDeNoiva, place: 'far', side: 'any', perLap: 2, turn: 0.35 },
   centro_geodesico: { build: centroGeodesico, place: 'near', side: 'any', perLap: 2 },
-};
+});

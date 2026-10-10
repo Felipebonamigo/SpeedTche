@@ -16,6 +16,7 @@ import { setClearings, type Clearing } from './clearings';
 import { groundOffset, isSeaSide, seaLevelOffset } from './ground';
 import type { LandmarkDef } from './landmarks/types';
 import { LANDMARK_SIGHT_MIN, SIGHT_TAN_H, sightRoad, sightSeconds, type SightRoad } from './sight';
+import { sways, windPhase } from './wind';
 
 /** |x| máximo do carro na física (sim/physics.ts) em metros, mais a meia largura visual dele. */
 export const CAR_REACH_M = 3.2 * ROAD_HALF_WIDTH_M + 0.95;
@@ -53,6 +54,11 @@ export interface Placement {
   /** Fios: segmentos até o próximo poste (0 = não é fio) e o ponto dele. */
   linkSeg: number; linkF: number; linkX: number; linkY: number;
   /**
+   * Fase do vento (0 = rígido; (0, 1] = a árvore balança, `wind.ts`): um hash da posição NA PISTA (segmento, lateral, fração), então o balanço
+   * não escorrega com o carro nem difere entre as telas. Só árvore, conífera e palmeira (o modelo de perto).
+   */
+  wind: number;
+  /**
    * Enfeite dispensável (0 = sempre; forração, mata e soltos têm um sorteio em (0, 1)): com a janela curta das
    * qualidades baixa e média o runtime desenha só os de nota ≤ a fração da janela (menos vista, menos enfeite).
    */
@@ -83,7 +89,7 @@ class ModelTable {
 function base(model: number): Placement {
   return {
     model, far: -1, farFrom: 1e9, maxAhead: 1e9, f: 0.5, x: 0, y: 0, yaw: 0, pitch: 0, yawC: 1, yawS: 0, sx: 1, sy: 1, sz: 1,
-    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, rank: 0,
+    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
   };
 }
 
@@ -683,7 +689,7 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         const lat = 26 + h(201) * 50;
         const id = pickWeighted(recipe.scatter, h(202));
         const r = footprintOf(id);
-        if (!(inner && lat < 60 && (id.startsWith('cactus:saguaro') || id === 'termite')) && occ.free(i, side, lat - r, lat + r, 0)) {
+        if (!(inner && lat < 60 && (id.startsWith('cactus:saguaro') || id === 'cactus:mandacaru' || id === 'termite')) && occ.free(i, side, lat - r, lat + r, 0)) {
           const sc = 0.7 + h(203) * 0.6;
           put(i, id, side * lat, h(204), { yaw: h(205) * 6.28, sx: sc, sy: sc, sz: sc, maxAhead: 150, rank: 0.02 + h(206) * 0.98 });
           occ.mark(i, side, lat - r, lat + r, 0);
@@ -732,7 +738,12 @@ export function sceneryLayout(track: Track, landmarks: readonly string[] = place
   placeSprites(track, table, bySeg, occ, tall, block);
   const sight = placeLandmarks(track, landmarks, table, bySeg, occ, tall, block);
   dress(track, dressingRecipe(track.def), table, bySeg, occ);
-  for (const list of bySeg) for (const p of list) { p.yawC = Math.cos(p.yaw); p.yawS = Math.sin(p.yaw); }
+  bySeg.forEach((list, i) => {
+    for (const p of list) {
+      p.yawC = Math.cos(p.yaw); p.yawS = Math.sin(p.yaw);
+      if (sways(table.ids[p.model])) p.wind = windPhase(i, p.x, p.f);
+    }
+  });
   return keepSight && sight ? { models: table.ids, bySeg, sight } : { models: table.ids, bySeg };
 }
 

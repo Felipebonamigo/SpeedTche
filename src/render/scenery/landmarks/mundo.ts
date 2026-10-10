@@ -12,8 +12,8 @@
 // placa de Las Vegas diz só "WELCOME".
 import * as THREE from 'three';
 import { hash2, hash3, valueNoise } from '../../noise';
-import { box, cone, cyl, dodeca, frond, gable, hip, ico, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type Model, type ModelPart } from '../geom';
-import { landmarkPart } from './kit';
+import { dodeca, frond, gable, hip, blobIco, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type Model, type ModelPart, mergeFlat } from '../geom';
+import { box, cone, cyl, extrudeRound, fitted, landmarkPart } from './kit';
 import type { LandmarkRegistry } from './types';
 
 type C = THREE.ColorRepresentation;
@@ -85,7 +85,7 @@ class Kit {
     }
     const parts: ModelPart[] = [];
     const [s0, s1] = opt.shade ?? [0.8, 1.05];
-    if (this.flat.length) parts.push({ geometry: shadeY(merge(this.flat), 0, height, s0, s1), mat: 'flat', shadow: opt.shadow ?? false });
+    if (this.flat.length) parts.push({ geometry: shadeY(mergeFlat(this.flat), 0, height, s0, s1), mat: 'flat', shadow: opt.shadow ?? false });
     if (this.glow.length) parts.push({ geometry: merge(this.glow), mat: 'glow' });
     if (this.beacon.length) parts.push({ geometry: merge(this.beacon), mat: 'beacon' });
     if (this.beams.length) parts.push({ geometry: merge(this.beams), mat: 'cone' });
@@ -222,7 +222,7 @@ function shapeOf(pts: ReadonlyArray<readonly [number, number]>, s = 1): THREE.Sh
 
 /** Extrusão de um contorno do plano XY, centrada em z (espessura `depth`). */
 function extrude(shape: THREE.Shape, depth: number, curveSegments = 6): Geo {
-  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments }).translate(0, 0, -depth / 2);
+  return extrudeRound(shape, depth, Math.min(1.2, Math.max(0.15, depth * 0.04)), { curveSegments }).translate(0, 0, -depth / 2);
 }
 
 /**
@@ -779,7 +779,7 @@ function portaoShurei(): Model {
   // Muros de pedra coral e hibiscos.
   for (const sz of [-1, 1]) {
     k.f(box(1.0, 1.7, 7), '#d8cfb4', tf(0, 0.85, sz * 11.6));
-    k.raw(speckle(paint(ico(1.0, 1), '#3f8a3a', tf(1.4, 0.9, sz * 9.4, 1.2, 1, 1.4)), 0.12, 4));
+    k.raw(speckle(paint(blobIco(1.0, 1), '#3f8a3a', tf(1.4, 0.9, sz * 9.4, 1.2, 1, 1.4)), 0.12, 4));
     k.l(sphere(0.18, 5, 3), '#ff4a5a', tf(2.4, 1.2, sz * 9.2)).l(sphere(0.18, 5, 3), '#ff4a5a', tf(2.0, 1.7, sz * 9.9));
   }
   return k.model(12.5, { shadow: true, blob: 5 });
@@ -789,10 +789,10 @@ function portaoShurei(): Model {
 function shisaFigure(k: Kit, m: THREE.Matrix4, open: boolean, seed: number): void {
   const s = new Kit();
   const t = '#c86a3c'; const t2 = '#a8522c';
-  s.f(ico(0.75, 1), t, tf(-0.3, 0.6, 0, 1.05, 0.8, 1));
-  s.f(ico(0.6, 1), t, tf(0.22, 1.05, 0, 0.85, 1.15, 0.9));
+  s.f(blobIco(0.75, 1), t, tf(-0.3, 0.6, 0, 1.05, 0.8, 1));
+  s.f(blobIco(0.6, 1), t, tf(0.22, 1.05, 0, 0.85, 1.15, 0.9));
   for (const z of [-0.32, 0.32]) { s.f(box(0.32, 1.0, 0.3), t, tf(0.45, 0.45, z)); s.f(box(0.48, 0.26, 0.38), t2, tf(0.62, 0.13, z)); }
-  s.f(ico(0.62, 1), t, tf(0.42, 1.88, 0, 1, 0.9, 1.12));
+  s.f(blobIco(0.62, 1), t, tf(0.42, 1.88, 0, 1, 0.9, 1.12));
   s.f(box(0.5, 0.42, 0.86), t, tf(0.92, 1.72, 0));
   if (open) {
     s.f(box(0.12, 0.3, 0.66), '#3a1a12', tf(1.17, 1.56, 0));
@@ -833,7 +833,7 @@ function shisa(): Model {
     else shisaFigure(k, tf(0, top, sz * z0, SHISA_SC, SHISA_SC, SHISA_SC), sz < 0, sz < 0 ? 5 : 6);
   }
   k.f(box(5, 0.12, 6.4), '#cfc6b2', tf(1, 0.06, 0));
-  k.raw(speckle(paint(ico(1.2, 1), '#3f8a3a', tf(1.4, 0.8, -12.5, 1.3, 0.9, 1.4)), 0.12, 7));
+  k.raw(speckle(paint(blobIco(1.2, 1), '#3f8a3a', tf(1.4, 0.8, -12.5, 1.3, 0.9, 1.4)), 0.12, 7));
   k.l(sphere(0.2, 5, 3), '#ff4a5a', tf(2.6, 1.2, -12.4));
   return k.model(top + 2.6 * SHISA_SC, { shadow: true, blob: 4 });
 }
@@ -894,8 +894,8 @@ function pagodeChureito(): Model {
     const gy = chureitoHill(x, z) - 0.3;
     k.f(cyl(0.3, 0.45, 4, 5), '#5a3e30', tf(x, gy + 2, z));
     const c = i % 2 ? '#f6a8c8' : '#f8c4d8';
-    k.raw(speckle(paint(ico(3.0, 0), c, tf(x, gy + 5.2, z, 1.2, 0.9, 1.2)), 0.08, 40 + i));
-    k.raw(speckle(paint(ico(2.2, 0), c, tf(x + 1.6, gy + 6.4, z - 1, 1.1, 0.9, 1.1)), 0.08, 50 + i));
+    k.raw(speckle(paint(blobIco(3.0, 0), c, tf(x, gy + 5.2, z, 1.2, 0.9, 1.2)), 0.08, 40 + i));
+    k.raw(speckle(paint(blobIco(2.2, 0), c, tf(x + 1.6, gy + 6.4, z - 1, 1.1, 0.9, 1.1)), 0.08, 50 + i));
   });
   // Escadaria que sobe pela frente.
   for (let i = 0; i < 12; i++) {
@@ -936,7 +936,7 @@ function casteloOsaka(): Model {
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + 0.3; const r = 38 + hash2(i, 61) * 6;
     k.f(cyl(0.35, 0.5, 3, 5), '#5a4030', tf(Math.cos(a) * r, 1.5, Math.sin(a) * r));
-    k.raw(speckle(paint(ico(3.4, 0), '#2f5a36', tf(Math.cos(a) * r, 5, Math.sin(a) * r, 1.4, 0.7, 1.4)), 0.1, 70 + i));
+    k.raw(speckle(paint(blobIco(3.4, 0), '#2f5a36', tf(Math.cos(a) * r, 5, Math.sin(a) * r, 1.4, 0.7, 1.4)), 0.1, 70 + i));
   }
   return k.model(y + 3, { shade: [0.8, 1.05] });
 }
@@ -996,7 +996,7 @@ function tsutenkaku(): Model {
 function casteloNeuschwanstein(): Model {
   const k = new Kit();
   const white = '#efeadc'; const slate = '#4c5d75';
-  const crag = paint(ico(1, 2), '#7a7670', tf(0, 4, 0, 52, 30, 78));
+  const crag = paint(blobIco(1, 2), '#7a7670', tf(0, 4, 0, 52, 30, 78));
   k.raw(speckle(tintUp(roughen(crag, 3.5, 81), '#4f7a3a', 0.6, 0.85), 0.08, 82));
   const Y = 30;
   k.f(box(40, 8, 86), '#a49e94', tf(-2, Y - 3, 2));
@@ -1190,7 +1190,7 @@ function capelaAlpina(): Model {
   k.f(box(0.12, 1.4, 0.12), '#c8a040', tf(4.8, 18.0, 0)).f(box(0.12, 0.12, 0.8), '#c8a040', tf(4.8, 18.2, 0));
   k.f(box(0.2, 2.6, 1.8), '#5a3e28', tf(6.55, 1.9, 0));
   // Rochas, cruz de caminho e banco.
-  k.raw(speckle(paint(roughen(paint(ico(1, 1), '#8a8680', tf(2, 0.6, 8, 3, 1.8, 2.4)), 0.4, 103), '#8a8680'), 0.1, 104));
+  k.raw(speckle(paint(roughen(paint(blobIco(1, 1), '#8a8680', tf(2, 0.6, 8, 3, 1.8, 2.4)), 0.4, 103), '#8a8680'), 0.1, 104));
   k.f(box(0.3, 4, 0.3), '#6a4a30', tf(5, 2, -7)).f(box(0.3, 0.3, 1.8), '#6a4a30', tf(5, 3.2, -7));
   k.f(gable(0.9, 0.5, 2.2, 0.1), '#4a3a2a', tf(5, 4.0, -7));
   k.f(box(0.6, 0.15, 2.2), '#7a5a3a', tf(6, 0.6, -3.5));
@@ -1295,7 +1295,7 @@ function giraffe(k: Kit, m: THREE.Matrix4, seed: number): void {
   const s = new Kit();
   const coat = (g: Geo): Geo => faceColor(g, (_x, _y, _z, _u, f) => (hash2(f, seed) < 0.66 ? '#a8521e' : '#f0dcaa'));
   // Corpo inclinado: a cernelha (frente, +Z) mais alta que a garupa.
-  s.raw(coat(paint(ico(1, 1), '#b8682c', tf(0, 2.75, 0, 0.7, 0.78, 1.3, -0.16, 0, 0))));
+  s.raw(coat(paint(blobIco(1, 1), '#b8682c', tf(0, 2.75, 0, 0.7, 0.78, 1.3, -0.16, 0, 0))));
   for (const [x, z, h] of [[0.3, 0.85, 2.5], [-0.3, 0.85, 2.5], [0.28, -0.85, 2.2], [-0.28, -0.85, 2.2]] as const) {
     s.raw(coat(paint(cyl(0.1, 0.15, h, 5), '#b8682c', tf(x, h / 2, z))));
     s.f(box(0.2, 0.16, 0.24), '#2a2018', tf(x, 0.08, z));
@@ -1608,7 +1608,7 @@ function arcoGreatOcean(): Model {
     k.raw(speckle(g, 0.05, 430 + l));
   }
   // Pedras caídas e a espuma das ondas em volta.
-  for (const [x, z, r] of [[16, -34, 4.5], [-14, 44, 3.5], [18, 46, 3]] as const) k.raw(speckle(roughen(paint(ico(r, 0), '#b88a5a', tf(x, r * 0.3, z)), 0.6, 427), 0.06, 428));
+  for (const [x, z, r] of [[16, -34, 4.5], [-14, 44, 3.5], [18, 46, 3]] as const) k.raw(speckle(roughen(paint(blobIco(r, 0), '#b88a5a', tf(x, r * 0.3, z)), 0.6, 427), 0.06, 428));
   k.f(new THREE.RingGeometry(1, 1.22, 20, 1).rotateX(-Math.PI / 2), '#eef6f8', tf(0, 0.3, -3, 18, 1, 58));
   k.f(new THREE.RingGeometry(1, 1.5, 12, 1).rotateX(-Math.PI / 2), '#eef6f8', tf(-4, 0.3, 70, 8, 1, 8));
   // O arco fica na ponta −Z, a que quem chega vê (mirrorZ).
@@ -1833,7 +1833,7 @@ function ponteStorseisundet(): Model {
   // Ilhotas de pedra com capim nas pontas, e a estrada que segue rente à água.
   for (const sz of [-1, 1]) {
     const [x0, , z0] = path[sz < 0 ? 0 : path.length - 1];
-    const g = paint(ico(1, 1), '#7c7a72', tf(x0 - 2, 0, z0 + sz * 18, 34, 9, 26));
+    const g = paint(blobIco(1, 1), '#7c7a72', tf(x0 - 2, 0, z0 + sz * 18, 34, 9, 26));
     k.raw(speckle(tintUp(roughen(g, 1.6, 361 + sz), '#6f8a4a', 0.55, 0.9), 0.08, 363 + sz));
     k.f(box(8.4, 1.2, 30), '#55555a', tf(x0, 3.1, z0 + sz * 15));
   }
@@ -1979,8 +1979,8 @@ function placaTrolls(): Model {
   // Troll de pedra musgoso.
   const t = new Kit();
   const moss = '#6f7a5a';
-  t.f(ico(1.1, 1), moss, tf(0, 1.7, 0, 1, 1.25, 0.95));
-  t.f(ico(0.75, 1), moss, tf(0.2, 3.25, 0));
+  t.f(blobIco(1.1, 1), moss, tf(0, 1.7, 0, 1, 1.25, 0.95));
+  t.f(blobIco(0.75, 1), moss, tf(0.2, 3.25, 0));
   t.f(cone(0.28, 1.4, 6), '#7a8466', tf(1.15, 3.1, 0, 1, 1, 1, 0, 0, -Math.PI / 2 + 0.25));
   for (const z of [-0.6, 0.6]) {
     t.f(cone(0.18, 0.6, 5), moss, tf(0.1, 3.4, z * 1.25, 1, 1, 1, z > 0 ? 1.1 : -1.1, 0, 0));
@@ -2235,8 +2235,8 @@ function cupulaAzul(): Model {
   // Mureta azul e branca, buganvília.
   k.f(box(0.5, 1.0, 13), white, tf(7.7, 1.7, 0));
   k.f(box(0.55, 0.15, 13.1), blue, tf(7.7, 2.25, 0));
-  k.raw(speckle(paint(ico(1.4, 1), '#d6368f', tf(-6.5, 2.4, -5, 1.2, 1, 1)), 0.1, 221));
-  k.raw(speckle(paint(ico(1.1, 1), '#3f8a3a', tf(-6.2, 1.8, -3.6)), 0.1, 222));
+  k.raw(speckle(paint(blobIco(1.4, 1), '#d6368f', tf(-6.5, 2.4, -5, 1.2, 1, 1)), 0.1, 221));
+  k.raw(speckle(paint(blobIco(1.1, 1), '#3f8a3a', tf(-6.2, 1.8, -3.6)), 0.1, 222));
   for (let i = 0; i < 5; i++) k.f(box(1.6, 0.3, 1.2), '#efebe2', tf(8.6 + i * 0.7, 1.05 - i * 0.22, -5));
   return k.model(13, { shadow: true, blob: 5 });
 }
@@ -2244,7 +2244,7 @@ function cupulaAzul(): Model {
 /** Moinhos de Santorini: três torres caiadas de telhado de sapé, rodas de raios com velas triangulares. */
 function moinhoSantorini(): Model {
   const k = new Kit();
-  const ridge = paint(ico(1, 1), '#9a8a78', tf(0, -1.5, 0, 9, 6.5, 32));
+  const ridge = paint(blobIco(1, 1), '#9a8a78', tf(0, -1.5, 0, 9, 6.5, 32));
   k.raw(speckle(roughen(ridge, 0.8, 231), 0.08, 232));
   [-15, 0, 15].forEach((z, idx) => {
     const y = 3.6 - Math.abs(z) * 0.06;
@@ -2393,7 +2393,7 @@ function cupulaSaoPedro(): Model {
 
 // ───────────────────────────── Registro ─────────────────────────────
 
-export const LANDMARKS_MUNDO: LandmarkRegistry = {
+export const LANDMARKS_MUNDO: LandmarkRegistry = fitted({
   // Estados Unidos
   placa_rota_66: { build: placaRota66, place: 'near', side: 'any', perLap: 2 },
   diner_neon: { build: dinerNeon, place: 'near', side: 'land', perLap: 1 },
@@ -2445,4 +2445,4 @@ export const LANDMARKS_MUNDO: LandmarkRegistry = {
   vulcao_etna: { build: vulcaoEtna, place: 'skyline', side: 'any', perLap: 1 },
   coliseu: { build: coliseu, place: 'far', side: 'any', perLap: 1 },
   cupula_sao_pedro: { build: cupulaSaoPedro, place: 'far', side: 'any', perLap: 1 },
-};
+});

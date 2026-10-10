@@ -6,7 +6,9 @@
 import * as THREE from 'three';
 import { fbm, hash2, valueNoise } from '../../noise';
 import { FACADE_TILE } from '../structures';
-import { jitter, merge, paint, shadeY, speckle, tintUp, type Geo, type MatKey, type Model, type ModelPart } from '../geom';
+import { bevelBox, getRoundLevel, getRoundPlace, roundHill, merge, mergeFlat, paint, roundScale, roundSides, setRoundLevel, shadeY, speckle, tintUp, type Geo, type MatKey, type Model, type ModelPart } from '../geom';
+import { LANDMARK_LIMITS } from './check';
+import type { LandmarkDef, LandmarkRegistry } from './types';
 
 type FacadeStyle = keyof typeof FACADE_TILE;
 
@@ -38,7 +40,7 @@ export class Kit {
   model(shade: [number, number], speck = 0, seed = 1): Model {
     const parts: ModelPart[] = [];
     if (this.flat.length) {
-      let g = shadeY(merge(this.flat), shade[0], shade[1], 0.8, 1.06);
+      let g = shadeY(mergeFlat(this.flat), shade[0], shade[1], 0.8, 1.06);
       if (speck > 0) g = speckle(g, speck, seed);
       parts.push({ geometry: g, mat: 'flat' });
     }
@@ -47,6 +49,103 @@ export class Kit {
     if (this.beacon.length) parts.push({ geometry: merge(this.beacon), mat: 'beacon' });
     return { parts, blob: 0 };
   }
+}
+
+// ───────────────────────── Kit redondo do marco (M3) ─────────────────────────
+// As primitivas que os construtores já usam (`box`, `cyl`, `cone`, `lathe`) e a extrusão, com o nível de arredondamento (geom.ts, `setRoundLevel`): o tamanho decide
+// se a peça ganha bisel ou lados, e o marco que estoura o orçamento do lugar é montado de novo num nível menor (`fitted`). Os construtores trocam só o `import`.
+
+/** Raio (m) a partir do qual um cilindro ou cone do marco ganha lados (1,2 m: o que a 300 m ainda ocupa uns 15 pixels de largura); no nível 2, 2,4 m… */
+export const BIG_R = 1.2;
+const big = (r: number): boolean => Number.isFinite(roundScale()) && r >= BIG_R * roundScale();
+
+/** Cilindro: de 8 a 13 lados sobem para 14 quando o raio é grande (senão a luz lisa desenha um polígono de 18–22° de faceta). */
+export function cyl(rt: number, rb: number, h: number, seg: number, open = false): Geo {
+  return new THREE.CylinderGeometry(rt, rb, h, big(Math.max(rt, rb)) ? roundSides(seg, 14) : seg, 1, open);
+}
+export function cone(r: number, h: number, seg: number): Geo {
+  return new THREE.ConeGeometry(r, h, big(r) ? roundSides(seg, 16) : seg);
+}
+
+/** Menor medida (m) da caixa a partir da qual ela ganha bisel (no nível pleno); o bisel é 9% dela, no máximo 1,1 m. */
+export const BEVEL_MIN = 2.5;
+
+/**
+ * Caixa do marco: a de sempre (12 triângulos) quando é fina ou pequena; de bisel (108 triângulos, a normal esférica do canto) quando a menor medida passa de
+ * `BEVEL_MIN` — a quina viva de uma parede de 20 m é o que lê como caixote de longe. As normais vão marcadas (`roundNormals`) para a fusão do liso as guardar.
+ */
+export function box(w: number, h: number, d: number): Geo {
+  const m = Math.min(w, h, d);
+  if (m < BEVEL_MIN * roundScale() || !Number.isFinite(roundScale())) return new THREE.BoxGeometry(w, h, d);
+  const g = bevelBox(w, h, d, Math.min(0.09 * m, 1.1));
+  g.userData.roundNormals = true;
+  return g;
+}
+
+/** Caixa de bisel explícita (o autor quer o canto redondo, não importa o tamanho): `r` é o raio do bisel. Sai marcada como a do `box`. */
+export function rbox(w: number, h: number, d: number, r: number, uvTile?: readonly [number, number], vOffset = 0): Geo {
+  const g = bevelBox(w, h, d, r, uvTile, vOffset);
+  if (!uvTile) g.userData.roundNormals = true;
+  return g;
+}
+
+/**
+ * Extrusão do contorno `shape` em Z, de 0 a `depth`, COM bisel (`ExtrudeGeometry` com `bevelEnabled`): o bisel de `bevel` m come a aresta da frente e a de trás, e
+ * o contorno e a profundidade ficam os mesmos (o `bevelOffset` negativo mantém o contorno do meio do corpo e o corpo encurta nas pontas), então a pegada e a
+ * altura do marco não mudam. Os furos (arcos, pátios) ganham o bisel por dentro. No nível 0, ou com o bisel pequeno demais, é a extrusão reta de antes.
+ */
+export function extrudeRound(shape: THREE.Shape, depth: number, bevel: number, o: { steps?: number; curveSegments?: number } = {}): Geo {
+  const b = Math.min(bevel, depth / 4);
+  const on = Number.isFinite(roundScale()) && b >= 0.04;
+  const steps = o.steps ?? 1; const curveSegments = o.curveSegments ?? 6;
+  if (!on) return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: on, curveSegments, steps });
+  const g = new THREE.ExtrudeGeometry(shape, { depth: depth - 2 * b, steps, bevelEnabled: on, bevelThickness: b, bevelSize: b, bevelOffset: -b, bevelSegments: 2, curveSegments });
+  g.translate(0, 0, b);
+  // Rede de segurança: um furo a menos de 2·b do contorno faz o bisel se cruzar e a malha sair da caixa do contorno; nesse caso fica a extrusão reta.
+  const plain = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: !on, curveSegments, steps });
+  plain.computeBoundingBox(); g.computeBoundingBox();
+  const pb = plain.boundingBox as THREE.Box3; const gb = g.boundingBox as THREE.Box3;
+  const slack = 0.02;
+  if (gb.min.x < pb.min.x - slack || gb.min.y < pb.min.y - slack || gb.min.z < pb.min.z - slack || gb.max.x > pb.max.x + slack || gb.max.y > pb.max.y + slack || gb.max.z > pb.max.z + slack) { g.dispose(); return plain; }
+  plain.dispose();
+  return g;
+}
+
+/** Quanto o lugar estica o limite de tamanho do arredondamento: de perto (30–80 m) a faceta de uma peça de 1 m já aparece; no horizonte (400 m+), só a de 15 m. */
+const PLACE_FACTOR = { near: 0.4, far: 1, skyline: 3 } as const;
+
+/** Orçamento do lugar em triângulos (geom → check.ts) e a conta de um modelo. */
+function trianglesOf(m: Model): number {
+  let t = 0;
+  for (const p of m.parts) t += p.geometry.getAttribute('position').count / 3;
+  return t;
+}
+
+/**
+ * Cada marco do registro é montado no nível pleno de arredondamento e, se passa do orçamento do lugar dele (`LANDMARK_LIMITS.budget`), de novo no nível seguinte,
+ * até o 0 (a geometria de antes da M3, que sempre cabe). Determinístico: a mesma conta dá o mesmo nível, e o modelo é montado uma vez (o catálogo guarda).
+ */
+export function fitted(reg: LandmarkRegistry): LandmarkRegistry {
+  const out: Record<string, LandmarkDef> = {};
+  for (const [id, def] of Object.entries(reg)) {
+    out[id] = {
+      ...def,
+      build: () => {
+        const budget = LANDMARK_LIMITS.budget[def.place];
+        const before = getRoundLevel(); const beforePlace = getRoundPlace();
+        try {
+          for (let level = 3; level >= 0; level--) {
+            setRoundLevel(level, PLACE_FACTOR[def.place]);
+            const m = def.build();
+            if (level === 0 || trianglesOf(m) <= budget) return m;
+            for (const p of m.parts) p.geometry.dispose();
+          }
+        } finally { setRoundLevel(before, beforePlace); }
+        throw new Error(`marco ${id}: nenhum nível de arredondamento coube`);
+      },
+    };
+  }
+  return out;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -77,7 +176,9 @@ export function cable(a: [number, number, number], b: [number, number, number], 
 /** Sólido de revolução em torno de Y: `profile` = [raio, altura] de baixo para cima; `seg` lados. */
 export function lathe(profile: Array<[number, number]>, seg: number, color: THREE.ColorRepresentation, m?: THREE.Matrix4): Geo {
   const pts = profile.map(([r, y]) => new THREE.Vector2(Math.max(0.0001, r), y));
-  return paint(new THREE.LatheGeometry(pts, seg), color, m);
+  // A cúpula e a torre redonda de raio grande ganham lados (de 8 a 15 sobem para 16: 13° de faceta), como o `cyl`.
+  const rmax = Math.max(...profile.map(([r]) => r));
+  return paint(new THREE.LatheGeometry(pts, big(rmax) ? roundSides(seg, 16) : seg), color, m);
 }
 
 /** Caixa com uv em metros para a textura de fachada (`structures.FACADE_TILE`): janelas de ~3 m que acendem à noite. */
@@ -102,7 +203,7 @@ export function facadeBox(style: FacadeStyle, w: number, h: number, d: number, c
  * chão (pousa em declive sem mostrar o fundo). `top` pinta as faces de cima (mata, grama), `rock` as encostas.
  */
 export function hill(rx: number, h: number, rz: number, seed: number, rock: string, top: string | null, detail = 1, amount = 0.16, skirt = 0.25, m?: THREE.Matrix4): Geo {
-  const g = jitter(new THREE.IcosahedronGeometry(1, detail), amount, seed);
+  const g = roundHill(detail, amount, seed, Math.max(rx, h, rz));
   // Meia esfera de cima vira o morro; a de baixo, a saia (achatada para baixo do chão).
   const p = g.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < p.count; i++) {

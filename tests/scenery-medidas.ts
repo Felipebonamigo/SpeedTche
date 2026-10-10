@@ -3,7 +3,10 @@
 // com a normal de CADA face guardada (o do `scenery-forma` empilha a mesma instância de vetor no vetor das faces, então lá toda
 // aresta de duas faces conta como lisa — mais rígido do que o texto do teste diz; ver o relatório da L4).
 import * as THREE from 'three';
-import type { Geo } from '../src/render/scenery/geom';
+import { smoothNormals } from '../src/render/normals';
+import type { Geo, Model } from '../src/render/scenery/geom';
+import type { Layout } from '../src/render/scenery/layout';
+import { sceneryShading } from '../src/render/scenery/smooth';
 
 export interface EdgeStats { smooth: number; maxJump: number }
 
@@ -50,14 +53,15 @@ export function edgeStats(g: Geo, creaseDeg: number): EdgeStats {
 
 /**
  * Quanto a luz lisa "mente" sobre a forma: o ângulo médio (graus) entre a normal de cada canto liso e a normal da própria face,
- * pesado pela área × o ângulo do canto (a normal suave pesa igual); canto vivo (< 0,5°) fora da conta.
+ * pesado pela área × o ângulo do canto (a normal suave pesa igual); canto vivo (< 0,5°) fora da conta. `mats`: as partes medidas
+ * (padrão só a `flat`; a faceta da bíblia, `tests/scenery-faceta.test.ts`, mede também as quatro fachadas).
  */
-export function normalLie(parts: ReadonlyArray<{ geometry: Geo; mat: string }>): number {
+export function normalLie(parts: ReadonlyArray<{ geometry: Geo; mat: string }>, mats: readonly string[] = ['flat']): number {
   let w = 0; let sum = 0;
   const P = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   const fn = new THREE.Vector3(); const e1 = new THREE.Vector3(); const e2 = new THREE.Vector3(); const nv = new THREE.Vector3();
   for (const p of parts) {
-    if (p.mat !== 'flat') continue;
+    if (!mats.includes(p.mat)) continue;
     const pos = p.geometry.getAttribute('position'); const nor = p.geometry.getAttribute('normal');
     for (let f = 0; f < pos.count / 3; f++) {
       for (let k = 0; k < 3; k++) P[k].fromBufferAttribute(pos, f * 3 + k);
@@ -74,4 +78,124 @@ export function normalLie(parts: ReadonlyArray<{ geometry: Geo; mat: string }>):
     }
   }
   return w > 0 ? sum / w : 0;
+}
+
+/** As partes iluminadas de um modelo (a normal conta): o liso e as quatro fachadas. `glow`, `beacon` e `cone` são luz pintada. */
+export const LIT_MATS = ['flat', 'office', 'apartment', 'classic', 'house'] as const;
+
+/** Fração mínima da área iluminada do modelo para uma peça contar na faceta: o que é menor que isso são poucos pixels na distância de jogo (o botão, a pedrinha, o olho). */
+export const FACET_MIN_PART = 0.015;
+
+/** Peças (sólidos) de uma malha não indexada: os triângulos ligados por pontos em comum (soldados a 1 mm), cada grupo é uma peça. */
+export function solids(g: Geo): number[][] {
+  const pos = g.getAttribute('position');
+  const key = (i: number): string => `${Math.round(pos.getX(i) * 1e3)},${Math.round(pos.getY(i) * 1e3)},${Math.round(pos.getZ(i) * 1e3)}`;
+  const parent = new Map<string, string>();
+  const find = (k: string): string => { let r = k; while (parent.get(r) !== r) r = parent.get(r) as string; let c = k; while (c !== r) { const nx = parent.get(c) as string; parent.set(c, r); c = nx; } return r; };
+  for (let i = 0; i < pos.count; i++) { const k = key(i); if (!parent.has(k)) parent.set(k, k); }
+  for (let t = 0; t + 2 < pos.count; t += 3) { const a = find(key(t)); for (let j = 1; j < 3; j++) { const b = find(key(t + j)); if (a !== b) parent.set(b, a); } }
+  const groups = new Map<string, number[]>();
+  for (let t = 0; t + 2 < pos.count; t += 3) { const r = find(key(t)); const l = groups.get(r); if (l) l.push(t); else groups.set(r, [t]); }
+  return [...groups.values()];
+}
+
+function areaOf(g: Geo, tris: readonly number[]): number {
+  const pos = g.getAttribute('position');
+  const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
+  let s = 0;
+  for (const t of tris) { a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2); s += b.sub(a).cross(c.sub(a)).length() / 2; }
+  return s;
+}
+
+function subGeometry(g: Geo, tris: readonly number[]): Geo {
+  const pos = g.getAttribute('position'); const nor = g.getAttribute('normal');
+  const p: number[] = []; const n: number[] = [];
+  for (const t of tris) for (let j = 0; j < 3; j++) { p.push(pos.getX(t + j), pos.getY(t + j), pos.getZ(t + j)); n.push(nor.getX(t + j), nor.getY(t + j), nor.getZ(t + j)); }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+  return out as Geo;
+}
+
+/**
+ * A faceta de um modelo do catálogo (a régua da bíblia, `scenery-faceta.test.ts`): o `normalLie` das partes iluminadas, só das PEÇAS que contam — cada sólido
+ * (cilindro, bolha, cúpula, casca) com pelo menos `FACET_MIN_PART` da área iluminada do modelo. Um modelo que é só caixa e tem 80 bolinhas de 1 m não tem faceta
+ * visível a 300 m; um com uma cúpula de 20 m tem. A parte do kit redondo (`userData.keepNormals`: a normal dela é esferizada ou de bisel de propósito, e mentiria
+ * à vontade) é medida pela GEOMETRIA: as normais são recalculadas com o vinco da família do modelo (`sceneryShading`), no máximo 44°, como o catálogo faria. Assim
+ * a palmeira de cartum (copa de normal esferizada) não escapa pelo truque da normal, e o chanfro de 45° do bisel (um gomo) continua sendo bisel, não faceta.
+ */
+export function facetOf(id: string, model: Model, minPart = FACET_MIN_PART): number {
+  const shading = sceneryShading(id);
+  const lit: Array<{ geometry: Geo; mat: string }> = [];
+  for (const p of model.parts) {
+    if (!(LIT_MATS as readonly string[]).includes(p.mat) || p.geometry.index) continue;
+    const g = p.geometry.userData.keepNormals ? smoothNormals(p.geometry.clone(), Math.min(shading.crease, 44), shading) : p.geometry;
+    lit.push({ geometry: g, mat: p.mat });
+  }
+  const pieces: Array<{ geometry: Geo; a: number; mat: string }> = [];
+  let total = 0;
+  for (const p of lit) for (const tris of solids(p.geometry)) { const a = areaOf(p.geometry, tris); total += a; pieces.push({ geometry: subGeometry(p.geometry, tris), a, mat: p.mat }); }
+  return normalLie(pieces.filter((q) => q.a >= minPart * total).map((q) => ({ geometry: q.geometry, mat: 'flat' })), ['flat']);
+}
+
+/** A janela de quadro da qualidade Alta (renderer.ts: BEHIND 30 + AHEAD 260) que o orçamento do cenário mede. */
+export const FRAME_BEHIND = 30;
+export const FRAME_AHEAD = 260;
+
+/**
+ * Custo do cenário por segmento de janela, no pior ponto da pista (docs/ondas/M/M3.md, "Orçamento de quadro"): para a câmera em cada segmento `s`,
+ * cada objeto na janela [s − 30, s + 260] custa os triângulos do modelo de PERTO se está a menos de `farFrom` segmentos à frente (ou não tem
+ * silhueta), os da silhueta de longe de `farFrom` até `maxAhead`, e nada além; o total ÷ 291 segmentos da janela. É o que o quadro de fato
+ * desenha (o `Scenery.update` faz as mesmas contas), ao contrário da soma estática de todo objeto da pista com o modelo de perto. Marcos ("lm:")
+ * ficam de fora (orçamento próprio por lugar). `rank` não entra: é a Alta, que desenha tudo.
+ */
+export function frameCost(layout: Layout, segs: number, trisOf: (id: string) => number): number {
+  const diff = new Float64Array(segs + 1);
+  const add = (lo: number, hi: number, v: number): void => { // câmeras lo..hi (inclusive, circular)
+    if (hi < lo || v === 0) return;
+    const len = hi - lo + 1;
+    if (len >= segs) { diff[0] += v; diff[segs] -= v; return; }
+    const a = ((lo % segs) + segs) % segs;
+    const b = a + len - 1;
+    if (b < segs) { diff[a] += v; diff[b + 1] -= v; } else { diff[a] += v; diff[segs] -= v; diff[0] += v; diff[b - segs + 1] -= v; }
+  };
+  layout.bySeg.forEach((list, i) => {
+    for (const p of list) {
+      const id = layout.models[p.model];
+      if (id.startsWith('lm:')) continue;
+      const reach = Math.min(p.maxAhead, FRAME_AHEAD);
+      const hasFar = p.far >= 0 && p.farFrom <= reach;
+      const nearAhead = hasFar ? Math.min(reach, p.farFrom - 1) : reach;
+      add(i - nearAhead, i + FRAME_BEHIND, trisOf(id));
+      if (hasFar) add(i - reach, i - p.farFrom, trisOf(layout.models[p.far]));
+    }
+  });
+  let worst = 0; let run = 0;
+  for (let s = 0; s < segs; s++) { run += diff[s]; worst = Math.max(worst, run); }
+  return worst / (FRAME_BEHIND + FRAME_AHEAD + 1);
+}
+
+/**
+ * Como a malha se parece, em fração da ÁREA das partes lisas: `axis` = faces alinhadas a um eixo (a cara de caixa: parede, laje, tábua reta) e `smooth` =
+ * faces cuja normal NÃO é a da própria face (superfície redonda: cilindro, bisel, arco). Um poste de 6 lados e uma cerca de tábuas retas têm `smooth` 0
+ * (o vinco de construção, 40°, deixa as quinas de 60° e de 90° vivas); com 14 lados, ou com bisel, sobe. É o que o teste dos props pede (`scenery-props`).
+ */
+export function areaShares(model: Model): { axis: number; smooth: number; area: number } {
+  let area = 0; let axis = 0; let smooth = 0;
+  const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3(); const n = new THREE.Vector3(); const v = new THREE.Vector3();
+  for (const p of model.parts) {
+    if (p.mat !== 'flat') continue;
+    const pos = p.geometry.getAttribute('position'); const nor = p.geometry.getAttribute('normal');
+    for (let t = 0; t + 2 < pos.count; t += 3) {
+      a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2);
+      n.crossVectors(b.clone().sub(a), c.clone().sub(a));
+      const ar = n.length() / 2;
+      if (ar < 1e-9) continue;
+      n.normalize();
+      area += ar;
+      if (Math.max(Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)) > 0.9998) axis += ar;
+      if (v.fromBufferAttribute(nor, t).angleTo(n) * (180 / Math.PI) > 0.5) smooth += ar;
+    }
+  }
+  return { axis: area ? axis / area : 0, smooth: area ? smooth / area : 0, area };
 }

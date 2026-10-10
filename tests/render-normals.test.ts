@@ -272,6 +272,8 @@ describe('normais suaves: cenário', () => {
       expect(shading.crease, id).toBeLessThan(90); // caixa (90°) continua caixa
       for (const p of getModel(id).parts) {
         if (p.mat === 'glow' || p.mat === 'beacon' || p.mat === 'cone' || p.mat === 'panel') continue;
+        // Parte do kit redondo (geom.ts, `mergeRound`): a normal é própria (bisel esférico, copa esferizada) e o catálogo não a reescreve. M3: o poste e a arquibancada passaram a usar o kit.
+        if (p.geometry.userData.keepNormals) continue;
         const want = smoothNormals(flatCopy(p.geometry), shading.crease, shading);
         expect(maxDiff(p.geometry.getAttribute('normal').array as Float32Array, want.getAttribute('normal').array as Float32Array), `${id}/${p.mat}`).toBeLessThan(1e-6);
       }

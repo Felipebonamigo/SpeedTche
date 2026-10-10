@@ -3,9 +3,9 @@
 // pela silhueta. Convenção do modelo em types.ts: origem no centro da base, frente para +X, comprimento em Z.
 import * as THREE from 'three';
 import { hash2 } from '../../noise';
-import { bakeAO, bevelBox, box, cone, cyl, dodeca, gable, hip, ico, jitter, lumpy, mergeRound, mottle, paint, sphere, tf, tintUp, tintUpSoft, tris, type Geo } from '../geom';
+import { bakeAO, bevelBox, dodeca, gable, hip, blobIco, ico, jitter, roundBlob, lumpy, mergeRound, mottle, paint, sphere, tf, tintUp, tintUpSoft, tris, type Geo } from '../geom';
 import { smoothNormals } from '../../normals';
-import { beam, cable, cliff, facadeBox, hill, Kit, landmarkPart, lathe } from './kit';
+import { beam, box, cable, cliff, cone, cyl, extrudeRound, facadeBox, fitted, hill, Kit, landmarkPart, lathe } from './kit';
 import type { LandmarkRegistry } from './types';
 
 type V3 = [number, number, number];
@@ -293,7 +293,7 @@ function casarioColonial(): ReturnType<Kit['model']> {
   k.add(hill(26, 30, 44, 44, '#5f7f45', '#4f8a3c', 1, 0.14, 0.3, tf(-40, 0, 16)));
   for (let i = 0; i < 4; i++) {
     const z = i * 10; const x = -40 + (hash2(i, 47) - 0.5) * 8;
-    k.add(paint(jitter(ico(1, 0), 0.2, 46 + i), i % 2 ? '#3f7a38' : '#4a8a3c', tf(x, 30 * Math.sqrt(1 - ((z - 16) / 44) ** 2) - 2, z, 4.5, 4, 4.5)));
+    k.add(paint(roundBlob(0.2, 46 + i, 0), i % 2 ? '#3f7a38' : '#4a8a3c', tf(x, 30 * Math.sqrt(1 - ((z - 16) / 44) ** 2) - 2, z, 4.5, 4, 4.5)));
   }
   for (let i = 0; i < n; i++) {
     const z = (i - (n - 1) / 2) * W;
@@ -388,19 +388,18 @@ function terceiraPonte(): ReturnType<Kit['model']> {
  * arco pleno entre pilares de `pier` m; o vão vai de `y0` até o arranque `spring` e fecha num semicírculo.
  */
 function arcade(z0: number, z1: number, y0: number, y1: number, n: number, pier: number, spring: number, w: number, color: string): Geo {
-  const shape = new THREE.Shape([new THREE.Vector2(z0, y0), new THREE.Vector2(z1, y0), new THREE.Vector2(z1, y1), new THREE.Vector2(z0, y1)]);
+  // Um contorno só, aberto no chão (os vãos são entalhes na base, não furos a 2 cm do chão): o bisel da extrusão não tem uma lâmina de 2 cm entre o furo e a borda.
+  const pts: THREE.Vector2[] = [new THREE.Vector2(z0, y0)];
   const bay = (z1 - z0) / n; const r = (bay - pier) / 2;
   for (let i = 0; i < n; i++) {
     const zc = z0 + (i + 0.5) * bay;
-    const hole = new THREE.Path();
-    hole.moveTo(zc - r, y0 + 0.02);
-    hole.lineTo(zc + r, y0 + 0.02);
-    hole.lineTo(zc + r, spring);
-    for (let q = 1; q < 6; q++) { const a = (q / 6) * Math.PI; hole.lineTo(zc + Math.cos(a) * r, spring + Math.sin(a) * r); }
-    hole.lineTo(zc - r, spring);
-    shape.holes.push(hole);
+    pts.push(new THREE.Vector2(zc - r, y0), new THREE.Vector2(zc - r, spring));
+    for (let q = 5; q >= 1; q--) { const a = (q / 6) * Math.PI; pts.push(new THREE.Vector2(zc + Math.cos(a) * r, spring + Math.sin(a) * r)); }
+    pts.push(new THREE.Vector2(zc + r, spring), new THREE.Vector2(zc + r, y0));
   }
-  const g = new THREE.ExtrudeGeometry(shape, { depth: w, bevelEnabled: false, curveSegments: 1 });
+  pts.push(new THREE.Vector2(z1, y0), new THREE.Vector2(z1, y1), new THREE.Vector2(z0, y1));
+  const shape = new THREE.Shape(pts);
+  const g = extrudeRound(shape, w, Math.min(1.2, Math.max(0.15, w * 0.04)), { curveSegments: 1 });
   // Giro de 90° em Y (sem espelhar: a normal continua para fora): o perfil fica no plano ZY (simétrico em z) e a
   // extrusão vai para +X, centrada.
   return paint(g, color, new THREE.Matrix4().makeRotationY(Math.PI / 2).setPosition(-w / 2, 0, 0));
@@ -418,7 +417,7 @@ function tremSerraVerde(): ReturnType<Kit['model']> {
   // Encostas da grota nas duas cabeceiras, mais altas que o tabuleiro, com a mata e a pedra aparecendo.
   for (const s of [-1, 1]) {
     k.add(hill(44, H + 24, 58, 41 + s, '#3f7a38', '#4a8a3c', 1, 0.14, 0.6, tf(-4, 0, s * (L / 2 + 36))));
-    for (let i = 0; i < 5; i++) k.add(paint(jitter(ico(1, 0), 0.2, 45 + i + s * 10), i % 2 ? '#2f6a30' : '#3a7a36', tf(14 + hash2(46, i + s) * 10, 8 + i * 9, s * (L / 2 + 6 + i * 6), 7, 6, 7)));
+    for (let i = 0; i < 5; i++) k.add(paint(roundBlob(0.2, 45 + i + s * 10, 0), i % 2 ? '#2f6a30' : '#3a7a36', tf(14 + hash2(46, i + s) * 10, 8 + i * 9, s * (L / 2 + 6 + i * 6), 7, 6, 7)));
   }
   // O rio no fundo da grota (atravessa por baixo do viaduto) e a cascata descendo a encosta.
   k.add(paint(box(90, 0.3, 16), '#4f8a86', tf(-6, 0.15, 12)));
@@ -664,16 +663,16 @@ function araucaria(): ReturnType<Kit['model']> {
         const p2: V3 = [x + Math.cos(a) * out, yb + R * 0.32, z + Math.sin(a) * out];
         k.add(beam([x, yb, z], p2, 0.3, bark));
         // Tufo largo e achatado na ponta (o "pinho" da araucária); os tufos vizinhos se encostam.
-        k.add(paint(jitter(ico(1, 0), 0.14, seed + b + ring * 20), (b + ring) % 2 ? '#24502e' : '#2c5c34', tf(p2[0], p2[1] + 0.1, p2[2], R * 0.46, R * 0.22, R * 0.46)));
+        k.add(paint(roundBlob(0.14, seed + b + ring * 20, 0), (b + ring) % 2 ? '#24502e' : '#2c5c34', tf(p2[0], p2[1] + 0.1, p2[2], R * 0.46, R * 0.22, R * 0.46)));
       }
     }
-    k.add(paint(jitter(ico(1, 0), 0.12, seed + 30), '#2a5832', tf(x, H - R * 0.02, z, R * 0.5, R * 0.2, R * 0.5)));
+    k.add(paint(roundBlob(0.12, seed + 30, 0), '#2a5832', tf(x, H - R * 0.02, z, R * 0.5, R * 0.2, R * 0.5)));
     // Galho seco mais abaixo (a araucária perde os de baixo).
     const a = hash2(seed, 41) * 6.28; const yb = H * 0.55;
     k.add(beam([x, yb, z], [x + Math.cos(a) * 2.6, yb + 1, z + Math.sin(a) * 2.6], 0.16, '#4a3a2e'));
   });
   // Campo no pé: capim e moitas.
-  for (let i = 0; i < 3; i++) k.add(paint(jitter(ico(1, 0), 0.2, 59 + i), '#5a8a3a', tf(-4 + i * 2, 0.3, -12 + i * 12, 6, 1, 5)));
+  for (let i = 0; i < 3; i++) k.add(paint(roundBlob(0.2, 59 + i, 0), '#5a8a3a', tf(-4 + i * 2, 0.3, -12 + i * 12, 6, 1, 5)));
   return k.model([0, 33], 0.06, 51);
 }
 
@@ -781,7 +780,7 @@ function cachoeiraVeadeiros(): ReturnType<Kit['model']> {
   for (let i = 0; i < 14; i++) {
     const z = -70 + i * 10.6 + (hash2(i, 63) - 0.5) * 4;
     const s = 4.5 + hash2(i, 64) * 3;
-    k.add(paint(jitter(ico(1, 0), 0.2, 62 + i), i % 3 ? '#6f8a3a' : '#5a7f32', tf(wx + wall.lipAt(z) - 6 - hash2(i, 65) * 14, Math.max(wall.topAt(z), H * 0.96) + s * 0.4, z, s * 1.2, s * 0.8, s * 1.2)));
+    k.add(paint(roundBlob(0.2, 62 + i, 0), i % 3 ? '#6f8a3a' : '#5a7f32', tf(wx + wall.lipAt(z) - 6 - hash2(i, 65) * 14, Math.max(wall.topAt(z), H * 0.96) + s * 0.4, z, s * 1.2, s * 0.8, s * 1.2)));
   }
   return k.model([-10, H], 0.05, 61);
 }
@@ -813,7 +812,7 @@ function buriti(): ReturnType<Kit['model']> {
   });
   // A vereda: o capim úmido verde-vivo em faixa, o córrego e as moitas no pé.
   k.add(paint(box(16, 0.3, 84), '#6aa844', tf(-1, 0.15, 0)), paint(box(3.2, 0.36, 80), '#4f8aa0', tf(3, 0.18, 0)));
-  for (let i = 0; i < 7; i++) k.add(paint(jitter(ico(1, 0), 0.2, 80 + i), i % 2 ? '#5a9a3a' : '#6aa844', tf(-3 + (hash2(i, 81) - 0.5) * 8, 0.4, (i - 3) * 11 + 5, 3.4, 1.3, 3.4)));
+  for (let i = 0; i < 7; i++) k.add(paint(roundBlob(0.2, 80 + i, 0), i % 2 ? '#5a9a3a' : '#6aa844', tf(-3 + (hash2(i, 81) - 0.5) * 8, 0.4, (i - 3) * 11 + 5, 3.4, 1.3, 3.4)));
   return k.model([0, 30], 0.05, 71);
 }
 
@@ -831,9 +830,9 @@ function grutaLagoAzul(): ReturnType<Kit['model']> {
   for (let i = 0; i < 11; i++) {
     const z = -36 + i * 7.2 + (hash2(i, 93) - 0.5) * 3;
     const s = 4 + hash2(i, 94) * 2.6;
-    k.add(paint(jitter(ico(1, 0), 0.18, 92 + i), i % 2 ? '#2f7a36' : '#3f8a3c', tf(wx + wall.lipAt(z) - 3 - hash2(i, 95) * 10, wall.topAt(z) + s * 0.5, z, s * 1.1, s, s * 1.1)));
+    k.add(paint(roundBlob(0.18, 92 + i, 0), i % 2 ? '#2f7a36' : '#3f8a3c', tf(wx + wall.lipAt(z) - 3 - hash2(i, 95) * 10, wall.topAt(z) + s * 0.5, z, s * 1.1, s, s * 1.1)));
   }
-  for (const s of [-1, 1]) k.add(paint(jitter(ico(1, 0), 0.18, 102 + s), '#2f7a36', tf(wx + wall.footAt(s * 30) + 3, 5, s * 30, 6, 7, 6)));
+  for (const s of [-1, 1]) k.add(paint(roundBlob(0.18, 102 + s, 0), '#2f7a36', tf(wx + wall.footAt(s * 30) + 3, 5, s * 30, 6, 7, 6)));
   // Boca da gruta: arco escuro na face (um pouco à frente dela), as estalactites e o azul do lago no fundo, aceso.
   const R = 13.5; const cx = wx + wall.footAt(0) + 3.6; const cy = 7;
   const arch: number[] = [];
@@ -878,7 +877,7 @@ function jabiru(k: Kit, x: number, y: number, z: number, face: number, S: number
   const fly = pose === 'fly';
   // Corpo (comprido em +X) e as asas. Em voo, as asas no plano do corpo; de asas abertas no ninho, as asas levantadas em
   // V e de frente para quem olha (a vela branca que se vê de longe; deitadas, de frente eram um risco).
-  k.add(paint(ico(1, 0), WHITE, M(0, fly ? 0 : 0.95, 0, 0.42, 0.24, 0.22)));
+  k.add(paint(blobIco(1, 0), WHITE, M(0, fly ? 0 : 0.95, 0, 0.42, 0.24, 0.22)));
   if (fly) for (const b of [-1, 1]) k.add(paint(box(0.5, 0.05, 1.25), WHITE, tf(...P(-0.05, 0.036, b * 0.68), S, S, S, -b * 0.12, -face, 0)));
   if (pose === 'wings') {
     for (const b of [-1, 1]) k.add(paint(box(0.06, 0.55, 1.25), WHITE, tf(...P(-0.05, 1.25, b * 0.62), S, S, S, -b * 0.5, -face, 0)));
@@ -887,14 +886,14 @@ function jabiru(k: Kit, x: number, y: number, z: number, face: number, S: number
     // Pescoço e cabeça esticados para a frente, pernas para trás.
     k.add(beam(P(0.35, 0.02), P(0.85, 0.06), 0.11 * S, BLACK));
     k.add(paint(cyl(0.1, 0.12, 0.16, 6), '#d42828', M(0.38, 0.02, 0, 1, 1, 1, Math.PI / 2)));
-    k.add(paint(ico(0.11, 0), BLACK, M(0.9, 0.07, 0, 1, 1, 1)));
+    k.add(paint(blobIco(0.11, 0), BLACK, M(0.9, 0.07, 0, 1, 1, 1)));
     k.add(beam(P(0.95, 0.07), P(1.32, 0.02), 0.06 * S, BLACK));
     for (const b of [-0.05, 0.05]) k.add(beam(P(-0.35, -0.02, b), P(-1.0, -0.06, b), 0.04 * S, BLACK));
     return;
   }
   k.add(beam(P(0.28, 1.05), P(0.34, 1.5), 0.11 * S, BLACK));
   k.add(paint(cyl(0.1, 0.13, 0.16, 6), '#d42828', M(0.29, 1.13, 0, 1, 1, 1)));
-  k.add(paint(ico(0.11, 0), BLACK, M(0.36, 1.56, 0, 1, 1, 1)));
+  k.add(paint(blobIco(0.11, 0), BLACK, M(0.36, 1.56, 0, 1, 1, 1)));
   k.add(beam(P(0.42, 1.56), P(0.8, 1.6), 0.06 * S, BLACK));
   for (const b of [-0.07, 0.07]) k.add(beam(P(0, 0.78, b), P(0.02, 0, b), 0.04 * S, BLACK));
 }
@@ -918,7 +917,7 @@ function tuiuiuNinho(): ReturnType<Kit['model']> {
   for (let b = 0; b < 7; b++) {
     const a = (b / 7) * 6.28 + hash2(111, b) * 0.6; const y = 8 + (b % 4) * 2.2;
     const tip: V3 = [Math.cos(a) * 4.6, y + 2.2, Math.sin(a) * 6.2];
-    k.add(beam([0, y, 0], tip, 0.32, bark), paint(jitter(ico(1, 0), 0.2, 112 + b), b % 2 ? '#3e6e30' : '#4a7a34', tf(tip[0], tip[1] + 0.6, tip[2], 4, 2.4, 4.4)));
+    k.add(beam([0, y, 0], tip, 0.32, bark), paint(roundBlob(0.2, 112 + b, 0), b % 2 ? '#3e6e30' : '#4a7a34', tf(tip[0], tip[1] + 0.6, tip[2], 4, 2.4, 4.4)));
   }
   // Ninho: prato largo de gravetos sobre a forquilha, a borda desfiada.
   const ny = H + 3;
@@ -948,7 +947,7 @@ function portalTranspantaneira(): ReturnType<Kit['model']> {
   k.add(paint(box(66, 0.25, 7.5), '#c8a070', tf(-24, 0.12, 0)));
   // Corixo com aguapés atravessando a estrada e a ponte de madeira sobre ele.
   k.add(paint(cyl(1, 1, 0.22, 12), '#6a9a88', tf(-40, 0.1, 0, 8, 1, 24)), paint(cyl(1, 1, 0.26, 12), '#4f7f74', tf(-40, 0.12, 0, 5, 1, 18)));
-  for (let i = 0; i < 5; i++) k.add(paint(jitter(ico(1, 0), 0.2, 122 + i), '#5aa040', tf(-40 + (hash2(123, i) - 0.5) * 6, 0.35, (i < 3 ? -1 : 1) * (8 + hash2(124, i) * 10), 2.2, 0.3, 1.8)));
+  for (let i = 0; i < 5; i++) k.add(paint(roundBlob(0.2, 122 + i, 0), '#5aa040', tf(-40 + (hash2(123, i) - 0.5) * 6, 0.35, (i < 3 ? -1 : 1) * (8 + hash2(124, i) * 10), 2.2, 0.3, 1.8)));
   k.add(paint(box(18, 0.5, 6.4), '#9a7a52', tf(-40, 1.5, 0)));
   for (const x of [-48, -43, -38, -33]) for (const s of [-1, 1]) k.add(paint(box(0.4, 3, 0.4), '#5a3e26', tf(x, 0.6, s * 3)));
   for (const s of [-1, 1]) k.add(paint(box(18, 0.2, 0.2), '#6a4a2a', tf(-40, 2.6, s * 3.1)));
@@ -974,7 +973,7 @@ function portalTranspantaneira(): ReturnType<Kit['model']> {
   return scaled(k.model([0, H + 2], 0.06, 121), 1.4);
 }
 
-export const LANDMARKS_BRASIL_CENTRO_SUL: LandmarkRegistry = {
+export const LANDMARKS_BRASIL_CENTRO_SUL: LandmarkRegistry = fitted({
   // Sudeste
   cristo_redentor: { build: cristoRedentor, place: 'skyline', side: 'land', perLap: 2 },
   pao_de_acucar: { build: paoDeAcucar, place: 'skyline', side: 'sea', perLap: 2 },
@@ -1000,4 +999,4 @@ export const LANDMARKS_BRASIL_CENTRO_SUL: LandmarkRegistry = {
   gruta_lago_azul: { build: grutaLagoAzul, place: 'near', side: 'any', perLap: 2 },
   tuiuiu_ninho: { build: tuiuiuNinho, place: 'near', side: 'any', perLap: 3 },
   portal_transpantaneira: { build: portalTranspantaneira, place: 'near', side: 'any', perLap: 2 },
-};
+});

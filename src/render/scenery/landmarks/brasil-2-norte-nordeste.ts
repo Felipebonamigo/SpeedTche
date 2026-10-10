@@ -7,9 +7,9 @@
 // observação, mangueira, açaizeiros).
 import * as THREE from 'three';
 import { hash2, hash3 } from '../../noise';
-import { box, cone, cyl, dodeca, frond, gable, hip, ico, jitter, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type MatKey, type Model, type ModelPart } from '../geom';
+import { dodeca, roundHill, frond, gable, hip, ico, jitter, roundBlob, merge, paint, shadeY, speckle, sphere, tf, tintUp, tris, type Geo, type MatKey, type Model, type ModelPart, mergeFlat } from '../geom';
 import { FACADE_TILE } from '../structures';
-import { cliff, dune as duneShape, landmarkPart, lathe } from './kit';
+import { box, cliff, cone, cyl, dune as duneShape, extrudeRound, fitted, landmarkPart, lathe } from './kit';
 import type { LandmarkDef, LandmarkRegistry } from './types';
 
 // ───────────────────────────── Kit ─────────────────────────────
@@ -68,7 +68,7 @@ class Kit {
   /** Monta o Model: sombreado por altura no `flat` (pé mais escuro, topo mais claro). */
   model(height: number, shade: [number, number] = [0.8, 1.06]): Model {
     const parts: ModelPart[] = [];
-    if (this.flat.length) parts.push({ geometry: shadeY(merge(this.flat), 0, height, shade[0], shade[1]), mat: 'flat' });
+    if (this.flat.length) parts.push({ geometry: shadeY(mergeFlat(this.flat), 0, height, shade[0], shade[1]), mat: 'flat' });
     for (const [mat, list] of this.facade) parts.push({ geometry: merge(list), mat });
     if (this.glow.length) parts.push({ geometry: merge(this.glow), mat: 'glow' });
     if (this.beacon.length) parts.push({ geometry: merge(this.beacon), mat: 'beacon' });
@@ -88,7 +88,7 @@ function segMatrix(a: V3, b: V3): THREE.Matrix4 {
 function extrude(pts: Array<[number, number]>, depth: number, holes: Array<Array<[number, number]>> = [], steps = 1): Geo {
   const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
   for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
-  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 1, steps });
+  return extrudeRound(shape, depth, Math.min(1.2, Math.max(0.15, depth * 0.04)), { steps, curveSegments: 1 });
 }
 
 /** Planta (x, z) erguida de y = 0 a `h` (paredes verticais), com furos (pátios). */
@@ -152,7 +152,7 @@ function water(k: Kit, x: number, z: number, rx: number, rz: number, color: stri
 
 /** Morro facetado (icosaedro deformado), meia esfera de cima vira o morro, a de baixo a saia sob o chão. */
 function hill(rx: number, h: number, rz: number, seed: number, rock: string, top: string | null, detail = 1, amount = 0.16, skirt = 0.25, m?: THREE.Matrix4): Geo {
-  const g = jitter(new THREE.IcosahedronGeometry(1, detail), amount, seed);
+  const g = roundHill(detail, amount, seed, Math.max(rx, h, rz));
   const p = g.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < p.count; i++) {
     const y = p.getY(i);
@@ -165,7 +165,7 @@ function hill(rx: number, h: number, rz: number, seed: number, rock: string, top
 
 /** Copa de árvore: massa achatada (icosaedro jitterado) com tom variado por face. */
 function crown(k: Kit, x: number, y: number, z: number, rx: number, ry: number, rz: number, color: string, seed: number, detail = 0): void {
-  k.raw(speckle(paint(jitter(ico(1, detail), 0.16, seed), color, tf(x, y, z, rx, ry, rz)), 0.09, seed));
+  k.raw(speckle(paint(roundBlob(0.16, seed, detail), color, tf(x, y, z, rx, ry, rz)), 0.09, seed));
 }
 
 /** Árvore genérica de mata (tronco + 1–2 copas); `y0` = chão dela (no alto de um paredão). */
@@ -483,7 +483,7 @@ function farolPiacabucu(): Model {
   const top = lightTower(k, 0, 0, 8, 28, 2.6, 1.8, ['#f4f4ee', '#d63a2a'], 7, '#d63a2a');
   k.add(box(8, 3.4, 10), '#f4f2ea', tf(-9, 7.8, 9)).add(gable(8.6, 1.8, 10.6), '#c8503a', tf(-9, 9.5, 9));
   for (let i = 0; i < 5; i++) palm(k, 26 + hash2(362, i) * 8, -36 + i * 18, 12 + hash2(363, i) * 5, 3630 + i);
-  for (let i = 0; i < 6; i++) k.raw(paint(jitter(ico(1, 0), 0.2, 364 + i), '#8a9a4a', tf(18 + hash2(365, i) * 14, 0.4, -40 + i * 16, 3, 1.2, 3)));
+  for (let i = 0; i < 6; i++) k.raw(paint(roundBlob(0.2, 364 + i, 0), '#8a9a4a', tf(18 + hash2(365, i) * 14, 0.4, -40 + i * 16, 3, 1.2, 3)));
   return k.model(top);
 }
 
@@ -505,7 +505,7 @@ function dunasPiacabucu(): Model {
   k.add(plan(blobPoly(14, 26, 36, 0.12, 374), 0.1), '#9ab060', tf(58, 0.02, -8));
   pond(k, 58, -8, 22, 31, ['#8fd0d0', '#4aa8b8', '#2f8aa4'], 374);
   for (let i = 0; i < 10; i++) palm(k, 76 + hash2(375, i) * 12, -150 + i * 33, 14 + hash2(376, i) * 6, 3760 + i);
-  for (let i = 0; i < 14; i++) k.raw(paint(jitter(ico(1, 0), 0.25, 377 + i), i % 2 ? '#5f9a40' : '#4a8236', tf(64 + hash2(378, i) * 26, 0.6, -156 + i * 24, 5, 2.6, 5)));
+  for (let i = 0; i < 14; i++) k.raw(paint(roundBlob(0.25, 377 + i, 0), i % 2 ? '#5f9a40' : '#4a8236', tf(64 + hash2(378, i) * 26, 0.6, -156 + i * 24, 5, 2.6, 5)));
   // Bugue subindo o barlavento (escala).
   k.add(box(2.4, 1.2, 3.6), '#ffcf3a', tf(26, 8.4, 34, 1, 1, 1, 0, PI / 2, -0.25));
   return k.model(46, [0.86, 1.06]);
@@ -775,7 +775,7 @@ function cajueiroGigante(): Model {
   // A copa: bolhas redondas sobrepostas em três anéis — o miolo alto, o do meio e a saia da borda, cujas bolhas
   // descem até o chão (o domo de folhas contínuo, mais claro em cima).
   const puff = (x: number, y: number, z: number, rr: number, ry: number, color: string, seed: number): void => {
-    k.raw(speckle(tintUp(paint(jitter(ico(1, 1), 0.1, seed), color, tf(x, y, z, rr, ry, rr * 0.92, 0, hash2(seed, 3) * PI, 0)), '#9ccc52', 0.45, 0.7), 0.07, seed));
+    k.raw(speckle(tintUp(paint(roundBlob(0.1, seed, 1), color, tf(x, y, z, rr, ry, rr * 0.92, 0, hash2(seed, 3) * PI, 0)), '#9ccc52', 0.45, 0.7), 0.07, seed));
   };
   const rings: Array<[number, number, number, number, number]> = [
     // [raio relativo, quantas, raio da bolha, altura da bolha, centro em y]
@@ -1199,7 +1199,7 @@ function bufalo(): Model {
   // Campo: capim claro em volta, a lâmina d'água (clara, do céu) e touceiras de capim aquático.
   k.add(plan(blobPoly(14, 30, 40, 0.12, 550), 0.08), '#9ab45a', tf(-2, 0.02, 0));
   pond(k, -3, 2, 25, 34, ['#a4c4bc', '#8cb4ae'], 551);
-  for (let i = 0; i < 8; i++) k.raw(paint(jitter(ico(1, 0), 0.25, 556 + i), i % 2 ? '#7fa050' : '#94b45a', tf(-18 + hash2(557, i) * 32, 0.2, -27 + i * 7.5, 1.8 + hash2(558, i), 0.5, 1.8 + hash2(559, i))));
+  for (let i = 0; i < 8; i++) k.raw(paint(roundBlob(0.25, 556 + i, 0), i % 2 ? '#7fa050' : '#94b45a', tf(-18 + hash2(557, i) * 32, 0.2, -27 + i * 7.5, 1.8 + hash2(558, i), 0.5, 1.8 + hash2(559, i))));
   const one = (x: number, z: number, yaw: number, rider: boolean, seed: number, wade = 0, egret = false): void => {
     const s = S; const c = Math.cos(yaw); const sn = Math.sin(yaw);
     const P = (lx: number, y: number, lz: number): THREE.Matrix4 => tf(x + lx * c + lz * sn, y - wade, z - lx * sn + lz * c, 1, 1, 1, 0, yaw, 0);
@@ -1706,7 +1706,7 @@ function pontePalmas(): Model {
 const def = (build: () => Model, place: LandmarkDef['place'], side: LandmarkDef['side'], perLap: number, turn?: number): LandmarkDef =>
   (turn === undefined ? { build, place, side, perLap } : { build, place, side, perLap, turn });
 
-export const LANDMARKS_BRASIL_2_NORTE_NORDESTE: LandmarkRegistry = {
+export const LANDMARKS_BRASIL_2_NORTE_NORDESTE: LandmarkRegistry = fitted({
   // Bahia
   morro_pai_inacio: def(morroPaiInacio, 'skyline', 'land', 1),
   igreja_quadrado: def(igrejaQuadrado, 'near', 'land', 1),
@@ -1758,4 +1758,4 @@ export const LANDMARKS_BRASIL_2_NORTE_NORDESTE: LandmarkRegistry = {
   // Tocantins
   palacio_araguaia: def(palacioAraguaia, 'near', 'land', 1),
   ponte_palmas: def(pontePalmas, 'near', 'any', 1, 0.1),
-};
+});

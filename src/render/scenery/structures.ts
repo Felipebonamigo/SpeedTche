@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { hash2 } from '../noise';
 import { bakeAO, bevelBox, box, cone, cyl, gable, hip, ico, jitter, lean, lumpy, merge, mergeRound, mottle, paint, roundedBar, shadeY, sphere, tf, tintUp, tintUpSoft, tris, type Geo, type MatKey, type Model, type ModelPart } from './geom';
-import { smoothNormals } from '../normals';
+import { CREASE, ROOF_TURN_DEG, smoothNormals } from '../normals';
 
 /** Tamanho (m) de uma repetição de cada textura de fachada (4 colunas de janela × 4 andares). */
 export const FACADE_TILE: Record<'office' | 'apartment' | 'classic' | 'house', [number, number]> = {
@@ -32,8 +32,8 @@ function facadeBox(w: number, h: number, d: number, style: FacadeStyle, color: s
   return paint(g, color, m, true);
 }
 
-interface Parts { flat: Geo[]; glow: Geo[]; beacon: Geo[]; facade: Map<MatKey, Geo[]> }
-function newParts(): Parts { return { flat: [], glow: [], beacon: [], facade: new Map() }; }
+interface Parts { flat: Geo[]; glow: Geo[]; beacon: Geo[]; facade: Map<MatKey, Geo[]>; /** Peças do kit redondo (caixa com bisel, barra de borda redonda): trazem a normal própria e vão por `mergeRound`. */ round: Geo[] }
+function newParts(): Parts { return { flat: [], glow: [], beacon: [], facade: new Map(), round: [] }; }
 function addFacade(p: Parts, style: MatKey, g: Geo): void {
   const list = p.facade.get(style) ?? [];
   list.push(g);
@@ -48,6 +48,33 @@ function toModel(p: Parts, height: number, blob = 0, shadow = true): Model {
   return { parts, blob };
 }
 
+/** Fachada de caixa com bisel (kit redondo): `r` arredonda a quina vertical e o topo; a face reta fica no plano, com a uv das janelas. */
+function bevelFacade(w: number, h: number, d: number, style: FacadeStyle, color: string, m: THREE.Matrix4, r: number, vOffset = 0): Geo {
+  return paint(bevelBox(w, h, d, r, FACADE_TILE[style], vOffset), color, m, true);
+}
+
+/** Barra de borda redonda (cornija, laje de varanda, toldo): seção `w` × `h` com os cantos de cima em arco, comprimento `L` em Z, pé em y = 0 da peça. */
+function roundBar(w: number, h: number, L: number, r: number, color: string, m: THREE.Matrix4): Geo {
+  return paint(smoothNormals(roundedBar(w, h, L, r, 1), 50), color, m);
+}
+
+/**
+ * Fecha um prédio do kit redondo: o liso comum (`flat`, com o vinco de construção e a regra do telhado) e as peças do kit (`round`, com as normais
+ * próprias) viram UMA parte `flat`; cada fachada vira uma parte (`mergeRound`). A luz assada é um degradê de altura (pé ≥ 16% mais escuro que o topo),
+ * barato o bastante para todo prédio da cidade (o `bakeAO` por raio da orla custa ~300 ms por modelo, e a cidade monta dezenas).
+ */
+function toRoundModel(p: Parts, height: number, shadow = true): Model {
+  const parts: ModelPart[] = [];
+  const lisas: Geo[] = [];
+  if (p.flat.length) lisas.push(smoothNormals(merge(p.flat), CREASE.built, { roofTurnDeg: ROOF_TURN_DEG }));
+  lisas.push(...p.round);
+  if (lisas.length) parts.push({ geometry: shadeY(mergeRound(lisas), -1, height, 0.78, 1.06), mat: 'flat', shadow });
+  for (const [mat, list] of p.facade) parts.push({ geometry: shadeY(mergeRound(list), 0, height, 0.82, 1.05), mat, shadow });
+  if (p.glow.length) parts.push({ geometry: merge(p.glow), mat: 'glow' });
+  if (p.beacon.length) parts.push({ geometry: merge(p.beacon), mat: 'beacon' });
+  return { parts, blob: 0 };
+}
+
 /** Fundação que entra 5 m no chão: prédio em terreno inclinado não flutua. */
 function foundation(p: Parts, L: number, D: number, color = '#8f8a82'): void {
   p.flat.push(paint(box(D, 5, L), color, tf(-D / 2, -2.4, 0)));
@@ -60,22 +87,25 @@ export function glassTower(seed: number, floors: number, tint: string): Model {
   const p = newParts();
   const L = 18; const D = 18;
   foundation(p, L, D);
-  addFacade(p, 'office', facadeBox(D, 7, L, 'office', '#dfe6ee', tf(-D / 2, 3.5, 0)));
-  p.flat.push(paint(box(D + 0.6, 0.5, L + 0.6), '#c8ccd2', tf(-D / 2, 7.2, 0)));
+  addFacade(p, 'office', bevelFacade(D, 7, L, 'office', '#dfe6ee', tf(-D / 2, 3.5, 0), 0.7)); // o embasamento
+  p.round.push(roundBar(D + 0.7, 0.55, L + 0.7, 0.2, '#c8ccd2', tf(-D / 2, 7.0, 0))); // cornija do embasamento
+  // Marquise da entrada: aba de borda redonda que sai 1,8 m da fachada, ligeiramente caída.
+  p.round.push(roundBar(1.9, 0.24, L * 0.55, 0.1, '#9aa3ad', tf(0.95, 4.1, 0, 1, 1, 1, 0, 0, -0.12)));
   const th = floors * 3.5;
   const inset = 2;
-  addFacade(p, 'office', facadeBox(D - inset * 2, th, L - inset * 2, 'office', tint, tf(-D / 2, 7.45 + th / 2, 0)));
+  addFacade(p, 'office', bevelFacade(D - inset * 2, th, L - inset * 2, 'office', tint, tf(-D / 2, 7.45 + th / 2, 0), 0.8));
   const top = 7.45 + th;
-  p.flat.push(paint(box(D - inset * 2 + 0.4, 0.6, L - inset * 2 + 0.4), '#d8dde4', tf(-D / 2, top + 0.3, 0)));
+  p.round.push(roundBar(D - inset * 2 + 0.6, 0.6, L - inset * 2 + 0.6, 0.22, '#d8dde4', tf(-D / 2, top, 0))); // cornija do corpo
   const crown = 3 + hash2(seed, 1) * 5;
-  addFacade(p, 'office', facadeBox(D - 8, crown, L - 8, 'office', tint, tf(-D / 2, top + 0.6 + crown / 2, 0)));
-  p.flat.push(paint(box(3, 1.4, 3), '#9aa0a8', tf(-D / 2 + 3, top + 1.3, 3)));
+  addFacade(p, 'office', bevelFacade(D - 8, crown, L - 8, 'office', tint, tf(-D / 2, top + 0.6 + crown / 2, 0), 0.5));
+  p.round.push(roundBar(D - 8 + 0.5, 0.5, L - 8 + 0.5, 0.18, '#d8dde4', tf(-D / 2, top + 0.6 + crown, 0))); // cornija da coroa
+  p.round.push(paint(bevelBox(3, 1.4, 3, 0.35), '#9aa0a8', tf(-D / 2 + 3, top + 1.3, 3)));
   const ant = 6 + hash2(seed, 2) * 8;
-  p.flat.push(paint(cyl(0.12, 0.2, ant, 5), '#c7c9cc', tf(-D / 2, top + 0.6 + crown + ant / 2, 0)));
-  p.beacon.push(paint(sphere(0.35, 6, 4), '#ff3030', tf(-D / 2, top + 0.6 + crown + ant, 0)));
+  p.flat.push(paint(cyl(0.12, 0.2, ant, 8), '#c7c9cc', tf(-D / 2, top + 0.6 + crown + ant / 2, 0)));
+  p.beacon.push(paint(sphere(0.35, 10, 6), '#ff3030', tf(-D / 2, top + 0.6 + crown + ant, 0)));
   // Faixa de luz no topo (acende à noite).
   p.glow.push(paint(box(0.08, 0.35, L - inset * 2 - 1), '#bfe4ff', tf(-inset + 0.05, top - 0.6, 0)));
-  return toModel(p, top + crown);
+  return toRoundModel(p, top + crown);
 }
 
 /** Bloco de apartamentos com sacadas; térreo com portaria e comércio; caixa-d'água no teto. */
@@ -83,17 +113,17 @@ export function apartmentBlock(seed: number, floors: number, tint: string, L = 1
   const p = newParts();
   foundation(p, L, D);
   const H = 4 + floors * 3;
-  p.flat.push(paint(box(D, 4, L), '#5a5e66', tf(-D / 2, 2, 0)));
+  p.round.push(paint(bevelBox(D, 4, L, 0.4), '#5a5e66', tf(-D / 2, 2, 0))); // térreo (portaria e comércio)
   p.flat.push(paint(box(0.1, 2.6, L - 2), '#2c3e55', tf(0.02, 1.6, 0)));
-  p.flat.push(paint(box(1.2, 0.18, L), ['#d63a3a', '#1e88e5', '#ffd23f', '#3ddc84'][seed % 4], tf(0.55, 3.2, 0, 1, 1, 1, 0, 0, -0.15)));
-  addFacade(p, 'apartment', facadeBox(D, H - 4, L, 'apartment', tint, tf(-D / 2, 4 + (H - 4) / 2, 0)));
-  // Lajes das sacadas em relevo (o que dá volume à fachada).
-  for (let f = 1; f < floors; f += 1) p.flat.push(paint(box(0.7, 0.18, L - 1.2), '#e8e6e0', tf(0.3, 4 + f * 3, 0)));
-  p.flat.push(paint(box(D + 0.3, 0.8, L + 0.3), '#d8d4cc', tf(-D / 2, H + 0.4, 0)));
-  p.flat.push(paint(box(4, 2.6, 3.4), '#b8b2a8', tf(-D / 2 - 1, H + 2.1, -L / 4)));
-  p.flat.push(paint(cyl(1, 1, 1.8, 8), '#6a8aa8', tf(-D / 2 + 2, H + 1.7, L / 4)));
+  p.round.push(roundBar(1.3, 0.22, L - 1.6, 0.1, ['#d63a3a', '#1e88e5', '#ffd23f', '#3ddc84'][seed % 4], tf(0.6, 3.2, 0, 1, 1, 1, 0, 0, -0.15))); // toldo
+  addFacade(p, 'apartment', bevelFacade(D, H - 4, L, 'apartment', tint, tf(-D / 2, 4 + (H - 4) / 2, 0), 0.7));
+  // Lajes das sacadas em relevo (o que dá volume à fachada), de borda redonda.
+  for (let f = 1; f < floors; f += 1) p.round.push(roundBar(1.0, 0.2, L - 1.4, 0.09, '#e8e6e0', tf(0.45, 4 + f * 3, 0)));
+  p.round.push(roundBar(D + 0.7, 0.85, L + 0.7, 0.28, '#d8d4cc', tf(-D / 2, H, 0))); // cornija
+  p.round.push(paint(bevelBox(4, 2.6, 3.4, 0.4), '#b8b2a8', tf(-D / 2 - 1, H + 1.3 + 0.85, -L / 4))); // casa de máquinas
+  p.flat.push(paint(cyl(1, 1, 1.8, 14), '#6a8aa8', tf(-D / 2 + 2, H + 1.7, L / 4)));
   p.glow.push(paint(box(0.06, 0.4, 1.8), '#fff0c0', tf(0.08, 3.6, L / 2 - 2.5)));
-  return toModel(p, H + 3);
+  return toRoundModel(p, H + 3);
 }
 
 /**
@@ -117,7 +147,7 @@ export function beachApartment(seed: number, floors: number, tint: string, L = 2
   for (const z of [-L / 3, 0, L / 3]) flat.push(paint(box(0.5, H - 4.4, 0.5), '#e2dfd8', tf(0.2, 4 + (H - 4.4) / 2, z)));
   flat.push(paint(round(roundedBar(D + 0.6, 0.9, L + 0.6, 0.3, 1)), '#d8d4cc', tf(-D / 2, H, 0))); // cornija
   flat.push(paint(bevelBox(D - 4, 2.8, L - 6, 0.5), '#b8b2a8', tf(-D / 2 - 1, H + 0.9 + 1.4, -L / 5))); // casa de máquinas
-  flat.push(paint(cyl(1.1, 1.1, 1.8, 8), '#6a8aa8', tf(-D / 2 + 2, H + 1.8, L / 4))); // caixa-d'água
+  flat.push(paint(cyl(1.1, 1.1, 1.8, 14), '#6a8aa8', tf(-D / 2 + 2, H + 1.8, L / 4))); // caixa-d'água
   glow.push(paint(box(0.06, 0.4, 1.8), '#fff0c0', tf(0.08, 3.6, L / 2 - 2.5)));
   const body = paint(bevelBox(D, H - 4, L, 0.7, FACADE_TILE.apartment), tint, tf(-D / 2, 4 + (H - 4) / 2, 0), true);
   const base = mergeRound(flat);
@@ -134,28 +164,33 @@ export function classicBuilding(seed: number, floors: number, tint: string, L = 
   const p = newParts();
   foundation(p, L, D, '#9a9286');
   const shopH = 4.6;
-  p.flat.push(paint(box(D, shopH, L), '#c9bfae', tf(-D / 2, shopH / 2, 0)));
+  p.round.push(paint(bevelBox(D, shopH, L, 0.4), '#c9bfae', tf(-D / 2, shopH / 2, 0)));
   const shops = 3;
   const awnings = ['#b8322a', '#2f6b4a', '#1f4f8a', '#c98a2a'];
   for (let k = 0; k < shops; k++) {
     const z = -L / 2 + (k + 0.5) * (L / shops);
     p.flat.push(paint(box(0.12, 3.0, L / shops - 1.6), '#23303e', tf(0.03, 1.8, z)));
-    p.flat.push(paint(box(1.4, 0.12, L / shops - 1.2), awnings[(seed + k) % awnings.length], tf(0.65, 3.5, z, 1, 1, 1, 0, 0, -0.35)));
+    p.round.push(roundBar(1.4, 0.16, L / shops - 1.2, 0.07, awnings[(seed + k) % awnings.length], tf(0.65, 3.5, z, 1, 1, 1, 0, 0, -0.35))); // toldo
     p.glow.push(paint(box(0.05, 2.4, L / shops - 2.2), '#b8844e', tf(0.1, 1.6, z)));
   }
   const H = floors * 3.8;
-  addFacade(p, 'classic', facadeBox(D, H, L, 'classic', tint, tf(-D / 2, shopH + H / 2, 0)));
-  for (let f = 1; f <= floors; f++) if (f === 1 || f === floors) p.flat.push(paint(box(0.5, 0.35, L + 0.2), '#e6ddcc', tf(0.15, shopH + f * 3.8 - (f === floors ? 0 : 3.8) + 0.1, 0)));
+  addFacade(p, 'classic', bevelFacade(D, H, L, 'classic', tint, tf(-D / 2, shopH + H / 2, 0), 0.7));
+  // Varandas de ferro: uma laje estreita de borda redonda por andar acima do térreo, com o gradil.
+  for (let f = 1; f < floors; f++) {
+    const y = shopH + f * 3.8;
+    p.round.push(roundBar(0.8, 0.2, L - 4.6, 0.08, '#e6ddcc', tf(0.4, y, 0)));
+    p.flat.push(paint(box(0.05, 0.85, L - 4.8), '#2a2e34', tf(0.78, y + 0.55, 0)));
+  }
   const top = shopH + H;
-  p.flat.push(paint(box(D + 0.8, 0.5, L + 0.8), '#e6ddcc', tf(-D / 2, top + 0.25, 0)));
+  p.round.push(roundBar(D + 0.9, 0.55, L + 0.9, 0.2, '#e6ddcc', tf(-D / 2, top, 0))); // cornija
   p.flat.push(paint(hip(D, 4.2, L, D * 0.5, L * 0.8), '#5d6878', tf(-D / 2, top + 0.5, 0)));
   for (let k = 0; k < 4; k++) {
     const z = -L / 2 + (k + 0.5) * (L / 4);
-    p.flat.push(paint(box(1.2, 1.6, 1.3), '#e6ddcc', tf(-1.4, top + 1.6, z)));
+    p.round.push(paint(bevelBox(1.2, 1.6, 1.3, 0.18), '#e6ddcc', tf(-1.4, top + 1.6, z)));
     p.flat.push(paint(gable(1.4, 0.7, 1.5), '#4d5868', tf(-1.4, top + 2.4, z, 1, 1, 1, 0, Math.PI / 2, 0)));
   }
   for (const z of [-L / 2 + 1.5, L / 2 - 2]) p.flat.push(paint(box(0.9, 2.2, 1.4), '#b86a4a', tf(-D * 0.6, top + 4.4, z)));
-  return toModel(p, top + 5);
+  return toRoundModel(p, top + 5);
 }
 
 /** Prédio de tijolo médio com letreiro luminoso no alto (Sampa, Osaka, Las Vegas). */
@@ -163,17 +198,21 @@ export function brickMidrise(seed: number, floors: number, tint: string, neon: s
   const p = newParts();
   foundation(p, L, D);
   const H = 4 + floors * 3;
-  p.flat.push(paint(box(D, 4, L), '#3a3e46', tf(-D / 2, 2, 0)));
+  p.round.push(paint(bevelBox(D, 4, L, 0.4), '#3a3e46', tf(-D / 2, 2, 0)));
   p.glow.push(paint(box(0.06, 2.4, L - 3), '#ffd8a0', tf(0.04, 1.7, 0)));
-  addFacade(p, 'house', facadeBox(D, H - 4, L, 'house', tint, tf(-D / 2, 4 + (H - 4) / 2, 0)));
-  p.flat.push(paint(box(D + 0.3, 0.6, L + 0.3), '#6a5a50', tf(-D / 2, H + 0.3, 0)));
+  // Toldo da loja: aba de borda redonda sobre a vitrine.
+  p.round.push(roundBar(1.5, 0.2, L * 0.62, 0.09, ['#d63a3a', '#1e88e5', '#2f8a4a', '#c98a2a'][seed % 4], tf(0.7, 3.4, 0, 1, 1, 1, 0, 0, -0.3)));
+  addFacade(p, 'house', bevelFacade(D, H - 4, L, 'house', tint, tf(-D / 2, 4 + (H - 4) / 2, 0), 0.7));
+  // Varandas: lajes de borda redonda a cada andar (o prédio de tijolo tem sacada, não só janela).
+  for (let f = 1; f < floors; f++) p.round.push(roundBar(0.9, 0.2, L * 0.7, 0.08, '#6a5a50', tf(0.45, 4 + f * 3, 0)));
+  p.round.push(roundBar(D + 0.7, 0.75, L + 0.7, 0.25, '#6a5a50', tf(-D / 2, H, 0))); // cornija
   // Letreiro: estrutura + painel de neon (placa vertical na quina, olhando a pista).
   const signH = 4 + hash2(seed, 3) * 4;
   p.flat.push(paint(box(0.4, signH, 2.2), '#1a1c20', tf(0.8, H - signH / 2 - 1, L / 2 - 1.6)));
   p.glow.push(paint(box(0.08, signH - 0.6, 1.8), neon, tf(1.02, H - signH / 2 - 1, L / 2 - 1.6)));
   p.flat.push(paint(box(0.3, 2.6, L * 0.7), '#1a1c20', tf(-D / 2, H + 1.9, 0)));
   p.glow.push(paint(box(0.06, 1.6, L * 0.62), neon, tf(-D / 2 + 0.18, H + 1.95, 0)));
-  return toModel(p, H + 4);
+  return toRoundModel(p, H + 4);
 }
 
 // ───────────────────────────── Casas por região ─────────────────────────────
@@ -192,12 +231,12 @@ export function cubeHouses(seed: number, walls: string[], dome: boolean, L = 16,
     p.flat.push(paint(box(d + 0.2, 0.25, w + 0.2), '#f4f1ea', tf(x - d / 2, y + h + 0.12, z * 0.5)));
   });
   if (dome) {
-    p.flat.push(paint(cyl(1.9, 1.9, 1.2, 12), '#ffffff', tf(-10.5, 7.6, -L * 0.05)));
-    p.flat.push(paint(sphere(2.0, 12, 6), '#2a62c9', tf(-10.5, 8.2, -L * 0.05, 1, 0.9, 1)));
+    p.flat.push(paint(cyl(1.9, 1.9, 1.2, 16), '#ffffff', tf(-10.5, 7.6, -L * 0.05)));
+    p.flat.push(paint(sphere(2.0, 16, 5, 0, Math.PI * 2, 0, Math.PI / 2), '#2a62c9', tf(-10.5, 8.2, -L * 0.05, 1, 0.9, 1)));
     p.flat.push(paint(box(0.2, 1.4, 0.2), '#ffffff', tf(-10.5, 10.3, -L * 0.05)));
   }
   for (let k = 0; k < 5; k++) p.flat.push(paint(box(1.2, 0.3, 1.2), '#f0ece2', tf(-0.2 - k * 0.9, 0.15 + k * 0.3, -L * 0.48)));
-  p.flat.push(paint(jitter(ico(0.9, 0), 0.1, seed), '#d6368f', tf(0.2, 1.4, L * 0.1, 1, 0.8, 1)));
+  p.flat.push(paint(lumpy(sphere(0.9, 14, 4, 0, Math.PI * 2, 0, Math.PI / 2), 0.1, seed), '#d6368f', tf(0.2, 0.5, L * 0.1, 1, 0.8, 1)));
   return toModel(p, 12);
 }
 
@@ -277,7 +316,7 @@ export function farmhouse(seed: number, roof = '#b8552e', wall = '#f2ede2', L = 
   for (let k = 0; k < 5; k++) p.flat.push(paint(box(0.22, 3.6, 0.22), '#f2ede2', tf(2.8, 1.8, -L / 2 + 0.6 + k * (L - 1.2) / 4)));
   p.flat.push(paint(box(0.12, 0.9, L), '#6a4a32', tf(3.0, 0.45, 0)));
   p.glow.push(paint(box(0.05, 1.1, 1.0), '#ffd8a0', tf(0.03, 1.8, L * 0.2)));
-  if (hash2(seed, 2) > 0.5) p.flat.push(paint(jitter(ico(1.2, 0), 0.1, seed), '#d6368f', tf(2.6, 1.0, -L * 0.42)));
+  if (hash2(seed, 2) > 0.5) p.flat.push(paint(lumpy(sphere(1.2, 14, 4, 0, Math.PI * 2, 0, Math.PI / 2), 0.1, seed), '#d6368f', tf(2.6, 0.2, -L * 0.42)));
   return toModel(p, 7);
 }
 
@@ -303,14 +342,14 @@ export function tvTower(seed: number, R: number): Model {
   const H = 46 + hash2(seed, 1) * 18;
   p.flat.push(paint(box(2 * R, 5, 2 * R), '#b8bcc4', tf(0, 0, 0)));
   p.flat.push(paint(box(2 * R - 1, 1.4, 2 * R - 1), '#9aa0a8', tf(0, 3.2, 0)));
-  p.flat.push(paint(cyl(1.3, 2.2, H, 10), '#d8dade', tf(0, 3.9 + H / 2, 0)));
+  p.flat.push(paint(cyl(1.3, 2.2, H, 16), '#d8dade', tf(0, 3.9 + H / 2, 0)));
   const podY = 3.9 + H * 0.82;
-  p.flat.push(paint(cyl(4.2, 3.0, 2.2, 14), '#c8ccd2', tf(0, podY - 1.6, 0)));
-  p.flat.push(paint(cyl(4.4, 4.4, 0.4, 14), '#e8eaee', tf(0, podY + 1.5, 0)));
-  p.flat.push(paint(cyl(3.2, 4.2, 1.6, 14), '#c8ccd2', tf(0, podY + 2.5, 0)));
-  p.glow.push(paint(cyl(4.25, 4.25, 1.0, 14, true), '#9fd6ff', tf(0, podY + 0.2, 0)));
-  p.flat.push(paint(cyl(0.3, 0.6, 14, 6), '#e0e0e0', tf(0, podY + 10, 0)));
-  for (let k = 0; k < 3; k++) p.flat.push(paint(cyl(0.34, 0.34, 1.2, 6), k % 2 ? '#e8e8e8' : '#d63a3a', tf(0, podY + 12 + k * 1.3, 0)));
+  p.flat.push(paint(cyl(4.2, 3.0, 2.2, 16), '#c8ccd2', tf(0, podY - 1.6, 0)));
+  p.flat.push(paint(cyl(4.4, 4.4, 0.4, 16), '#e8eaee', tf(0, podY + 1.5, 0)));
+  p.flat.push(paint(cyl(3.2, 4.2, 1.6, 16), '#c8ccd2', tf(0, podY + 2.5, 0)));
+  p.glow.push(paint(cyl(4.25, 4.25, 1.0, 16, true), '#9fd6ff', tf(0, podY + 0.2, 0)));
+  p.flat.push(paint(cyl(0.3, 0.6, 14, 12), '#e0e0e0', tf(0, podY + 10, 0)));
+  for (let k = 0; k < 3; k++) p.flat.push(paint(cyl(0.34, 0.34, 1.2, 12), k % 2 ? '#e8e8e8' : '#d63a3a', tf(0, podY + 12 + k * 1.3, 0)));
   p.beacon.push(paint(sphere(0.5, 6, 4), '#ff3030', tf(0, podY + 17.3, 0)));
   return toModel(p, podY + 18, R * 0.9);
 }
@@ -349,26 +388,26 @@ export function latticeMast(seed: number, R: number): Model {
 export function officeSpire(seed: number, R: number, tint: string): Model {
   const p = newParts();
   const podH = 7;
-  addFacade(p, 'office', facadeBox(2 * R, podH, 2 * R, 'office', '#dfe6ee', tf(0, podH / 2, 0)));
-  p.flat.push(paint(box(2 * R + 0.6, 0.5, 2 * R + 0.6), '#c8ccd2', tf(0, podH + 0.25, 0)));
+  addFacade(p, 'office', bevelFacade(2 * R, podH, 2 * R, 'office', '#dfe6ee', tf(0, podH / 2, 0), 0.7));
+  p.round.push(roundBar(2 * R + 0.7, 0.55, 2 * R + 0.7, 0.2, '#c8ccd2', tf(0, podH, 0))); // cornija do embasamento
   const w = Math.max(6, 2 * R - 3);
   const H = 42 + hash2(seed, 1) * 30;
-  addFacade(p, 'office', facadeBox(w, H, w, 'office', tint, tf(0, podH + 0.5 + H / 2, 0)));
+  addFacade(p, 'office', bevelFacade(w, H, w, 'office', tint, tf(0, podH + 0.5 + H / 2, 0), 0.8));
   const top = podH + 0.5 + H;
-  p.flat.push(paint(box(w + 0.4, 0.6, w + 0.4), '#d8dde4', tf(0, top + 0.3, 0)));
-  addFacade(p, 'office', facadeBox(w * 0.6, 5, w * 0.6, 'office', tint, tf(0, top + 3.1, 0)));
-  p.flat.push(paint(cyl(0.12, 0.2, 10, 5), '#c7c9cc', tf(0, top + 10.6, 0)));
+  p.round.push(roundBar(w + 0.5, 0.6, w + 0.5, 0.2, '#d8dde4', tf(0, top, 0))); // cornija do corpo
+  addFacade(p, 'office', bevelFacade(w * 0.6, 5, w * 0.6, 'office', tint, tf(0, top + 3.1, 0), 0.4));
+  p.flat.push(paint(cyl(0.12, 0.2, 10, 8), '#c7c9cc', tf(0, top + 10.6, 0)));
   p.beacon.push(paint(new THREE.OctahedronGeometry(0.4, 0), '#ff3030', tf(0, top + 15.8, 0)));
   p.glow.push(paint(box(w + 0.1, 0.3, w + 0.1), '#bfe4ff', tf(0, top - 0.5, 0)));
-  return toModel(p, top + 16, 0);
+  return toRoundModel(p, top + 16);
 }
 
 /** Prédio clássico com cúpula (Paris, Roma): tambor com colunas sobre base quadrada (±R), cúpula e lanterna. */
 export function domeBuilding(seed: number, R: number): Model {
   const p = newParts();
   const baseH = 12;
-  addFacade(p, 'classic', facadeBox(2 * R, baseH, 2 * R, 'classic', '#efe4cc', tf(0, baseH / 2, 0)));
-  p.flat.push(paint(box(2 * R + 0.8, 0.8, 2 * R + 0.8), '#e6dcc6', tf(0, baseH + 0.4, 0)));
+  addFacade(p, 'classic', bevelFacade(2 * R, baseH, 2 * R, 'classic', '#efe4cc', tf(0, baseH / 2, 0), 0.7));
+  p.round.push(roundBar(2 * R + 0.9, 0.8, 2 * R + 0.9, 0.28, '#e6dcc6', tf(0, baseH, 0))); // cornija
   const dr = Math.min(R * 0.72, 9);
   p.flat.push(paint(cyl(dr, dr, 7, 16), '#efe6d2', tf(0, baseH + 0.8 + 3.5, 0)));
   for (let k = 0; k < 12; k++) {
@@ -380,7 +419,7 @@ export function domeBuilding(seed: number, R: number): Model {
   p.flat.push(paint(cyl(1.0, 1.2, 3, 8), '#efe6d2', tf(0, baseH + 8.4 + dr * 1.15 + 1.2, 0)));
   p.flat.push(paint(cone(1.3, 2.4, 8), '#6f8f8a', tf(0, baseH + 8.4 + dr * 1.15 + 3.9, 0)));
   p.glow.push(paint(cyl(dr + 0.05, dr + 0.05, 1.2, 16, true), '#ffd89a', tf(0, baseH + 3.2, 0)));
-  return toModel(p, baseH + 8.4 + dr * 1.3 + 6, 0);
+  return toRoundModel(p, baseH + 8.4 + dr * 1.3 + 6);
 }
 
 /** Farol sobre rochedo (o rochedo é a pegada); lanterna acesa e facho girando à noite. */
@@ -392,13 +431,13 @@ export function lighthouse(seed: number, R: number, bands = '#d63a3a'): Model {
   for (let k = 0; k < segs; k++) {
     const t0 = k / segs; const t1 = (k + 1) / segs;
     const r0 = 2.3 - 0.7 * t0; const r1 = 2.3 - 0.7 * t1;
-    p.flat.push(paint(cyl(r1, r0, H / segs, 12), k % 2 ? bands : '#f6f6f2', tf(0, y0 + (t0 + t1) / 2 * H, 0)));
+    p.flat.push(paint(cyl(r1, r0, H / segs, 16), k % 2 ? bands : '#f6f6f2', tf(0, y0 + (t0 + t1) / 2 * H, 0)));
   }
   const top = y0 + H;
-  p.flat.push(paint(cyl(2.2, 2.2, 0.35, 12), '#2e3238', tf(0, top + 0.17, 0)));
-  p.flat.push(paint(cyl(2.25, 2.25, 0.7, 12, true), '#2e3238', tf(0, top + 0.7, 0)));
-  p.glow.push(paint(cyl(1.3, 1.3, 2.0, 10), '#fff4c8', tf(0, top + 1.4, 0)));
-  p.flat.push(paint(cone(1.6, 1.5, 10), bands, tf(0, top + 3.1, 0)));
+  p.flat.push(paint(cyl(2.2, 2.2, 0.35, 16), '#2e3238', tf(0, top + 0.17, 0)));
+  p.flat.push(paint(cyl(2.25, 2.25, 0.7, 16, true), '#2e3238', tf(0, top + 0.7, 0)));
+  p.glow.push(paint(cyl(1.3, 1.3, 2.0, 14), '#fff4c8', tf(0, top + 1.4, 0)));
+  p.flat.push(paint(cone(1.6, 1.5, 16), bands, tf(0, top + 3.1, 0)));
   p.flat.push(paint(box(4, 3, 3.4), '#f2f0ea', tf(R * 0.35, 2.4 + 1.5, R * 0.3)));
   p.flat.push(paint(gable(4, 1.6, 3.4, 0.2), bands, tf(R * 0.35, 5.4, R * 0.3)));
   return toModel(p, top + 4, 0);
@@ -427,9 +466,9 @@ export function waterTower(seed: number, R: number): Model {
       p.flat.push(paint(box(dz !== 0 ? r * 1.414 : 0.1, 0.1, dx !== 0 ? r * 1.414 : 0.1), '#7a6a5a', tf(dx * r * 0.707, y, dz * r * 0.707)));
     }
   }
-  p.flat.push(paint(cyl(3.2, 3.2, 4.6, 14), '#c9c4b8', tf(0, H + 2.3, 0)));
-  p.flat.push(paint(cyl(3.25, 3.25, 0.8, 14), '#d63a3a', tf(0, H + 2.8, 0)));
-  p.flat.push(paint(cone(3.5, 1.8, 14), '#8a8f96', tf(0, H + 5.5, 0)));
+  p.flat.push(paint(cyl(3.2, 3.2, 4.6, 16), '#c9c4b8', tf(0, H + 2.3, 0)));
+  p.flat.push(paint(cyl(3.25, 3.25, 0.8, 16), '#d63a3a', tf(0, H + 2.8, 0)));
+  p.flat.push(paint(cone(3.5, 1.8, 16), '#8a8f96', tf(0, H + 5.5, 0)));
   return toModel(p, H + 6, 0);
 }
 
@@ -451,8 +490,8 @@ export function windpumpTower(seed: number, R: number): Model {
   p.flat.push(paint(box(0.8, 0.5, 0.5), '#6a6e74', tf(0, H + 0.2, 0)));
   p.flat.push(paint(box(0.06, 1.8, 3.2), '#b8bcc2', tf(0, H + 0.6, -2.0)));
   // Tanque australiano de chapa ao lado (dentro da pegada).
-  p.flat.push(paint(cyl(1.6, 1.6, 2.2, 12), '#b8bcc2', tf(R * 0.55, 1.1, R * 0.4)));
-  p.flat.push(paint(cone(1.7, 0.5, 12), '#9a9ea4', tf(R * 0.55, 2.45, R * 0.4)));
+  p.flat.push(paint(cyl(1.6, 1.6, 2.2, 16), '#b8bcc2', tf(R * 0.55, 1.1, R * 0.4)));
+  p.flat.push(paint(cone(1.7, 0.5, 16), '#9a9ea4', tf(R * 0.55, 2.45, R * 0.4)));
   return toModel(p, H + 2, 0);
 }
 
@@ -475,27 +514,32 @@ export type FenceStyle = 'ranch' | 'rail' | 'armco' | 'stone' | 'railing' | 'hed
 export function fence(style: FenceStyle, seed: number): Model {
   const parts: Geo[] = [];
   const L = 4.02;
+  // Barra de borda arredondada (4 gomos por canto: 22,5° cada, lisa à luz de construção — o vinco é 40°; com 2 gomos de 45° a quina ficava viva) e fio redondo ao longo de Z.
+  const bar = (w: number, h: number, r: number, color: string, y: number, x = 0): Geo => paint(smoothNormals(roundedBar(w, h, L, r, 4), 50), color, tf(x, y, 0));
+  const wire = (r: number, color: string, y: number, x = 0): Geo => paint(cyl(r, r, L, 12, true), color, tf(x, y, 0, 1, 1, 1, Math.PI / 2, 0, 0));
   switch (style) {
     case 'ranch':
-      parts.push(paint(box(0.14, 1.35, 0.14), '#7a5a3a', tf(0, 0.62, -2, 1, 1, 1, 0, 0, (hash2(seed, 1) - 0.5) * 0.08)));
-      for (const y of [0.75, 1.15]) parts.push(paint(box(0.025, 0.025, L), '#6a6a6a', tf(0, y, 0)));
+      parts.push(paint(cyl(0.065, 0.07, 1.35, 14, true), '#7a5a3a', tf(0, 0.62, -2, 1, 1, 1, 0, 0, (hash2(seed, 1) - 0.5) * 0.08)));
+      for (const y of [0.75, 1.15]) parts.push(wire(0.014, '#6a6a6a', y));
       break;
     case 'rail':
-      parts.push(paint(box(0.16, 1.3, 0.16), '#f2f0ea', tf(0, 0.6, -2)));
-      for (const y of [0.45, 0.8, 1.15]) parts.push(paint(box(0.06, 0.16, L), '#f2f0ea', tf(0, y, 0)));
+      parts.push(paint(cyl(0.08, 0.08, 1.3, 14, true), '#f2f0ea', tf(0, 0.6, -2)));
+      for (const y of [0.37, 0.72, 1.07]) parts.push(bar(0.07, 0.17, 0.03, '#f2f0ea', y));
       break;
     case 'armco':
-      parts.push(paint(box(0.12, 0.8, 0.16), '#8a9098', tf(-0.1, 0.4, -2)));
-      parts.push(paint(box(0.08, 0.34, L), '#c8ccd2', tf(0.02, 0.62, 0)));
-      parts.push(paint(box(0.1, 0.08, L), '#dfe3e8', tf(0.03, 0.62, 0)));
+      parts.push(paint(cyl(0.06, 0.06, 0.8, 12, true), '#8a9098', tf(-0.1, 0.4, -2)));
+      parts.push(bar(0.1, 0.34, 0.05, '#c8ccd2', 0.45, 0.02));
       break;
-    case 'stone':
-      for (let k = 0; k < 4; k++) parts.push(paint(jitter(box(0.62, 0.42, 1.08), 0.08, seed + k), k % 2 ? '#a8a092' : '#968e80', tf(0, 0.2, -1.5 + k * 1.0)));
-      for (let k = 0; k < 3; k++) parts.push(paint(jitter(box(0.54, 0.36, 1.2), 0.08, seed + k + 9), k % 2 ? '#9a9284' : '#b0a898', tf(0, 0.58, -1.3 + k * 1.3)));
+    case 'stone': {
+      // Muro baixo de duas fiadas de pedra de topo arredondado, em lances de ~1 m de tons alternados (eram caixas sorteadas).
+      const lance = (w: number, h: number, y: number, z0: number, len: number, c: string, x: number): Geo => paint(smoothNormals(roundedBar(w, h, len, Math.min(0.2, h / 2.1), 4), 50), c, tf(x, y, z0));
+      for (let k = 0; k < 4; k++) parts.push(lance(0.62, 0.42, 0, -1.5 + k * 1.0, 1.0, k % 2 ? '#a8a092' : '#968e80', 0));
+      for (let k = 0; k < 3; k++) parts.push(lance(0.54, 0.38, 0.38, -1.3 + k * 1.3, 1.25, k % 2 ? '#9a9284' : '#b0a898', 0));
       break;
+    }
     case 'railing':
-      parts.push(paint(box(0.08, 1.05, 0.08), '#e8eaee', tf(0, 0.52, -2)));
-      for (const y of [0.55, 1.02]) parts.push(paint(box(0.06, 0.06, L), '#e8eaee', tf(0, y, 0)));
+      parts.push(paint(cyl(0.04, 0.045, 1.05, 14, true), '#e8eaee', tf(0, 0.52, -2)));
+      for (const y of [0.55, 1.02]) parts.push(wire(0.032, '#e8eaee', y));
       break;
     case 'hedge':
       // Cerca-viva aparada de quinas redondas (era uma caixa). A seção não muda ao longo do lance: emenda sem degrau.
@@ -509,10 +553,10 @@ export function fence(style: FenceStyle, seed: number): Model {
 /** Poste de madeira com travessa e isoladores (os fios são um modelo à parte, esticado por quadro). */
 export function utilityPole(): Model {
   const g = merge([
-    paint(cyl(0.12, 0.16, 9.4, 6), '#6a5238', tf(0, 4.7, 0)),
+    paint(cyl(0.12, 0.16, 9.4, 14), '#6a5238', tf(0, 4.7, 0)),
     paint(box(0.14, 0.16, 2.4), '#5a4430', tf(0, 8.8, 0)),
-    paint(cyl(0.06, 0.06, 0.2, 5), '#e8ecf0', tf(0, 9.0, -1.0)), paint(cyl(0.06, 0.06, 0.2, 5), '#e8ecf0', tf(0, 9.0, 1.0)),
-    paint(cyl(0.06, 0.06, 0.2, 5), '#e8ecf0', tf(0, 9.5, 0)),
+    paint(cyl(0.06, 0.06, 0.2, 10), '#e8ecf0', tf(0, 9.0, -1.0)), paint(cyl(0.06, 0.06, 0.2, 10), '#e8ecf0', tf(0, 9.0, 1.0)),
+    paint(cyl(0.06, 0.06, 0.2, 10), '#e8ecf0', tf(0, 9.5, 0)),
   ]);
   return { parts: [{ geometry: g, mat: 'flat' }], blob: 0.4 };
 }
@@ -527,7 +571,7 @@ export function wires(): Model {
 /** Turbina eólica (torre + nacele); o rotor é à parte e gira em torno de X. */
 export function windTurbine(): Model {
   const g = merge([
-    paint(cyl(1.1, 2.0, 62, 10), '#f2f4f6', tf(0, 31, 0)),
+    paint(cyl(1.1, 2.0, 62, 16), '#f2f4f6', tf(0, 31, 0)),
     paint(box(2.2, 2.4, 6.0), '#e8eaee', tf(0, 63, -0.8)),
     paint(box(3, 0.6, 3), '#c8ccd2', tf(0, 0.3, 0)),
   ]);
@@ -536,7 +580,7 @@ export function windTurbine(): Model {
 
 /** Rotor de três pás (gira em torno de Z do modelo, que o renderizador põe olhando a pista). */
 export function turbineRotor(): Model {
-  const parts: Geo[] = [paint(sphere(1.0, 8, 6), '#f2f4f6', tf(0, 0, 0, 1, 1, 1.4))];
+  const parts: Geo[] = [paint(sphere(1.0, 16, 10), '#f2f4f6', tf(0, 0, 0, 1, 1, 1.4))];
   for (let k = 0; k < 3; k++) {
     const a = (k / 3) * Math.PI * 2;
     parts.push(paint(box(0.3, 26, 1.4), '#f6f7f8', tf(Math.sin(a) * 13, Math.cos(a) * 13, 0.2, 1, 1, 1, 0, 0, -a)));
@@ -547,7 +591,7 @@ export function turbineRotor(): Model {
 /** Portal torii vermelho (Japão). */
 export function torii(): Model {
   const g = merge([
-    paint(cyl(0.45, 0.5, 9, 10), '#d8402a', tf(-4.4, 4.5, 0)), paint(cyl(0.45, 0.5, 9, 10), '#d8402a', tf(4.4, 4.5, 0)),
+    paint(cyl(0.45, 0.5, 9, 16), '#d8402a', tf(-4.4, 4.5, 0)), paint(cyl(0.45, 0.5, 9, 16), '#d8402a', tf(4.4, 4.5, 0)),
     paint(box(12.4, 0.8, 1.1), '#2a2a2a', tf(0, 9.4, 0)), paint(box(11.6, 0.6, 0.9), '#d8402a', tf(0, 8.7, 0)),
     paint(box(10, 0.5, 0.6), '#d8402a', tf(0, 7.3, 0)), paint(box(0.7, 1.4, 0.4), '#d8402a', tf(0, 8.0, 0)),
     paint(box(1.3, 0.6, 1.3), '#3a3a3a', tf(-4.4, 0.3, 0)), paint(box(1.3, 0.6, 1.3), '#3a3a3a', tf(4.4, 0.3, 0)),
@@ -631,7 +675,7 @@ export function beachUmbrella(seed: number): Model {
 /** Moinho de vento clássico de pedra (Mediterrâneo): corpo cilíndrico caiado e telhado cônico. */
 export function stoneWindmill(): Model {
   const g = merge([
-    paint(cyl(2.4, 2.8, 8, 12), '#f4f2ea', tf(0, 4, 0)), paint(cone(2.8, 2.6, 12), '#8a5a3a', tf(0, 9.3, 0)),
+    paint(cyl(2.4, 2.8, 8, 16), '#f4f2ea', tf(0, 4, 0)), paint(cone(2.8, 2.6, 16), '#8a5a3a', tf(0, 9.3, 0)),
     paint(box(0.1, 1.8, 1.0), '#3a5a8a', tf(2.62, 0.9, 0)),
   ]);
   const sails: Geo[] = [];
@@ -653,7 +697,7 @@ export function pier(): Model {
 
 /** Pedras soltas grandes no mar/encosta (um penedo): redondo em bolhas macias, a cor por ponto (era por face). */
 export function seaRock(seed: number, color: string, r: number): Model {
-  const g = paint(lumpy(sphere(1, 14, 7), 0.12, seed), color, tf(0, r * 0.2, 0, r, r * 0.8, r * 0.9));
+  const g = paint(lumpy(sphere(1, 16, 8), 0.09, seed), color, tf(0, r * 0.2, 0, r, r * 0.8, r * 0.9));
   return { parts: [{ geometry: mottle(tintUpSoft(g, '#ffffff', 0.7, 0.2), 0.1, seed, 0.5), mat: 'flat' }] };
 }
 

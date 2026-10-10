@@ -16,6 +16,7 @@ import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
 import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
+import { applyWind, makeWindUniforms, windDetailOn } from './wind';
 
 type BatchKey = 'flat' | 'dress' | 'haze' | 'office' | 'apartment' | 'classic' | 'house' | 'glow' | 'beacon' | 'cone' | 'panel' | 'blob' | 'cutout';
 
@@ -65,6 +66,8 @@ interface Batch {
   slots: number[];
   /** Lotes com cor por instância: 1 onde a instância já está branca (null = lote sem cor). */
   white: Uint8Array | null;
+  /** O mesmo lote: a fase do vento escrita no alfa da cor de cada instância (0 = rígido; wind.ts). */
+  phase: Float32Array | null;
 }
 
 /** Mancha de sombra: disco horizontal de raio 1. */
@@ -118,10 +121,13 @@ export class Scenery {
   private refs: Array<Ref | undefined> = [];
   private blobSlot = -1;
   private night = false;
+  /** Vento (wind.ts): tempo e amplitude compartilhados por todas as telas; desliga na janela curta (qualidade Baixa). */
+  private readonly windU = makeWindUniforms();
+  private windOn = true;
   /** Entardecer: luzes acesas, mas mais fracas que à noite (o céu ainda clareia). */
   private dusk = false;
   private readonly m = new THREE.Matrix4();
-  private readonly c = new THREE.Color();
+  private readonly c4 = new THREE.Vector4();
   private cosH = new Float32Array(WINDOW + 8);
   private sinH = new Float32Array(WINDOW + 8);
 
@@ -137,6 +143,8 @@ export class Scenery {
 #endif`);
     };
     this.hazeMat.customProgramCacheKey = () => 'scenery-haze';
+    // Vento no lote liso (copa que balança; o alfa da cor por instância é a fase) ANTES do stylize, que compõe por cima.
+    applyWind(this.flatMat, this.windU);
     // Luz estilizada DEPOIS do callback e da chave acima: o stylize compõe com eles (o `fog_fragment` da névoa do horizonte fica).
     applyStylize(this.flatMat, 'scenery');
     applyStylize(this.hazeMat, 'scenery');
@@ -297,7 +305,11 @@ export class Scenery {
       }
       mesh.visible = false;
       this.group.add(mesh);
-      batches.push({ key, mesh, slots: mine.map((e) => e.i), white: key === 'flat' || key === 'dress' ? new Uint8Array(Math.max(1, inst)).fill(1) : null });
+      const tinted = key === 'flat' || key === 'dress';
+      // A textura de cor por instância nasce já (senão o programa compila sem `USE_BATCHING_COLOR` e recompila na 1ª árvore tingida). Ela nasce
+      // toda em 1 (inclusive o alfa, a fase do vento): `phase` começa em 1 para casar, e a 1ª escrita de cada instância põe o alfa certo.
+      if (tinted && inst > 0) mesh.setColorAt(0, this.c4.set(1, 1, 1, 1));
+      batches.push({ key, mesh, slots: mine.map((e) => e.i), white: tinted ? new Uint8Array(Math.max(1, inst)).fill(1) : null, phase: tinted ? new Float32Array(Math.max(1, inst)).fill(1) : null });
     }
     this.batches = batches;
     this.slots = slots;
@@ -330,6 +342,10 @@ export class Scenery {
     // O cenário acompanha: com menos vista, desenha só a fração correspondente dos enfeites dispensáveis
     // (forração, mata, soltos — `rank`), nunca os sprites da física, cercas, postes ou pontos de referência.
     const detail = Math.min(1, Math.max(0.5, (count - 1) / FULL_WINDOW));
+    // O vento acompanha a janela como o resto do enfeite: a qualidade Baixa (140 à frente) fica parada (docs/ondas/M/M3.md).
+    this.windOn = windDetailOn(detail);
+    this.windU.uWindTime.value = time;
+    this.windU.uWindAmp.value = this.windOn ? 1 : 0;
     const first = Math.max(0, frame.behind - BEHIND_DRAW);
     for (let j = first; j < count - 1; j++) {
       const list = layout.bySeg[frame.segIndex[j]];
@@ -385,7 +401,7 @@ export class Scenery {
       const dh = Math.hypot(dx, dz);
       const len = Math.hypot(dh, dy);
       this.compose(Math.atan2(-dx, -dz), Math.atan2(dy, dh), 0, 1, 1, len, x, y, z);
-      this.write(ref, p, false);
+      this.write(ref, p, false, 0);
       return;
     }
     // Rumo no ponto: interpola cos/sen do rumo dos dois pontos (o giro por segmento é < 0,03 rad) e soma o giro do
@@ -412,7 +428,7 @@ export class Scenery {
     } else {
       this.compose(p.spinY === 0 ? Math.atan2(sy, cy) : yaw, pitch, spin, p.sx, p.sy, p.sz, x, y, z);
     }
-    this.write(ref, p, true);
+    this.write(ref, p, true, this.windOn && model === p.model ? p.wind : 0);
     if (blob && ref.blob > 0 && this.blobSlot >= 0) {
       // Mancha: disco no chão alinhado ao rumo da pista (giro −h: cos = cH, sen = −sH).
       const r = ref.blob * Math.max(p.sx, p.sz);
@@ -436,22 +452,23 @@ export class Scenery {
     e[12] = x; e[13] = y; e[14] = z; e[15] = 1;
   }
 
-  private write(ref: Ref, p: Placement, tint: boolean): void {
-    for (let k = 0; k < ref.slots.length; k++) this.writeSlot(ref.slots[k], tint ? p : null);
+  private write(ref: Ref, p: Placement, tint: boolean, wind: number): void {
+    for (let k = 0; k < ref.slots.length; k++) this.writeSlot(ref.slots[k], tint ? p : null, wind);
   }
 
-  private writeSlot(si: number, tint: Placement | null): void {
+  private writeSlot(si: number, tint: Placement | null, wind = 0): void {
     const s = this.slots[si];
     if (s.used >= s.cap) return;
     const b = this.batches[s.batch];
     const id = s.start + s.used++;
     b.mesh.setMatrixAt(id, this.m);
-    if (!b.white) return;
-    // Cor por instância só quando muda (a maioria é branca: nada a escrever de novo).
+    if (!b.white || !b.phase) return;
+    // Cor por instância só quando muda (a maioria é branca e rígida: nada a escrever de novo). O alfa é a fase do vento.
     const white = !tint || (tint.r === 1 && tint.g === 1 && tint.b === 1);
-    if (white && b.white[id] === 1) return;
-    b.mesh.setColorAt(id, white || !tint ? this.c.setRGB(1, 1, 1) : this.c.setRGB(tint.r, tint.g, tint.b));
+    if (white && b.white[id] === 1 && b.phase[id] === wind) return;
+    b.mesh.setColorAt(id, white || !tint ? this.c4.set(1, 1, 1, wind) : this.c4.set(tint.r, tint.g, tint.b, wind));
     b.white[id] = white ? 1 : 0;
+    b.phase[id] = wind;
   }
 
   dispose(): void {

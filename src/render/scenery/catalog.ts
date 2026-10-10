@@ -50,6 +50,7 @@ const BUILDERS: Record<string, () => Model> = {
   'tree:maple-orange': () => V.roundTree(19, ['#e8822a', '#f09a3a', '#d8702a'], SK.alp, '#4a3428', 0.95),
   'tree:beech-autumn': () => V.roundTree(20, ['#c8962a', '#d9a83a', '#b8862a'], SK.alp, '#5a4a3a'),
   'tree:eucalyptus': () => V.eucalyptus(21), 'tree:olive': () => V.olive(22), 'tree:cypress': () => V.cypress(23),
+  'tree:carnauba': () => V.carnauba(261), 'tree:juazeiro': () => V.juazeiro(262), 'tree:umbuzeiro': () => V.umbuzeiro(263),
   'tree:street': () => V.roundTree(24, ['#3a8a3a', '#4a9a40', '#357f36'], ['#8a8a86', '#9a9a94'], '#5a4430', 0.85),
   // Coníferas (R de `pine`).
   'pine:spruce': () => V.conifer(31, '#2a6b42', 5, 1), 'pine:fir': () => V.conifer(32, '#347a66', 6, 0.95),
@@ -70,6 +71,8 @@ const BUILDERS: Record<string, () => Model> = {
   'cactus:pear': () => V.pricklyPear(54), 'cactus:termite': () => V.termiteMound(55), 'cactus:spinifex': () => V.spinifex(56),
   'cactus:euphorbia': () => V.euphorbia(57), 'cactus:aloe': () => V.rosette(58, '#6a9a6a', '#e8502a', 2.2),
   'cactus:agave': () => V.rosette(59, '#7a9a8a', '#f2c33a', 4.2),
+  // Sertão do Brasil (M3): mandacaru, xique-xique, coroa-de-frade, palma; e as árvores carnaúba, juazeiro e umbuzeiro (mais abaixo, junto das árvores).
+  'cactus:mandacaru': () => V.mandacaru(251), 'cactus:xique': () => V.xiqueXique(252), 'cactus:coroa': () => V.coroaDeFrade(253), 'cactus:palma': () => V.palma(254),
   // Arbustos (não sólidos).
   'bush:fern': () => V.fernClump(61), 'bush:heliconia': () => V.shrub(62, ['#2f8a38', '#3f9a3c'], '#e8402a'),
   'bush:dry': () => V.shrub(63, ['#8a8a3c', '#9a9245', '#7a7a38'], null), 'bush:dry-yellow': () => V.shrub(64, ['#7f8a3a', '#8f9a42'], '#f2c33a'),
@@ -109,6 +112,7 @@ const BUILDERS: Record<string, () => Model> = {
   'far:boulder-red': () => V.farRock('#c8683a', 5, 2.3, 1.7), 'far:boulder-grey': () => V.farRock('#8d8f94', 6, 2.3, 1.7),
   'far:boulder-ochre': () => V.farRock('#a39480', 7, 2.3, 1.7), 'far:boulder-dark': () => V.farRock('#4a4648', 8, 2.3, 1.7),
   'far:saguaro': () => V.farSaguaro(),
+  'far:mandacaru': () => V.farMandacaru(), 'far:round-umbu': () => V.farRound('#8fa04c', 4.4, 2.9),
   // Decoração de beira e pontos de referência.
   ...Object.fromEntries((['ranch', 'rail', 'armco', 'stone', 'railing', 'hedge'] as S.FenceStyle[]).map((s) => [`fence:${s}`, () => S.fence(s, 7)])),
   'pole': () => S.utilityPole(), 'wires': () => S.wires(),
@@ -131,6 +135,9 @@ const BUILDERS: Record<string, () => Model> = {
   'house:cubes-white': () => S.cubeHouses(9, ['#ffffff', '#f6f4ee'], true), 'house:cubes-pastel': () => S.cubeHouses(10, ['#f2c46b', '#f08a7a', '#f5e0b0', '#e8a0a0'], false),
   'beam': () => S.lighthouseBeam(), 'fan': () => S.windpumpFan(),
 };
+
+/** Todos os ids do registro fixo (os de prédio e torre, com parâmetros, nascem do `dynamicBuilder`; os marcos, de `LANDMARKS`): a faceta da bíblia os mede. */
+export const BUILDER_IDS: readonly string[] = Object.keys(BUILDERS);
 
 const cache = new Map<string, Model>();
 
@@ -299,13 +306,14 @@ export function farModelFor(id: string): string | null {
     const map: Record<string, string> = {
       'tree:ipe-pink': 'far:round-pink', 'tree:ipe-yellow': 'far:round-gold', 'tree:aspen-gold': 'far:round-gold', 'tree:beech-autumn': 'far:round-gold',
       'tree:maple-red': 'far:round-red', 'tree:maple-orange': 'far:round-red', 'tree:acacia:0': 'far:flat-acacia', 'tree:acacia:1': 'far:flat-acacia',
-      'tree:baobab': 'far:round-dry', 'tree:marula': 'far:round-dry', 'tree:olive': 'far:round-olive', 'tree:eucalyptus': 'far:round-olive',
+      'tree:baobab': 'far:round-dry', 'tree:marula': 'far:round-dry', 'tree:carnauba': 'far:palm-dry', 'tree:umbuzeiro': 'far:round-umbu', 'tree:juazeiro': 'far:round-dark', 'tree:olive': 'far:round-olive', 'tree:eucalyptus': 'far:round-olive',
       'tree:cypress': 'far:cone-cypress', 'tree:poplar': 'far:poplar', 'tree:giant:0': 'far:round-dark', 'tree:giant:1': 'far:round-dark',
     };
     return map[id] ?? 'far:round-green';
   }
   if (id.startsWith('rock:')) return id.startsWith('rock:sandstone') ? 'far:boulder-red' : id === 'rock:lava' || id === 'rock:basalt' ? 'far:boulder-dark' : id === 'rock:kopje' ? 'far:boulder-ochre' : 'far:boulder-grey';
   if (id.startsWith('cactus:saguaro')) return 'far:saguaro';
+  if (id === 'cactus:mandacaru') return 'far:mandacaru';
   return null;
 }
 
@@ -335,7 +343,7 @@ const TREES: Record<SceneryId, Partial<Record<Region, string[]>> & { _: string[]
   savanna: { _: ['tree:acacia:0', 'tree:baobab', 'tree:acacia:1', 'tree:marula'], eu: ['tree:oak', 'tree:poplar', 'tree:linden', 'tree:poplar'], br: ['tree:ipe-pink', 'tree:mango:0', 'tree:ipe-yellow', 'tree:marula'] },
   alpine: { _: ['tree:aspen-gold', 'tree:aspen-green', 'tree:oak', 'tree:aspen-gold'], jp: ['tree:maple-red', 'tree:oak', 'tree:maple-orange', 'tree:maple-red'], eu: ['tree:beech-autumn', 'tree:aspen-green', 'tree:oak', 'tree:beech-autumn'], no: ['tree:aspen-green', 'tree:aspen-gold', 'tree:aspen-green', 'tree:beech-autumn'] },
   coast: { _: ['tree:mango:0', 'tree:linden', 'tree:mango:1', 'tree:oak'], med: ['tree:olive', 'tree:cypress', 'tree:olive', 'tree:cypress'], au: ['tree:eucalyptus', 'tree:mango:0', 'tree:eucalyptus', 'tree:oak'] },
-  desert: { _: ['tree:marula', 'tree:acacia:0', 'tree:marula', 'tree:acacia:1'], au: ['tree:eucalyptus', 'tree:eucalyptus', 'tree:acacia:0', 'tree:eucalyptus'], med: ['tree:olive', 'tree:olive', 'tree:cypress', 'tree:olive'] },
+  desert: { _: ['tree:marula', 'tree:acacia:0', 'tree:marula', 'tree:acacia:1'], br: ['tree:umbuzeiro', 'tree:juazeiro', 'tree:carnauba', 'tree:juazeiro'], au: ['tree:eucalyptus', 'tree:eucalyptus', 'tree:acacia:0', 'tree:eucalyptus'], med: ['tree:olive', 'tree:olive', 'tree:cypress', 'tree:olive'] },
   city_night: { _: ['tree:street', 'tree:street', 'tree:linden', 'tree:street'] },
 };
 
@@ -356,6 +364,7 @@ const PALMS: Partial<Record<Region, string[]>> & { _: string[] } = {
 const CACTI: Partial<Record<Region, string[]>> & { _: string[] } = {
   _: ['cactus:saguaro2', 'cactus:saguaro3', 'cactus:barrel', 'cactus:pear'], au: ['cactus:termite', 'cactus:spinifex', 'cactus:termite', 'cactus:spinifex'],
   za: ['cactus:euphorbia', 'cactus:aloe', 'cactus:euphorbia', 'cactus:aloe'], med: ['cactus:pear', 'cactus:agave', 'cactus:pear', 'cactus:agave'],
+  br: ['cactus:mandacaru', 'cactus:xique', 'cactus:coroa', 'cactus:palma'],
 };
 
 const BUSHES: Record<SceneryId, string[]> = {
@@ -532,11 +541,12 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
     case 'desert': {
       const rocksFar = region === 'med' ? 'far:rock-dark' : region === 'za' ? 'far:rock-ochre' : 'far:rock-red';
       const mesas: Array<[string, number, number, number]> = region === 'med' ? [['mesa:etna', 1, 180, 300]] : region === 'za' ? [['mesa:karoo', 2, 150, 300]] : [['mesa:0', 2, 140, 300], ['mesa:1', 2, 120, 260]];
-      const trees = region === 'au' ? [{ near: ['tree:eucalyptus'], far: 'far:round-olive', weight: 1 }] : region === 'med' ? [{ near: ['tree:olive'], far: 'far:round-olive', weight: 2 }, { near: ['tree:cypress'], far: 'far:cone-cypress', weight: 1 }] : [];
-      const scatter: Array<[string, number]> = region === 'au' ? [['termite', 2], ['cactus:spinifex', 3], ['rock:sandstone', 1]] : region === 'za' ? [['cactus:aloe', 2], ['bush:sage', 2], ['rock:kopje', 1]] : region === 'med' ? [['cactus:pear', 2], ['cactus:agave', 1], ['rock:lava', 1]] : [['cactus:saguaro2', 2], ['cactus:saguaro3', 1], ['cactus:barrel', 1], ['rock:sandstone', 1], ['bush:sage', 2]];
+      const trees = region === 'br' ? [{ near: ['tree:juazeiro'], far: 'far:round-dark', weight: 3 }, { near: ['tree:umbuzeiro'], far: 'far:round-umbu', weight: 3 }, { near: ['tree:carnauba'], far: 'far:palm-dry', weight: 2 }]
+        : region === 'au' ? [{ near: ['tree:eucalyptus'], far: 'far:round-olive', weight: 1 }] : region === 'med' ? [{ near: ['tree:olive'], far: 'far:round-olive', weight: 2 }, { near: ['tree:cypress'], far: 'far:cone-cypress', weight: 1 }] : [];
+      const scatter: Array<[string, number]> = region === 'au' ? [['termite', 2], ['cactus:spinifex', 3], ['rock:sandstone', 1]] : region === 'za' ? [['cactus:aloe', 2], ['bush:sage', 2], ['rock:kopje', 1]] : region === 'med' ? [['cactus:pear', 2], ['cactus:agave', 1], ['rock:lava', 1]] : region === 'br' ? [['cactus:mandacaru', 2], ['cactus:xique', 2], ['cactus:coroa', 1], ['cactus:palma', 1], ['rock:sandstone', 1], ['bush:sage', 2]] : [['cactus:saguaro2', 2], ['cactus:saguaro3', 1], ['cactus:barrel', 1], ['rock:sandstone', 1], ['bush:sage', 2]];
       const extra: Array<[string, number, number, number]> = region === 'med' ? [['windmill', 1, 50, 120]] : region === 'us' ? [['tower:water:3:1', 1, 40, 90]] : [['tower:windpump:3:2', 1, 35, 80]];
       return { ...base, fence: region === 'med' ? 'stone' : 'ranch', poles: region !== 'med', cover: region === 'med' ? [['tuft:sage:0', 2], ['pebbles:dark', 2], ['flowers:desert', 1]] : [['tuft:sage:0', 2], ['tuft:sage:1', 1], ['pebbles:red', 2], ['tuft:dry:1', 1]],
-        coverDensity: 2.0, groves: trees, groveDensity: trees.length ? 0.2 : 0, clearing: 0.5, scatter, scatterDensity: 0.4,
+        coverDensity: 2.0, groves: trees, groveDensity: trees.length ? (region === 'br' ? 0.3 : 0.2) : 0, clearing: 0.5, scatter, scatterDensity: 0.4,
         landmarks: [...mesas, [rocksFar, 3, 50, 140], ...extra], landmarkEvery: 60 };
     }
     case 'alpine': {

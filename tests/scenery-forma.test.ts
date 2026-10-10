@@ -6,9 +6,10 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { getTrack, TRACKS } from '../src/core/track';
 import { getModel } from '../src/render/scenery/catalog';
-import { sceneryLayout } from '../src/render/scenery/layout';
+import { sceneryLayout, type Layout } from '../src/render/scenery/layout';
 import { sceneryShading } from '../src/render/scenery/smooth';
 import { modelTriangles } from '../src/render/scenery/vegetation';
+import { frameCost } from './scenery-medidas';
 
 /** Famílias de forma redonda (o vinco de planta ou de pedra): o resto (construção, objeto de pista) pode ser caixa. */
 const ROUND = /^(tree|pine|palm|cactus|bush|rock|termite|stack|searock|mesa|far):/;
@@ -145,19 +146,7 @@ describe('cenário redondo: cor', () => {
 });
 
 describe('cenário redondo: forma', () => {
-  it('as famílias redondas não mostram gomos largos (a normal lisa fica, em média, a ≤ 22° da face; pedra ≤ 18°)', () => {
-    const bad: string[] = [];
-    for (const id of ids) {
-      if (id.startsWith('far:')) continue; // silhueta de longe: poucos pixels, ≤ 60 triângulos
-      // Palmeira de cartum (L4): a copa tem a normal ESFERIZADA de propósito (lê como uma bola de luz), então a normal se afasta da face;
-      // o que se trava nela é o teste da copa em tests/scenery-copacabana.test.ts (aponta para fora) e a cor lisa aqui em cima.
-      if (id.startsWith('palm:cartoon:')) continue;
-      const lie = normalLie(getModel(id).parts);
-      const cap = /^(rock|searock):/.test(id) ? 18 : 22;
-      if (lie > cap) bad.push(`${id}: ${lie.toFixed(1)}° (máx. ${cap}°)`);
-    }
-    expect(bad, `${bad.length} modelos`).toEqual([]);
-  }, 60000);
+  // O teto de faceta de TODAS as famílias (15°, a bíblia) é de tests/scenery-faceta.test.ts; antes, aqui, 22° (pedra 18°) com a palmeira de cartum de fora.
 
   it('o detector separa a malha grossa da fina (icosaedro de 20 faces × subdividido)', async () => {
     const { ico, paint } = await import('../src/render/scenery/geom');
@@ -169,29 +158,67 @@ describe('cenário redondo: forma', () => {
 });
 
 describe('cenário redondo: orçamento', () => {
-  it('custo do cenário por segmento (triângulos do modelo de perto de cada objeto, sem marcos) ≤ 900 em toda pista', () => {
-    // A medida que acompanha o quadro (docs/DESEMPENHO.md, "Cenário redondo"): antes da onda I a pior pista era
-    // 764 (Pororoca), média 405; depois 856, média 484. O teto segura a próxima rodada de "mais redondo".
-    const tris = new Map<string, number>();
+  // O custo que o quadro paga (docs/ondas/M/M3.md, "Orçamento de quadro"): a janela de 291 segmentos da qualidade Alta, o modelo de perto só até o `farFrom` e
+  // depois a silhueta (os impostores e o LOD de longe pagam os triângulos). A soma estática de antes (todo objeto da pista com o modelo de perto) media o pior caso
+  // que nunca acontece: a vegetação só usa o modelo de perto nos primeiros 90 segmentos da janela. Antes da M3: pior pista 510, média 245; a copa nuvem (bolha de
+  // 180 faces) e os 12 lados dos troncos subiram o custo, e o teto de 900 segura a próxima rodada.
+  const tris = new Map<string, number>();
+  const trisOf = (m: string): number => {
+    let t = tris.get(m);
+    if (t === undefined) { t = modelTriangles(getModel(m)); tris.set(m, t); }
+    return t;
+  };
+
+  it('custo de quadro do cenário ≤ 900 triângulos por segmento de janela em toda pista (o modelo de perto só até o farFrom; sem marcos)', () => {
+    const bad: string[] = []; let worst = 0; let worstId = '';
+    for (const { id, segs, layout } of layouts) {
+      const c = frameCost(layout, segs, trisOf);
+      if (c > worst) { worst = c; worstId = id; }
+      if (c > 900) bad.push(`${id}: ${c.toFixed(0)}`);
+    }
+    expect(bad, `pior pista ${worstId}: ${worst.toFixed(0)}`).toEqual([]);
+  }, 60000);
+
+  it('a soma estática (todo objeto com o modelo de perto) fica ≤ 2.400 por segmento: o teto de sanidade, para um modelo não explodir', () => {
     const bad: string[] = [];
     for (const { id, segs, layout } of layouts) {
       let sum = 0;
       for (const list of layout.bySeg) for (const p of list) {
         const m = layout.models[p.model];
-        if (m.startsWith('lm:')) continue;
-        let t = tris.get(m);
-        if (t === undefined) { t = modelTriangles(getModel(m)); tris.set(m, t); }
-        sum += t;
+        if (!m.startsWith('lm:')) sum += trisOf(m);
       }
-      if (sum / segs > 900) bad.push(`${id}: ${(sum / segs).toFixed(0)}`);
+      if (sum / segs > 2400) bad.push(`${id}: ${(sum / segs).toFixed(0)}`);
     }
     expect(bad).toEqual([]);
   }, 60000);
 
-  it('modelos redondos de sprite e de mata ≤ 700 triângulos (pedra ≤ 360)', () => {
+  it('a medida de quadro conta o modelo de perto até o farFrom e a silhueta depois (e nada além do maxAhead)', () => {
+    const mk = (over: Record<string, number>): Layout['bySeg'][number][number] => ({ model: 0, far: -1, farFrom: 1e9, maxAhead: 1e9, ...over } as Layout['bySeg'][number][number]);
+    const n = 1000;
+    const bySeg: Layout['bySeg'] = Array.from({ length: n }, () => []);
+    bySeg[500].push(mk({ far: 1, farFrom: 90 })); // 1 objeto: perto até 89 à frente (e 30 atrás), silhueta de 90 a 260
+    const layout: Layout = { models: ['near', 'far'], bySeg };
+    const t = (id: string) => (id === 'near' ? 1000 : 10);
+    // Câmera a 50 segmentos antes: o objeto está a 50 à frente (perto). Os 120 segmentos de perto (89 + 30 + 1) custam 1000; o resto da janela (170) custa 10.
+    const only = frameCost(layout, n, t);
+    expect(only).toBeCloseTo(1000 / 291, 6);
+    // Sem silhueta, o objeto custa 1000 em todas as câmeras da janela de 291.
+    bySeg[500][0] = mk({});
+    expect(frameCost(layout, n, t)).toBeCloseTo(1000 / 291, 6);
+    // Fora do maxAhead ele some: com maxAhead 40, só as câmeras de 40 antes até 30 depois o veem — a mesma contagem de câmeras, o mesmo pico.
+    bySeg[500][0] = mk({ maxAhead: 40 });
+    expect(frameCost(layout, n, t)).toBeCloseTo(1000 / 291, 6);
+    // Dois objetos em segmentos afastados (nunca na mesma janela) não se somam; dois na mesma janela, sim.
+    bySeg[500].push(mk({ maxAhead: 40 }));
+    expect(frameCost(layout, n, t)).toBeCloseTo(2000 / 291, 6);
+  });
+
+  it('modelos redondos de sprite e de mata ≤ 900 triângulos (pedra ≤ 420, mesa e coluna de arenito ≤ 600)', () => {
+    // O teto subiu de 700 para 900 e o da pedra de 360 para 420 DE PROPÓSITO (M3): a bolha de copa grande passou a 180 faces e o tronco a 12 lados, o que a faceta
+    // de 15° da bíblia exige. É o orçamento de quadro, acima, que paga a conta.
     for (const id of ids) {
       if (id.startsWith('far:')) continue;
-      const cap = /^(rock|searock):/.test(id) ? 360 : /^(mesa|stack):/.test(id) ? 600 : 700;
+      const cap = /^(rock|searock):/.test(id) ? 420 : /^(mesa|stack):/.test(id) ? 600 : 900;
       expect(modelTriangles(getModel(id)), id).toBeLessThanOrEqual(cap);
     }
   });

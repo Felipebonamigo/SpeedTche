@@ -36,6 +36,11 @@ export function atlasPlane(w: number, h: number, rect: readonly [number, number,
   return out;
 }
 
+// Kit redondo nos props (M3): a barra de borda arredondada e o fecho que guarda as normais do kit.
+const round = (g: Geo): Geo => smoothNormals(g, 50);
+/** Barra de borda arredondada (seção `w` × `h`, comprimento `L` em Z, pé em y = 0 da peça), pintada. */
+const bar = (w: number, h: number, L: number, r: number, color: string, m?: THREE.Matrix4, n = 1): Geo => paint(round(roundedBar(w, h, L, r, n)), color, m);
+
 // ───────────────────────────── Poste de luz (sprite `lamp`) ─────────────────────────────
 
 /** Poste com base de concreto (a pegada), braço curvo até a pista, luminária e facho (só à noite). */
@@ -45,13 +50,14 @@ export const LAMP_HEAD_X = 2.35;
 export function streetLamp(): Model {
   const R = collisionHalfM('lamp');
   const metal = '#5d636b';
-  const pole = merge([
-    paint(box(R * 2, 0.7, R * 2), '#b9b6ae', tf(0, 0.35, 0)),
-    paint(box(R * 2 - 0.12, 0.08, R * 2 - 0.12), '#9a978f', tf(0, 0.74, 0)),
-    paint(cyl(0.09, 0.14, 8.6, 6, true), metal, tf(0, 0.7 + 4.3, 0)),
-    paint(cyl(0.06, 0.06, 1.4, 5, true), metal, tf(0.45, 9.3, 0, 1, 1, 1, 0, 0, -0.9)),
-    paint(cyl(0.06, 0.06, 1.3, 5, true), metal, tf(1.55, 9.75, 0, 1, 1, 1, 0, 0, -Math.PI / 2)),
-    paint(box(1.0, 0.16, 0.42), '#3c4148', tf(LAMP_HEAD_X, 9.7, 0)),
+  // Do kit redondo: base de concreto de caixa com bisel, colar, fuste de 14 lados, braço curvo e a luminária de borda arredondada (a normal do kit fica).
+  const pole = mergeRound([
+    paint(bevelBox(R * 2, 0.7, R * 2, 0.2), '#b9b6ae', tf(0, 0.35, 0)),
+    paint(cyl(0.2, 0.26, 0.12, 16, true), '#9a978f', tf(0, 0.76, 0)),
+    paint(cyl(0.09, 0.14, 8.6, 14, true), metal, tf(0, 0.7 + 4.3, 0)),
+    paint(cyl(0.06, 0.06, 1.4, 10, true), metal, tf(0.45, 9.3, 0, 1, 1, 1, 0, 0, -0.9)),
+    paint(cyl(0.06, 0.06, 1.3, 10, true), metal, tf(1.55, 9.75, 0, 1, 1, 1, 0, 0, -Math.PI / 2)),
+    bar(1.0, 0.18, 0.42, 0.07, '#3c4148', tf(LAMP_HEAD_X, 9.62, 0)),
   ]);
   const head = paint(box(0.86, 0.06, 0.32), '#fff2c8', tf(LAMP_HEAD_X, 9.6, 0));
   const beam = new THREE.ConeGeometry(2.8, 9.4, 14, 1, true).translate(LAMP_HEAD_X, 4.9, 0).toNonIndexed();
@@ -72,26 +78,26 @@ export function billboard(variant: number): Model {
   const R = collisionHalfM('billboard');
   const steel = '#3d4148';
   const legX = R - 0.16;
-  const frame = merge([
-    paint(box(0.32, 5.0, 0.32), steel, tf(-legX, 2.5, 0)), paint(box(0.32, 5.0, 0.32), steel, tf(legX, 2.5, 0)),
+  const frame = mergeRound([
+    paint(cyl(0.16, 0.16, 5.0, 14, true), steel, tf(-legX, 2.5, 0)), paint(cyl(0.16, 0.16, 5.0, 14, true), steel, tf(legX, 2.5, 0)),
     paint(box(0.5, 0.25, 0.5), '#8a8680', tf(-legX, 0.12, 0)), paint(box(0.5, 0.25, 0.5), '#8a8680', tf(legX, 0.12, 0)),
-    paint(box(2 * R - 0.3, 0.12, 0.12), steel, tf(0, 1.4, 0)),
-    paint(box(2 * R, 3.7, 0.28), '#23262b', tf(0, 6.6, -0.05)),
-    paint(box(2 * R + 0.1, 0.16, 0.9), '#6a6e75', tf(0, 4.68, 0.35)),
+    paint(cyl(0.06, 0.06, 2 * R - 0.3, 8, true), steel, tf(0, 1.4, 0, 1, 1, 1, 0, 0, Math.PI / 2)),
+    paint(bevelBox(2 * R, 3.7, 0.28, 0.08), '#23262b', tf(0, 6.6, -0.05)),
+    bar(2 * R + 0.1, 0.16, 0.9, 0.06, '#6a6e75', tf(0, 4.6, 0.35)),
     paint(box(2 * R + 0.1, 0.5, 0.04), '#50545a', tf(0, 5.0, 0.78)),
   ]);
   const arms: Geo[] = [];
   const lights: Geo[] = [];
   for (let k = 0; k < 3; k++) {
     const x = (k - 1) * R * 0.62;
-    arms.push(paint(box(0.06, 0.06, 1.1), steel, tf(x, 8.6, 0.45)));
-    arms.push(paint(box(0.4, 0.22, 0.3), '#2c2f34', tf(x, 8.55, 0.95)));
+    arms.push(paint(cyl(0.035, 0.035, 1.1, 8), steel, tf(x, 8.6, 0.45, 1, 1, 1, Math.PI / 2, 0, 0)));
+    arms.push(bar(0.4, 0.22, 0.3, 0.08, '#2c2f34', tf(x, 8.44, 0.95)));
     lights.push(paint(box(0.34, 0.04, 0.24), '#fff4d8', tf(x, 8.43, 0.95)));
   }
   const panel = atlasPlane(2 * R - 0.34, 3.36, PANEL_RECTS.billboard[variant % 8]).translate(0, 6.6, 0.1);
   return {
     parts: [
-      { geometry: shadeY(merge([frame, ...arms]), 0, 9, 0.8, 1.05), mat: 'flat', shadow: true },
+      { geometry: shadeY(mergeRound([frame, ...arms]), 0, 9, 0.8, 1.05), mat: 'flat', shadow: true },
       { geometry: panel, mat: 'panel', shadow: false },
       { geometry: merge(lights), mat: 'glow' },
     ],
@@ -104,9 +110,9 @@ export function billboard(variant: number): Model {
 /** Chevrons na altura do para-choque: o painel ocupa a largura de colisão inteira. */
 export function chevronSign(dir: -1 | 1): Model {
   const R = collisionHalfM('sign_left');
-  const posts = merge([
-    paint(box(0.12, 1.9, 0.12), '#5a5e66', tf(-R + 0.35, 0.95, -0.08)), paint(box(0.12, 1.9, 0.12), '#5a5e66', tf(R - 0.35, 0.95, -0.08)),
-    paint(box(2 * R, 1.08, 0.08), '#2b2e33', tf(0, 1.2, -0.05)),
+  const posts = mergeRound([
+    paint(cyl(0.06, 0.06, 1.9, 12, true), '#5a5e66', tf(-R + 0.35, 0.95, -0.08)), paint(cyl(0.06, 0.06, 1.9, 12, true), '#5a5e66', tf(R - 0.35, 0.95, -0.08)),
+    paint(bevelBox(2 * R, 1.08, 0.08, 0.03), '#2b2e33', tf(0, 1.2, -0.05)),
   ]);
   const panel = atlasPlane(2 * R - 0.06, 1.0, dir < 0 ? PANEL_RECTS.chevronLeft : PANEL_RECTS.chevronRight).translate(0, 1.2, 0.0);
   return { parts: [{ geometry: posts, mat: 'flat', shadow: true }, { geometry: panel, mat: 'panel' }], blob: 0.9 };
@@ -126,11 +132,11 @@ export function grandstand(variant: number): Model {
   const L = 14.4;
   const roof = variant === 0 ? '#ffd23f' : '#1e88e5';
   const parts: Geo[] = [];
-  // Muro da frente e alambrado (o que o carro toca).
-  parts.push(paint(box(0.35, 1.15, L), '#e8e8e4', tf(R - 0.175, 0.575, 0)));
+  // Muro da frente e alambrado (o que o carro toca): o muro é de caixa com bisel, os postes do alambrado são redondos.
+  parts.push(paint(bevelBox(0.35, 1.15, L, 0.12), '#e8e8e4', tf(R - 0.175, 0.575, 0)));
   for (let k = 0; k < 6; k++) parts.push(paint(box(0.04, 0.5, L / 6 - 0.1), k % 2 ? '#d63a3a' : '#1e88e5', tf(R + 0.01, 0.62, -L / 2 + (k + 0.5) * (L / 6))));
-  for (let k = 0; k <= 6; k++) parts.push(paint(box(0.08, 3.0, 0.08), '#8a9098', tf(R - 0.2, 2.6, -L / 2 + k * (L / 6))));
-  for (const y of [1.6, 2.6, 3.6]) parts.push(paint(box(0.03, 0.03, L), '#9aa0a8', tf(R - 0.2, y, 0)));
+  for (let k = 0; k <= 6; k++) parts.push(paint(cyl(0.045, 0.045, 3.0, 10), '#8a9098', tf(R - 0.2, 2.6, -L / 2 + k * (L / 6))));
+  for (const y of [1.6, 2.6, 3.6]) parts.push(paint(cyl(0.02, 0.02, L, 8), '#9aa0a8', tf(R - 0.2, y, 0, 1, 1, 1, Math.PI / 2, 0, 0)));
   // Base e degraus com público.
   const rows = 6;
   const x0 = R - 2.6; const stepW = 1.25; const stepH = 0.62;
@@ -155,15 +161,15 @@ export function grandstand(variant: number): Model {
   }
   const backX = x0 - rows * stepW;
   const topY = 0.3 + rows * stepH;
-  parts.push(paint(box(0.3, topY + 1.2, L), '#9aa0a8', tf(backX - 0.15, (topY + 1.2) / 2, 0)));
+  parts.push(paint(bevelBox(0.3, topY + 1.2, L, 0.1), '#9aa0a8', tf(backX - 0.15, (topY + 1.2) / 2, 0)));
   // Cobertura em balanço: pilares atrás, viga, telhado inclinado.
   const roofY = topY + 3.2;
-  for (const z of [-L / 2 + 0.3, 0, L / 2 - 0.3]) parts.push(paint(box(0.3, roofY, 0.3), '#4a4e55', tf(backX - 0.1, roofY / 2, z)));
-  parts.push(paint(box(R - backX + 0.4 - 1.0, 0.18, L + 0.4), roof, tf((R - 1.0 + backX) / 2, roofY + 0.2, 0, 1, 1, 1, 0, 0, 0.08)));
-  parts.push(paint(box(0.25, 0.6, L + 0.4), '#2e3238', tf(R - 1.2, roofY - 0.05, 0)));
+  for (const z of [-L / 2 + 0.3, 0, L / 2 - 0.3]) parts.push(paint(cyl(0.17, 0.17, roofY, 14), '#4a4e55', tf(backX - 0.1, roofY / 2, z)));
+  parts.push(bar(R - backX + 0.4 - 1.0, 0.2, L + 0.4, 0.09, roof, tf((R - 1.0 + backX) / 2, roofY + 0.1, 0, 1, 1, 1, 0, 0, 0.08), 2));
+  parts.push(paint(bevelBox(0.25, 0.6, L + 0.4, 0.09), '#2e3238', tf(R - 1.2, roofY - 0.05, 0)));
   const lights: Geo[] = [];
   for (let k = 0; k < 4; k++) lights.push(paint(box(0.12, 0.18, 1.0), '#fff6dc', tf(R - 1.3, roofY - 0.4, -L / 2 + 1.8 + k * (L - 3.6) / 3)));
-  const g = merge(parts);
+  const g = mergeRound(parts.map((q) => (q.getAttribute('normal') ? q : (q.computeVertexNormals(), q))));
   return { parts: [{ geometry: shadeY(g, 0, roofY, 0.78, 1.05), mat: 'flat', shadow: true }, { geometry: merge(lights), mat: 'glow' }], blob: 0 };
 }
 
@@ -178,23 +184,23 @@ export function startGantry(): Model {
   const reach = 8.2;
   const steel = '#2b2f36';
   const parts: Geo[] = [
-    paint(box(1.3, 11.2, 1.6), steel, tf(tower, 5.6, 0)),
+    paint(bevelBox(1.3, 11.2, 1.6, 0.25), steel, tf(tower, 5.6, 0)),
     paint(box(1.6, 0.5, 1.9), '#8a8680', tf(tower, 0.25, 0)),
-    paint(box(reach - tower, 1.9, 1.0), '#f2f2f2', tf((reach + tower) / 2, 9.4, 0)),
-    paint(box(reach - tower, 0.16, 1.1), '#d63a3a', tf((reach + tower) / 2, 10.42, 0)),
-    paint(box(reach - tower, 0.16, 1.1), '#d63a3a', tf((reach + tower) / 2, 8.38, 0)),
-    paint(box(0.25, 5.2, 0.25), steel, tf(tower + 2.0, 8.1, 0, 1, 1, 1, 0, 0, 0.6)),
-    paint(box(4.6, 0.7, 0.5), '#1a1c20', tf(0, 7.95, 0.3)),
+    paint(bevelBox(reach - tower, 1.9, 1.0, 0.25), '#f2f2f2', tf((reach + tower) / 2, 9.4, 0)),
+    bar(reach - tower, 0.16, 1.1, 0.06, '#d63a3a', tf((reach + tower) / 2, 10.34, 0)),
+    bar(reach - tower, 0.16, 1.1, 0.06, '#d63a3a', tf((reach + tower) / 2, 8.3, 0)),
+    paint(cyl(0.14, 0.14, 5.2, 10, true), steel, tf(tower + 2.0, 8.1, 0, 1, 1, 1, 0, 0, 0.6)),
+    paint(bevelBox(4.6, 0.7, 0.5, 0.15), '#1a1c20', tf(0, 7.95, 0.3)),
   ];
   const lights: Geo[] = [];
-  for (let k = 0; k < 5; k++) lights.push(paint(cyl(0.22, 0.22, 0.12, 10), '#ff2a2a', tf(-1.8 + k * 0.9, 7.95, 0.56, 1, 1, 1, Math.PI / 2, 0, 0)));
+  for (let k = 0; k < 5; k++) lights.push(paint(cyl(0.22, 0.22, 0.12, 16), '#ff2a2a', tf(-1.8 + k * 0.9, 7.95, 0.56, 1, 1, 1, Math.PI / 2, 0, 0)));
   const panel = atlasPlane(15.5, 1.5, PANEL_RECTS.banner).translate(0, 9.4, 0.51);
   const panelBack = atlasPlane(15.5, 1.5, PANEL_RECTS.banner).rotateY(Math.PI).translate(0, 9.4, -0.51);
   const checker = atlasPlane(reach - tower - 0.4, 0.5, PANEL_RECTS.checker).translate((reach + tower) / 2, 10.75, 0);
   const checkerBack = checker.clone().rotateY(Math.PI).translate(reach + tower, 0, 0);
   return {
     parts: [
-      { geometry: merge(parts), mat: 'flat', shadow: true },
+      { geometry: mergeRound(parts), mat: 'flat', shadow: true },
       { geometry: merge([panel, panelBack, checker, checkerBack]), mat: 'panel' },
       { geometry: merge(lights), mat: 'beacon' },
     ],
@@ -242,7 +248,7 @@ export function pitGarages(team: number): Model {
 
 /** Placa do box (não sólida). */
 export function pitSign(): Model {
-  const post = merge([paint(cyl(0.07, 0.08, 2.4, 6), '#5a5e66', tf(0, 1.2, 0)), paint(box(1.8, 0.9, 0.06), '#2b2e33', tf(0, 2.6, -0.04))]);
+  const post = mergeRound([paint(cyl(0.07, 0.08, 2.4, 12, true), '#5a5e66', tf(0, 1.2, 0)), paint(bevelBox(1.8, 0.9, 0.06, 0.025), '#2b2e33', tf(0, 2.6, -0.04))]);
   const panel = atlasPlane(1.74, 0.84, PANEL_RECTS.pit).translate(0, 2.6, 0.0);
   return { parts: [{ geometry: post, mat: 'flat', shadow: true }, { geometry: panel, mat: 'panel' }] };
 }
@@ -250,8 +256,8 @@ export function pitSign(): Model {
 /** Cone de sinalização com faixa refletiva. */
 export function trafficCone(): Model {
   const g = merge([
-    paint(cone(0.3, 0.74, 10), '#ff6a14', tf(0, 0.39, 0)), paint(box(0.62, 0.05, 0.62), '#222222', tf(0, 0.025, 0)),
-    paint(cyl(0.19, 0.235, 0.14, 10), '#f4f4f4', tf(0, 0.36, 0)),
+    paint(cone(0.3, 0.74, 16), '#ff6a14', tf(0, 0.39, 0)), paint(box(0.62, 0.05, 0.62), '#222222', tf(0, 0.025, 0)),
+    paint(cyl(0.19, 0.235, 0.14, 16), '#f4f4f4', tf(0, 0.36, 0)),
   ]);
   return { parts: [{ geometry: g, mat: 'flat', shadow: true }] };
 }
