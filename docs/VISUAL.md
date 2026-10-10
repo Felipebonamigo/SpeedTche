@@ -750,3 +750,7 @@ Com `npm run dev` no ar: `node tools/scenery-harness.mjs 5174 scratch/cen [cenas
 bioma × período (1 e 4 jogadores) e imprime o custo do cenário isolado (o mesmo quadro com e sem o grupo
 `scenery`); `node tools/scenery-showroom.mjs 5174 scratch/sr.png tree:baobab,pine:snow,...` mostra modelos
 soltos num gramado, sem a pista (ids em `catalog.ts`).
+
+## Céu e luz por bioma (M2)
+
+O sol do entardecer tem azimute e elevação por bioma (`palette.ts`), conferidos por teste contra o anel de montanhas (`horizonElevation`, folga ≥ 2°). A tinta das sombras do `stylizeGrade` some no preto. Reflexo de lente: 1 malha, só no entardecer, Média ou melhor; `Sky.setFlare(on)` é ligado a Reduzir efeitos no renderizador. Para a M6: elevação do dia 34°, entardecer 9–10,5°, noite 20°; `flare`, `seaGlint` e `seaSpec` também interpolam; `flareColor` é a mesma nos 3 períodos de um bioma.
