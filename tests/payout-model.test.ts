@@ -172,7 +172,7 @@ describe('payoutTimeline / payoutFrame (M6)', () => {
     const n = kind === 'solo' ? 1 : 3;
     const { career, humans } = careerOf(n, kind);
     career.wallets.fill(0);
-    const positions = n === 1 ? { 0: 1 } : { 0: 1, 1: 2, 2: 5 };
+    const positions: Record<number, number> = n === 1 ? { 0: 1 } : { 0: 1, 1: 2, 2: 5 };
     return pay(career, humans, positions).model;
   }
 
@@ -265,7 +265,7 @@ describe('o pagamento só lê (M7)', () => {
     for (const kind of ['solo', 'coop', 'versus'] as const) {
       const n = kind === 'solo' ? 1 : 2;
       const { career, humans } = careerOf(n, kind);
-      const positions = n === 1 ? { 0: 1 } : { 0: 1, 1: 4 };
+      const positions: Record<number, number> = n === 1 ? { 0: 1 } : { 0: 1, 1: 4 };
       const { report } = settleCareerRace(career, fakeResults(positions, humans));
       const snapshot = JSON.stringify(career);
       const model = payoutModel(career, report);

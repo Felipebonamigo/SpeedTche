@@ -311,8 +311,8 @@ export interface AudioEngine {
   currentMusic(): string | null;
   setVolumes(master: number, music: number, sfx: number): void;
   musicList(): MusicInfo[];
-  /** Som de interface (navegar/confirmar/voltar). */
-  ui(kind: 'move' | 'confirm' | 'back'): void;
+  /** Som de interface (navegar/confirmar/voltar e, no Pagamento, a moeda, o tique da contagem e o sino). */
+  ui(kind: UiSound): void;
 }
 
 // ───────────────────────────── Fonte das entradas por tick ─────────────────────────────
@@ -340,7 +340,10 @@ export interface RaceDriver {
 
 // ───────────────────────────── Menus ─────────────────────────────
 
-export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'online'
+/** Os sons de interface: os de menu e os do Pagamento (N4: `coin`, `count`, `chime`). */
+export type UiSound = 'move' | 'confirm' | 'back' | 'coin' | 'count' | 'chime';
+
+export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'payout' | 'online'
   | 'party' | 'tournament' | 'handoff' | 'tournamentTable' | 'access'
   | 'tutorial' | 'tutorialDone' | 'passport' | 'survey';
 

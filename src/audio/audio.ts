@@ -10,7 +10,7 @@
 // O abafamento da pausa (filtro + duck) não pega os sons de interface, que precisam soar
 // limpos justamente no menu de pausa.
 import type { SimEvent, TrackDef } from '../core/types';
-import { DEFAULT_SETTINGS, type AudioEngine, type MusicInfo, type RenderFrame } from '../game/contracts';
+import { DEFAULT_SETTINGS, type AudioEngine, type MusicInfo, type RenderFrame, type UiSound } from '../game/contracts';
 import { EngineBank, type RevHook } from './engine';
 import { createHornPlayer, type HornPlayer } from './horn';
 import { Jukebox, musicInfos, songById, songForScenery, SONGS } from './music';
@@ -190,7 +190,7 @@ export function createAudio(): SessionAudio {
     return musicInfos();
   }
 
-  function ui(kind: 'move' | 'confirm' | 'back'): void {
+  function ui(kind: UiSound): void {
     graph?.effects.ui(kind);
   }
 

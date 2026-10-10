@@ -1,13 +1,14 @@
 // Efeitos por evento da simulação e sons de interface. Cada efeito é uma receita curta de
 // playTone/noiseBurst agendada no tempo do contexto; nada fica vivo depois da cauda.
 import type { SimEvent, SpriteKind } from '../core/types';
+import type { UiSound } from '../game/contracts';
 import type { SampleBank } from './samples';
 import { ENV_HIT, ENV_PAD, ENV_PLUCK, noiseBurst, playTone } from './synth';
 
 export interface Sfx {
   /** `localSeat` ≥ 0 = evento de um jogador local; -1 = carro da IA (só alguns tocam, baixinho). */
   play(event: SimEvent, localSeat: number): void;
-  ui(kind: 'move' | 'confirm' | 'back'): void;
+  ui(kind: UiSound): void;
   /** Raspão de lado (race-feel.ts: observeScrapes) de um jogador local; `strength` 0..1 pela velocidade. */
   scrape(strength: number): void;
 }
@@ -21,7 +22,7 @@ const AI_THROTTLE_SECONDS = 0.12;
 
 // Frequências das notas usadas nas fanfarras (Hz).
 const C4 = 261.63, A4 = 440.0, B4 = 493.88;
-const C5 = 523.25, E5 = 659.25, G5 = 783.99, A5 = 880.0, C6 = 1046.5, E6 = 1318.5;
+const C5 = 523.25, E5 = 659.25, G5 = 783.99, A5 = 880.0, C6 = 1046.5, E6 = 1318.5, G6 = 1568.0, C7 = 2093.0;
 
 /** Colisão com o que quebra (vidro/metal) soa mais agudo do que madeira e pedra. */
 const GLASSY: ReadonlySet<SpriteKind> = new Set(['building', 'tower', 'lamp', 'billboard', 'sign_left', 'sign_right', 'pit_sign']);
@@ -205,8 +206,30 @@ export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode,
     }
   }
 
-  function ui(kind: 'move' | 'confirm' | 'back'): void {
+  /** A moeda caindo, o tique do número que conta e o sino do "Já dá para" (Pagamento, N4). */
+  function payoutSound(kind: 'coin' | 'count' | 'chime', at: number): void {
+    const t = (freq: number, dur: number, gain: number, when: number, type: OscillatorType, env = ENV_PLUCK) =>
+      playTone(ctx, uiDest, { freq, dur, gain, at: when, type, env });
+    switch (kind) {
+      case 'coin':
+        // "tim" de moeda: duas notas agudas coladas, a segunda mais alta e mais longa, com o brilho de uma oitava acima.
+        t(G6, 0.05, 0.13, at, 'triangle', ENV_HIT);
+        t(C7, 0.2, 0.14, at + 0.045, 'triangle');
+        t(C7 * 2, 0.1, 0.04, at + 0.045, 'square', ENV_HIT);
+        break;
+      case 'count':
+        t(A5, 0.02, 0.06, at, 'triangle', ENV_HIT);
+        break;
+      case 'chime':
+        [C5, E5, G5, C6].forEach((f, i) => t(f, 0.22, 0.14, at + i * 0.09, 'triangle'));
+        break;
+    }
+  }
+
+  function ui(kind: UiSound): void {
     const now = ctx.currentTime;
+    // Os sons do Pagamento (N4) são só síntese: não têm amostra gravada.
+    if (kind === 'coin' || kind === 'count' || kind === 'chime') { payoutSound(kind, now); return; }
     const id = kind === 'move' ? 'uiMove' : kind === 'confirm' ? 'uiConfirm' : 'uiBack';
     if (samples?.play(id, { at: now, gain: kind === 'move' ? 0.5 : 0.7, dest: uiDest })) return;
     switch (kind) {
