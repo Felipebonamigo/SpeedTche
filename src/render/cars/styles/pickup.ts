@@ -1,9 +1,10 @@
 // Picape: alta e quadrada, cabine simples e caçamba aberta (fundo e paredes de dentro, caixas das rodas),
 // santantônio com quatro faróis de milha, grade cromada grande, para-choques cromados grossos,
 // para-lamas de plástico preto, lanternas verticais nos cantos e rodas de aço com pneu de flanco alto.
-import { BodyShape, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
-import { exhaust, grille, lampPair, mirrors, plate, roundLampPair } from '../details';
-import { beam, box, insideBox, MeshBuilder, roundBar } from '../kit';
+import { BodyShape, bubble, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
+import { grille, lampPair, mirrors, plate, roundLampPair } from '../details';
+import { beam, box, insideBox, MeshBuilder, roundBar, type Lod } from '../kit';
+import { buildRear, exhaustPoint } from '../rear';
 import { finish, regions, type CarModel } from '../model';
 import { AMBER, CHROME, GLASS, HEAD, HEAD_HOUSING, LIVERY_A, LIVERY_B, PAINT, STRIPE_A, TAIL, TRIM, TRIM_SOFT, UNDER } from '../paints';
 
@@ -12,9 +13,9 @@ const BED1 = 2.1; // fim (tampa)
 const FLOOR = 0.8;
 const RAIL = 1.06;
 
-export function buildPickup(): CarModel {
-  const b = new MeshBuilder();
-  const axles: [Axle, Axle] = [{ z: -1.35, r: 0.4, x: 0.77, w: 0.33 }, { z: 1.32, r: 0.4, x: 0.77, w: 0.33 }];
+export function buildPickup(lod: Lod = 0): CarModel {
+  const b = new MeshBuilder(lod);
+  const axles: [Axle, Axle] = [{ z: -1.35, r: 0.45, x: 0.77, w: 0.34 }, { z: 1.32, r: 0.45, x: 0.77, w: 0.34 }];
   const base = regions({ sill: TRIM });
   const shape = new BodyShape({
     secs: [
@@ -27,6 +28,7 @@ export function buildPickup(): CarModel {
     ],
     axles, flare: [0.05, 0.05], band: 0.07, clear: 0.07,
     // Caçamba: sem as faces de cima entre as paredes (o interior é desenhado à parte).
+    lod,
     brush: (r, z, inArch) => {
       if (z > BED0 && z < BED1 && (r === 'top' || r === 'stripe' || r === 'center')) return null;
       if (inArch && (r === 'sill' || r === 'lower')) return TRIM;
@@ -40,7 +42,7 @@ export function buildPickup(): CarModel {
   insideBox(b, [0, (FLOOR + RAIL) / 2 + 0.01, (BED0 + BED1) / 2], [inner * 2, RAIL - FLOOR, BED1 - BED0], TRIM_SOFT, { nv: UNDER });
   b.mirrored(() => box(b, [inner - 0.14, FLOOR + 0.07, axles[1].z], [0.28, 0.14, 0.9], TRIM_SOFT));
   // Cabine alta com o vidro traseiro quase vertical.
-  const cab: CabinSpec = {
+  const cab: CabinSpec = bubble({
     secs: [
       { z: -0.98, hwb: 0.84, yb: 1.03, hwt: 0.84, yt: 1.03 },
       { z: -0.45, hwb: 0.86, yb: 1.04, hwt: 0.76, yt: 1.72, crown: 0.02 },
@@ -50,7 +52,7 @@ export function buildPickup(): CarModel {
     side: () => GLASS,
     // Parede de trás da cabine: a tampa do loft, no contorno da cabine (borda do teto redonda).
     capBack: PAINT,
-  };
+  });
   buildCabin(b, cab);
   box(b, [0, 1.47, BED0 - 0.005], [1.12, 0.3, 0.02], GLASS); // vidro traseiro
   b.mirrored(() => {
@@ -73,11 +75,14 @@ export function buildPickup(): CarModel {
   box(b, [0, 0.38, -2.12], [1.1, 0.06, 0.2], TRIM);
   plate(b, 0.5, -2.29);
   mirrors(b, 0.87, 1.2, -0.72, TRIM, 1.1);
-  // Traseira: lanternas verticais nos cantos, para-choque cromado com engate, escape de lado.
-  lampPair(b, 0.84, 0.9, 2.2, 0.1, 0.3, 0, TAIL, false, HEAD_HOUSING, 0.05);
+  // Traseira-vitrine: lanternas verticais grandes nos cantos, para-choque cromado com engate, escape de lado largo e protetor inferior.
+  lampPair(b, 0.78, 0.83, 2.2, 0.24, 0.42, 0, TAIL, false, HEAD_HOUSING, 0.05);
   roundBar(b, [0, 0.5, 2.22], [1.84, 0.14, 0.12], CHROME, { r: 0.05 });
   box(b, [0, 0.43, 2.3], [0.08, 0.06, 0.08], TRIM);
   plate(b, 0.7, 2.21);
-  const exhausts = [exhaust(b, -0.62, 0.4, 2.2, 0.065, 0.2)];
-  return finish('pickup', b, { wheel: 'steel', axles, exhausts, liveries: [LIVERY_B, LIVERY_A] });
+  const rear = buildRear(b, {
+    exhausts: [{ x: -0.62, y: 0.4, z: 2.2, r: 0.085, len: 0.25 }],
+    diffuser: { y: 0.37, z: 2.06, w: 1.0, fins: 4 },
+  });
+  return finish('pickup', b, { wheel: 'steel', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [LIVERY_B, LIVERY_A] });
 }

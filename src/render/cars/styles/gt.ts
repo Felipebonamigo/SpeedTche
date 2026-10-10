@@ -1,16 +1,17 @@
 // GT: grã-turismo esportivo de motor dianteiro. Capô longo entre para-lamas que sobem sobre as rodas,
 // cabine recuada em fastback, traseira curta com "ducktail", quatro lanternas redondas, saída de ar
 // atrás da roda dianteira e rodas grandes de cinco raios.
-import { BodyShape, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
-import { calipers, diffuser, exhaust, grille, lampPair, mirrors, onTop, plate, roundLampPair, splitter } from '../details';
-import { box, extrudeZY, fillet, MeshBuilder, roundBar } from '../kit';
+import { BodyShape, bubble, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
+import { calipers, grille, lampPair, mirrors, onTop, plate, roundLampPair, splitter } from '../details';
+import { box, extrudeZY, fillet, MeshBuilder, roundBar, type Lod } from '../kit';
 import { finish, type CarModel } from '../model';
+import { buildRear, exhaustPoint } from '../rear';
 import { CHROME, GLASS, GRILLE, HEAD, HEAD_HOUSING, LIVERY_A, LIVERY_B, PAINT, STRIPE_A, STRIPE_B, TAIL, TRIM, TRIM_SOFT, UNDER } from '../paints';
 import { beam } from '../kit';
 
-export function buildGt(): CarModel {
-  const b = new MeshBuilder();
-  const axles: [Axle, Axle] = [{ z: -1.36, r: 0.37, x: 0.79, w: 0.3 }, { z: 1.34, r: 0.37, x: 0.79, w: 0.3 }];
+export function buildGt(lod: Lod = 0): CarModel {
+  const b = new MeshBuilder(lod);
+  const axles: [Axle, Axle] = [{ z: -1.36, r: 0.44, x: 0.79, w: 0.32 }, { z: 1.34, r: 0.44, x: 0.79, w: 0.32 }];
   const shape = new BodyShape({
     secs: [
       { z: -2.2, yb: 0.25, yt: 0.5, hw: 0.8, crown: 0.02, sh: 0.16, tuck: 0.06, belt: 0.55 },
@@ -22,13 +23,13 @@ export function buildGt(): CarModel {
       { z: 1.95, yb: 0.22, yt: 0.86, hw: 0.9, crown: 0.03 },
       { z: 2.2, yb: 0.3, yt: 0.84, hw: 0.8, crown: 0.02, sh: 0.14 },
     ],
-    axles, rise: [0.12, 0.05], flare: [0, 0.015], band: 0.05,
+    axles, rise: [0.12, 0.05], flare: [0, 0.015], band: 0.05, lod,
     brush: (r) => ({ under: UNDER, well: UNDER, sill: TRIM, lower: PAINT, band: STRIPE_B, upper: PAINT, shoulder: PAINT, top: PAINT, stripe: STRIPE_A, center: PAINT })[r],
     capFront: PAINT, capBack: PAINT,
   });
   shape.build(b);
   // Cabine fastback.
-  const cab: CabinSpec = {
+  const cab: CabinSpec = bubble({
     secs: [
       { z: -0.58, hwb: 0.8, yb: 0.77, hwt: 0.8, yt: 0.77 },
       { z: 0.16, hwb: 0.83, yb: 0.8, hwt: 0.6, yt: 1.16, crown: 0.03 },
@@ -37,7 +38,7 @@ export function buildGt(): CarModel {
     ],
     top: (gap, region) => (gap === 1 ? (region === 'stripe' ? STRIPE_A : PAINT) : GLASS),
     side: (gap) => (gap === 2 ? PAINT : GLASS),
-  };
+  });
   buildCabin(b, cab);
   // Colunas A escuras (a faixa de vidro lê como uma peça só), até a borda redonda do teto.
   b.mirrored(() => beam(b, [0.8, 0.78, -0.56], cabinGlassTop(cab, 0.12), 0.06, 0.04, TRIM_SOFT));
@@ -56,13 +57,16 @@ export function buildGt(): CarModel {
   // Saída de ar atrás da roda dianteira.
   b.mirrored(() => box(b, [0.935, 0.5, -0.62], [0.03, 0.12, 0.34], TRIM));
   mirrors(b, 0.84, 0.88, -0.36, PAINT);
-  // Traseira: quatro lanternas redondas, placa, difusor, dois escapes.
-  roundLampPair(b, 0.6, 0.66, 2.2, 0.085, TAIL, false, HEAD_HOUSING, 0.05);
-  roundLampPair(b, 0.38, 0.66, 2.2, 0.075, TAIL, false, HEAD_HOUSING, 0.05);
+  // Traseira-vitrine: quatro lanternas redondas grandes, placa, difusor, dois escapes largos e a asa de brinquedo.
+  roundLampPair(b, 0.62, 0.66, 2.2, 0.125, TAIL, false, HEAD_HOUSING, 0.05);
+  roundLampPair(b, 0.37, 0.66, 2.2, 0.11, TAIL, false, HEAD_HOUSING, 0.05);
   lampPair(b, 0.55, 0.52, 2.21, 0.5, 0.025, 0, TRIM, false, TRIM, 0.04);
   plate(b, 0.46, 2.22);
-  diffuser(b, 0.24, 2.1, 1.2, 5);
-  const exhausts = [exhaust(b, 0.42, 0.25, 2.26, 0.06), exhaust(b, -0.42, 0.25, 2.26, 0.06)];
+  const rear = buildRear(b, {
+    exhausts: [{ x: 0.42, y: 0.26, z: 2.26, r: 0.075 }, { x: -0.42, y: 0.26, z: 2.26, r: 0.075 }],
+    diffuser: { y: 0.24, z: 2.1, w: 1.2, fins: 5 },
+    wing: { z: 2.0, y: 1.04, span: 1.5, chord: 0.34, thick: 0.07, pitch: -0.12, brush: PAINT, plate: PAINT, strut: 'post', baseY: 0.86, strutX: 0.5 },
+  });
   calipers(b, axles);
-  return finish('gt', b, { wheel: 'sport5', axles, exhausts, liveries: [LIVERY_A, LIVERY_B] });
+  return finish('gt', b, { wheel: 'sport5', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [LIVERY_A, LIVERY_B] });
 }

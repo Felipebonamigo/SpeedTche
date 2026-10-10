@@ -8,6 +8,8 @@ import * as THREE from 'three';
 import { CREASE, smoothNormals } from '../normals';
 
 export type P3 = readonly [number, number, number];
+/** Nível de detalhe do casco procedural: 0 = completo, 1 = o casco simples dos carros longe e da qualidade Baixa (M4). */
+export type Lod = 0 | 1;
 export type P2 = readonly [number, number];
 
 /** Como uma face é pintada e de que material ela é (ver o shader em material.ts). */
@@ -50,6 +52,15 @@ export function withBrush(b: Brush, o: Partial<Brush>): Brush {
 const q8 = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)));
 
 export class MeshBuilder {
+  /**
+   * No nível 1 as peças arredondadas viram caixas e vigas retas, os cilindros perdem metade dos lados e as peças finas
+   * (`details.ts`) somem: o casco simples (nó `lod1`) sai do MESMO construtor do estilo, sem uma segunda modelagem.
+   */
+  constructor(readonly lod: Lod = 0) {}
+
+  /** Roda `fn` só no casco completo: o acabamento fino (frisos, venezianas, maçanetas, bancos) que o casco simples dispensa. */
+  fine(fn: () => void): void { if (!this.lod) fn(); }
+
   private readonly pos: number[] = [];
   private readonly col: number[] = [];
   private readonly pnt: number[] = [];
@@ -202,7 +213,8 @@ export const AXIS_Y: Omit<LatheFrame, 'o'> = { axis: [0, 1, 0], a: [0, 0, 1], c:
  * Sólido de revolução: `profile` é uma lista de [raio, t] (t ao longo do eixo). Para fechar, comece e
  * termine com raio 0 (tampas no eixo). `brushAt(i)` pinta o trecho entre os pontos i e i+1.
  */
-export function lathe(b: MeshBuilder, fr: LatheFrame, profile: readonly P2[], segs: number, brushAt: (i: number) => Brush, phase = 0.5): void {
+export function lathe(b: MeshBuilder, fr: LatheFrame, profile: readonly P2[], segsFull: number, brushAt: (i: number) => Brush, phase = 0.5): void {
+  const segs = b.lod ? Math.max(6, Math.round(segsFull / 2)) : segsFull;
   const pt = (r: number, t: number, k: number): P3 => {
     const th = ((k + phase) / segs) * Math.PI * 2;
     const ca = Math.cos(th) * r; const sa = Math.sin(th) * r;
@@ -335,6 +347,7 @@ export interface RoundBarOptions {
  * (a caixa tem 12). Mesma caixa por fora que `box` com o mesmo centro e medidas; `faces` como em `box`.
  */
 export function roundBar(b: MeshBuilder, center: P3, size: P3, br: Brush, o: RoundBarOptions): void {
+  if (b.lod) { box(b, center, size, br, o.faces ?? {}); return; }
   const axis = o.axis ?? 'x';
   const [su, sv, sw] = axisSizes(axis, size);
   const r = Math.max(0, Math.min(o.r, su / 2, sv / 2));
@@ -347,6 +360,7 @@ export function roundBar(b: MeshBuilder, center: P3, size: P3, br: Brush, o: Rou
 
 /** Viga de seção arredondada (w × h, cantos de raio r) de p0 a p1, como `beam`: para-choque cromado, santantônio. */
 export function roundBeam(b: MeshBuilder, p0: P3, p1: P3, w: number, h: number, br: Brush, r: number, up: P3 = [0, 1, 0]): void {
+  if (b.lod) { beam(b, p0, p1, w, h, br, up); return; }
   const d = new THREE.Vector3(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
   const len = d.length();
   if (len < 1e-9) return;
@@ -366,6 +380,7 @@ export function roundBeam(b: MeshBuilder, p0: P3, p1: P3, w: number, h: number, 
  * mais perto dele).
  */
 export function roundBox(b: MeshBuilder, center: P3, size: P3, br: Brush, r: number, faces: FaceMap = {}): void {
+  if (b.lod) { box(b, center, size, br, faces); return; }
   const [hx, hy, hz] = [size[0] / 2, size[1] / 2, size[2] / 2];
   const rr = Math.max(0, Math.min(r, hx, hy, hz));
   // Estações em z: a ponta da frente (tampa → começo do lado), o meio, a ponta de trás.

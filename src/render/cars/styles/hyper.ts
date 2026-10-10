@@ -1,15 +1,16 @@
 // Hipercarro: cunha muito baixa, bico rente ao chão entre para-lamas altos, cabine-bolha avançada,
 // tampa do motor com venezianas, entradas de ar laterais enormes, asa traseira em pescoço de cisne,
 // difusor grande, escape central duplo e rodas de trava central (traseiras maiores).
-import { BodyShape, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
-import { calipers, diffuser, exhaust, lampPair, mirrors, onTop, splitter, wing } from '../details';
-import { beam, cuboid, MeshBuilder, roundBar } from '../kit';
+import { BodyShape, bubble, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
+import { calipers, lampPair, mirrors, onTop, splitter } from '../details';
+import { beam, cuboid, MeshBuilder, roundBar, type Lod } from '../kit';
+import { buildRear, exhaustPoint } from '../rear';
 import { finish, regions, type CarModel } from '../model';
 import { ACCENT, CARBON, GLASS, GRILLE, HEAD, HEAD_HOUSING, LIVERY_A, LIVERY_B, PAINT, STRIPE_A, TAIL, TRIM, UNDER } from '../paints';
 
-export function buildHyper(): CarModel {
-  const b = new MeshBuilder();
-  const axles: [Axle, Axle] = [{ z: -1.42, r: 0.36, x: 0.8, w: 0.3 }, { z: 1.38, r: 0.385, x: 0.79, w: 0.34 }];
+export function buildHyper(lod: Lod = 0): CarModel {
+  const b = new MeshBuilder(lod);
+  const axles: [Axle, Axle] = [{ z: -1.42, r: 0.44, x: 0.8, w: 0.32 }, { z: 1.38, r: 0.46, x: 0.79, w: 0.36 }];
   const shape = new BodyShape({
     secs: [
       { z: -2.2, yb: 0.15, yt: 0.33, hw: 0.8, crown: 0.02, sh: 0.22, tuck: 0.04, belt: 0.5 },
@@ -22,12 +23,13 @@ export function buildHyper(): CarModel {
       { z: 2.2, yb: 0.24, yt: 0.75, hw: 0.88, crown: 0.02, sh: 0.14 },
     ],
     axles, rise: [0.2, 0.1], flare: [0.02, 0.03], band: 0.05, clear: 0.05,
+    lod,
     brush: regions({ sill: CARBON }),
     capFront: PAINT, capBack: TRIM,
   });
   shape.build(b);
   // Cabine-bolha avançada e tampa do motor em fastback.
-  const cab: CabinSpec = {
+  const cab: CabinSpec = bubble({
     secs: [
       { z: -1.08, hwb: 0.7, yb: 0.64, hwt: 0.7, yt: 0.64 },
       { z: -0.28, hwb: 0.8, yb: 0.68, hwt: 0.56, yt: 1.07, crown: 0.04 },
@@ -36,11 +38,11 @@ export function buildHyper(): CarModel {
     ],
     top: (gap, region) => (gap === 1 ? (region === 'stripe' ? STRIPE_A : PAINT) : gap === 2 ? (region === 'stripe' ? STRIPE_A : PAINT) : GLASS),
     side: (gap) => (gap === 2 ? PAINT : GLASS),
-  };
+  });
   buildCabin(b, cab);
   b.mirrored(() => beam(b, [0.7, 0.65, -1.06], cabinGlassTop(cab, -0.32), 0.05, 0.035, CARBON));
   // Venezianas na tampa do motor.
-  for (let i = 0; i < 4; i++) onTop(b, shape, 0, 1.62 + i * 0.12, 0.9, 0.05, 0.03, TRIM);
+  b.fine(() => { for (let i = 0; i < 4; i++) onTop(b, shape, 0, 1.62 + i * 0.12, 0.9, 0.05, 0.03, TRIM); });
   // Entradas de ar laterais: cunha escura antes da roda traseira, com a lâmina de acento em cima.
   b.mirrored(() => {
     cuboid(b, [
@@ -55,11 +57,13 @@ export function buildHyper(): CarModel {
   b.mirrored(() => roundBar(b, [0.66, 0.24, -2.1], [0.34, 0.12, 0.08], GRILLE, { r: 0.045, axis: 'z' }));
   splitter(b, 0.14, -2.16, 1.72, 0.26, CARBON);
   mirrors(b, 0.84, 0.8, -0.72, PAINT, 0.85);
-  // Asa traseira em pescoço de cisne (acento), lanternas finas, difusor e escape central duplo.
-  wing(b, { z: 1.98, y: 1.1, span: 1.76, chord: 0.38, thick: 0.05, pitch: -0.14, brush: ACCENT, plate: ACCENT, strut: 'swan', baseY: 0.8, strutX: 0.42, strutBrush: CARBON });
-  lampPair(b, 0.55, 0.66, 2.19, 0.6, 0.05, 0, TAIL, false, TRIM, 0.04);
-  diffuser(b, 0.22, 2.1, 1.5, 7, CARBON);
-  const exhausts = [exhaust(b, 0.13, 0.46, 2.25, 0.07, 0.12), exhaust(b, -0.13, 0.46, 2.25, 0.07, 0.12)];
+  // Traseira-vitrine: asa em pescoço de cisne (acento), lanternas grandes, difusor e escape central duplo largo.
+  lampPair(b, 0.55, 0.66, 2.19, 0.62, 0.15, 0, TAIL, false, TRIM, 0.04);
+  const rear = buildRear(b, {
+    exhausts: [{ x: 0.13, y: 0.46, z: 2.25, r: 0.075, len: 0.15 }, { x: -0.13, y: 0.46, z: 2.25, r: 0.075, len: 0.15 }],
+    diffuser: { y: 0.22, z: 2.1, w: 1.5, fins: 7, fin: CARBON },
+    wing: { z: 1.98, y: 1.1, span: 1.76, chord: 0.4, thick: 0.07, pitch: -0.14, brush: ACCENT, plate: ACCENT, strut: 'swan', baseY: 0.8, strutX: 0.42, strutBrush: CARBON },
+  });
   calipers(b, axles);
-  return finish('hyper', b, { wheel: 'center', axles, exhausts, liveries: [LIVERY_B, LIVERY_A] });
+  return finish('hyper', b, { wheel: 'center', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [LIVERY_B, LIVERY_A] });
 }

@@ -279,6 +279,8 @@ describe('o que não pode mudar com a forma nova', () => {
     AREA[body].forEach((before, k) => {
       const what = ['farol', 'lanterna', 'escamoteável', 'faixa A', 'faixa B', 'acento'][k];
       if (before === 0) expect(area[k], what).toBe(0);
+      // A lanterna CRESCEU de propósito na M4 (traseira-vitrine; a meta de área é do estilo-carro.test.ts): aqui só não pode encolher.
+      else if (k === 1) expect(area[k], what).toBeGreaterThan(before * 0.9);
       else { expect(area[k], what).toBeGreaterThan(before * 0.6); expect(area[k], what).toBeLessThan(before * 1.6); }
     });
   });

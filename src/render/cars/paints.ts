@@ -24,8 +24,11 @@ export const GRILLE = brush('#101114', { rough: 0.8 });
 export const CHROME = brush('#e2e6ec', { rough: 0.12, metal: 1 });
 export const ALU = brush('#b9bec6', { rough: 0.34, metal: 0.9 });
 export const GUNMETAL = brush('#4a4e57', { rough: 0.32, metal: 0.85 });
-export const GLASS = brush('#2c3d55', { rough: 0.05, metal: 0.72 });
-export const GLASS_DARK = brush('#1a2332', { rough: 0.06, metal: 0.7 });
+// Vidro com reflexo (M4): polido e quase espelho (o env map do céu manda), mais claro que o de antes para o azul ler com o céu por cima.
+export const GLASS = brush('#34507a', { rough: 0.04, metal: 0.92 });
+export const GLASS_DARK = brush('#1b2638', { rough: 0.05, metal: 0.9 });
+/** Faixa de brilho do vidro (cartum: o reflexo diagonal do céu): espelho puro, claro. */
+export const GLINT = brush('#eaf6ff', { rough: 0.04, metal: 1 });
 export const HEAD = brush('#fff6e0', { rough: 0.15, head: 1 });
 export const HEAD_HOUSING = brush('#3a3f48', { rough: 0.2, metal: 0.8 });
 export const DRL = brush('#e8f4ff', { rough: 0.15, head: 0.8 });

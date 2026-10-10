@@ -67,5 +67,8 @@ export function buildModel(key: string): CarModel {
   if (loaded) return loaded;
   const make = MODEL_BUILDERS[key as CarBody];
   if (!make) throw new Error(`Estilo de carroceria sem modelo: ${key}`);
-  return make();
+  // O casco simples (lod1) do procedural sai do MESMO construtor, no nível 1 (M4): carros a mais de 30 m e a qualidade Baixa.
+  const full = make();
+  const low = make(1);
+  return { ...full, lod1: { shell: low.shell, triangles: low.triangles } };
 }

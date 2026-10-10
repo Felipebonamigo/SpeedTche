@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { CarBody } from '../../core/types';
 import type { Axle, Region } from './body';
-import type { Brush, MeshBuilder, P3 } from './kit';
+import type { Brush, Lod, MeshBuilder, P3 } from './kit';
 import { PAINT, STRIPE_A, STRIPE_B, TRIM, UNDER } from './paints';
 import type { WheelDesign, WheelModel } from './wheels';
 
@@ -30,8 +30,7 @@ export interface CarContract {
   lodNodes: { lod0: boolean; lod1: boolean };
 }
 
-/** Nível de detalhe do casco procedural: 0 = completo, 1 = o casco simples dos carros longe e da qualidade Baixa (M4). */
-export type Lod = 0 | 1;
+export type { Lod };
 
 /** Caixa no referencial do carro (metros), para o teste conferir a peça contra a malha. */
 export interface Box3Like { min: P3; max: P3 }

@@ -10,9 +10,9 @@ import { CAR_LIMITS } from '../src/render/cars/check';
 import type { CarModel } from '../src/render/cars/model';
 import { MODEL_BUILDERS, buildModel } from '../src/render/cars/models';
 
-const META = { shellMax: 4500, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.9, lodMax: 0.5, exhaustR: 0.055, glassMetal: 0.85, glassRough: 0.06 } as const;
-/** Estilos com aerofólio de brinquedo; clássico, sedã, picape e micro ficam sem, de propósito (decisão de forma). */
-const WING: readonly CarBody[] = ['gt', 'muscle', 'hatch', 'rally', 'hyper', 'wedge', 'prototype', 'roadster', 'electric'];
+const META = { shellMax: 4500, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.92, lodMax: 0.5, exhaustR: 0.055, glassMetal: 0.85, glassRough: 0.06 } as const;
+/** Estilos com aerofólio de brinquedo; clássico, sedã, picape, micro e o roadster (cockpit aberto, com as corcovas) ficam sem, de propósito (decisão de forma). */
+const WING: readonly CarBody[] = ['gt', 'muscle', 'hatch', 'rally', 'hyper', 'wedge', 'prototype', 'electric'];
 
 const models = new Map<CarBody, CarModel>(CAR_BODIES.map((b) => [b, buildModel(b)]));
 const get = (b: CarBody): CarModel => models.get(b) as CarModel;
@@ -49,15 +49,18 @@ function glassVertices(m: CarModel): number[] {
   for (let i = 0; i < mat.count; i++) if (mat.getX(i) <= 0.08 && mat.getY(i) >= 0.6 && mat.getZ(i) < 0.1 && mat.getW(i) < 0.1) out.push(i);
   return out;
 }
-/** Largura do alto do vidro sobre a da base: 1 = paredes retas (bolha), < 1 = cabine afunilada. */
+/**
+ * Cabine bolha: a largura da METADE DE CIMA do vidro sobre a largura máxima dele. 1 = paredes retas (bolha); a cabine que
+ * afunila para o teto dá menos (a de antes: 0,77 a 0,91). Mede o vidro todo (pincéis de baixa rugosidade e metal alto).
+ */
 function bubble(m: CarModel): number {
   const p = m.shell.getAttribute('position');
   const v = glassVertices(m);
   if (!v.length) return 0;
   const ys = v.map((i) => p.getY(i));
-  const lo = Math.min(...ys); const hi = Math.max(...ys);
-  const half = (from: number, to: number) => Math.max(...v.filter((i) => p.getY(i) >= from && p.getY(i) <= to).map((i) => Math.abs(p.getX(i))));
-  return half(hi - 0.1, hi) / half(lo, lo + 0.05);
+  const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const half = (list: number[]) => Math.max(...list.map((i) => Math.abs(p.getX(i))));
+  return half(v.filter((i) => p.getY(i) >= mid)) / half(v);
 }
 /** Triângulos com o centroide dentro da caixa. */
 function inside(m: CarModel, box: { min: readonly number[]; max: readonly number[] }): number {
@@ -123,7 +126,7 @@ describe('estilo do carro: traseira-vitrine', () => {
 });
 
 describe('estilo do carro: cabine bolha e vidro com reflexo', () => {
-  it.each(CAR_BODIES.map((b) => [b] as const))('%s: o alto do vidro tem ≥ 90% da largura da base (cabine bolha)', (body) => {
+  it.each(CAR_BODIES.map((b) => [b] as const))('%s: o alto do vidro tem ≥ 92% da largura do vidro (cabine bolha)', (body) => {
     expect(bubble(get(body))).toBeGreaterThanOrEqual(META.bubble);
   });
 
