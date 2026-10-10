@@ -5,8 +5,8 @@
 // Puro: sem DOM e sem three (tests/bench.test.ts).
 import type { Quality } from '../game/contracts';
 
-/** O que o bench mede: as qualidades do jogo e o Ultra, que ainda não existe como `Quality`. */
-export type BenchLevel = Quality | 'ultra';
+/** O que o bench mede: as qualidades do jogo (o Ultra é uma delas desde a L2; o nome fica para os relatórios antigos). */
+export type BenchLevel = Quality;
 
 /** Meta do Ultra: placa, resolução de desenho e quadros por segundo (média). */
 export const ULTRA_TARGET = { fps: 120, width: 2560, height: 1440, gpu: 'NVIDIA GeForce RTX 4070 Ti' } as const;
@@ -38,7 +38,7 @@ export function ultraEffectsActive(): string[] {
   return ULTRA_EFFECTS.filter((e) => e.implemented).map((e) => e.id);
 }
 
-/** A qualidade do renderizador com que o nível é desenhado: o Ultra parte da Alta. */
+/** A qualidade do renderizador com que o nível é desenhado: desde a L2 o Ultra é uma qualidade de verdade. */
 export function renderQualityOf(level: BenchLevel): Quality {
-  return level === 'ultra' ? 'high' : level;
+  return level;
 }

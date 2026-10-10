@@ -196,8 +196,8 @@ describe('Ultra: registro do nível', () => {
     expect(ultraEffectsActive()).toEqual([]);
   });
 
-  it('o Ultra desenha na qualidade Alta do renderizador; o resto é o próprio nível', () => {
-    expect(renderQualityOf('ultra')).toBe('high');
+  it('o Ultra é uma qualidade do renderizador (L2): o nível e a qualidade são a mesma coisa', () => {
+    expect(renderQualityOf('ultra')).toBe('ultra');
     for (const q of BENCH_QUALITIES) expect(renderQualityOf(q)).toBe(q);
   });
 });
@@ -262,7 +262,7 @@ describe('Ultra: avisos do relatório', () => {
     expect(benchWarnings({ ...r, runs: [withFps(r.runs[0], { avgFps: 60 })] }).join('\n')).not.toMatch(/teto de quadros/);
   });
 
-  it('o Ultra sem os efeitos avisa que o número é o da Alta em 1440p, e só quando há corrida Ultra', () => {
+  it('o Ultra com efeitos faltando avisa quantos existem, e só quando há corrida Ultra', () => {
     const r = reportWithUltra();
     r.ultra = { target: ULTRA_TARGET, effectsPlanned: ULTRA_EFFECTS.map((e) => e.id), effectsActive: [] };
     expect(benchWarnings(r).join('\n')).toMatch(/ultra: 0 de 7 efeitos/);
