@@ -215,7 +215,7 @@ export class Stage {
     const sparkGeo = this.own(new THREE.BufferGeometry());
     sparkGeo.setAttribute('position', new THREE.BufferAttribute(this.sparkPositions, 3));
     this.sparks = new THREE.Points(sparkGeo, this.own(new THREE.PointsMaterial({
-      size: 0.075, sizeAttenuation: true, color: '#ffd27a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+      size: 0.12, sizeAttenuation: true, color: '#ffb347', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
     })));
     this.sparks.name = 'stage:sparks'; this.sparks.visible = false; this.sparks.frustumCulled = false; this.sparks.renderOrder = 5;
     scene.add(this.sparks);
