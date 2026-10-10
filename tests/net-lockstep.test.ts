@@ -29,6 +29,9 @@ function pilot(seat: number, frame: number): PlayerInput {
     nitro: frame % 700 === 100 + seat * 20,
     gearUp: false, gearDown: false,
     drift: (phase >= 10 && phase < 75) || (phase >= 90 && phase < 155),
+    // N6: buzina segurada em fases (nível) e uma frase de vez em quando (borda); o núcleo nunca os lê.
+    horn: (phase >= 100 && phase < 130) || (phase >= 200 && phase < 206),
+    ...(frame % 300 === 150 + seat * 7 ? { taunt: (frame / 300 + seat) % 8 | 0 } : {}),
   };
 }
 
@@ -385,6 +388,95 @@ describe('lockstep em rede simulada', () => {
     for (let i = 0; i < 10; i++) ls.step(state, 0, (inputs) => stepRace(state, TRACK, inputs));
     expect(ls.behindBy()).toBe(26);
   });
+});
+
+/** O que cada tick entregou ao stepRace deste cliente: só os ticks em que alguém buzinava ou mandou uma frase. */
+interface VoiceTick { tick: number; seat: number; horn: boolean; taunt: number | undefined }
+function traceVoice(c: SimClient): VoiceTick[] {
+  const log: VoiceTick[] = [];
+  const orig = c.ls.step.bind(c.ls);
+  c.ls.step = (state, now, run) => orig(state, now, (inputs) => {
+    const tick = state.tick;
+    inputs.forEach((inp, seat) => { if (inp && (inp.horn === true || inp.taunt !== undefined)) log.push({ tick, seat, horn: inp.horn === true, taunt: inp.taunt }); });
+    run(inputs);
+  });
+  return log;
+}
+
+describe('buzina e frase pelo lockstep (N6)', () => {
+  const hold: PlayerInput = { steer: 0, throttle: true, brake: false, nitro: false, gearUp: false, gearDown: false };
+
+  it('a buzina é nível: fica nos envios seguintes até soltar (o bit 64)', () => {
+    const state = createRace(config(1), TRACK);
+    const sent: InputRecord[] = [];
+    const ls = new Lockstep({ seats: [0], localSeats: [0], delay: 2 }, { sendInputs: (r) => sent.push(...r), sendHash: () => undefined });
+    const run = (inputs: PlayerInput[]) => stepRace(state, TRACK, inputs);
+    ls.setLocalInput(0, { ...hold, horn: true });
+    for (let i = 0; i < 6; i++) ls.step(state, i * 16, run);
+    const held = sent.filter((r) => r.tick >= 2 && r.tick <= 7);
+    expect(held.length).toBeGreaterThanOrEqual(6);
+    for (const r of held) expect(r.bits & 64, `tick ${r.tick}`).toBe(64);
+    ls.setLocalInput(0, { ...hold, horn: false });
+    const before = sent.length;
+    for (let i = 6; i < 12; i++) ls.step(state, i * 16, run);
+    expect(sent.length).toBeGreaterThan(before);
+    for (const r of sent.slice(before)) expect(r.bits & 64, `tick ${r.tick}`).toBe(0);
+  });
+
+  it('a frase é borda: sai uma vez só, mesmo que o quadro seguinte já a tenha esquecido, e nunca se repete', () => {
+    const state = createRace(config(1), TRACK);
+    const sent: InputRecord[] = [];
+    const ls = new Lockstep({ seats: [0], localSeats: [0], delay: 2 }, { sendInputs: (r) => sent.push(...r), sendHash: () => undefined });
+    const run = (inputs: PlayerInput[]) => stepRace(state, TRACK, inputs);
+    ls.setLocalInput(0, { ...hold, taunt: 5 });
+    ls.setLocalInput(0, { ...hold }); // o quadro seguinte (sem passo) já não traz a frase: ela fica guardada
+    for (let i = 0; i < 12; i++) ls.step(state, i * 16, run);
+    const withTaunt = sent.filter((r) => (r.bits >> 8) !== 0);
+    expect(withTaunt).toHaveLength(1);
+    expect(decodeInput(withTaunt[0].bits, withTaunt[0].steer).taunt).toBe(5);
+    // Uma frase nova, depois: sai de novo uma vez.
+    ls.setLocalInput(0, { ...hold, taunt: 0 });
+    for (let i = 12; i < 24; i++) ls.step(state, i * 16, run);
+    const all = sent.filter((r) => (r.bits >> 8) !== 0);
+    expect(all.map((r) => decodeInput(r.bits, r.steer).taunt)).toEqual([5, 0]);
+  });
+
+  for (const delay of [3, 12]) {
+    it(`a buzina e a frase de cada jogador chegam aos MESMOS ticks em todos os clientes (3 clientes, atraso de entrada ${delay}, rede bagunçada)`, () => {
+      const net = new Net(createRng(5150 + delay), 5);
+      const seats = [0, 1, 2];
+      const cfg = config(3);
+      const clients = seats.map((s) => makeClient(net, s, [s], seats, cfg, delay));
+      const traces = clients.map(traceVoice);
+      runAll(net, clients, 2400);
+      for (const c of clients) { expect(c.state.tick).toBe(2400); expect(c.desyncs).toEqual([]); }
+      const horns = traces[0].filter((v) => v.horn);
+      const taunts = traces[0].filter((v) => v.taunt !== undefined);
+      expect(horns.length, 'ninguém buzinou').toBeGreaterThan(100);
+      expect(new Set(horns.map((v) => v.seat)).size, 'só um assento buzinou').toBe(3);
+      expect(taunts.length, 'ninguém mandou frase').toBeGreaterThanOrEqual(3);
+      for (const t of traces) expect(t).toEqual(traces[0]);
+      // A frase é uma borda por tick: nunca duas vezes seguidas para o mesmo assento no mesmo envio.
+      expect(new Set(taunts.map((v) => `${v.tick}:${v.seat}`)).size).toBe(taunts.length);
+      for (const c of clients) expect(hashRace(c.state)).toBe(hashRace(clients[0].state));
+    }, 60_000);
+  }
+
+  it('buzina e frase não mexem na física: a mesma corrida sem eles dá o mesmo hash', () => {
+    const run = (voice: boolean): number => {
+      const net = new Net(createRng(808), 4);
+      const seats = [0, 1];
+      const cfg = config(2);
+      const cs = seats.map((s) => makeClient(net, s, [s], seats, cfg));
+      if (!voice) for (const c of cs) {
+        const orig = c.ls.setLocalInput.bind(c.ls);
+        c.ls.setLocalInput = (seat, input) => { const { horn: _h, taunt: _t, ...rest } = input; void _h; void _t; orig(seat, rest); };
+      }
+      runAll(net, cs, 1500);
+      return hashRace(cs[0].state);
+    };
+    expect(run(true)).toBe(run(false));
+  }, 60_000);
 });
 
 describe('IA que assume o carro de um humano', () => {

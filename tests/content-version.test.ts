@@ -141,9 +141,9 @@ describe('a derrapagem renova as versões (M1)', () => {
     expect(recordFromOtherVersion({ ...old, fp: lapFingerprint('copacabana', 'falcao') as string }, 'copacabana')).toBe(false);
   });
 
-  it('a impressão do online mudou (protocolo 2 e as constantes da derrapagem): um build novo não entra na sala de um velho', () => {
+  it('a impressão do online mudou (as constantes da derrapagem; o protocolo agora é o 3): um build novo não entra na sala de um velho', () => {
     expect(onlineFingerprint()).not.toBe(BEFORE.online);
-    expect(fingerprintContent()).toMatchObject({ protocol: 2 });
+    expect(fingerprintContent()).toMatchObject({ protocol: 3 });
   });
 
   it('a revisão da física, sozinha, já muda a impressão da volta (cobre a mudança só de código)', () => {
@@ -184,5 +184,25 @@ describe('recordes guardam a impressão (nenhum é apagado)', () => {
     expect(save.bestLaps.copacabana).toEqual({ ...base, fp: 'deadbeef' });
     recordRaceResults(save, [row(0, 9000, 2900)], one, 'copacabana', 3);
     expect(save.bestLaps.copacabana).toMatchObject({ ticks: 2900, name: 'Bia', fp: current });
+  });
+});
+
+// Onda N, N6: a buzina e a frase vão na rede (PROTOCOL_VERSION 3), mas NÃO mudam a física: recordes e fantasmas gravados em
+// 640538f seguem valendo (a impressão de volta não leva o protocolo nem nada de áudio), e só a do online muda — de propósito:
+// um build v3 não divide sala com um v2.
+describe('a voz do carro renova só a impressão do online (N6)', () => {
+  const AT_640538F = { lap: '4fb0f246', lapRota66Trovao: '0df4070d', online: '5b13a09a' };
+
+  it('a impressão de uma volta é a mesma de 640538f: o recorde e o fantasma de antes continuam desta versão', () => {
+    expect(lapFingerprint('copacabana', 'falcao')).toBe(AT_640538F.lap);
+    expect(lapFingerprint('rota_66', 'trovao')).toBe(AT_640538F.lapRota66Trovao);
+    expect(PHYSICS_REVISION).toBe(2);
+    const old: BestLap = { ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-09', fp: AT_640538F.lap };
+    expect(recordFromOtherVersion(old, 'copacabana')).toBe(false);
+  });
+
+  it('a impressão do online mudou e leva o protocolo 3', () => {
+    expect(onlineFingerprint()).not.toBe(AT_640538F.online);
+    expect(fingerprintContent()).toMatchObject({ protocol: 3 });
   });
 });

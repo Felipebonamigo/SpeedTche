@@ -270,29 +270,34 @@ describe.skipIf(!HAS_WS)('relay (mensagens cruas)', () => {
     for (const x of [a, b, c]) x.ws.close();
   });
 
-  it('aceita a faixa de versões do protocolo (1 e 2) em create, join e rejoin; as de fora dão "version"', async () => {
+  it('aceita a faixa de versões do protocolo (1 a 3) em create, join e rejoin; as de fora dão "version"', async () => {
     const a = await raw();
-    for (const v of [0, 3, 99, -1, 1.5, '2', null]) {
+    for (const v of [0, 4, 99, -1, 1.5, '3', null]) {
       a.send({ t: 'create', v, seats: 1, info: INFO('x') });
       expect(await a.next(isT('error')), `create v=${String(v)}`).toEqual({ t: 'error', code: 'version' });
     }
-    a.send({ t: 'create', v: 2, seats: 1, info: INFO('Ana') });
+    a.send({ t: 'create', v: 3, seats: 1, info: INFO('Ana') });
     const room = String((await a.next(isT('welcome'))).room);
-    // Um cliente da v1 entra na sala de um da v2: o relay só confere a faixa (quem separa conteúdos diferentes é o `b`).
+    // Clientes da v1 e da v2 entram na sala de um da v3: o relay só confere a faixa (quem separa conteúdos diferentes é o `b`).
     const b = await raw();
     b.send({ t: 'join', v: 1, room, seats: 1, info: INFO('Bia') });
     expect((await b.next(isT('welcome'))).id).toBe(1);
+    const b2 = await raw();
+    b2.send({ t: 'join', v: 2, room, seats: 1, info: INFO('Beto') });
+    expect((await b2.next(isT('welcome'))).id).toBe(2);
     const c = await raw();
-    c.send({ t: 'join', v: 3, room, seats: 1, info: INFO('Caio') });
+    c.send({ t: 'join', v: 4, room, seats: 1, info: INFO('Caio') });
     expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'version' });
     // rejoin: a versão é conferida antes de procurar a sala.
-    c.send({ t: 'rejoin', v: 3, room, token: 'a1b2c3d4e5f6' });
+    c.send({ t: 'rejoin', v: 4, room, token: 'a1b2c3d4e5f6' });
     expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'version' });
+    c.send({ t: 'rejoin', v: 3, room: 'ZZZZZ', token: 'a1b2c3d4e5f6' });
+    expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'no_room' });
     c.send({ t: 'rejoin', v: 2, room: 'ZZZZZ', token: 'a1b2c3d4e5f6' });
     expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'no_room' });
     c.send({ t: 'rejoin', v: 1, room: 'ZZZZZ', token: 'a1b2c3d4e5f6' });
     expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'no_room' });
-    a.ws.close(); b.ws.close(); c.ws.close();
+    a.ws.close(); b.ws.close(); b2.ws.close(); c.ws.close();
   });
 
   it('só junta na mesma sala quem tem o mesmo conteúdo: impressão diferente é recusada com "build"', async () => {

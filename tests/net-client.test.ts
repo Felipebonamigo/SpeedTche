@@ -39,7 +39,7 @@ describe('NetClient', () => {
     sock.push('isto não é json');
     sock.push({ t: 'desconhecido' });
     sock.push({ t: 'i', from: 1, d: [5, 9, 1, 0] }); // assento 9 não existe
-    sock.push({ t: 'i', from: 1, d: [5, 1, 64, 0] }); // bit que não é de jogador
+    sock.push({ t: 'i', from: 1, d: [5, 1, 4096, 0] }); // bit que não é de jogador (o 64 é a buzina desde a v3)
     sock.push({ t: 'pong', n: -1 });
     sock.onmessage?.({ data: new ArrayBuffer(4) }); // binário
     sock.push({ t: 'pong', n: 7 });
@@ -142,7 +142,7 @@ describe('sessão online: remetente conferido', () => {
     if (myId === 0) ctl.create('kb1'); else ctl.join('KQXTR', 'kb1');
     sock.open();
     // A impressão do conteúdo vai junto: o relay não põe na mesma sala builds diferentes.
-    expect(sock.sent[0]).toMatchObject({ t: myId === 0 ? 'create' : 'join', v: 2, b: onlineFingerprint() });
+    expect(sock.sent[0]).toMatchObject({ t: myId === 0 ? 'create' : 'join', v: 3, b: onlineFingerprint() });
     sock.push({ t: 'welcome', room: 'KQXTR', id: myId, token: TOKEN, rejoined: false });
     sock.push(roomMsg(0));
     expect(ctl.phase).toBe('lobby');
