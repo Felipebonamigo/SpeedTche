@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { CARS } from '../src/core/data/cars';
 import { TRACKS } from '../src/core/track';
 import {
-  decodeInput, encodeInput, normalizeRoomCode, normalizeServerUrl, packRecords, parseServerMessage, quantizeSteer,
-  TAKEOVER_BIT, unpackRecords, type ContentRules, type RoomSettings, type StartConfig,
+  decodeInput, encodeInput, INPUT_BIT, normalizeRoomCode, normalizeServerUrl, packRecords, parseServerMessage, PROTOCOL_VERSION,
+  quantizeSteer, TAKEOVER_BIT, unpackRecords, type ContentRules, type RoomSettings, type StartConfig,
 } from '../src/net/protocol';
 
 const RULES: ContentRules = { cars: CARS.map((c) => c.id), tracks: TRACKS.map((t) => t.id) };
@@ -17,11 +17,26 @@ const parse = (m: unknown) => parseServerMessage(typeof m === 'string' ? m : JSO
 
 describe('entrada compacta', () => {
   it('bits e volante em int8 vão e voltam', () => {
-    const input = { steer: -0.5, throttle: true, brake: false, nitro: true, gearUp: false, gearDown: true };
+    const input = { steer: -0.5, throttle: true, brake: false, nitro: true, gearUp: false, gearDown: true, drift: false };
     const { bits, steer } = encodeInput(input);
     expect(bits).toBe(1 + 4 + 16);
     expect(steer).toBe(-64);
     expect(decodeInput(bits, steer)).toEqual({ ...input, steer: -64 / 127 });
+  });
+
+  it('o bit de derrapar (32) vai e volta; sem ele a entrada decodificada diz derrapar: falso', () => {
+    expect(PROTOCOL_VERSION).toBe(2);
+    expect(INPUT_BIT.drift).toBe(32);
+    const input = { steer: 0.25, throttle: true, brake: false, nitro: false, gearUp: false, gearDown: false, drift: true };
+    const { bits, steer } = encodeInput(input);
+    expect(bits).toBe(1 + 32);
+    expect(decodeInput(bits, steer)).toEqual({ ...input, steer: 32 / 127 });
+    // Sem o campo (quem monta o PlayerInput sem saber da derrapagem) ou com ele falso, o bit não sai.
+    expect(encodeInput({ steer: 0, throttle: true, brake: false, nitro: false, gearUp: false, gearDown: false }).bits).toBe(1);
+    expect(encodeInput({ ...input, drift: false }).bits).toBe(1);
+    expect(decodeInput(1, 0).drift).toBe(false);
+    // O bit 32 convive com todos os outros: toda combinação de 6 bits vai e volta.
+    for (let b = 0; b < 64; b++) expect(encodeInput(decodeInput(b, 0)).bits, `bits ${b}`).toBe(b);
   });
 
   it('o volante é quantizado de forma estável (decodificar e codificar de novo não muda nada)', () => {
@@ -37,10 +52,16 @@ describe('entrada compacta', () => {
     expect(unpackRecords(packRecords(recs))).toEqual(recs);
   });
 
+  it('registros com o bit de derrapar são aceitos', () => {
+    const recs = [{ tick: 10, seat: 0, bits: 32, steer: 5 }, { tick: 11, seat: 2, bits: 1 + 32 + 4, steer: -127 }];
+    expect(unpackRecords(packRecords(recs))).toEqual(recs);
+  });
+
   it('registros fora do formato são recusados por inteiro', () => {
     const bad: unknown[] = [
       null, 'x', [], [1, 2, 3], [1.5, 0, 0, 0], [-1, 0, 0, 0], [1, 4, 0, 0], [1, 0, 256, 0], [1, 0, 0, 128],
-      [1, 0, 32, 0], // bit que não existe
+      [1, 0, 64, 0], // bit que não existe (o 32 é a derrapagem)
+      [1, 0, TAKEOVER_BIT | 32, 0], // tomada misturada com a derrapagem
       [1, 0, TAKEOVER_BIT | 1, 0], // tomada misturada com pedal
       [1, 0, TAKEOVER_BIT, 5], // tomada com volante
       [1, 0, '1', 0],

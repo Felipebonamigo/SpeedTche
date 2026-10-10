@@ -210,6 +210,11 @@ export interface PlayerInput {
   gearUp: boolean;
   gearDown: boolean;
   /**
+   * Derrapar: o botão SEGURADO (nível, não borda). Opcional de propósito, como `takeover`: ausente vale falso, e quem monta
+   * um PlayerInput sem saber da derrapagem continua válido. Vai na rede no bit 32 (src/net/protocol.ts).
+   */
+  drift?: boolean;
+  /**
    * Comando, não tecla: a IA assume este carro a partir deste tick (online, quando o jogador não
    * volta — src/net/lockstep.ts). Vem no fluxo de entradas para a tomada passar pelo stepRace.
    */
@@ -291,6 +296,17 @@ export interface CarState {
   skidTicks: number;
   /** Última direção do volante (-1, 0, 1) para a pose do sprite. */
   steerPose: number;
+  /**
+   * Derrapagem (onda M, M1; docs/ondas/M/M1.md): o lado da derrapagem (-1, 0 ou 1; 0 = não derrapa), fixo da entrada à saída.
+   * Os 4 campos entram no hashRace e têm padrão 0 no deserializeRace: sem isso a checagem de dessincronia não os vê.
+   */
+  driftDir: number;
+  /** Ticks desde a entrada na derrapagem (conta o tick da entrada); 0 fora dela. */
+  driftTicks: number;
+  /** Ticks de carga: só sobe com o carro numa curva forte para o lado da derrapagem; o nível (0..3) é driftLevel(). */
+  driftCharge: number;
+  /** Ticks restantes do impulso de saída da derrapagem (0 = sem impulso). Menor que o nitro em tudo. */
+  driftBoostTicks: number;
   ai: AiBrain | null;
   /** Atributos efetivos (carro + melhorias), fixos durante a corrida. Ler por carStats(car). */
   stats: CarStats;
@@ -314,6 +330,10 @@ export type SimEvent =
   | { type: 'fuel_low'; carId: number }
   | { type: 'fuel_empty'; carId: number }
   | { type: 'gear'; carId: number; gear: number }
+  /** Derrapagem: a carga subiu para o nível `level` (1 azul, 2 laranja, 3 roxa). */
+  | { type: 'drift_charge'; carId: number; level: number }
+  /** Derrapagem: soltou o botão com carga; o impulso de saída do nível `level` começou. */
+  | { type: 'drift_boost'; carId: number; level: number }
   /** Revezamento (src/core/modes.ts): a volta fechou e a troca está liberada no box. */
   | { type: 'relay_due'; carId: number }
   /** Revezamento: o controle do carro passou de um assento para o outro, no box. */

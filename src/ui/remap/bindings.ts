@@ -3,8 +3,12 @@
 // conflito e restaurar padrão. A navegação dos menus (setas, Enter, Esc; d-pad, A, B, Start) NÃO
 // passa por aqui: é fixa em src/ui/input.ts e src/ui/menus.ts, para ninguém se trancar fora.
 
-export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'pause';
-export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'pause'];
+/**
+ * As 10 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
+ * `lookBack` é só de câmera — nada no núcleo o lê, só a ação existe para o jogador ter o botão. `pause` continua a última.
+ */
+export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'pause';
+export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'pause'];
 
 /** Colunas da tela de controles: os dois teclados e um mapeamento único para todos os gamepads. */
 export type BindDevice = 'kb1' | 'kb2' | 'gamepad';
@@ -61,21 +65,33 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** O mapeamento de antes do remapeamento (setas + Espaço + M/N; WASD + F + E/Q; A/RT, X/B/LT, RB, Y/LB). */
+/**
+ * O mapeamento padrão (decisão nº 9 do dono, onda M). Controle: derrapar no RB, nitro no LB (e no Y), câmbio manual no D-pad
+ * ↑/↓ (o automático é o padrão), olhar para trás no R3. Teclado 1: derrapar no Shift direito; teclado 2: no Shift esquerdo
+ * (códigos físicos diferentes: os dois teclados não colidem). Antes da M1 o RB era o nitro e Y/LB as marchas: os mapas salvos
+ * migram em `sanitizeBindings` (LEGACY_PAD_DEFAULTS).
+ */
 export const DEFAULT_BINDINGS: ControlBindings = deepFreeze({
   kb1: {
     throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], pause: ['Escape'],
+    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], drift: ['ShiftRight'], lookBack: ['KeyB'], pause: ['Escape'],
   },
   kb2: {
     throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
-    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], pause: ['Escape'],
+    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], drift: ['ShiftLeft'], lookBack: ['KeyR'], pause: ['Escape'],
   },
   gamepad: {
     throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15],
-    nitro: [5], gearUp: [3], gearDown: [4], pause: [9],
+    nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9],
   },
 });
+
+/**
+ * Os padrões do gamepad que MUDARAM de botão na M1 (ação → botões de antes): nitro era o RB, e as marchas eram Y e LB. Um mapa
+ * salvo antes da M1 (sem `drift` nem `lookBack`) que ainda tem uma dessas ações no padrão antigo ganha o novo; o que o jogador
+ * personalizou fica. Sem isso o RB ficaria no nitro e a derrapagem cairia num botão de reserva qualquer.
+ */
+const LEGACY_PAD_DEFAULTS: Readonly<Partial<Record<BindAction, readonly number[]>>> = { nitro: [5], gearUp: [3], gearDown: [4] };
 
 /** Reserva para quando uma ação fica sem código e o padrão dela já está com outra (só com save adulterado). */
 const SPARE_KEYS: readonly string[] = [
@@ -152,13 +168,31 @@ function sanitizeDevice<C extends BindCode>(raw: unknown, rules: DeviceRules<C>)
   return lists;
 }
 
-/** Funde o que veio do armazenamento com o padrão: código inválido vira o padrão da ação, conflito é resolvido. Nunca lança. */
+/**
+ * Dispositivo gravado antes da M1 (8 ações: sem `drift` nem `lookBack`): as ações do gamepad que ainda estão no padrão antigo
+ * (LEGACY_PAD_DEFAULTS) passam ao padrão novo. Um mapa da M1 em diante tem as 10 ações e não migra (o RB no nitro ali é escolha).
+ */
+function migrateLegacyPad(raw: unknown): unknown {
+  if (!isRecord(raw) || 'drift' in raw || 'lookBack' in raw) return raw;
+  const out: Record<string, unknown> = { ...raw };
+  for (const action of Object.keys(LEGACY_PAD_DEFAULTS) as BindAction[]) {
+    const old = LEGACY_PAD_DEFAULTS[action] ?? [];
+    const v = out[action];
+    if (Array.isArray(v) && v.length === old.length && v.every((c, i) => c === old[i])) out[action] = [...DEFAULT_BINDINGS.gamepad[action]];
+  }
+  return out;
+}
+
+/**
+ * Funde o que veio do armazenamento com o padrão: código inválido vira o padrão da ação, conflito é resolvido, e o mapa de
+ * antes da M1 migra (migrateLegacyPad). Nunca lança.
+ */
 export function sanitizeBindings(raw: unknown): ControlBindings {
   const r = isRecord(raw) ? raw : {};
   return {
     kb1: sanitizeDevice(r.kb1, KEY_RULES.kb1),
     kb2: sanitizeDevice(r.kb2, KEY_RULES.kb2),
-    gamepad: sanitizeDevice(r.gamepad, PAD_RULES),
+    gamepad: sanitizeDevice(migrateLegacyPad(r.gamepad), PAD_RULES),
   };
 }
 

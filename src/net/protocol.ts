@@ -6,7 +6,12 @@ import { ASSIST_LEVELS } from '../core/sim/assist';
 import type { AssistLevel, CoopAssists, Difficulty, PlayerInput } from '../core/types';
 import { withPaint } from '../game/paints';
 
-export const PROTOCOL_VERSION = 1;
+/**
+ * Versão do protocolo. 2 (onda M, M1): a entrada ganhou o bit de derrapar (32). O relay aceita a FAIXA de versões
+ * (server/relay.mjs: MIN_PROTOCOL_VERSION … PROTOCOL_VERSION) e quem separa jogos de conteúdo diferente é a impressão do
+ * conteúdo (`b`, content-version.ts), que já carrega esta versão: um cliente v1 e um v2 nunca dividem sala.
+ */
+export const PROTOCOL_VERSION = 2;
 export const DEFAULT_SERVER_URL = 'ws://localhost:8787';
 export const SERVER_URL_MAX_LENGTH = 200;
 
@@ -31,10 +36,10 @@ export const RECONNECT_WINDOW_MS = 60_000;
 
 // ───────────────────────────── Entrada por tick ─────────────────────────────
 
-/** Bits da entrada compacta. `TAKEOVER` não é do jogador: é o comando "a IA assume este assento". */
-export const INPUT_BIT = { throttle: 1, brake: 2, nitro: 4, gearUp: 8, gearDown: 16 } as const;
+/** Bits da entrada compacta (o 32, derrapar, é da v2; 64 está livre). `TAKEOVER` não é do jogador: é o comando "a IA assume este assento". */
+export const INPUT_BIT = { throttle: 1, brake: 2, nitro: 4, gearUp: 8, gearDown: 16, drift: 32 } as const;
 export const TAKEOVER_BIT = 128;
-const PLAYER_BITS = 31;
+const PLAYER_BITS = 63;
 
 /** Um registro do fluxo de entradas: o que o assento `seat` faz no tick `tick`. */
 export interface InputRecord {
@@ -60,6 +65,7 @@ export function encodeInput(input: PlayerInput): { bits: number; steer: number }
   if (input.nitro) bits |= INPUT_BIT.nitro;
   if (input.gearUp) bits |= INPUT_BIT.gearUp;
   if (input.gearDown) bits |= INPUT_BIT.gearDown;
+  if (input.drift) bits |= INPUT_BIT.drift;
   return { bits, steer: quantizeSteer(input.steer) };
 }
 
@@ -72,6 +78,7 @@ export function decodeInput(bits: number, steer: number): PlayerInput {
     nitro: (bits & INPUT_BIT.nitro) !== 0,
     gearUp: (bits & INPUT_BIT.gearUp) !== 0,
     gearDown: (bits & INPUT_BIT.gearDown) !== 0,
+    drift: (bits & INPUT_BIT.drift) !== 0,
   };
 }
 

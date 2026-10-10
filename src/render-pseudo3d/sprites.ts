@@ -227,13 +227,22 @@ const REAR: Record<CarBody, RearShape> = {
   roadster: { bodyTop: 0.46, cabinW: 0.5, cabinH: 0.16, spoiler: false, wide: 0.96, open: true },
 };
 
-/** Traseira de um carro em pixel art. `pose` −1/0/1 inclina (vira), `braking` acende as lanternas. */
-function drawCar(color: string, accent: string, body: CarBody, pose: number, braking: boolean, night: boolean): HTMLCanvasElement {
+/** Cor das faíscas da derrapagem por nível de carga: azul, laranja e roxa (CarState.driftCharge → driftLevel). */
+export const DRIFT_SPARK_COLORS: readonly string[] = ['#3aa8ff', '#ff9a1f', '#c04cff'];
+
+/**
+ * Traseira de um carro em pixel art. `pose` −1/0/1 inclina (vira), `braking` acende as lanternas. `drift` −1/0/1 é a derrapagem
+ * (CarState.driftDir): a pose é a do volante MAIS o carro de lado — carroceria e teto deslocados, fumaça nas rodas de trás — e
+ * `level` (1 a 3) põe as faíscas na cor do nível. Sem derrapar (0) o desenho é o de antes, pixel por pixel.
+ */
+function drawCar(color: string, accent: string, body: CarBody, pose: number, braking: boolean, night: boolean, drift = 0, level = 0): HTMLCanvasElement {
   const [c, ctx] = bitmap(CAR_PX_W, CAR_PX_H);
   const s = REAR[body];
   const w = CAR_PX_W; const h = CAR_PX_H;
-  const bodyW = w * 0.9 * s.wide; const x0 = (w - bodyW) / 2;
-  const lean = pose * w * 0.05;                     // o teto desliza para o lado da curva
+  const bodyW = w * 0.9 * s.wide;
+  const slide = drift * w * 0.05;                   // derrapando, o carro inteiro sai de lado
+  const x0 = (w - bodyW) / 2 + slide;
+  const lean = pose * w * 0.05 + drift * w * 0.08;  // o teto desliza para o lado da curva (mais ainda derrapando)
   const shade = (col: string, k: number) => mix(col, '#000000', k);
   const paint = night ? mix(color, '#1a2040', 0.35) : color;
   // Sombra e pneus
@@ -274,6 +283,14 @@ function drawCar(color: string, accent: string, body: CarBody, pose: number, bra
   }
   rect(ctx, '#f0f0e0', w / 2 - 5, h * 0.6, 10, 4);
   rect(ctx, '#3a3a3a', x0 + bodyW * 0.18, h * 0.8, 4, 2);
+  if (drift !== 0) {
+    // A traseira escorrega para fora da curva: fumaça na roda do lado oposto ao da derrapagem, e as faíscas no mesmo lado.
+    const wheelX = drift > 0 ? x0 + bodyW * 0.1 : x0 + bodyW * 0.9;
+    const out = drift > 0 ? -1 : 1;
+    for (const [dx, dy, r] of [[0, 0.86, 3.2], [out * 4, 0.8, 2.6], [out * 8, 0.9, 3.6], [out * 12, 0.82, 2.2]] as const) disc(ctx, night ? 'rgba(170,176,200,0.65)' : 'rgba(236,236,236,0.7)', wheelX + dx, h * dy, r);
+    const spark = DRIFT_SPARK_COLORS[level - 1];
+    if (spark) for (const [dx, dy] of [[-2, 0.72], [1, 0.66], [3, 0.76]] as const) rect(ctx, spark, wheelX + dx * -out, h * dy, 2, 2);
+  }
   return c;
 }
 
@@ -289,15 +306,20 @@ export class SpriteAtlas {
     return b;
   }
 
-  /** `paint` = a pintura escolhida pelo jogador (RenderFrame.paints); ausente/null = a de fábrica. */
-  car(carId: string, pose: number, braking: boolean, night: boolean, paint?: CarColors | null): HTMLCanvasElement {
-    const key = `c:${carId}:${pose}:${braking ? 1 : 0}:${night ? 1 : 0}${paint ? `:${paint.color}:${paint.accent}` : ''}`;
+  /**
+   * `paint` = a pintura escolhida pelo jogador (RenderFrame.paints); ausente/null = a de fábrica. `drift` = CarState.driftDir
+   * (−1, 0, 1) e `driftLevel` = driftLevel(CarState.driftCharge) (0 a 3); sem derrapar o bitmap e a chave do cache são os de antes.
+   */
+  car(carId: string, pose: number, braking: boolean, night: boolean, paint?: CarColors | null, drift = 0, driftLevel = 0): HTMLCanvasElement {
+    const d = drift > 0 ? 1 : drift < 0 ? -1 : 0;
+    const level = d === 0 ? 0 : Math.max(0, Math.min(DRIFT_SPARK_COLORS.length, Math.floor(driftLevel)));
+    const key = `c:${carId}:${pose}:${braking ? 1 : 0}:${night ? 1 : 0}${paint ? `:${paint.color}:${paint.accent}` : ''}${d !== 0 ? `:d${d}${level}` : ''}`;
     let b = this.cache.get(key);
     if (!b) {
       const def = carDef(carId);
       b = paint
-        ? drawCar(paint.color, paint.accent, def.body, pose, braking, night)
-        : drawCar(def.color, def.accent ?? mix(def.color, '#ffffff', 0.55), def.body, pose, braking, night);
+        ? drawCar(paint.color, paint.accent, def.body, pose, braking, night, d, level)
+        : drawCar(def.color, def.accent ?? mix(def.color, '#ffffff', 0.55), def.body, pose, braking, night, d, level);
       this.cache.set(key, b);
     }
     return b;

@@ -19,7 +19,7 @@ function config(humans: number, seed = 99): RaceConfig {
   };
 }
 
-/** Piloto de teste: volante com fração (testa a quantização), freio de vez em quando, nitro em borda. */
+/** Piloto de teste: volante com fração (testa a quantização), freio de vez em quando, nitro em borda e derrapagem em fases (nível, não borda). */
 function pilot(seat: number, frame: number): PlayerInput {
   const phase = (frame + seat * 53) % 240;
   return {
@@ -28,7 +28,13 @@ function pilot(seat: number, frame: number): PlayerInput {
     brake: phase > 225,
     nitro: frame % 700 === 100 + seat * 20,
     gearUp: false, gearDown: false,
+    drift: (phase >= 10 && phase < 75) || (phase >= 90 && phase < 155),
   };
+}
+
+/** Algum humano do estado está derrapando agora? (`?? 0`: antes da M1 o campo não existia.) */
+function anyHumanDrifting(state: RaceState): boolean {
+  return state.cars.some((c) => c.seat >= 0 && (c.driftDir ?? 0) !== 0);
 }
 
 type Payload = { from: number; kind: 'i'; records: InputRecord[] } | { from: number; kind: 'h'; tick: number; hash: number };
@@ -42,6 +48,8 @@ interface SimClient {
   frames: number;
   online: boolean;
   desyncs: DesyncReport[];
+  /** Ticks em que algum humano deste estado estava derrapando (prova de que o bit chegou à simulação). */
+  drifted: number;
 }
 
 /** Rede em memória: cada pacote chega depois de um atraso sorteado; às vezes duas vezes. */
@@ -74,7 +82,7 @@ class Net {
 }
 
 function makeClient(net: Net, id: number, seats: number[], allSeats: number[], cfg: RaceConfig, delay = 3, resendMs = 20): SimClient {
-  const c: SimClient = { id, seats, state: createRace(cfg, TRACK), ls: null as unknown as Lockstep, frames: 0, online: true, desyncs: [] };
+  const c: SimClient = { id, seats, state: createRace(cfg, TRACK), ls: null as unknown as Lockstep, frames: 0, online: true, desyncs: [], drifted: 0 };
   c.ls = new Lockstep({ seats: allSeats, localSeats: seats, delay, resendMs }, {
     sendInputs: (records) => { if (c.online) net.send({ kind: 'i', from: id, records: records.map((r) => ({ ...r })) }); },
     sendHash: (tick, hash) => { if (c.online) net.send({ kind: 'h', from: id, tick, hash }); },
@@ -89,7 +97,7 @@ function frame(c: SimClient, budget: number, limit: number, now: number): number
   c.frames++;
   for (const s of c.seats) c.ls.setLocalInput(s, pilot(s, c.frames));
   let n = 0;
-  while (n < budget && c.state.tick < limit && c.ls.step(c.state, now, (inputs) => stepRace(c.state, TRACK, inputs))) n++;
+  while (n < budget && c.state.tick < limit && c.ls.step(c.state, now, (inputs) => stepRace(c.state, TRACK, inputs))) { n++; if (anyHumanDrifting(c.state)) c.drifted++; }
   return n;
 }
 
@@ -121,6 +129,39 @@ describe('lockstep em rede simulada', () => {
       expect(clients.reduce((a, c) => a + c.ls.stats.stalls, 0)).toBeGreaterThan(0);
     }, 60_000);
   }
+
+  it('o bit de derrapar atravessa a rede: todos os clientes derrapam os mesmos ticks e chegam ao mesmo hash (3 clientes, atraso e reordenação)', () => {
+    const net = new Net(createRng(2024), 5);
+    const seats = [0, 1, 2];
+    const clients = seats.map((s) => makeClient(net, s, [s], seats, config(3)));
+    runAll(net, clients, 2400);
+    for (const c of clients) {
+      expect(c.state.tick).toBe(2400);
+      expect(c.drifted, `cliente ${c.id} nunca viu um humano derrapar`).toBeGreaterThan(100);
+      expect(c.drifted).toBe(clients[0].drifted);
+      expect(hashRace(c.state)).toBe(hashRace(clients[0].state));
+      expect(c.desyncs).toEqual([]);
+    }
+  }, 60_000);
+
+  it('derrapar é nível, não borda: fica nos envios seguintes até o jogador soltar (e o bit 32 é o que sai)', () => {
+    const state = createRace(config(1), TRACK);
+    const sent: InputRecord[] = [];
+    const ls = new Lockstep({ seats: [0], localSeats: [0], delay: 2 }, { sendInputs: (r) => sent.push(...r), sendHash: () => undefined });
+    const run = (inputs: PlayerInput[]) => stepRace(state, TRACK, inputs);
+    const hold: PlayerInput = { steer: 0.5, throttle: true, brake: false, nitro: false, gearUp: false, gearDown: false, drift: true };
+    ls.setLocalInput(0, hold);
+    for (let i = 0; i < 6; i++) ls.step(state, i * 16, run);
+    const withDrift = sent.filter((r) => r.tick >= 2 && r.tick <= 7);
+    expect(withDrift.length).toBeGreaterThanOrEqual(6);
+    for (const r of withDrift) expect(r.bits & 32, `tick ${r.tick}`).toBe(32);
+    ls.setLocalInput(0, { ...hold, drift: false });
+    const before = sent.length;
+    for (let i = 6; i < 12; i++) ls.step(state, i * 16, run);
+    const after = sent.slice(before);
+    expect(after.length).toBeGreaterThan(0);
+    for (const r of after) expect(r.bits & 32, `tick ${r.tick}`).toBe(0);
+  });
 
   it('pacote de entrada perdido não trava a corrida para sempre: quem está parado reenvia o recente', () => {
     const net = new Net(createRng(77), 3, 0, 0.08);
@@ -276,6 +317,34 @@ describe('lockstep em rede simulada', () => {
     c2.ls.ingest(snap.inputs);
     runAll(net, [a, b, c2], 3000);
     for (const x of [a, b, c2]) expect(x.state.tick).toBe(3000);
+    expect(hashRace(c2.state)).toBe(hashRace(a.state));
+    expect(hashRace(b.state)).toBe(hashRace(a.state));
+    expect([...a.desyncs, ...b.desyncs, ...c2.desyncs]).toEqual([]);
+  }, 60_000);
+
+  it('reconexão por snapshot no MEIO de uma derrapagem: o estado serializado leva a derrapagem e todos terminam com o mesmo hash', () => {
+    const net = new Net(createRng(21), 5);
+    const cfg = config(3);
+    const [a, b, c] = [0, 1, 2].map((s) => makeClient(net, s, [s], [0, 1, 2], cfg));
+    // Anda até algum carro estar derrapando com carga (a derrapagem do piloto de teste dura ~65 quadros).
+    let limit = 300;
+    do { runAll(net, [a, b, c], limit); limit += 5; } while (!a.state.cars.some((x) => x.seat >= 0 && (x.driftCharge ?? 0) > 20) && limit < 3000);
+    expect(limit, 'nenhum carro carregou uma derrapagem').toBeLessThan(3000);
+    c.online = false;
+    net.deliver(true);
+    runAll(net, [a, b], limit + 400, 300);
+    expect(a.ls.missingSeats()).toEqual([2]);
+    const snap = { tick: a.state.tick, state: serializeRace(a.state), inputs: a.ls.bufferedRecords(), ai: a.ls.aiList() };
+    const c2 = makeClient(net, 2, [2], [0, 1, 2], cfg);
+    net.clients.splice(net.clients.indexOf(c), 1);
+    c2.state = deserializeRace(snap.state);
+    c2.ls = new Lockstep({ seats: [0, 1, 2], localSeats: [2], delay: 3, startTick: snap.tick }, {
+      sendInputs: (records) => net.send({ kind: 'i', from: 2, records }),
+      sendHash: (tick, hash) => net.send({ kind: 'h', from: 2, tick, hash }),
+    });
+    c2.ls.onDesync = (r) => c2.desyncs.push(r);
+    c2.ls.ingest(snap.inputs);
+    runAll(net, [a, b, c2], limit + 1500);
     expect(hashRace(c2.state)).toBe(hashRace(a.state));
     expect(hashRace(b.state)).toBe(hashRace(a.state));
     expect([...a.desyncs, ...b.desyncs, ...c2.desyncs]).toEqual([]);

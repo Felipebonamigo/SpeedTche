@@ -9,6 +9,15 @@
 // não bate em ninguém e não tem IA. Por isso PHYSICS_REVISION não subiu: ela anda presa a esse hash, e as constantes
 // novas já renovam sozinhas a impressão de toda volta (fantasmas e recordes antigos viram "outra versão").
 //
+// Onda M, M1 (derrapagem, 10/10/2026): as 8 impressões mudaram, por dois motivos que o relatório da M1 separa (docs/ondas/M/M1.md, §7).
+// (1) Os 4 campos novos do CarState (driftDir, driftTicks, driftCharge, driftBoostTicks) entram no serializeRace e no hashRace que o
+// fingerprintScenario mistura: mudam TODAS, inclusive o contra-relógio. Conferido tick a tick contra o 2ce0f48 com o hash "legado"
+// (a fórmula antiga do hashRace): contra-relogio, solo-sem-assistencias (Copacabana) e versus-cambio-manual (Noite em Sampa) têm o
+// hash legado IDÊNTICO nos 7768, 7812 e 9520 ticks — nelas a IA nunca derrapa (curvas de menos de 18 segmentos) e quem não derrapa
+// anda bit a bit como antes. (2) Nas outras 5 a IA passa a derrapar nas curvas fortes compridas: o hash legado diverge no tick da
+// primeira derrapagem de uma IA (coop4-tudo 848, escolta 887, revezamento 939, tomada-pela-ia 859, sem-personalidades 641).
+// PHYSICS_REVISION subiu de 1 para 2 junto com o contra-relógio (o teste lá embaixo prende os dois).
+//
 // Mudou a jogabilidade DE PROPÓSITO (constante, IA, física)? Aí o hash muda e é esperado: rode
 // `npx tsx scripts/perf-sim.ts --fingerprints`, confira que só mudaram as corridas que deviam e atualize.
 import { describe, expect, it } from 'vitest';
@@ -24,14 +33,14 @@ import { PHYSICS_REVISION } from '../src/game/content-version';
 // Onda K (K5): Copacabana com o Cristo em traço de cartum (`bend`), e as placas de curva só em curva forte de ≥ 12
 // segmentos — Noite em Sampa (quinas de 8–9) perdeu as placas. Só as duas corridas delas mudaram.
 const EXPECTED: Record<string, { fingerprint: string; ticks: number }> = {
-  'solo-sem-assistencias': { fingerprint: '368c98f8', ticks: 7812 },
-  'coop4-tudo': { fingerprint: '4aebaa41', ticks: 7860 },
-  'versus-cambio-manual': { fingerprint: '56beefb8', ticks: 9520 },
-  escolta: { fingerprint: 'a44eeff9', ticks: 8491 },
-  revezamento: { fingerprint: 'ca459552', ticks: 11597 },
-  'tomada-pela-ia': { fingerprint: 'a7cca80f', ticks: 8910 },
-  'contra-relogio': { fingerprint: '89f654e0', ticks: 7768 },
-  'sem-personalidades': { fingerprint: '0b8c4a83', ticks: 9887 },
+  'solo-sem-assistencias': { fingerprint: '641c7ff0', ticks: 7812 },
+  'coop4-tudo': { fingerprint: 'b88f085d', ticks: 7867 },
+  'versus-cambio-manual': { fingerprint: '63d22337', ticks: 9520 },
+  escolta: { fingerprint: 'a41e7b06', ticks: 8491 },
+  revezamento: { fingerprint: '708033c1', ticks: 11728 },
+  'tomada-pela-ia': { fingerprint: '697f585e', ticks: 8819 },
+  'contra-relogio': { fingerprint: '9a2e40b9', ticks: 7768 },
+  'sem-personalidades': { fingerprint: '965b5b9c', ticks: 9808 },
 };
 
 describe('corridas de referência (impressão digital fixa)', () => {
@@ -50,7 +59,7 @@ describe('corridas de referência (impressão digital fixa)', () => {
   // O contra-relógio de referência é o carro sozinho na pista (sem IA): se o hash dele mudou, a física de quem pilota
   // mudou, e um fantasma ou recorde gravado antes pode ter ficado impossível. As constantes, o carro e o traçado já
   // entram na impressão da volta; mudança só de CÓDIGO não entra — por isso a revisão manual anda presa a este hash.
-  const PHYSICS_REVISION_AT = { revision: 1, contraRelogio: '89f654e0' };
+  const PHYSICS_REVISION_AT = { revision: 2, contraRelogio: '9a2e40b9' };
   it('a revisão da física dos fantasmas e recordes anda junto com o contra-relógio de referência', () => {
     expect(
       { revision: PHYSICS_REVISION, contraRelogio: EXPECTED['contra-relogio'].fingerprint },

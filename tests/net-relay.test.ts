@@ -93,6 +93,9 @@ class FakeHost implements OnlineHost {
   exited = false;
   /** hashRace a cada 60 ticks, tirado do estado deste "computador". */
   readonly hashes = new Map<number, number>();
+  /** Ticks em que algum humano deste "computador" estava derrapando (o bit atravessou o relay e chegou à simulação). */
+  drifted = 0;
+  private countDrift(state: RaceState): void { if (state.cars.some((c) => c.seat >= 0 && (c.driftDir ?? 0) !== 0)) this.drifted++; }
   constructor(name: string) { this.save.seatNames = [name, `${name}2`, 'P3', 'P4']; this.settings.serverUrl = `ws://127.0.0.1:${port}`; }
   startRace(config: RaceConfig, localSeats: number[], driver: RaceDriver, state?: RaceState): void {
     const track = getTrack(config.trackId);
@@ -118,6 +121,7 @@ class FakeHost implements OnlineHost {
     for (const seat of r.localSeats) local[seat] = autopilot(r.state, r.track, seat);
     const n = r.driver.advance(dt, local, (inputs) => {
       stepRace(r.state, r.track, inputs);
+      this.countDrift(r.state);
       if (r.state.tick % 60 === 0) this.hashes.set(r.state.tick, hashRace(r.state));
     });
     if (r.state.phase === 'finished' && !r.reported) {
@@ -153,6 +157,7 @@ class FakeHost implements OnlineHost {
     for (const seat of r.localSeats) local[seat] = pilot(seat, r.state.tick);
     return r.driver.force(Math.max(0, Math.min(max, limit - r.state.tick)), local, (inputs) => {
       stepRace(r.state, r.track, inputs);
+      this.countDrift(r.state);
       if (r.state.tick % 60 === 0) this.hashes.set(r.state.tick, hashRace(r.state));
     });
   }
@@ -169,7 +174,10 @@ function autopilot(state: RaceState, track: Track, seat: number): PlayerInput {
 
 function pilot(seat: number, tick: number): PlayerInput {
   const phase = (tick + seat * 41) % 200;
-  return { steer: phase < 70 ? 0.42 : phase < 140 ? -0.33 : 0, throttle: true, brake: phase > 190, nitro: tick % 500 === 250 + seat, gearUp: false, gearDown: false };
+  return {
+    steer: phase < 70 ? 0.42 : phase < 140 ? -0.33 : 0, throttle: true, brake: phase > 190, nitro: tick % 500 === 250 + seat, gearUp: false, gearDown: false,
+    drift: phase >= 10 && phase < 65,
+  };
 }
 
 /**
@@ -260,6 +268,31 @@ describe.skipIf(!HAS_WS)('relay (mensagens cruas)', () => {
     c.send({ t: 'join', v: 1, room, seats: 1, info: INFO('Caio') });
     expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'started' });
     for (const x of [a, b, c]) x.ws.close();
+  });
+
+  it('aceita a faixa de versões do protocolo (1 e 2) em create, join e rejoin; as de fora dão "version"', async () => {
+    const a = await raw();
+    for (const v of [0, 3, 99, -1, 1.5, '2', null]) {
+      a.send({ t: 'create', v, seats: 1, info: INFO('x') });
+      expect(await a.next(isT('error')), `create v=${String(v)}`).toEqual({ t: 'error', code: 'version' });
+    }
+    a.send({ t: 'create', v: 2, seats: 1, info: INFO('Ana') });
+    const room = String((await a.next(isT('welcome'))).room);
+    // Um cliente da v1 entra na sala de um da v2: o relay só confere a faixa (quem separa conteúdos diferentes é o `b`).
+    const b = await raw();
+    b.send({ t: 'join', v: 1, room, seats: 1, info: INFO('Bia') });
+    expect((await b.next(isT('welcome'))).id).toBe(1);
+    const c = await raw();
+    c.send({ t: 'join', v: 3, room, seats: 1, info: INFO('Caio') });
+    expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'version' });
+    // rejoin: a versão é conferida antes de procurar a sala.
+    c.send({ t: 'rejoin', v: 3, room, token: 'a1b2c3d4e5f6' });
+    expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'version' });
+    c.send({ t: 'rejoin', v: 2, room: 'ZZZZZ', token: 'a1b2c3d4e5f6' });
+    expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'no_room' });
+    c.send({ t: 'rejoin', v: 1, room: 'ZZZZZ', token: 'a1b2c3d4e5f6' });
+    expect(await c.next(isT('error'))).toEqual({ t: 'error', code: 'no_room' });
+    a.ws.close(); b.ws.close(); c.ws.close();
   });
 
   it('só junta na mesma sala quem tem o mesmo conteúdo: impressão diferente é recusada com "build"', async () => {
@@ -438,6 +471,11 @@ describe.skipIf(!HAS_WS)('duas sessões online completas pelo relay', () => {
     const bCars = ha.race!.state.cars.filter((c) => c.seat === 1 || c.seat === 2);
     expect(bCars.every((c) => c.ai !== null)).toBe(true);
     expect(ha.race?.state.tick).toBe(1500);
+
+    // O piloto automático (o cérebro da IA) dirige os humanos e aperta derrapar nas curvas fortes: o bit atravessou o relay
+    // nos dois computadores (B, depois do snapshot, conta só o que rodou depois dele).
+    expect(ha.drifted, 'A viu algum humano derrapar').toBeGreaterThan(0);
+    expect(hb.drifted, 'B viu algum humano derrapar').toBeGreaterThan(0);
 
     A.leave();
     expect(ha.exited).toBe(true);

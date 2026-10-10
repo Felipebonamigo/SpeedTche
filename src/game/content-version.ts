@@ -66,7 +66,12 @@ export function onlineFingerprint(): string {
  * já entram na impressão sozinhos. `tests/sim-golden.test.ts` prende esta revisão ao hash do contra-relógio de
  * referência (o carro sozinho na pista): mudou um sem o outro, o teste falha.
  */
-export const PHYSICS_REVISION = 1;
+export const PHYSICS_REVISION = 2;
+// Revisão 2 (onda M, M1): a derrapagem (physics.ts: estado, centrífuga ×0,55, volante puxando para dentro, perda de velocidade,
+// carga e impulso; ai.ts e assist.ts: a IA e a direção assistida derrapam). As constantes novas já renovavam a impressão de toda
+// volta sozinhas; a revisão torna isso explícito e cobre a próxima mudança só de código. O contra-relógio de referência (carro
+// sozinho, sem derrapar) anda bit a bit como na revisão 1 — o que mudou no hash dele são só os 4 campos novos do CarState.
+
 
 /** Impressão bem formada (8 dígitos hex minúsculos). */
 export function isFingerprint(v: unknown): v is string {

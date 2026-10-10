@@ -20,7 +20,7 @@ function blankCar(config: RaceConfig, id: number, seat: number, name: string, te
   return {
     id, seat, name, teamId, carId, z: 0, x: 0, speed: 0, gear: 0, fuel: 1, nitroLeft: stats.nitro, nitroTicks: 0,
     lap: 1, lapTicks: [], lapStartTick: 0, finished: false, finishTick: -1, position: id + 1, progress: 0,
-    inPit: false, collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, ai: null, stats,
+    inPit: false, collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, driftBoostTicks: 0, ai: null, stats,
   };
 }
 

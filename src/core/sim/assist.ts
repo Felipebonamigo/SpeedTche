@@ -7,13 +7,17 @@
 //   full  — as duas coisas e o volante inteiro (faixa, desvio, box): o jogador só acelera e usa nitro.
 // O jogador sempre por cima: o freio dele vale sempre, o volante dele sobrepõe o da assistência,
 // e acelerar (e o nitro) é sempre dele — a assistência só tira velocidade, nunca põe.
+// Derrapagem (M1): `steer` e `full` derrapam sozinhas nas curvas fortes compridas, pela mesma regra da IA (ai.ts: wantsDrift),
+// porque o volante é delas; em `brake` o volante e a derrapagem são do jogador, e o freio automático só passa a contar com o
+// limite da derrapagem quando ele derrapa (senão frearia como se a curva fosse mais forte do que é). O botão do jogador vale
+// em qualquer nível e a assistência nunca o desfaz.
 import {
-  ASSIST_EDGE_GAIN, ASSIST_EDGE_X, ASSIST_GRIP_BRAKE, ASSIST_GRIP_FULL, ASSIST_GRIP_STEER, ASSIST_LANE_LIMIT,
-  ASSIST_LOOKAHEAD, ASSIST_STEER_DEADZONE, SEGMENT_LENGTH,
+  AI_DRIFT_CORNER_GAIN, AI_DRIFT_MIN_SEGMENTS, ASSIST_EDGE_GAIN, ASSIST_EDGE_X, ASSIST_GRIP_BRAKE, ASSIST_GRIP_FULL, ASSIST_GRIP_STEER,
+  ASSIST_LANE_LIMIT, ASSIST_LOOKAHEAD, ASSIST_STEER_DEADZONE, DRIFT_ENTRY_STEER, SEGMENT_LENGTH,
 } from '../constants';
 import { segmentAt } from '../track/builder';
 import type { AssistLevel, CarState, PlayerInput, RaceState, Track } from '../types';
-import { brakingTarget, counterSteer, nearestAhead } from './ai';
+import { brakingTarget, counterSteer, nearestAhead, wantsDrift } from './ai';
 import { distanceToFinish, fuelToSkipPit, PIT_LOOKAHEAD } from './fuel';
 import { PIT_LANE_X } from './physics';
 import { carStats } from './stats';
@@ -66,13 +70,22 @@ export function assistInput(state: RaceState, track: Track, car: CarState, playe
   // ── Freio automático: o ponto de frenagem da IA, com margem maior se quem esterça é o jogador.
   // O volante assistido sozinho só freia onde nem o volante todo seguraria a curva.
   const grip = level === 'brake' ? ASSIST_GRIP_BRAKE : full ? ASSIST_GRIP_FULL : ASSIST_GRIP_STEER;
-  const target = brakingTarget(track, car.z, def, grip, ASSIST_LOOKAHEAD + Math.floor(sf * 30), 2) * def.topSpeed;
+  // Derrapagem: a assistência que esterça (steer, full) derrapa sozinha longe do box, como a IA, e freia contando com ela; em
+  // `brake` o limite da derrapagem só vale inteiro quando o jogador a aperta ou já derrapa.
+  const pitNear = car.inPit || seg.pit || segmentAt(track, car.z + PIT_LOOKAHEAD).pit;
+  const steers = level !== 'brake';
+  const auto = steers && !pitNear && wantsDrift(track, car, def);
+  if (auto) out.drift = true;
+  let driftGain = 0; let driftMinRun = 0;
+  if (steers) { if (!pitNear) { driftGain = AI_DRIFT_CORNER_GAIN; driftMinRun = AI_DRIFT_MIN_SEGMENTS; } }
+  else if (player.drift === true || car.driftDir !== 0) driftGain = 1;
+  const target = brakingTarget(track, car.z, def, grip, ASSIST_LOOKAHEAD + Math.floor(sf * 30), 2, driftGain, driftMinRun) * def.topSpeed;
   if (car.speed > target * 1.08) { out.throttle = false; out.brake = true; }
   else if (car.speed > target) out.throttle = false;
   if (level === 'brake') return out;
 
   // ── Volante: contra-esterço da curva + borda; na completa, a faixa quando o jogador solta.
-  const counter = counterSteer(def, sf, seg.curve);
+  const counter = counterSteer(def, sf, seg.curve, car.driftDir);
   const playerSteers = Math.abs(player.steer) > ASSIST_STEER_DEADZONE;
   // Box: no trecho dele, a borda direita fica aberta para quem vai (ou já está) para lá.
   const pit = full && wantsPit(state, track, car, def.fuelPerUnit);
@@ -97,5 +110,10 @@ export function assistInput(state: RaceState, track: Track, car: CarState, playe
     steer = player.steer + counter;
   }
   out.steer = clamp(steer + edgeGuard(car.x, openRight), -1, 1);
+  // Na entrada da derrapagem automática o volante vai ao menos ao mínimo de entrada, para o lado da curva.
+  if (auto && car.driftDir === 0) {
+    const side = seg.curve > 0 ? 1 : -1;
+    if (out.steer * side < DRIFT_ENTRY_STEER) out.steer = side * DRIFT_ENTRY_STEER;
+  }
   return out;
 }

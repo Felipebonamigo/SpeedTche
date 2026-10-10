@@ -121,6 +121,38 @@ const humans: HumanEntry[] = [
   { seat: 1, name: 'Bia', carId: 'tornado', teamId: 0, color: '#fff' },
 ];
 
+// Onda M, M1: a derrapagem muda a física de quem corre (constantes novas, IA, assistência, estado). Os valores abaixo são
+// os de 2ce0f48, ANTES da M1: um recorde ou fantasma gravado com eles tem de virar "versão anterior" (docs/ondas/M/M1.md, §4.7).
+describe('a derrapagem renova as versões (M1)', () => {
+  const BEFORE = { revision: 1, lap: '91f7285b', lapRota66Trovao: '9b8a49fc', online: '9f6ec609' };
+
+  it('a revisão da física subiu: 1 → 2 (presa ao hash do contra-relógio pelo sim-golden)', () => {
+    expect(BEFORE.revision).toBe(1);
+    expect(PHYSICS_REVISION).toBe(2);
+    expect(lapContent('copacabana', 'falcao')).toMatchObject({ physics: 2 });
+  });
+
+  it('a impressão de uma volta mudou, em qualquer pista e carro: recorde e fantasma de antes viram "versão anterior"', () => {
+    expect(lapFingerprint('copacabana', 'falcao')).not.toBe(BEFORE.lap);
+    expect(lapFingerprint('rota_66', 'trovao')).not.toBe(BEFORE.lapRota66Trovao);
+    const old: BestLap = { ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-01', fp: BEFORE.lap };
+    expect(recordFromOtherVersion(old, 'copacabana')).toBe(true);
+    // O recorde feito agora é desta versão; e nenhum é apagado (a marca é só aviso).
+    expect(recordFromOtherVersion({ ...old, fp: lapFingerprint('copacabana', 'falcao') as string }, 'copacabana')).toBe(false);
+  });
+
+  it('a impressão do online mudou (protocolo 2 e as constantes da derrapagem): um build novo não entra na sala de um velho', () => {
+    expect(onlineFingerprint()).not.toBe(BEFORE.online);
+    expect(fingerprintContent()).toMatchObject({ protocol: 2 });
+  });
+
+  it('a revisão da física, sozinha, já muda a impressão da volta (cobre a mudança só de código)', () => {
+    const content = lapContent('copacabana', 'falcao');
+    expect(content).not.toBeNull();
+    expect(contentFingerprint({ ...content, physics: PHYSICS_REVISION - 1 })).not.toBe(lapFingerprint('copacabana', 'falcao'));
+  });
+});
+
 describe('recordes guardam a impressão (nenhum é apagado)', () => {
   it('recorde novo leva a impressão da pista e do carro de quem fez', () => {
     const save = sanitizeSave({});

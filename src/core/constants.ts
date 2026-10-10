@@ -57,6 +57,39 @@ export const NITRO_DURATION_TICKS = 150;  // 2,5 s
 export const NITRO_SPEED_MULT = 1.28;
 export const NITRO_ACCEL_MULT = 2.2;
 
+/*
+ * Derrapagem (onda M, frente M1; o design e a razão de cada número estão em docs/ondas/M/M1.md). Segura-se o botão com o
+ * volante para um lado, numa velocidade boa: o carro "desliza" — a centrífuga cai a ×0,55, o volante puxa para dentro e a
+ * velocidade perde um pouco —, a carga sobe em 3 níveis enquanto ele está numa curva forte do mesmo lado, e soltar dá um
+ * impulso menor que o nitro. Constantes de AJUSTE FINO (o balance é que as acerta): DRIFT_DRAG_PER_SECOND e
+ * AI_DRIFT_CORNER_GAIN; as outras são o contrato do cronograma.
+ */
+/** Entra na derrapagem com velocidade a partir desta fração da máxima do carro… */
+export const DRIFT_MIN_SPEED_FACTOR = 0.45;
+/** …e se mantém até cair abaixo desta (histerese: a perda de velocidade da própria derrapagem não a cancela na borda). */
+export const DRIFT_KEEP_SPEED_FACTOR = 0.35;
+/** |volante| mínimo para entrar; o lado da derrapagem é o sinal do volante. Segurar o botão com o volante no meio não entra. */
+export const DRIFT_ENTRY_STEER = 0.3;
+/** Enquanto derrapa, a força centrífuga da curva vale esta fração. */
+export const DRIFT_CENTRIFUGAL_MULT = 0.55;
+/** Enquanto derrapa, o volante efetivo ganha isto para o lado da derrapagem ("puxa para dentro"); esterçar contra anula. */
+export const DRIFT_PULL = 0.4;
+/** Perda de velocidade enquanto derrapa: fração da velocidade máxima por segundo (pequena: ~12 km/h/s num carro de 300 km/h). */
+export const DRIFT_DRAG_PER_SECOND = 0.04;
+/** A carga só sobe com o segmento nesta curva (|curva|) ou mais, para o lado da derrapagem. */
+export const DRIFT_CHARGE_MIN_CURVE = 1.0;
+/** Carga (ticks derrapando em curva forte) para o nível 1 (azul), 2 (laranja) e 3 (roxa): 0,75 s, 1,67 s e 2,67 s. */
+export const DRIFT_LEVEL_TICKS: readonly number[] = [45, 100, 160];
+/** Impulso ao soltar, por nível: 0,5, 1,0 e 1,5 s (o nitro dura 2,5 s). */
+export const DRIFT_BOOST_TICKS: readonly number[] = [30, 60, 90];
+/**
+ * Durante o impulso: velocidade máxima e aceleração, as duas menores que as do nitro (1,28 e 2,2). Sem multiplicador de
+ * consumo próprio (o nitro tem 1,6): a velocidade maior já gasta mais por tick, e com um ×1,3 a antecedência do aviso de
+ * combustível do jogador de pé no fundo caía de 0,10 para 0,09 volta em 4 pistas (tests/fuel.test.ts).
+ */
+export const DRIFT_BOOST_SPEED_MULT = 1.12;
+export const DRIFT_BOOST_ACCEL_MULT = 1.8;
+
 export const GEAR_COUNT = 5;
 /** Fração da velocidade máxima que cada marcha alcança (manual). */
 export const GEAR_TOP = [0.22, 0.42, 0.62, 0.82, 1.0];
@@ -167,6 +200,28 @@ export const UPGRADE_NITRO_CHARGES = 1;
 // mora em data/drivers.ts (PERSONALITY_TUNING).
 /** Curva a partir da qual a IA freia para ela (sim/ai.ts); abaixo disto o trecho é reta para ela. */
 export const AI_BRAKE_CURVE = 1.5;
+/**
+ * A IA e a direção assistida só derrapam num trecho de curva forte (≥ AI_BRAKE_CURVE, do mesmo lado) de pelo menos este
+ * tamanho em segmentos: o necessário para a carga chegar ao 1º nível (DRIFT_LEVEL_TICKS[0] = 45 ticks a ~0,8 da máxima ≈ 18
+ * segmentos). Com 10 (o 1º palpite do cartão), medido em 10 pistas: 20% das derrapagens da IA acabavam sem impulso — perdiam
+ * velocidade (DRIFT_DRAG_PER_SECOND) sem nada em troca, e em Copacabana e Noite em Sampa (curvas de 10 a 17 segmentos) nenhuma
+ * dava impulso. O quartil baixo das 109 pistas tem 7 segmentos, a mediana 43.
+ */
+export const AI_DRIFT_MIN_SEGMENTS = 18;
+/** A IA solta o botão (e leva o impulso) quando faltam menos que isto segmentos do trecho, ou a curva troca de lado. */
+export const AI_DRIFT_RELEASE_SEGMENTS = 3;
+/**
+ * Quanto do ganho de aderência da derrapagem a IA e a direção assistida (steer, full) usam ao decidir a velocidade das curvas:
+ * 0 = freiam como sem derrapar, 1 = usam tudo (holdableSpeedFraction com ×0,55). É o botão de RITMO da frente e fica em 0
+ * (provisório, a calibragem final é da O2), pelo que o `npm run balance -- corrida profissional 11 12 13` mediu (109 pistas,
+ * média das sementes; docs/ondas/M/M1.md, §11): com 0,6 a IA ficava ~7% mais rápida e as ultrapassagens por minuto caíam 6%
+ * (todo carro passa a segurar a curva forte, o handling deixa de separar o grid); com 0,25, −4,0% de volta e −2% de
+ * ultrapassagens; com 0 o ritmo não muda (volta −0,2%), as batidas traseiras caem ~11% e a derrapagem da IA é só o impulso na
+ * saída das curvas. Quem ganha a aderência é o jogador que derrapa (o botão do jogador vale o ganho inteiro).
+ */
+export const AI_DRIFT_CORNER_GAIN = 0;
+/** Só usa o limite com derrapagem se ele deixar a IA com velocidade para entrar nela (DRIFT_MIN_SPEED_FACTOR e uma folga). */
+export const AI_DRIFT_LIMIT_MIN = DRIFT_MIN_SPEED_FACTOR + 0.1;
 /** Faixa lateral mais longe do centro que a IA usa para ultrapassar (sim/ai.ts). */
 export const AI_PASS_LANE_MAX = 0.7;
 /**

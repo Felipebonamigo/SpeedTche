@@ -12,7 +12,13 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 
-export const PROTOCOL_VERSION = 1;
+/**
+ * Versões do protocolo que o relay aceita: a FAIXA MIN_PROTOCOL_VERSION … PROTOCOL_VERSION (um relay novo atende clientes
+ * velhos sem redeploy casado). A v2 (onda M, M1) só acrescentou o bit de derrapar na entrada, que o relay nem lê. Quem separa
+ * jogos de conteúdo diferente na mesma sala é `b` (a impressão do conteúdo, que já leva a versão do protocolo).
+ */
+export const MIN_PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 /** Impressão do conteúdo do jogo (`b` no create/join): texto curto e opaco para o relay. */
 const BUILD_MAX = 64;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -46,6 +52,7 @@ export const DEFAULTS = Object.freeze({
 });
 
 const isInt = (v, min, max) => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
+const validVersion = (v) => isInt(v, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION);
 const validBuild = (v) => v === undefined || (typeof v === 'string' && v.length <= BUILD_MAX);
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -136,7 +143,7 @@ export function startRelay(options = {}) {
         return true;
       case 'create': {
         if (room) return false;
-        if (msg.v !== PROTOCOL_VERSION) { send(ws, { t: 'error', code: 'version' }); return true; }
+        if (!validVersion(msg.v)) { send(ws, { t: 'error', code: 'version' }); return true; }
         if (!isInt(msg.seats, 1, o.maxLocalSeats) || !validInfo(msg.info) || !validBuild(msg.b)) return false;
         if (rooms.size >= o.maxRooms) { send(ws, { t: 'error', code: 'rooms' }); return true; }
         const code = newCode();
@@ -154,7 +161,7 @@ export function startRelay(options = {}) {
       }
       case 'join': {
         if (room) return false;
-        if (msg.v !== PROTOCOL_VERSION) { send(ws, { t: 'error', code: 'version' }); return true; }
+        if (!validVersion(msg.v)) { send(ws, { t: 'error', code: 'version' }); return true; }
         if (typeof msg.room !== 'string' || !isInt(msg.seats, 1, o.maxLocalSeats) || !validInfo(msg.info) || !validBuild(msg.b)) return false;
         const r = rooms.get(msg.room.toUpperCase());
         if (!r) { send(ws, { t: 'error', code: 'no_room' }); return true; }
@@ -172,7 +179,7 @@ export function startRelay(options = {}) {
       }
       case 'rejoin': {
         if (room) return false;
-        if (msg.v !== PROTOCOL_VERSION) { send(ws, { t: 'error', code: 'version' }); return true; }
+        if (!validVersion(msg.v)) { send(ws, { t: 'error', code: 'version' }); return true; }
         if (typeof msg.room !== 'string' || typeof msg.token !== 'string' || msg.token.length > 64) return false;
         const r = rooms.get(msg.room.toUpperCase());
         const c = r ? [...r.clients.values()].find((x) => x.token === msg.token) : undefined;
@@ -338,7 +345,7 @@ if (invokedDirectly) {
   });
   relay.wss.on('listening', () => {
     // O teste de integração lê a porta desta linha (com PORT=0 ela é sorteada pelo sistema).
-    console.log(`Speed Tchê relay ouvindo em ws://${env.HOST || DEFAULTS.host}:${relay.port()} (protocolo v${PROTOCOL_VERSION})`);
+    console.log(`Speed Tchê relay ouvindo em ws://${env.HOST || DEFAULTS.host}:${relay.port()} (protocolo v${MIN_PROTOCOL_VERSION}–v${PROTOCOL_VERSION})`);
   });
   const stop = () => { relay.close().then(() => process.exit(0)); };
   process.on('SIGINT', stop);

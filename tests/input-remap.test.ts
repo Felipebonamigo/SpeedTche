@@ -9,10 +9,10 @@ import { newRumbleMemory, RUMBLE_GRASS, rumbleCues } from '../src/game/rumble';
 import { sanitizeSettings } from '../src/game/settings';
 import { setLanguage } from '../src/i18n';
 import {
-  createInput, mapGamepad, mapKeyboard, nextRumble, rumbleMagnitudes, usedKeyCodes, USED_KEY_CODES,
+  createInput, mapGamepad, mapKeyboard, NAV_LAYOUTS, nextRumble, rumbleMagnitudes, usedKeyCodes, USED_KEY_CODES,
 } from '../src/ui/input';
 import {
-  assignBinding, BIND_ACTIONS, BIND_DEVICES, DEFAULT_BINDINGS, defaultBindings, isDefaultDevice, keyboardConflicts,
+  assignBinding, BIND_ACTIONS, BIND_DEVICES, DEFAULT_BINDINGS, defaultBindings, isBindableButton, isBindableKey, isDefaultDevice, keyboardConflicts,
   restoreDefaults, sanitizeBindings, type BindAction, type BindCode, type BindDevice, type ControlBindings,
 } from '../src/ui/remap/bindings';
 import { CAPTURE_SECONDS, captureButtons, captureKey, captureTick, startCapture } from '../src/ui/remap/capture';
@@ -42,13 +42,27 @@ function expectSound(b: ControlBindings): void {
 // ───────────────────────────── Padrão e saneamento ─────────────────────────────
 
 describe('bindings: padrão e saneamento', () => {
-  it('o padrão é o mapeamento de antes e é o das opções', () => {
-    expect(DEFAULT_BINDINGS.kb1).toEqual({ throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], pause: ['Escape'] });
-    expect(DEFAULT_BINDINGS.kb2).toEqual({ throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], pause: ['Escape'] });
-    expect(DEFAULT_BINDINGS.gamepad).toEqual({ throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [5], gearUp: [3], gearDown: [4], pause: [9] });
+  it('o padrão é o da decisão nº 9 (10 ações) e é o das opções', () => {
+    expect(DEFAULT_BINDINGS.kb1).toEqual({
+      throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'],
+      drift: ['ShiftRight'], lookBack: ['KeyB'], pause: ['Escape'],
+    });
+    expect(DEFAULT_BINDINGS.kb2).toEqual({
+      throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'],
+      drift: ['ShiftLeft'], lookBack: ['KeyR'], pause: ['Escape'],
+    });
+    // Controle: derrapar no RB (5), nitro no LB (4) e no Y (3), câmbio manual no D-pad ↑/↓ (12/13), olhar para trás no R3 (11).
+    expect(DEFAULT_BINDINGS.gamepad).toEqual({
+      throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9],
+    });
     expect(DEFAULT_SETTINGS.controls).toEqual(DEFAULT_BINDINGS);
     expect(DEFAULT_SETTINGS.vibration).toBe(true);
     expectSound(DEFAULT_BINDINGS);
+  });
+
+  it('são 10 ações: derrapar e olhar para trás entram antes da pausa', () => {
+    expect([...BIND_ACTIONS]).toEqual(['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'pause']);
+    for (const device of BIND_DEVICES) expect(Object.keys(DEFAULT_BINDINGS[device]).sort(), device).toEqual([...BIND_ACTIONS].sort());
   });
 
   it('o padrão é imutável e o saneamento devolve cópias novas', () => {
@@ -85,7 +99,7 @@ describe('bindings: padrão e saneamento', () => {
     const b = sanitizeBindings({ kb1: { nitro: ['Escape'], pause: ['KeyP'] }, gamepad: { nitro: [9], pause: [8] } });
     expect(b.kb1.nitro).toEqual(['Space']);
     expect(b.kb1.pause).toEqual(['KeyP']);
-    expect(b.gamepad.nitro).toEqual([5]);
+    expect(b.gamepad.nitro).toEqual([4, 3]);
     expect(b.gamepad.pause).toEqual([8]);
   });
 
@@ -119,6 +133,123 @@ describe('bindings: padrão e saneamento', () => {
     expect(sanitizeSettings({ vibration: 'sim' }).vibration).toBe(true);
     // O que foi gravado sobrevive a um ciclo JSON.
     expect(sanitizeSettings(JSON.parse(JSON.stringify(s)))).toEqual(s);
+  });
+});
+
+// ───────────────────────────── M1: conflito kb1 × kb2 e migração dos mapas salvos ─────────────────────────────
+
+/** O mapeamento de ANTES da M1 (8 ações), como o `Settings.controls` o gravava. */
+const LEGACY_KB1 = { throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], pause: ['Escape'] };
+const LEGACY_KB2 = { throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], pause: ['Escape'] };
+const LEGACY_PAD = { throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [5], gearUp: [3], gearDown: [4], pause: [9] };
+const LEGACY = { kb1: LEGACY_KB1, kb2: LEGACY_KB2, gamepad: LEGACY_PAD };
+/** O gamepad padrão novo, por extenso (não pelo DEFAULT_BINDINGS: um teste que compara o código com ele mesmo não prova nada). */
+const NEW_PAD = { throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9] };
+
+describe('derrapar e olhar para trás: conflito entre os teclados', () => {
+  it('o padrão não tem conflito kb1 × kb2: Shift direito × Shift esquerdo, e nenhuma tecla repetida (menos Esc)', () => {
+    expect(keyboardConflicts(DEFAULT_BINDINGS)).toEqual([]);
+    expect(DEFAULT_BINDINGS.kb1.drift).toEqual(['ShiftRight']);
+    expect(DEFAULT_BINDINGS.kb2.drift).toEqual(['ShiftLeft']);
+    const k1 = new Set(BIND_ACTIONS.flatMap((a) => DEFAULT_BINDINGS.kb1[a]));
+    const shared = BIND_ACTIONS.flatMap((a) => DEFAULT_BINDINGS.kb2[a]).filter((c) => k1.has(c));
+    expect(shared).toEqual(['Escape']);
+    expect(isBindableKey('ShiftLeft', 'drift')).toBe(true);
+    expect(isBindableKey('ShiftRight', 'drift')).toBe(true);
+  });
+
+  it('ligar a mesma tecla de derrapar nos dois teclados é avisado (não bloqueado) e some ao restaurar', () => {
+    const b = assign(DEFAULT_BINDINGS, 'kb1', 'drift', 'ShiftLeft');
+    expect(b.kb1.drift).toEqual(['ShiftLeft']);
+    expect(b.kb2.drift).toEqual(['ShiftLeft']);
+    expect(keyboardConflicts(b)).toEqual([{ code: 'ShiftLeft', kb1: 'drift', kb2: 'drift' }]);
+    expectSound(b);
+    expect(keyboardConflicts(restoreDefaults(b, 'kb1'))).toEqual([]);
+  });
+
+  it('as teclas novas não são teclas de navegação dos menus (seriam roubadas do jogo)', () => {
+    const nav = new Set(Object.values(NAV_LAYOUTS).flatMap((l) => Object.values(l).flat()));
+    for (const kb of ['kb1', 'kb2'] as const) for (const a of ['drift', 'lookBack'] as const) for (const c of DEFAULT_BINDINGS[kb][a]) expect(nav.has(c), `${kb}.${a}=${c}`).toBe(false);
+  });
+
+  it('R3 (11) vale para olhar para trás e RB (5) para derrapar; Start (9) continua só na pausa', () => {
+    expect(isBindableButton(11, 'lookBack')).toBe(true);
+    expect(isBindableButton(5, 'drift')).toBe(true);
+    expect(isBindableButton(9, 'drift')).toBe(false);
+    expect(isBindableButton(9, 'lookBack')).toBe(false);
+  });
+});
+
+describe('migração dos mapas salvos de antes da M1 (8 ações)', () => {
+  it('um mapa antigo no padrão antigo vira o padrão novo: nitro no LB e no Y, marchas no D-pad, derrapar no RB', () => {
+    const b = sanitizeBindings(LEGACY);
+    expect(b.gamepad).toEqual(NEW_PAD);
+    expect(b.kb1.drift).toEqual(['ShiftRight']);
+    expect(b.kb1.lookBack).toEqual(['KeyB']);
+    expect(b.kb2.drift).toEqual(['ShiftLeft']);
+    expect(b.kb2.lookBack).toEqual(['KeyR']);
+    // Os teclados mantêm o que tinham.
+    expect(b.kb1.nitro).toEqual(['Space']);
+    expect(b.kb2.gearUp).toEqual(['KeyE']);
+    expectSound(b);
+    // Idempotente: o mapa já migrado (agora com `drift`) não migra de novo.
+    expect(sanitizeBindings(b)).toEqual(b);
+    expect(sanitizeBindings(JSON.parse(JSON.stringify(b)))).toEqual(b);
+  });
+
+  it('o que o jogador personalizou fica: só as ações ainda no padrão antigo migram', () => {
+    const a = sanitizeBindings({ ...LEGACY, gamepad: { ...LEGACY_PAD, nitro: [8] } }).gamepad;
+    expect(a).toEqual({ ...NEW_PAD, nitro: [8] });
+    const b = sanitizeBindings({ ...LEGACY, gamepad: { ...LEGACY_PAD, gearUp: [10] } }).gamepad;
+    expect(b).toEqual({ ...NEW_PAD, gearUp: [10] });
+    const c = sanitizeBindings({ ...LEGACY, kb1: { ...LEGACY_KB1, nitro: ['KeyJ'] } }).kb1;
+    expect(c.nitro).toEqual(['KeyJ']);
+    expect(c.drift).toEqual(['ShiftRight']);
+  });
+
+  it('um mapa que já tem `drift` não migra: o RB no nitro ali é escolha do jogador', () => {
+    const b = sanitizeBindings({ ...LEGACY, gamepad: { ...LEGACY_PAD, drift: [10], lookBack: [11] } }).gamepad;
+    expect(b.nitro).toEqual([5]);
+    expect(b.gearUp).toEqual([3]);
+    expect(b.gearDown).toEqual([4]);
+    expect(b.drift).toEqual([10]);
+    expect(b.lookBack).toEqual([11]);
+  });
+
+  it('o padrão da derrapagem tomado por outra ação do mapa antigo: ela fica com a tecla e a derrapagem ganha uma livre', () => {
+    const b = sanitizeBindings({ ...LEGACY, kb1: { ...LEGACY_KB1, nitro: ['ShiftRight'] } }).kb1;
+    expect(b.nitro).toEqual(['ShiftRight']);
+    expect(b.drift.length).toBe(1);
+    expect(b.drift).not.toEqual(['ShiftRight']);
+    expect(new Set(BIND_ACTIONS.flatMap((a) => b[a])).size).toBe(BIND_ACTIONS.flatMap((a) => b[a]).length);
+  });
+
+  it('pelo caminho real das opções: Settings.controls antigo migra', () => {
+    const s = sanitizeSettings({ controls: LEGACY });
+    expect(s.controls.gamepad).toEqual(NEW_PAD);
+    expect(s.controls.kb2.drift).toEqual(['ShiftLeft']);
+    expect(sanitizeSettings(JSON.parse(JSON.stringify(s)))).toEqual(s);
+  });
+
+  it('300 mapas antigos sorteados migram sem ação vazia nem código repetido, e ganham as 2 ações novas', () => {
+    let seed = 987654;
+    const next = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    const keyPool = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyM', 'KeyN', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyE', 'KeyQ', 'ShiftLeft', 'ShiftRight', 'KeyB', 'KeyR', 'KeyJ'];
+    const legacyActions = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'pause'];
+    for (let i = 0; i < 300; i++) {
+      const raw: Record<string, Record<string, BindCode[]>> = { kb1: {}, kb2: {}, gamepad: {} };
+      for (const device of BIND_DEVICES) {
+        for (const a of legacyActions) {
+          if (next(5) === 0) continue; // ação ausente do mapa gravado
+          const n = 1 + next(2);
+          raw[device][a] = Array.from({ length: n }, () => (device === 'gamepad' ? next(16) : keyPool[next(keyPool.length)]));
+        }
+      }
+      const b = sanitizeBindings(raw);
+      expectSound(b);
+      for (const device of BIND_DEVICES) { expect(b[device].drift.length, `${device}.drift`).toBeGreaterThan(0); expect(b[device].lookBack.length, `${device}.lookBack`).toBeGreaterThan(0); }
+      expect(sanitizeBindings(b)).toEqual(b);
+    }
   });
 });
 
@@ -253,12 +384,14 @@ describe('mapKeyboard / mapGamepad com bindings', () => {
   });
 
   it('as teclas que recebem preventDefault seguem os bindings', () => {
-    const b = assign(DEFAULT_BINDINGS, 'kb1', 'nitro', 'KeyR');
+    const b = assign(DEFAULT_BINDINGS, 'kb1', 'nitro', 'KeyJ');
     const used = usedKeyCodes(b);
-    expect(used.has('KeyR')).toBe(true);
+    expect(used.has('KeyJ')).toBe(true);
     for (const nav of ['ArrowUp', 'Enter', 'Space', 'Escape', 'Backspace', 'KeyW', 'KeyF']) expect(used.has(nav), nav).toBe(true);
     expect(used.has('KeyZ')).toBe(false);
-    expect(USED_KEY_CODES.has('KeyR')).toBe(false);
+    expect(USED_KEY_CODES.has('KeyJ')).toBe(false);
+    // Os Shifts (derrapar) e as teclas de olhar para trás também estão em uso por padrão.
+    for (const k of ['ShiftLeft', 'ShiftRight', 'KeyB', 'KeyR']) expect(USED_KEY_CODES.has(k), k).toBe(true);
   });
 });
 
@@ -478,7 +611,7 @@ function car(id: number, seat: number, over: Partial<CarState> = {}): CarState {
   return {
     id, seat, name: `c${id}`, teamId: 0, carId: 'falcao', z: 0, x: 0, speed: 3000, gear: 3, fuel: 1, nitroLeft: 3, nitroTicks: 0,
     lap: 1, lapTicks: [], lapStartTick: 0, finished: false, finishTick: 0, position: 1, progress: 0, inPit: false,
-    collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, ai: null, stats: effectiveStats(carDef('falcao')), ...over,
+    collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, driftBoostTicks: 0, ai: null, stats: effectiveStats(carDef('falcao')), ...over,
   };
 }
 function race(cars: CarState[], events: SimEvent[], tick = 500): RaceState {

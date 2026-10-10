@@ -1,7 +1,9 @@
 // Piloto de IA: decide o PlayerInput de um carro a cada tick a partir do que vê na pista.
 import {
-  AI_BRAKE_CURVE, AI_PASS_CLEARANCE, AI_PASS_LANE_MAX, AI_SIDE_LOOK, CAR_HALF_WIDTH, CAR_LENGTH, CATCHUP_DISTANCE, MISTAKE_BRAKE_LATE,
-  MISTAKE_CORNER_SPEED, MISTAKE_WIDE_SEGMENTS, MISTAKE_WIDE_X, RIVAL_SKILL_BONUS, SEGMENT_LENGTH,
+  AI_BRAKE_CURVE, AI_DRIFT_CORNER_GAIN, AI_DRIFT_LIMIT_MIN, AI_DRIFT_MIN_SEGMENTS, AI_DRIFT_RELEASE_SEGMENTS, AI_PASS_CLEARANCE,
+  AI_PASS_LANE_MAX, AI_SIDE_LOOK, CAR_HALF_WIDTH, CAR_LENGTH, CATCHUP_DISTANCE, DRIFT_CENTRIFUGAL_MULT, DRIFT_ENTRY_STEER,
+  DRIFT_MIN_SPEED_FACTOR, DRIFT_PULL, MISTAKE_BRAKE_LATE, MISTAKE_CORNER_SPEED, MISTAKE_WIDE_SEGMENTS, MISTAKE_WIDE_X, RIVAL_SKILL_BONUS,
+  SEGMENT_LENGTH,
 } from '../constants';
 import { nextFloat, nextRange } from '../rng';
 import { maxCurveAhead, segmentAt } from '../track/builder';
@@ -97,27 +99,75 @@ function lastHumanProgress(state: RaceState): number {
 }
 
 /**
+ * Quantos segmentos seguidos, a partir de `z`, são curva forte (|curva| ≥ AI_BRAKE_CURVE) do MESMO lado do segmento de `z`;
+ * 0 se o de `z` não for forte. Conta até `cap` (quem pergunta só quer saber se passa de um tamanho).
+ */
+export function strongRun(track: Track, z: number, cap: number): number {
+  const first = segmentAt(track, z).curve;
+  if (Math.abs(first) < AI_BRAKE_CURVE) return 0;
+  const dir = first > 0 ? 1 : -1;
+  let n = 1;
+  while (n < cap) {
+    const c = segmentAt(track, z + n * SEGMENT_LENGTH).curve;
+    if (Math.abs(c) < AI_BRAKE_CURVE || (c > 0 ? 1 : -1) !== dir) break;
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Fração da velocidade máxima que a IA (ou a direção assistida) usa como limite de uma curva forte quando conta derrapar
+ * nela: do limite sem derrapar até o limite com derrapagem, na proporção `gain` (AI_DRIFT_CORNER_GAIN). `gain` 0 é o limite
+ * de sempre. Se o resultado não deixa velocidade para entrar na derrapagem (AI_DRIFT_LIMIT_MIN), fica o limite de sempre.
+ */
+export function cornerHoldable(def: CarStats, curve: number, gain: number): number {
+  const plain = holdableSpeedFraction(def, curve);
+  if (gain <= 0) return plain;
+  const drifting = plain + (holdableSpeedFraction(def, curve, true) - plain) * gain;
+  return drifting >= AI_DRIFT_LIMIT_MIN ? drifting : plain;
+}
+
+/**
  * Ponto de frenagem: a maior fração da velocidade máxima (até `cap`) com que dá para chegar a cada
  * curva forte dos próximos `lookahead` segmentos freando a partir de agora. `grip` escala o limite
  * de cada curva (holdableSpeedFraction). Usado pela direção assistida (sim/assist.ts); é a conta da IA sem
  * personalidade — o aiInput repete o laço com o freio tardio e os erros de frenagem de cada piloto.
+ * `driftGain` > 0 conta com a derrapagem (cornerHoldable); com `driftMinRun` > 0 só nos trechos fortes de pelo menos esse tamanho.
  */
-export function brakingTarget(track: Track, z: number, def: CarStats, grip: number, lookahead: number, cap: number): number {
+export function brakingTarget(track: Track, z: number, def: CarStats, grip: number, lookahead: number, cap: number, driftGain = 0, driftMinRun = 0): number {
   let target = cap;
   const brakeDecel = def.brake * 0.8 + def.accel * 0.45;
   for (let i = 0; i < lookahead; i++) {
     const seg = segmentAt(track, z + i * SEGMENT_LENGTH);
     if (Math.abs(seg.curve) < AI_BRAKE_CURVE) continue;
-    const limit = holdableSpeedFraction(def, seg.curve) * grip * def.topSpeed;
+    const gain = driftGain > 0 && (driftMinRun <= 0 || strongRun(track, z + i * SEGMENT_LENGTH, driftMinRun) >= driftMinRun) ? driftGain : 0;
+    const limit = (gain > 0 ? cornerHoldable(def, seg.curve, gain) : holdableSpeedFraction(def, seg.curve)) * grip * def.topSpeed;
     const allowed = Math.sqrt(limit * limit + 2 * brakeDecel * i * SEGMENT_LENGTH) / def.topSpeed;
     if (allowed < target) target = allowed;
   }
   return target;
 }
 
-/** Contra-esterço que anula o empurrão da curva `curve` na fração de velocidade `sf` (0..1). */
-export function counterSteer(def: CarStats, sf: number, curve: number): number {
-  return sf > 0.05 ? (centrifugalRate(def) * sf * curve) / steerRate(def) : 0;
+/**
+ * Contra-esterço que anula o empurrão da curva `curve` na fração de velocidade `sf` (0..1). Com `driftDir` ≠ 0 (o carro
+ * derrapando): a centrífuga é DRIFT_CENTRIFUGAL_MULT dela, e o puxão da derrapagem para dentro (DRIFT_PULL) já ajuda.
+ */
+export function counterSteer(def: CarStats, sf: number, curve: number, driftDir = 0): number {
+  const plain = sf > 0.05 ? (centrifugalRate(def) * sf * curve) / steerRate(def) : 0;
+  return driftDir === 0 ? plain : DRIFT_CENTRIFUGAL_MULT * plain - driftDir * DRIFT_PULL;
+}
+
+/**
+ * A IA (ou a direção assistida) quer o botão de derrapar apertado neste tick? Entra numa curva forte (≥ AI_BRAKE_CURVE) cujo
+ * trecho, do mesmo lado, tem pelo menos AI_DRIFT_MIN_SEGMENTS segmentos, com a velocidade de entrada; derrapando, mantém
+ * enquanto a curva segue para o mesmo lado e faltam AI_DRIFT_RELEASE_SEGMENTS segmentos ou mais — soltar aí é o impulso na saída.
+ * Quem chama decide se pode (box, erro de frenagem, carro acabado).
+ */
+export function wantsDrift(track: Track, car: CarState, def: CarStats): boolean {
+  const curve = segmentAt(track, car.z).curve;
+  if (car.driftDir !== 0) return curve * car.driftDir > 0 && strongRun(track, car.z, AI_DRIFT_RELEASE_SEGMENTS) >= AI_DRIFT_RELEASE_SEGMENTS;
+  return Math.abs(curve) >= AI_BRAKE_CURVE && car.speed >= def.topSpeed * DRIFT_MIN_SPEED_FACTOR
+    && strongRun(track, car.z, AI_DRIFT_MIN_SEGMENTS) >= AI_DRIFT_MIN_SEGMENTS;
 }
 
 /**
@@ -161,6 +211,9 @@ export function aiInput(state: RaceState, track: Track, car: CarState): PlayerIn
   // ── Velocidade-alvo: na reta, o que a habilidade permite; para cada curva à frente, a
   // velocidade que dá para chegar nela freando a partir de agora (ponto de frenagem).
   const lookahead = brain.lookahead + Math.floor(speedFrac * 30);
+  // Perto do box (a 30 segmentos ou menos dele) ou nele, a IA não derrapa: o limitador e a faixa do box não combinam com a pose.
+  const pitAhead = seg.pit || segmentAt(track, car.z + PIT_LOOKAHEAD).pit;
+  const driftOk = !car.finished && !car.inPit && !pitAhead;
   const straightLimit = brain.skill * (car.seat < 0 ? pacedSpeed(difficulty, state.config.aiPace) : DIFFICULTY_SPEED[difficulty]);
   let target = straightLimit;
   // Personalidade: o agressivo supõe frear mais forte (freia mais tarde) e entrar mais rápido; o
@@ -169,15 +222,23 @@ export function aiInput(state: RaceState, track: Track, car: CarState): PlayerIn
   let zone = -1; let miss = false;
   /** Segmentos já andados dentro de um trecho de curva em que errou a frenagem (-1 = não está num). */
   let missedFor = -1;
+  /** O trecho forte (do mesmo lado) em que o laço está merece derrapagem: tamanho suficiente (ou já derrapando nele) e pode. */
+  let runDir = 0; let runDrifts = false;
   for (let i = 0; i < lookahead; i++) {
     const seg = segmentAt(track, car.z + i * SEGMENT_LENGTH);
-    if (Math.abs(seg.curve) < AI_BRAKE_CURVE) { zone = -1; continue; }
+    if (Math.abs(seg.curve) < AI_BRAKE_CURVE) { zone = -1; runDir = 0; continue; }
+    const dir = seg.curve > 0 ? 1 : -1;
+    if (dir !== runDir) {
+      runDir = dir;
+      runDrifts = driftOk && ((i === 0 && car.driftDir !== 0) || strongRun(track, car.z + i * SEGMENT_LENGTH, AI_DRIFT_MIN_SEGMENTS) >= AI_DRIFT_MIN_SEGMENTS);
+    }
     if (tune.mistake > 0 && zone < 0) {
       zone = i === 0 ? curveZoneStart(track, seg.index) : seg.index;
       miss = missesBraking(state, car, tune, zone);
       if (miss && i === 0) missedFor = (seg.index - zone + track.segments.length) % track.segments.length;
     }
-    const limit = holdableSpeedFraction(def, seg.curve) * (0.9 + 0.12 * brain.skill) * tune.cornerSpeed * (miss ? MISTAKE_CORNER_SPEED : 1) * def.topSpeed;
+    const hold = runDrifts && !miss ? cornerHoldable(def, seg.curve, AI_DRIFT_CORNER_GAIN) : holdableSpeedFraction(def, seg.curve);
+    const limit = hold * (0.9 + 0.12 * brain.skill) * tune.cornerSpeed * (miss ? MISTAKE_CORNER_SPEED : 1) * def.topSpeed;
     const allowed = Math.sqrt(limit * limit + 2 * brakeDecel * (miss ? MISTAKE_BRAKE_LATE : 1) * i * SEGMENT_LENGTH) / def.topSpeed;
     if (allowed < target) target = allowed;
   }
@@ -197,7 +258,6 @@ export function aiInput(state: RaceState, track: Track, car: CarState): PlayerIn
   // à próxima passagem por ele (ou à chegada). Era "abaixo de 22%", que secava o tanque nas voltas
   // longas (sim/fuel.ts).
   markFuel(brain, car, track.length);
-  const pitAhead = seg.pit || segmentAt(track, car.z + PIT_LOOKAHEAD).pit;
   const toFinish = distanceToFinish(state, track, car);
   const burn = skipPitBurn(measuredBurn(brain, car, def.fuelPerUnit, track.length), def.fuelPerUnit, track.length, toFinish);
   const short = pitAhead && car.fuel < fuelToSkipPit(burn, track.length, toFinish);
@@ -258,9 +318,19 @@ export function aiInput(state: RaceState, track: Track, car: CarState): PlayerIn
 
   // ── Volante: vai para a faixa e compensa o empurrão da curva.
   const sf = Math.min(1, speedFrac);
-  const counter = counterSteer(def, sf, seg.curve);
+  const counter = counterSteer(def, sf, seg.curve, car.driftDir);
   const toLane = (laneTarget - car.x) * 5;
   input.steer = Math.max(-1, Math.min(1, toLane + counter));
+
+  // ── Derrapagem: nas curvas fortes compridas (wantsDrift), longe do box e sem estar no erro de frenagem. Na entrada o
+  // volante vai ao menos ao mínimo de entrada, para o lado da curva (o "pulinho").
+  if (driftOk && !erring && wantsDrift(track, car, def)) {
+    input.drift = true;
+    if (car.driftDir === 0) {
+      const side = seg.curve > 0 ? 1 : -1;
+      if (input.steer * side < DRIFT_ENTRY_STEER) input.steer = side * DRIFT_ENTRY_STEER;
+    }
+  }
 
   // ── Nitro: reta livre, velocidade alta, ninguém colado na frente (o limpo só em reta longa; o
   // agressivo mais cedo, mais vezes e com curva leve à frente).
