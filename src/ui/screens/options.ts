@@ -7,6 +7,7 @@ import { optionsFooter } from '../../errors/options';
 import { getLanguage, setLanguage, t, type Lang } from '../../i18n';
 import '../remap/strings';
 import '../../ghost/strings';
+import './strings';
 import { button, createFocusList, h, listNav, onOff, screenFrame, selector, type FocusItem, type ScreenApi, type ScreenInstance, type Selector } from './common';
 
 const ASSIST_KEYS: ReadonlyArray<keyof CoopAssists> = ['sharedNitro', 'tow', 'teamDraft', 'catchup'];
@@ -50,6 +51,12 @@ export function raceOptionSelectors(api: ScreenApi, commit: () => void, opts: { 
   return out;
 }
 
+/** Qualidade gráfica: baixa, média, alta e Ultra (RTX). Fora de `optionsScreen` para o teste montar só a linha. */
+export function qualitySelector(api: ScreenApi, commit: () => void): Selector {
+  const s = api.ctx.settings;
+  return selector(t('ui.options.quality'), () => t(`ui.options.quality.${s.quality}`), (d) => { s.quality = cycle(QUALITIES, s.quality, d); commit(); }, { sfx: api.sfx });
+}
+
 export function commitSettings(api: ScreenApi): void {
   saveSettings(api.ctx.settings);
   api.emit({ type: 'settingsChanged', settings: api.ctx.settings });
@@ -80,7 +87,7 @@ export function optionsScreen(api: ScreenApi): ScreenInstance {
     // No Electron a sessão aplica pelo desktop.ts (settingsChanged); no navegador só um gesto do
     // usuário pode pedir tela cheia, e este handler de teclado/clique é o gesto.
     selector(t('ui.options.fullscreen'), () => onOff(s.fullscreen), () => { s.fullscreen = !s.fullscreen; if (!api.ctx.isDesktop) applyFullscreen(s.fullscreen); commit(); }, { sfx }),
-    selector(t('ui.options.quality'), () => t(`ui.options.quality.${s.quality}`), (d) => { s.quality = cycle(QUALITIES, s.quality, d); commit(); }, { sfx }),
+    qualitySelector(api, commit),
     // Visual: o 3D moderno ou o pseudo-3D Retrô (a sessão troca o renderizador na hora; src/render-pseudo3d).
     // Cada coluna comporta dez linhas (docs/TELAS.md): para esta caber, o "Tremor de tela" foi para a Acessibilidade.
     selector(t('ui.options.renderStyle'), () => t(`ui.options.renderStyle.${s.renderStyle}`), (d) => { s.renderStyle = cycle(RENDER_STYLES, s.renderStyle, d); commit(); }, { sfx }),

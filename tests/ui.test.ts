@@ -37,7 +37,7 @@ describe('sanitizeSettings', () => {
   });
 
   it('tipo errado, NaN e enumeração inválida caem no padrão', () => {
-    const s = sanitizeSettings({ language: 'de', quality: 'ultra', difficulty: 'impossível', masterVolume: 'alto', totalCars: NaN, fullscreen: 'sim', music: 7 });
+    const s = sanitizeSettings({ language: 'de', quality: 'maxima', difficulty: 'impossível', masterVolume: 'alto', totalCars: NaN, fullscreen: 'sim', music: 7 });
     expect(s.language).toBe('pt');
     expect(s.quality).toBe('high');
     expect(s.difficulty).toBe('profissional');

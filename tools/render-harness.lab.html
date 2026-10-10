@@ -1,0 +1,7 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>render-harness lab</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#game{position:fixed;inset:0;width:100vw;height:100vh;display:block}#hud{position:fixed;inset:0}</style>
+</head><body><canvas id="game"></canvas><div id="hud"></div>
+<!-- Laboratório GL do renderizador (tests/gl-render.test.ts): sem corrida a olho, só funções em `window.lab` que o Playwright chama.
+     Uso à mão: abrir esta página no vite e, no console, `await lab.collect()`; o resto está em tools/render-harness.lab.ts. -->
+<script type="module" src="./render-harness.lab.ts"></script>
+</body></html>

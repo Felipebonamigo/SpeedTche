@@ -126,6 +126,8 @@ window.carAssets = await loadCarAssets();
 window.landmarkParts = await loadLandmarkParts();
 window.landmarkAssets = await loadLandmarkAssets();
 const renderer = createRenderer(canvas, hud);
+// Resolução dinâmica: desligada sob automação (captura reprodutível); `dynres=1` a liga e `dynscale=0.72` fixa o degrau (L2).
+if (q.get('dynscale')) { renderer.setDynamicResolution(true); renderer.pinDynamicScale(Number(q.get('dynscale'))); }
 // Folha de contato: o renderizador desenha no tamanho de um quadro (5 × 3 na janela) e cada quadro é
 // copiado para a folha — 15 vezes menos pixels que desenhar a janela inteira por estilo.
 // A folha de pinturas tem 16 quadros (4 × 4); a de estilos, 14 (5 × 3).

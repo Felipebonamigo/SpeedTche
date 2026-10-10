@@ -188,16 +188,17 @@ describe('Ultra: registro do nível', () => {
     expect(FLOOR_TARGET_FPS).toBe(60);
   });
 
-  it('os 7 efeitos previstos, ids únicos, cada um com parâmetros, e nenhum implementado ainda (é da L)', () => {
+  it('os 7 efeitos previstos, ids únicos, cada um com parâmetros; a L2 ligou só os que têm código (o GTAO), os outros ficam honestos', () => {
     expect(ULTRA_EFFECTS.map((e) => e.id)).toEqual(['gtao', 'ssr', 'volumetric-rays', 'dof', 'motion-blur', 'csm', 'taa']);
     for (const e of ULTRA_EFFECTS) expect(Object.keys(e.params).length, e.id).toBeGreaterThan(0);
     const csm = ULTRA_EFFECTS.find((e) => e.id === 'csm');
     expect(csm?.params).toMatchObject({ cascades: 4, mapSize: 4096 });
-    expect(ultraEffectsActive()).toEqual([]);
+    expect(ultraEffectsActive()).toContain('gtao');
+    for (const falta of ['ssr', 'csm', 'taa']) expect(ultraEffectsActive(), falta).not.toContain(falta);
   });
 
-  it('o Ultra desenha na qualidade Alta do renderizador; o resto é o próprio nível', () => {
-    expect(renderQualityOf('ultra')).toBe('high');
+  it('o Ultra é uma qualidade do renderizador (L2): o nível e a qualidade são a mesma coisa', () => {
+    expect(renderQualityOf('ultra')).toBe('ultra');
     for (const q of BENCH_QUALITIES) expect(renderQualityOf(q)).toBe(q);
   });
 });
@@ -262,7 +263,7 @@ describe('Ultra: avisos do relatório', () => {
     expect(benchWarnings({ ...r, runs: [withFps(r.runs[0], { avgFps: 60 })] }).join('\n')).not.toMatch(/teto de quadros/);
   });
 
-  it('o Ultra sem os efeitos avisa que o número é o da Alta em 1440p, e só quando há corrida Ultra', () => {
+  it('o Ultra com efeitos faltando avisa quantos existem, e só quando há corrida Ultra', () => {
     const r = reportWithUltra();
     r.ultra = { target: ULTRA_TARGET, effectsPlanned: ULTRA_EFFECTS.map((e) => e.id), effectsActive: [] };
     expect(benchWarnings(r).join('\n')).toMatch(/ultra: 0 de 7 efeitos/);

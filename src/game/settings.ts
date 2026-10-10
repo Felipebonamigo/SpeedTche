@@ -21,7 +21,7 @@ export const HUD_SCALE_MIN = 0.8;
 export const HUD_SCALE_MAX = 1.5;
 
 export const LANGUAGES: readonly Lang[] = ['pt', 'en'];
-export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high'];
+export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 export const RENDER_STYLES: readonly RenderStyle[] = ['modern', 'retro'];
 export const DIFFICULTIES: readonly Difficulty[] = ['amador', 'profissional', 'campeao'];
 

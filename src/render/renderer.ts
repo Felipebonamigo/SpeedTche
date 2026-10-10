@@ -1,19 +1,19 @@
 // Renderizador 3D (Three.js). Uma cena só; a cada quadro, para cada viewport, o mundo é
 // reposicionado no referencial do carro daquele jogador (RoadFrame) e desenhado por
-// scissor. Tone mapping Custom (Neutral + gradação por bioma × período, stylize.ts) com a exposição da paleta. Pós-processamento
-// (bloom + saída sRGB) por viewport na qualidade alta, com MSAA no render target; o limiar do
-// bloom fica acima do branco iluminado pelo sol (de dia só o disco do sol e os emissivos
-// brilham; à noite, faróis, postes e neon); médio sem pós; baixo sem sombras e com menos pista.
+// scissor. Tone mapping Custom (Neutral + gradação por bioma × período, stylize.ts) com a exposição da paleta.
+// Os degraus de qualidade (onda L, L2; o desenho de cada um está em postfx/plan.ts):
+//   Baixa  — direto na tela (o tone mapping é do material), sem sombra do sol, com a mancha de contato sob o carro;
+//   Média  — cena num alvo HDR + bloom em meia resolução + saída + FXAA;
+//   Alta   — MSAA no alvo, bloom, desfoque radial (nitro e > 85% da velocidade) e GTAO em meia resolução até 2 jogadores;
+//   Ultra  — a Alta com o GTAO em resolução cheia (de 1 a 4 jogadores).
+// Cada viewport tem um ViewportPipeline (postfx/pipeline.ts) criado UMA vez e redimensionado em lugar (resize, lotação); a resolução
+// dinâmica usa um sub-retângulo do alvo de tamanho fixo. O limiar do bloom fica acima do branco iluminado pelo sol (de dia só o disco
+// do sol e os emissivos brilham; à noite, faróis, postes e neon).
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
 import type { Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer } from '../game/contracts';
-import { atLeast } from '../game/quality';
 import { ChaseCamera, IdleCamera } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
 import { Cars } from './cars';
@@ -21,12 +21,16 @@ import { Effects, type Shake } from './effects';
 import { Hud } from './hud';
 import { viewportRects, type Rect } from './layout';
 import { palette } from './palette';
+import { DynamicResolution, dynamicResolutionDefault } from './postfx/dynres';
+import { ViewportPipeline } from './postfx/pipeline';
+import { planFor, radialBlurStrength, shadowPlan, type PostPlan } from './postfx/plan';
+import { ShadowRing } from './postfx/shadows';
 import { Road } from './road';
 import { absoluteHeading, buildRoadFrame, FRAME_AHEAD, FRAME_BEHIND, type RoadFrame } from './roadframe';
 import { Scenery } from './scenery';
 import type { Layout } from './scenery/layout';
 import { Sky } from './sky';
-import { gradeUniforms, installToneMapping, setStylizePalette } from './stylize';
+import { installToneMapping, setStylizePalette } from './stylize';
 import { Terrain } from './terrain';
 
 const BEHIND = FRAME_BEHIND;
@@ -36,12 +40,38 @@ const MAX_POINTS = BEHIND + Math.max(AHEAD.high, AHEAD.ultra) + 1;
 const IDLE_SPEED = 2600;
 
 /** Contadores de um viewport no último quadro (banco de prova, src/bench/; gate da L2). */
-export interface ViewportDebug { calls: number; triangles: number; targetW: number; targetH: number; samples: number; passes: number; postPx: number }
-export interface DebugInfo { calls: number; triangles: number; frameMs: number; quality: Quality | null; shadows: boolean; viewports: ViewportDebug[] }
+export interface ViewportDebug {
+  calls: number; triangles: number;
+  /** O pedaço do alvo da cena realmente desenhado (px): menor que o viewport quando a resolução dinâmica está num degrau abaixo de 1. */
+  targetW: number; targetH: number;
+  /** Amostras do MSAA do alvo da cena (0 = sem). */
+  samples: number;
+  /** Passes de pós habilitados no quadro (a Baixa não tem). */
+  passes: number;
+  /** Pixels escritos pelos passes de pós no quadro (a cena resolvida, o AO, os alvos do bloom, a saída…). */
+  postPx: number;
+}
+/** O que o renderizador conta de si: composers criados (um por viewport usado, nunca mais um por resize ou lotação) e os redimensionamentos em lugar. */
+export interface PostDebug { builds: number; resizes: number; scale: number; dynamic: boolean }
+export interface DebugInfo {
+  calls: number; triangles: number; frameMs: number; quality: Quality | null; shadows: boolean; viewports: ViewportDebug[];
+  post: PostDebug;
+  /** Mapas de sombra do sol redesenhados no quadro (com 3 e 4 jogadores, metade deles). */
+  shadowUpdates: number;
+}
 
-interface ViewportPost { composer: EffectComposer; renderPass: RenderPass; bloom: UnrealBloomPass; key: string }
+/** O renderizador do jogo: o contrato `Renderer` mais o que o banco de prova, o harness e os testes usam. */
+export type GameRenderer = Renderer & {
+  debugInfo(): DebugInfo;
+  /** Liga ou desliga a resolução dinâmica (ligada por padrão no jogo; desligada sob automação e com `?dynres=0`). */
+  setDynamicResolution(on: boolean): void;
+  /** Fixa a escala da resolução dinâmica (harness e testes); nulo volta ao controle automático. */
+  pinDynamicScale(scale: number | null): void;
+  /** Fixa a força do desfoque radial (0..1) no lugar da velocidade e do nitro (harness e testes); nulo volta ao normal. */
+  pinRadialBlur(strength: number | null): void;
+};
 
-export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement): Renderer & { debugInfo(): DebugInfo } {
+export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement): GameRenderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   installToneMapping(); // antes do primeiro quadro: troca a CustomToneMapping do chunk global (Neutral + gradação, stylize.ts)
@@ -80,8 +110,23 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   let trackKey = '';
   /** Bloom da paleta atual: força, raio, limiar. */
   let bloom: [number, number, number] = [0.3, 0.4, 1];
-  const posts: ViewportPost[] = [];
-  const debug: DebugInfo = { calls: 0, triangles: 0, frameMs: 0, quality: null, shadows: false, viewports: [] };
+  /** Um pipeline de pós por viewport usado (postfx/pipeline.ts); nasce na primeira vez e é redimensionado em lugar. */
+  const pipes: Array<ViewportPipeline | undefined> = [];
+  let builds = 0;
+  let resizes = 0;
+  const dynamic = new DynamicResolution();
+  dynamic.setEnabled(dynamicResolutionDefault(typeof location === 'undefined' ? '' : location.search, typeof navigator !== 'undefined' && navigator.webdriver === true));
+  let pinned: number | null = null;
+  let lastScale = 1;
+  let pinnedRadial: number | null = null;
+  let lastRenderAt = -1;
+  let lastBlurAt = 0;
+  /** Desfoque radial suavizado por viewport (0..1). */
+  const radial = [0, 0, 0, 0];
+  const debug: DebugInfo = { calls: 0, triangles: 0, frameMs: 0, quality: null, shadows: false, viewports: [], post: { builds: 0, resizes: 0, scale: 1, dynamic: true }, shadowUpdates: 0 };
+  // O sol é uma luz só (sky.ts); a sombra dele é por viewport com 3 e 4 jogadores (postfx/shadows.ts).
+  const sun = scene.children.find((o): o is THREE.DirectionalLight => (o as THREE.DirectionalLight).isDirectionalLight === true);
+  const shadowRing = sun ? new ShadowRing(sun.shadow) : null;
   /** Contadores por viewport do último quadro: 4 objetos fixos; a cópia só acontece em debugInfo(). */
   const vps: ViewportDebug[] = [0, 1, 2, 3].map(() => ({ calls: 0, triangles: 0, targetW: 0, targetH: 0, samples: 0, passes: 0, postPx: 0 }));
   let vpCount = 0;
@@ -102,7 +147,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     effects.clear();
     renderer.toneMappingExposure = setStylizePalette(p).exposure;
     bloom = p.bloom;
-    for (const post of posts) applyBloom(post.bloom);
+    for (const pipe of pipes) pipe?.setBloom(bloom);
     for (const c of cameras) c.reset();
     if (quality) sky.setQuality(quality);
   }
@@ -115,74 +160,46 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     cars.setQuality(q);
     // Materiais com sombra precisam recompilar quando o shadow map liga/desliga.
     scene.traverse((o) => { if (o instanceof THREE.Mesh) { const m = o.material as THREE.Material; m.needsUpdate = true; } });
-    disposePosts();
+    disposePosts(); // os passes de cada degrau são outros
+    dynamic.reset();
   }
 
   function disposePosts(): void {
-    for (const p of posts) disposeComposer(p.composer);
-    posts.length = 0;
+    for (const p of pipes) p?.dispose();
+    pipes.length = 0;
   }
 
-  /**
-   * O EffectComposer.dispose() do three só libera os dois alvos dele: o bloom (11 alvos de render e 9
-   * materiais) e o OutputPass ficavam na GPU a cada troca de qualidade, de tamanho ou de lotação
-   * (docs/DESEMPENHO.md, scripts/playtest-memoria.mjs). E o dispose() do UnrealBloomPass (r186)
-   * esquece o material do filtro de brilho (materialHighPassFilter): liberado aqui.
-   */
-  function disposeComposer(composer: EffectComposer): void {
-    for (const pass of composer.passes) {
-      pass.dispose();
-      if (pass instanceof UnrealBloomPass) pass.materialHighPassFilter.dispose();
+  /** O pipeline do viewport `i` (criado na primeira vez, nunca recriado), do tamanho do viewport em px, redimensionado em lugar. */
+  function pipelineFor(i: number, rect: Rect, camera: THREE.PerspectiveCamera, q: Quality): ViewportPipeline {
+    let pipe = pipes[i];
+    if (!pipe) {
+      pipe = new ViewportPipeline(renderer, scene, camera, planFor(q, 1), planFor(q, 1).ao, bloom);
+      pipes[i] = pipe;
+      builds++;
     }
-    composer.dispose();
+    if (pipe.setSize(rect.w * dpr, rect.h * dpr)) resizes++;
+    return pipe;
   }
 
-  function applyBloom(pass: UnrealBloomPass): void {
-    pass.strength = bloom[0]; pass.radius = bloom[1]; pass.threshold = bloom[2];
-  }
-
-  function postFor(i: number, rect: Rect, camera: THREE.PerspectiveCamera): ViewportPost {
-    const key = `${rect.w}x${rect.h}@${dpr}`;
-    const existing = posts[i];
-    // O mesmo composer serve a corrida e o fundo dos menus: a câmera do passo muda por chamada.
-    if (existing && existing.key === key) { existing.renderPass.camera = camera; return existing; }
-    if (existing) disposeComposer(existing.composer);
-    const target = new THREE.WebGLRenderTarget(Math.max(1, Math.round(rect.w * dpr)), Math.max(1, Math.round(rect.h * dpr)), { type: THREE.HalfFloatType, samples: 4 });
-    const composer = new EffectComposer(renderer, target);
-    composer.setPixelRatio(dpr);
-    composer.setSize(rect.w, rect.h);
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(rect.w, rect.h), bloom[0], bloom[1], bloom[2]);
-    composer.addPass(bloomPass);
-    // O OutputPass faz o tone mapping na alta (o desenho vai a um alvo): os uniformes da gradação entram no material dele.
-    const output = new OutputPass();
-    Object.assign(output.uniforms, gradeUniforms);
-    composer.addPass(output);
-    const post = { composer, renderPass, bloom: bloomPass, key };
-    posts[i] = post;
-    return post;
-  }
+  /** A escala da resolução dinâmica que vale neste quadro (1 com ela desligada). */
+  function currentScale(): number { return dynamic.enabled ? (pinned ?? dynamic.scale) : 1; }
 
   /**
-   * Desenha um viewport (com pós na alta) e conta o que ele custou. Mede a diferença do `renderer.info` em volta do
+   * Desenha um viewport (com pós a partir da Média) e conta o que ele custou. Mede a diferença do `renderer.info` em volta do
    * desenho, e não do `setViewport`: a passada de sombra e os quadros cheios do bloom acontecem dentro do `render()`.
    * `vpCount` só conta os viewports de fato desenhados (o `continue` da corrida pula assento sem carro).
    */
-  function drawViewport(i: number, rect: Rect, camera: THREE.PerspectiveCamera, high: boolean): void {
+  function drawViewport(i: number, rect: Rect, camera: THREE.PerspectiveCamera, q: Quality, plan: PostPlan, blur: number): void {
     const c0 = renderer.info.render.calls; const tri0 = renderer.info.render.triangles;
     const v = vps[vpCount];
-    if (high) {
-      const post = postFor(i, rect, camera);
-      post.composer.render();
-      const rt1 = post.composer.renderTarget1; const rt2 = post.composer.renderTarget2; const b = post.bloom;
-      let px = rt2.width * rt2.height + b.renderTargetBright.width * b.renderTargetBright.height;
-      for (const t of b.renderTargetsHorizontal) px += t.width * t.height;
-      for (const t of b.renderTargetsVertical) px += t.width * t.height;
-      v.targetW = rt1.width; v.targetH = rt1.height; v.samples = rt1.samples; v.passes = post.composer.passes.length; v.postPx = px;
+    if (plan.post) {
+      const pipe = pipelineFor(i, rect, camera, q);
+      lastScale = currentScale();
+      const st = pipe.render({ camera, scale: lastScale, radial: plan.radialBlur ? blur : 0 }, plan.ao !== null);
+      v.targetW = st.targetW; v.targetH = st.targetH; v.samples = st.samples; v.passes = st.passes; v.postPx = st.postPx;
     } else {
       renderer.render(scene, camera);
-      v.targetW = Math.max(1, Math.round(rect.w * dpr)); v.targetH = Math.max(1, Math.round(rect.h * dpr)); // a fórmula do postFor
+      v.targetW = Math.max(1, Math.round(rect.w * dpr)); v.targetH = Math.max(1, Math.round(rect.h * dpr)); // a Baixa desenha direto
       v.samples = 0; v.passes = 0; v.postPx = 0;
     }
     v.calls = renderer.info.render.calls - c0; v.triangles = renderer.info.render.triangles - tri0;
@@ -225,8 +242,14 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     effects.update(frame);
     const n = Math.max(1, Math.min(4, frame.viewports.length));
     const rects = viewportRects(n, width, height);
+    const plan = planFor(q, n);
+    const sp = shadowPlan(q, n);
+    tickDynamic(t0);
+    const blurDt = frame.paused ? 0 : Math.min(0.1, Math.max(0, (t0 - lastBlurAt) / 1000));
+    lastBlurAt = t0;
     renderer.info.reset();
     vpCount = 0;
+    if (shadowRing && sp.enabled) shadowRing.beginFrame(sp);
     for (let i = 0; i < n; i++) {
       const vp = frame.viewports[i];
       const car = frame.state.cars[vp.carIndex];
@@ -251,14 +274,27 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       captionView.aspect = rect.w / Math.max(1, rect.h); captionView.ahead = AHEAD[q];
       captions[i].update(captionsOn ? captionSceneFor(track) : null, captionView, Math.max(1, car.lap), frame.state.tick / TICK_RATE,
         frame.state.phase === 'racing' && !car.finished);
+      // Desfoque radial: velocidade acima de 85% ou nitro (plan.ts), com subida e descida suaves (nada de piscar).
+      const blurTarget = radialBlurStrength(car.speed / car.stats.topSpeed, car.nitroTicks > 0, frame.options.reduceEffects);
+      radial[i] += (blurTarget - radial[i]) * (1 - Math.exp(-blurDt * 7));
+      if (pinnedRadial !== null) radial[i] = pinnedRadial;
       setViewport(rect);
-      drawViewport(i, rect, cam.camera, atLeast(q, 'high'));
+      const due = shadowRing && sp.enabled ? shadowRing.beginViewport(i, car.z, track.length) : false;
+      drawViewport(i, rect, cam.camera, q, plan, radial[i]);
+      if (shadowRing && sp.enabled) shadowRing.endViewport(i, due, car.z);
     }
     if (frame.showHud) hud.update(frame, width, height, captions); else hud.hide();
     debug.calls = renderer.info.render.calls;
     debug.triangles = renderer.info.render.triangles;
     debug.quality = q; debug.shadows = renderer.shadowMap.enabled;
+    debug.shadowUpdates = sp.enabled && shadowRing ? shadowRing.updates : 0;
     debug.frameMs = performance.now() - t0;
+  }
+
+  /** O tempo entre dois quadros alimenta a resolução dinâmica (postfx/dynres.ts); o primeiro quadro só marca o relógio. */
+  function tickDynamic(now: number): void {
+    if (lastRenderAt >= 0) dynamic.update(now - lastRenderAt);
+    lastRenderAt = now;
   }
 
   function renderIdle(time: number, track: Track): void {
@@ -266,6 +302,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     const t0 = performance.now();
     ensureTrack(track);
     ensureQuality(quality ?? 'high');
+    tickDynamic(t0);
     const z = (time * IDLE_SPEED) % track.length;
     const rf = buildRoadFrame(track, z, BEHIND, AHEAD[quality ?? 'high'], frames[0]);
     frames[0] = rf;
@@ -279,11 +316,15 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     setViewport(rect);
     renderer.info.reset();
     vpCount = 0;
-    drawViewport(0, rect, idleCamera.camera, atLeast(quality ?? 'high', 'high'));
+    const q = quality ?? 'high';
+    // Fundo dos menus: um viewport, um mapa de sombra (o jeito do three), sem desfoque radial.
+    shadowRing?.shared();
+    drawViewport(0, rect, idleCamera.camera, q, planFor(q, 1), 0);
     hud.hide();
     debug.calls = renderer.info.render.calls;
     debug.triangles = renderer.info.render.triangles;
     debug.quality = quality; debug.shadows = renderer.shadowMap.enabled;
+    debug.shadowUpdates = shadowPlan(q, 1).enabled ? 1 : 0;
     debug.frameMs = performance.now() - t0;
   }
 
@@ -291,21 +332,25 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     width = Math.max(1, Math.floor(w)); height = Math.max(1, Math.floor(h)); dpr = Math.max(0.5, Math.min(3, ratio));
     renderer.setPixelRatio(dpr);
     renderer.setSize(width, height, false);
-    disposePosts();
+    // Os pipelines NÃO são recriados: cada um se redimensiona em lugar no próximo quadro (pipelineFor).
   }
 
   function dispose(): void {
     if (disposed) return;
     disposed = true;
     disposePosts();
+    shadowRing?.dispose();
     sky.dispose(); road.dispose(); terrain.dispose(); scenery.dispose(); cars.dispose(); effects.dispose(); hud.dispose();
     renderer.dispose();
   }
 
   return {
     canvas, resize, render, renderIdle, dispose,
-    debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })) }),
+    debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })), post: { builds, resizes, scale: lastScale, dynamic: dynamic.enabled } }),
+    setDynamicResolution: (on: boolean) => { dynamic.setEnabled(on); if (!on) lastScale = 1; },
+    pinDynamicScale: (scale: number | null) => { pinned = scale; },
+    pinRadialBlur: (strength: number | null) => { pinnedRadial = strength; },
     /** Só para depuração no harness (não faz parte do contrato). */
-    __scene: scene, __gl: renderer, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
-  } as Renderer & { debugInfo(): DebugInfo };
+    __scene: scene, __gl: renderer, __pipes: pipes, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
+  } as GameRenderer;
 }
