@@ -1,78 +1,99 @@
-// Chama do nitro: atlas de 4 quadros num billboard axial instanciado (o plano gira em torno do eixo da
-// chama para encarar a câmera). Veio de render/cars.ts sem mudança.
+// Chama do nitro em MALHA (M4): uma gota de ~120 triângulos ao longo de +Z (0 no escape, 1 na ponta), instanciada uma por
+// escape. O tremor, o núcleo branco e a ponta que apaga são do shader; a cor vem por instância (`instanceColor`, a cor
+// do visual do carro: flameColorFor) e a fase do tremor por um atributo de instância (`aFlame`). Substitui o billboard
+// de textura de 4 quadros — que não tinha cor por instância nem volume visto de lado.
 import * as THREE from 'three';
-import { hash2 } from '../noise';
-import { canvas2d } from '../textures';
 
-/** Atlas de 4 quadros da chama (base embaixo de cada quadro, ponta em cima): gaussiana que afina, núcleo branco → azul. */
-export function flameTexture(): THREE.CanvasTexture {
-  const W = 64; const H = 512; const F = 128;
-  const [c, ctx] = canvas2d(W, H);
-  const img = ctx.createImageData(W, H);
-  const d = img.data;
-  for (let f = 0; f < 4; f++) {
-    const len = 0.78 + hash2(f, 1) * 0.2;
-    const sig0 = 0.21 + hash2(f, 2) * 0.05;
-    for (let row = 0; row < F; row++) {
-      const v = (row + 0.5) / F; // 0 = base (embaixo do quadro)
-      const t = v / len;
-      const y = H - 1 - (f * F + row); // linha do canvas (v=0 no fundo, flipY)
-      for (let px = 0; px < W; px++) {
-        const k = (y * W + px) * 4;
-        if (t >= 1) { d[k + 3] = 0; continue; }
-        const u = (px + 0.5) / W - 0.5 + Math.sin(t * 11 + f * 2.1) * 0.03 * t;
-        const sigma = sig0 * (1 - 0.7 * t);
-        const g = Math.exp(-(u * u) / (2 * sigma * sigma));
-        const profile = t < 0.08 ? t / 0.08 : Math.pow(1 - (t - 0.08) / 0.92, 0.9);
-        const a = Math.min(1, g * profile * 1.15);
-        const core = g * g * (1 - t * 0.85);
-        d[k] = Math.round(90 + (255 - 90) * core); d[k + 1] = Math.round(175 + (255 - 175) * core); d[k + 2] = 255; d[k + 3] = Math.round(a * 255);
-      }
+/** Azul-branco de sempre: a chama do carro que não pediu outra. */
+export const FLAME_BASE = '#58b6ff';
+/** Quanto do acento do carro tinge a chama (0 = todas azuis). A N3 troca isto por `chosen.flame` quando o CarLook trouxer a cor da chama. */
+const FLAME_TINT = 0.35;
+
+const RADIAL = 10;
+/** Posição ao longo da chama e raio de cada anel: bico estreito, barriga a ~25%, ponta fechada. */
+const RINGS: ReadonlyArray<readonly [number, number]> = [[0, 0.2], [0.1, 0.42], [0.25, 0.5], [0.45, 0.4], [0.7, 0.24], [0.9, 0.09], [1, 0]];
+
+/** A gota: anéis de `RADIAL` lados ao longo de +Z, tampa no bico e ponta fechada. `uv` = (volta, posição ao longo da chama). */
+export function buildFlameGeometry(): THREE.BufferGeometry {
+  const pos: number[] = []; const uv: number[] = []; const idx: number[] = [];
+  for (const [t, r] of RINGS) {
+    for (let k = 0; k <= RADIAL; k++) {
+      const a = (k / RADIAL) * Math.PI * 2;
+      pos.push(Math.cos(a) * r, Math.sin(a) * r, t);
+      uv.push(k / RADIAL, t);
     }
   }
-  ctx.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  const row = RADIAL + 1;
+  for (let i = 0; i < RINGS.length - 1; i++) {
+    for (let k = 0; k < RADIAL; k++) {
+      const a = i * row + k; const b = a + 1; const c = a + row; const d = c + 1;
+      if (RINGS[i + 1][1] === 0) idx.push(a, c, b); // a ponta: o último anel é um ponto, só um triângulo por gomo
+      else idx.push(a, c, b, b, c, d);
+    }
+  }
+  // Tampa do bico (fica dentro da ponteira do escape).
+  const centre = pos.length / 3;
+  pos.push(0, 0, 0); uv.push(0.5, 0);
+  for (let k = 0; k < RADIAL; k++) idx.push(centre, k, k + 1);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  g.computeBoundingBox(); g.computeBoundingSphere();
+  return g;
 }
 
-/** Billboard axial: o plano gira em torno do eixo da chama (+Z da instância) para encarar a câmera. */
+/**
+ * A cor da chama de um carro, pronta por instância: o azul-branco de sempre tingido pelo acento do carro, sempre clara e
+ * com cor (nunca breu nem branco liso). `out` reaproveita o objeto.
+ */
+export function flameColorFor(accent: string | THREE.Color, out: THREE.Color = new THREE.Color()): THREE.Color {
+  const base = new THREE.Color(FLAME_BASE);
+  const c = accent instanceof THREE.Color ? accent.clone() : new THREE.Color(accent);
+  base.lerp(c, FLAME_TINT);
+  const hsl = { h: 0, s: 0, l: 0 };
+  base.getHSL(hsl);
+  return out.setHSL(hsl.h, Math.max(hsl.s, 0.5), Math.min(0.72, Math.max(hsl.l, 0.55)));
+}
+
+/**
+ * Vértice: tremor (a chama balança e a barriga pulsa, mais perto da ponta) e as saídas para o fragmento — posição ao longo,
+ * o quanto a face encara a câmera (núcleo) e o quanto o EIXO encara (de trás a chama é um brilho curto, para não engolir as lanternas).
+ * `aFlame` = (fase, força 0..1) por instância; a cor é `instanceColor`.
+ */
 export const FLAME_VERT = /* glsl */ `
-varying vec2 vUv; varying float vFacing;
+attribute vec2 aFlame;
+uniform float uTime;
+varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel;
 void main() {
+  float t = uv.y;
+  float ph = aFlame.x;
+  vec3 p = position;
+  float wob = 1.0 + 0.16 * t * sin(t * 13.0 - uTime * 41.0 + ph) + 0.08 * sin(uTime * 63.0 + ph * 2.3);
+  p.xy *= wob;
+  p.x += 0.14 * t * t * sin(uTime * 29.0 + ph * 2.1 + t * 5.0);
+  p.y += 0.10 * t * t * sin(uTime * 23.0 + ph * 3.3 + t * 4.0);
   mat4 m = modelMatrix * instanceMatrix;
-  vec3 origin = (m * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  vec3 axisRaw = mat3(m) * vec3(0.0, 0.0, 1.0);
-  float len = length(axisRaw);
-  vec3 axis = axisRaw / max(len, 1e-4);
-  float wid = length(mat3(m) * vec3(1.0, 0.0, 0.0));
-  vec3 toCam = normalize(cameraPosition - origin);
-  vec3 crossv = cross(axis, toCam);
-  float cl = length(crossv);
-  vec3 side = cl > 1e-3 ? crossv / cl : normalize(cross(vec3(0.0, 1.0, 0.0), toCam));
-  // De frente/de trás o plano axial colapsa numa linha: mistura com um billboard esférico curto.
-  float facing = abs(dot(axis, toCam));
-  float k = facing * facing;
-  vec3 upv = normalize(mix(axis, normalize(cross(toCam, side)), k));
-  // Visto de trás (câmera de perseguição) o brilho é curto, para não engolir as lanternas.
-  float lenEff = mix(len, wid * 1.15, k);
-  vec3 p = origin + upv * ((uv.y - 0.5 * k) * lenEff) + side * ((uv.x - 0.5) * wid * (1.0 + 0.25 * k));
-  vUv = uv; vFacing = k;
-  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+  vec4 wp = m * vec4(p, 1.0);
+  vec3 toCam = normalize(cameraPosition - wp.xyz);
+  vec3 n = normalize(mat3(m) * vec3(normal.xy, 0.0) + 1e-5);
+  vec3 axis = normalize(mat3(m) * vec3(0.0, 0.0, 1.0));
+  vT = t; vFacing = abs(dot(n, toCam)); vAxis = abs(dot(axis, toCam)); vCol = instanceColor; vLevel = aFlame.y;
+  gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
+/** Fragmento: núcleo branco onde a face encara a câmera, a cor do carro nas bordas, ponta que apaga; aditivo. */
 export const FLAME_FRAG = /* glsl */ `
-uniform sampler2D uMap; uniform float uTime;
-varying vec2 vUv; varying float vFacing;
+varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel;
 void main() {
-  float frame = floor(mod(uTime * 22.0, 4.0));
-  vec4 c = texture2D(uMap, vec2(vUv.x, (vUv.y + frame) * 0.25));
-  float gain = mix(4.0, 1.6, vFacing); // de trás as duas chamas se somam (aditivo): menos ganho
-  gl_FragColor = vec4(c.rgb * gain * c.a, c.a);
+  float body = 1.0 - smoothstep(0.55, 1.0, vT);
+  float core = pow(vFacing, 1.7) * (1.0 - vT * 0.85);
+  vec3 c = mix(vCol * vec3(0.85, 0.95, 1.1), vec3(1.0), clamp(core * core * 1.5, 0.0, 1.0));
+  c = mix(c, vCol * vec3(1.3, 0.75, 0.5), smoothstep(0.35, 0.95, vT) * 0.6); // a ponta esquenta para o tom quente
+  float a = body * mix(0.35, 1.0, vFacing) * mix(1.0, 0.5, vAxis) * (0.7 + 0.3 * vLevel);
+  float gain = mix(3.4, 1.7, vAxis);
+  gl_FragColor = vec4(c * gain * a, a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
-
-/** (Esqueleto da M4: a malha de verdade vem depois do teste vermelho.) */
-export function buildFlameGeometry(): THREE.BufferGeometry { return new THREE.PlaneGeometry(1, 1); }
-export function flameColorFor(_accent: string | THREE.Color): THREE.Color { return new THREE.Color('#58b6ff'); }

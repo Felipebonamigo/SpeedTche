@@ -30,7 +30,7 @@ interface Inner { flames: THREE.InstancedMesh; stars: THREE.InstancedMesh; style
 const inner = (c: Cars) => c as unknown as Inner;
 
 /** Corrida de 4 carros (o jogador de Falcão, que fica em `own`) e uma passada de `update` + `pose`. */
-function scene(mutate: (state: RaceState, own: number) => void = () => undefined, paints?: RenderFrame['paints']) {
+function scene(mutate: (state: RaceState, own: number) => void = () => undefined, paint?: { color: string; accent: string }) {
   fakeCanvasDocument();
   const track = getTrack('copacabana');
   const state = createRace({
@@ -41,6 +41,7 @@ function scene(mutate: (state: RaceState, own: number) => void = () => undefined
   state.cars.forEach((c, i) => { if (i !== own) { c.z = state.cars[own].z - 100_000; c.x = 0; } }); // longe, atrás: só o jogador aparece
   mutate(state, own);
   const cars = new Cars(new THREE.Scene());
+  const paints = paint ? state.cars.map((_, i) => (i === own ? paint : null)) : undefined;
   const frame: RenderFrame = {
     state, track, viewports: [], time: 0, paused: true, coop: false, showHud: false, paints,
     options: { quality: 'high', showMinimap: false, screenShake: false, reduceEffects: false, palette: 'default' },
@@ -98,7 +99,7 @@ describe('Cars: a chama em malha, por instância', () => {
     expect(inner(none.cars).flames.visible).toBe(false);
     none.cars.dispose();
 
-    const on = scene((s, own) => { s.cars[own].nitroTicks = 90; }, [{ color: '#2244ff', accent: '#e53935' }]);
+    const on = scene((s, own) => { s.cars[own].nitroTicks = 90; }, { color: '#2244ff', accent: '#e53935' });
     on.draw(0.5);
     const flames = inner(on.cars).flames;
     expect(flames.count).toBe(2);
@@ -153,7 +154,7 @@ describe('Cars: guinada da derrapagem e estrelinhas', () => {
     expect(inner(s.cars).stars.count).toBe(3);
     expect(inner(s.cars).stars.visible).toBe(true);
     s.state.cars[s.own].collisionCooldown = 0;
-    s.draw(1.4);
+    for (let k = 1; k <= 20; k++) s.draw(0.3 + k * 0.06); // quadros de 60 ms (o relógio do Cars limita cada passo a 100 ms)
     expect(inner(s.cars).stars.count).toBe(0);
     expect(inner(s.cars).stars.visible).toBe(false);
     s.cars.dispose();
