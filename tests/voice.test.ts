@@ -21,10 +21,10 @@ const DT = 1 / TICK_RATE;
 
 // ───────────────────────────── V1: o núcleo nunca lê a buzina nem a frase ─────────────────────────────
 
-/** Valores gravados em 640538f (antes da N6), com o `hashRace` de hoje, dobrado tick a tick em FNV-1a (scratch/guard.ts). */
+/** Valores gravados na mescla N6+N1 (física revisão 3), sem buzina nem frase, com o `hashRace` de hoje dobrado tick a tick em FNV-1a. Os de 640538f eram 148fef1e/ced2734f e 9fca71dd/d9bd15f6: a N1 mudou a física de propósito. */
 const RECORDED = {
-  'guarda-contra-relogio': { trace: '148fef1e', json: 'ced2734f' },
-  'guarda-3-humanos-manual': { trace: '9fca71dd', json: 'd9bd15f6' },
+  'guarda-contra-relogio': { trace: 'bfd477d4', json: '28043e64' },
+  'guarda-3-humanos-manual': { trace: '9fe6a2d2', json: 'e89cb923' },
 } as const;
 
 function traceOf(scenarioIndex: number, voice: boolean): { trace: string; json: string } {
@@ -44,7 +44,7 @@ function traceOf(scenarioIndex: number, voice: boolean): { trace: string; json: 
 
 describe('V1: buzinar e provocar não mudam a física nem o hash', () => {
   GUARD_SCENARIOS.forEach((s, i) => {
-    it(`${s.name}: ${GUARD_TICKS} ticks com buzina e frases espalhadas dão o mesmo hash, tick a tick, que sem elas — e o valor gravado em 640538f`, () => {
+    it(`${s.name}: ${GUARD_TICKS} ticks com buzina e frases espalhadas dão o mesmo hash, tick a tick, que sem elas — e o valor gravado na mescla N6+N1`, () => {
       const recorded = RECORDED[s.name as keyof typeof RECORDED];
       const quiet = traceOf(i, false);
       expect(quiet).toEqual(recorded);

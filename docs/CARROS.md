@@ -406,3 +406,7 @@ falso: a prévia muda, o save guarda e volta), `tests/paint-session.test.ts` (se
 "Continuar", carreira, tutorial — `RenderFrame.paints` e a config sem pintura), `tests/online-paint.test.ts`.
 `scripts/playtest-paint.mjs` (Chromium, fluxo real: lobby → corrida 3D e Retrô → garagem → reabrir o jogo; capturas
 `scratch/cores-*.png`) e `scripts/playtest-online.mjs` (o convidado pinta, o anfitrião vê, os dois desenham igual).
+
+## Rodas, traseira e cabine (M4)
+
+Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo. O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.

@@ -206,17 +206,17 @@ describe('recordes guardam a impressão (nenhum é apagado)', () => {
   });
 });
 
-// Onda N, N6: a buzina e a frase vão na rede (PROTOCOL_VERSION 3), mas NÃO mudam a física: recordes e fantasmas gravados em
-// 640538f seguem valendo (a impressão de volta não leva o protocolo nem nada de áudio), e só a do online muda — de propósito:
-// um build v3 não divide sala com um v2.
+// Onda N, N6: a buzina e a frase vão na rede (PROTOCOL_VERSION 3), mas NÃO mudam a física: a impressão de volta não leva o protocolo
+// nem nada de áudio. Valores gravados na mescla N6+N1 (física revisão 3): se um deles mudar sem a física ter mudado, a voz vazou para o conteúdo.
 describe('a voz do carro renova só a impressão do online (N6)', () => {
-  const AT_640538F = { lap: '4fb0f246', lapRota66Trovao: '0df4070d', online: '5b13a09a' };
+  const AT_MERGE = { lap: '9fb16efb', lapRota66Trovao: 'e3e257b4' };
+  const AT_640538F = { online: '5b13a09a' };
 
-  it('a impressão de uma volta é a mesma de 640538f: o recorde e o fantasma de antes continuam desta versão', () => {
-    expect(lapFingerprint('copacabana', 'falcao')).toBe(AT_640538F.lap);
-    expect(lapFingerprint('rota_66', 'trovao')).toBe(AT_640538F.lapRota66Trovao);
-    expect(PHYSICS_REVISION).toBe(2);
-    const old: BestLap = { ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-09', fp: AT_640538F.lap };
+  it('a impressão de uma volta só depende da física: o protocolo 3 e o áudio não a mexem', () => {
+    expect(lapFingerprint('copacabana', 'falcao')).toBe(AT_MERGE.lap);
+    expect(lapFingerprint('rota_66', 'trovao')).toBe(AT_MERGE.lapRota66Trovao);
+    expect(PHYSICS_REVISION).toBe(3);
+    const old: BestLap = { ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-09', fp: AT_MERGE.lap };
     expect(recordFromOtherVersion(old, 'copacabana')).toBe(false);
   });
 
