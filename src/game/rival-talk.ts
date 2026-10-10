@@ -83,3 +83,39 @@ export function observeRivalTalk(mem: RivalTalk, state: RaceState, localSeats: r
   }
   return out;
 }
+
+// ───────────────────────────── Resposta à provocação (N6) ─────────────────────────────
+
+/** O rival só responde a quem está a até este tanto de posições dele. */
+export const REPLY_RANGE = 3;
+/** Chance (em %) de ele responder quando as outras condições deixam: "de vez em quando". */
+export const REPLY_PERCENT = 60;
+
+/** Um dado de 0 a 99 que sai só do tick e do assento (sem `state.rng`: a resposta é apresentação, não pode mexer na corrida). */
+export function replyRoll(tick: number, seat: number): number {
+  let h = Math.imul(tick + 1, 0x9e3779b1) ^ Math.imul(seat + 7, 0x85ebca6b);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) % 100;
+}
+
+/**
+ * O humano do assento `seat` acabou de mandar uma frase de provocação (voice.ts). O rival da copa responde — de vez em quando
+ * (`REPLY_PERCENT`) — se está na corrida, não chegou, o humano também não e estão a até `REPLY_RANGE` posições um do outro; e
+ * só se o intervalo mínimo e o teto de falas dele deixam (a mesma conta de `observeRivalTalk`: uma resposta conta como fala).
+ * Devolve o tipo da fala — `taunt` se ele está à frente, `revenge` se está atrás — ou null. Só visual: não toca o estado.
+ */
+export function rivalReply(mem: RivalTalk, state: RaceState, seat: number): RivalLineKind | null {
+  const name = state.config.rival;
+  if (!name || state.phase !== 'racing') return null;
+  const rival = state.cars.find((c) => c.seat < 0 && c.name === name);
+  const human = state.cars.find((c) => c.seat === seat);
+  if (!rival || rival.finished || !human || human.finished) return null;
+  if (Math.abs(rival.position - human.position) > REPLY_RANGE) return null;
+  if (mem.lines >= MAX_LINES || state.tick - mem.lastLineTick < MIN_GAP_SECONDS * TICK_RATE) return null;
+  if (replyRoll(state.tick, seat) >= REPLY_PERCENT) return null;
+  mem.lines++;
+  mem.lastLineTick = state.tick;
+  return rival.position < human.position ? 'taunt' : 'revenge';
+}

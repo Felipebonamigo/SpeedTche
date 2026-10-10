@@ -320,7 +320,7 @@ describe('bordas', () => {
   it('toPlayerInput junta o segurado (volante, acelerador, freio) com as bordas (nitro, marchas)', () => {
     const raw = { ...NEUTRAL_RAW, steer: -0.5, throttle: true, nitro: true, gearUp: true };
     const edges = { ...NO_EDGES, gearUp: true };
-    expect(toPlayerInput(raw, edges)).toEqual({ steer: -0.5, throttle: true, brake: false, nitro: false, gearUp: true, gearDown: false, drift: false });
+    expect(toPlayerInput(raw, edges)).toEqual({ steer: -0.5, throttle: true, brake: false, nitro: false, gearUp: true, gearDown: false, drift: false, horn: false });
   });
 });
 

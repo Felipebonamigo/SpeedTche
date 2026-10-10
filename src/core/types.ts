@@ -215,6 +215,17 @@ export interface PlayerInput {
    */
   drift?: boolean;
   /**
+   * Buzina (N6): o botão SEGURADO (nível). Opcional, como `drift`. É só som e balão: o núcleo NUNCA lê este campo nem `taunt`
+   * (o `hashRace` e o `sim-golden` de quem buzina são os de quem não buzina); a sessão os vê em `stepOnce`, no mesmo tick em todas
+   * as máquinas. Vai na rede no bit 64 (src/net/protocol.ts).
+   */
+  horn?: boolean;
+  /**
+   * Frase de provocação (N6): o índice 0..7 da frase pronta escolhida na roda, presente SÓ no tick em que foi escolhida (borda).
+   * Vai na rede nos bits 8–11 como índice + 1. Ver `horn`: o núcleo não a lê.
+   */
+  taunt?: number;
+  /**
    * Comando, não tecla: a IA assume este carro a partir deste tick (online, quando o jogador não
    * volta — src/net/lockstep.ts). Vem no fluxo de entradas para a tomada passar pelo stepRace.
    */

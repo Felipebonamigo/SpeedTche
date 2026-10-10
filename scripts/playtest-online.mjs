@@ -213,6 +213,37 @@ const speeds = await Promise.all([host, guest].map((p) => p.evaluate(() => { con
 // Os dois computadores podem estar em ticks um pouco diferentes aqui (o laço de quadros também
 // roda); a igualdade do estado já foi provada pelo hash acima.
 check(speeds.every((list) => list.length === 2 && list.every((v) => v > 1000)), `os dois carros andam nos dois computadores (${JSON.stringify(speeds)})`);
+
+// ── N6: a buzina e a frase de provocação do convidado atravessam a rede e chegam ao anfitrião, no mesmo tick (entrada, bit 64 e bits 8–11).
+await Promise.all([host, guest].map((p) => p.evaluate(() => {
+  window.__horns = [];
+  const a = window.nc.session.audio; const orig = a.horn.bind(a);
+  a.horn = (id, g) => { window.__horns.push([id, g]); orig(id, g); };
+  // O balão dura 2 s de tempo de QUADRO; com o 3D por software cada quadro leva segundos e ele some antes de a conferência olhar: guarda os que passaram.
+  window.__balloons = [];
+  setInterval(() => { for (const b of window.nc.session.race?.voice.balloons ?? []) if (!window.__balloons.some((x) => x.id === b.id)) window.__balloons.push({ id: b.id, seat: b.seat, text: b.text, own: b.own }); }, 25);
+})));
+const guestCar = await guest.evaluate(() => window.nc.session.race.state.cars.find((c) => c.seat === 1).carId);
+const hornTick = (await info(guest)).tick;
+await guest.keyboard.down('KeyH');
+await raceTo(hornTick + 40);
+const horns = await Promise.all([host, guest].map((p) => p.evaluate(() => window.__horns)));
+check(horns[0].some(([id, g]) => id === guestCar && Math.abs(g - 0.6) < 1e-9), `a buzina do convidado soa no anfitrião com o carro dele e o ganho de outro computador (${JSON.stringify(horns[0])})`);
+check(horns[1].some(([id, g]) => id === guestCar && g === 1), `e no próprio convidado com ganho cheio (${JSON.stringify(horns[1])})`);
+check(horns[0].length === 1 && horns[1].length === 1, `segurar a buzina é uma buzinada só (${horns[0].length} no anfitrião, ${horns[1].length} no convidado)`);
+const wheelOpen = await waitFor(guest, () => window.nc.session.race.voice.wheels[1]?.open === true);
+check(wheelOpen, 'segurar a buzina abre a roda de frases no convidado');
+await shot(guest, '11-roda-de-frases');
+await press(guest, 'KeyM'); // marcha acima: marca a primeira frase
+await guest.keyboard.up('KeyH');
+const tauntTick = (await info(guest)).tick;
+await raceTo(tauntTick + 60);
+const balloons = await Promise.all([host, guest].map((p) => p.evaluate(() => window.__balloons)));
+check(balloons[0].length === 1 && balloons[0][0].seat === 1 && balloons[0][0].text === 'Come poeira!' && !balloons[0][0].own, `a frase do convidado vira balão no anfitrião (${JSON.stringify(balloons[0])})`);
+check(balloons[1].length === 1 && balloons[1][0].seat === 1 && balloons[1][0].own, `e no próprio convidado, sobre o carro dele (${JSON.stringify(balloons[1])})`);
+await shot(host, '12-balao-no-anfitriao');
+[ha, hg] = await hashes(Math.floor((await Promise.all([host, guest].map((p) => info(p)))).reduce((m, x) => Math.min(m, x.tick), Infinity) / 60) * 60);
+check(ha !== null && ha === hg, `mesmo hash depois da buzina e da frase (${ha} × ${hg})`);
 await host.waitForTimeout(800);
 await shot(host, '05-race-host');
 await shot(guest, '06-race-guest');

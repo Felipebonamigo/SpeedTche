@@ -7,11 +7,12 @@ import type { AssistLevel, CoopAssists, Difficulty, PlayerInput } from '../core/
 import { withPaint } from '../game/paints';
 
 /**
- * Versão do protocolo. 2 (onda M, M1): a entrada ganhou o bit de derrapar (32). O relay aceita a FAIXA de versões
- * (server/relay.mjs: MIN_PROTOCOL_VERSION … PROTOCOL_VERSION) e quem separa jogos de conteúdo diferente é a impressão do
- * conteúdo (`b`, content-version.ts), que já carrega esta versão: um cliente v1 e um v2 nunca dividem sala.
+ * Versão do protocolo. 2 (onda M, M1): a entrada ganhou o bit de derrapar (32). 3 (onda N, N6): a buzina (bit 64) e a frase de
+ * provocação (bits 8–11). O relay aceita a FAIXA de versões (server/relay.mjs: MIN_PROTOCOL_VERSION … PROTOCOL_VERSION) e quem
+ * separa jogos de conteúdo diferente é a impressão do conteúdo (`b`, content-version.ts), que já carrega esta versão: um
+ * cliente v2 e um v3 nunca dividem sala.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const DEFAULT_SERVER_URL = 'ws://localhost:8787';
 export const SERVER_URL_MAX_LENGTH = 200;
 
@@ -36,10 +37,19 @@ export const RECONNECT_WINDOW_MS = 60_000;
 
 // ───────────────────────────── Entrada por tick ─────────────────────────────
 
-/** Bits da entrada compacta (o 32, derrapar, é da v2; 64 está livre). `TAKEOVER` não é do jogador: é o comando "a IA assume este assento". */
-export const INPUT_BIT = { throttle: 1, brake: 2, nitro: 4, gearUp: 8, gearDown: 16, drift: 32 } as const;
+/**
+ * Bits da entrada compacta (o 32, derrapar, é da v2; o 64, buzina, da v3). `TAKEOVER` não é do jogador: é o comando "a IA assume
+ * este assento" e vai sozinho. A frase de provocação (v3) mora acima, nos bits 8–11, como índice + 1 (0 = nenhuma): o registro
+ * continua `[tick, assento, bits, volante]`, só a faixa dos bits cresceu.
+ */
+export const INPUT_BIT = { throttle: 1, brake: 2, nitro: 4, gearUp: 8, gearDown: 16, drift: 32, horn: 64 } as const;
 export const TAKEOVER_BIT = 128;
-const PLAYER_BITS = 63;
+const PLAYER_BITS = 127;
+/** Quantas frases prontas existem (src/game/voice.ts) e onde o índice + 1 mora nos bits da entrada. */
+export const TAUNT_COUNT = 8;
+export const TAUNT_SHIFT = 8;
+const TAUNT_MASK = 0xf << TAUNT_SHIFT;
+const MAX_BITS = 0xfff;
 
 /** Um registro do fluxo de entradas: o que o assento `seat` faz no tick `tick`. */
 export interface InputRecord {
@@ -66,11 +76,15 @@ export function encodeInput(input: PlayerInput): { bits: number; steer: number }
   if (input.gearUp) bits |= INPUT_BIT.gearUp;
   if (input.gearDown) bits |= INPUT_BIT.gearDown;
   if (input.drift) bits |= INPUT_BIT.drift;
+  if (input.horn) bits |= INPUT_BIT.horn;
+  const taunt = input.taunt;
+  if (typeof taunt === 'number' && Number.isInteger(taunt) && taunt >= 0 && taunt < TAUNT_COUNT) bits |= (taunt + 1) << TAUNT_SHIFT;
   return { bits, steer: quantizeSteer(input.steer) };
 }
 
 /** A entrada que todas as máquinas simulam (inclusive a que a gerou): sempre a decodificada. */
 export function decodeInput(bits: number, steer: number): PlayerInput {
+  const taunt = (bits & TAUNT_MASK) >> TAUNT_SHIFT; // índice + 1; 0 = nenhuma
   return {
     steer: Math.max(-127, Math.min(127, Math.trunc(steer))) / 127,
     throttle: (bits & INPUT_BIT.throttle) !== 0,
@@ -79,6 +93,9 @@ export function decodeInput(bits: number, steer: number): PlayerInput {
     gearUp: (bits & INPUT_BIT.gearUp) !== 0,
     gearDown: (bits & INPUT_BIT.gearDown) !== 0,
     drift: (bits & INPUT_BIT.drift) !== 0,
+    horn: (bits & INPUT_BIT.horn) !== 0,
+    // A frase só existe no tick em que foi escolhida: sem ela a chave nem aparece.
+    ...(taunt >= 1 && taunt <= TAUNT_COUNT ? { taunt: taunt - 1 } : {}),
   };
 }
 
@@ -106,8 +123,9 @@ export function unpackRecords(d: unknown): InputRecord[] | null {
   const out: InputRecord[] = [];
   for (let i = 0; i < d.length; i += 4) {
     const [tick, seat, bits, steer] = [d[i], d[i + 1], d[i + 2], d[i + 3]];
-    if (!isInt(tick, 0, MAX_TICK) || !isInt(seat, 0, MAX_HUMANS - 1) || !isInt(bits, 0, 255) || !isInt(steer, -127, 127)) return null;
-    if (bits !== TAKEOVER_BIT && (bits & ~PLAYER_BITS) !== 0) return null;
+    if (!isInt(tick, 0, MAX_TICK) || !isInt(seat, 0, MAX_HUMANS - 1) || !isInt(bits, 0, MAX_BITS) || !isInt(steer, -127, 127)) return null;
+    if (bits !== TAKEOVER_BIT && (bits & ~(PLAYER_BITS | TAUNT_MASK)) !== 0) return null;
+    if (bits !== TAKEOVER_BIT && (bits & TAUNT_MASK) >> TAUNT_SHIFT > TAUNT_COUNT) return null;
     if (bits === TAKEOVER_BIT && steer !== 0) return null;
     out.push({ tick, seat, bits, steer });
   }

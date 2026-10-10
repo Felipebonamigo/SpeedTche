@@ -12,6 +12,7 @@ registerStrings('remap', {
     'action.gearDown': 'Marcha abaixo',
     'action.drift': 'Derrapar',
     'action.lookBack': 'Olhar para trás',
+    'action.horn': 'Buzina',
     'action.pause': 'Pausar',
 
     'key.space': 'Espaço',
@@ -68,6 +69,7 @@ registerStrings('remap', {
     'action.gearDown': 'Gear down',
     'action.drift': 'Drift',
     'action.lookBack': 'Look back',
+    'action.horn': 'Horn',
     'action.pause': 'Pause',
 
     'key.space': 'Space',

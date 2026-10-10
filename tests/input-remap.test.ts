@@ -42,26 +42,26 @@ function expectSound(b: ControlBindings): void {
 // ───────────────────────────── Padrão e saneamento ─────────────────────────────
 
 describe('bindings: padrão e saneamento', () => {
-  it('o padrão é o da decisão nº 9 (10 ações) e é o das opções', () => {
+  it('o padrão é o da decisão nº 9 mais a buzina da N6 (11 ações) e é o das opções', () => {
     expect(DEFAULT_BINDINGS.kb1).toEqual({
       throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'],
-      drift: ['ShiftRight'], lookBack: ['KeyB'], pause: ['Escape'],
+      drift: ['ShiftRight'], lookBack: ['KeyB'], horn: ['KeyH'], pause: ['Escape'],
     });
     expect(DEFAULT_BINDINGS.kb2).toEqual({
       throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'], nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'],
-      drift: ['ShiftLeft'], lookBack: ['KeyR'], pause: ['Escape'],
+      drift: ['ShiftLeft'], lookBack: ['KeyR'], horn: ['KeyG'], pause: ['Escape'],
     });
-    // Controle: derrapar no RB (5), nitro no LB (4) e no Y (3), câmbio manual no D-pad ↑/↓ (12/13), olhar para trás no R3 (11).
+    // Controle: derrapar no RB (5), nitro no LB (4) e no Y (3), câmbio manual no D-pad ↑/↓ (12/13), olhar para trás no R3 (11), buzina no L3 (10).
     expect(DEFAULT_BINDINGS.gamepad).toEqual({
-      throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9],
+      throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], horn: [10], pause: [9],
     });
     expect(DEFAULT_SETTINGS.controls).toEqual(DEFAULT_BINDINGS);
     expect(DEFAULT_SETTINGS.vibration).toBe(true);
     expectSound(DEFAULT_BINDINGS);
   });
 
-  it('são 10 ações: derrapar e olhar para trás entram antes da pausa', () => {
-    expect([...BIND_ACTIONS]).toEqual(['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'pause']);
+  it('são 11 ações: derrapar e olhar para trás (M1) e a buzina (N6) entram antes da pausa', () => {
+    expect([...BIND_ACTIONS]).toEqual(['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'pause']);
     for (const device of BIND_DEVICES) expect(Object.keys(DEFAULT_BINDINGS[device]).sort(), device).toEqual([...BIND_ACTIONS].sort());
   });
 
@@ -144,7 +144,7 @@ const LEGACY_KB2 = { throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right:
 const LEGACY_PAD = { throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [5], gearUp: [3], gearDown: [4], pause: [9] };
 const LEGACY = { kb1: LEGACY_KB1, kb2: LEGACY_KB2, gamepad: LEGACY_PAD };
 /** O gamepad padrão novo, por extenso (não pelo DEFAULT_BINDINGS: um teste que compara o código com ele mesmo não prova nada). */
-const NEW_PAD = { throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9] };
+const NEW_PAD = { throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15], nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], horn: [10], pause: [9] };
 
 describe('derrapar e olhar para trás: conflito entre os teclados', () => {
   it('o padrão não tem conflito kb1 × kb2: Shift direito × Shift esquerdo, e nenhuma tecla repetida (menos Esc)', () => {
@@ -169,7 +169,7 @@ describe('derrapar e olhar para trás: conflito entre os teclados', () => {
 
   it('as teclas novas não são teclas de navegação dos menus (seriam roubadas do jogo)', () => {
     const nav = new Set(Object.values(NAV_LAYOUTS).flatMap((l) => Object.values(l).flat()));
-    for (const kb of ['kb1', 'kb2'] as const) for (const a of ['drift', 'lookBack'] as const) for (const c of DEFAULT_BINDINGS[kb][a]) expect(nav.has(c), `${kb}.${a}=${c}`).toBe(false);
+    for (const kb of ['kb1', 'kb2'] as const) for (const a of ['drift', 'lookBack', 'horn'] as const) for (const c of DEFAULT_BINDINGS[kb][a]) expect(nav.has(c), `${kb}.${a}=${c}`).toBe(false);
   });
 
   it('R3 (11) vale para olhar para trás e RB (5) para derrapar; Start (9) continua só na pausa', () => {
@@ -201,7 +201,13 @@ describe('migração dos mapas salvos de antes da M1 (8 ações)', () => {
     const a = sanitizeBindings({ ...LEGACY, gamepad: { ...LEGACY_PAD, nitro: [8] } }).gamepad;
     expect(a).toEqual({ ...NEW_PAD, nitro: [8] });
     const b = sanitizeBindings({ ...LEGACY, gamepad: { ...LEGACY_PAD, gearUp: [10] } }).gamepad;
-    expect(b).toEqual({ ...NEW_PAD, gearUp: [10] });
+    // O L3 (padrão da buzina) já era a marcha acima do jogador: ela fica com ele e a buzina ganha outro botão livre.
+    const { horn, ...rest } = b;
+    const { horn: _unused, ...expectedRest } = { ...NEW_PAD, gearUp: [10] };
+    void _unused;
+    expect(rest).toEqual(expectedRest);
+    expect(horn.length).toBe(1);
+    expect(horn[0]).not.toBe(10);
     const c = sanitizeBindings({ ...LEGACY, kb1: { ...LEGACY_KB1, nitro: ['KeyJ'] } }).kb1;
     expect(c.nitro).toEqual(['KeyJ']);
     expect(c.drift).toEqual(['ShiftRight']);
@@ -250,6 +256,100 @@ describe('migração dos mapas salvos de antes da M1 (8 ações)', () => {
       for (const device of BIND_DEVICES) { expect(b[device].drift.length, `${device}.drift`).toBeGreaterThan(0); expect(b[device].lookBack.length, `${device}.lookBack`).toBeGreaterThan(0); }
       expect(sanitizeBindings(b)).toEqual(b);
     }
+  });
+});
+
+// Onda N, N6: a 11ª ação, a buzina (H no teclado 1, G no 2, L3 no controle). Nenhum padrão antigo mudou de lugar, então a
+// migração é só "a ação nova ganha o padrão", e quem já usava o botão para outra ação NÃO o perde (a ordem das ações decide).
+describe('a buzina é a 11ª ação (N6)', () => {
+  /** Um mapa gravado na M1: as 10 ações, sem `horn`. */
+  function m1Map(): Record<BindDevice, Record<string, BindCode[]>> {
+    const out = {} as Record<BindDevice, Record<string, BindCode[]>>;
+    for (const device of BIND_DEVICES) {
+      out[device] = {};
+      for (const a of BIND_ACTIONS) if (a !== 'horn') out[device][a] = [...DEFAULT_BINDINGS[device][a]];
+    }
+    return out;
+  }
+
+  it('H (teclado 1), G (teclado 2) e L3 (controle) são o padrão, a buzina vem antes da pausa e nenhuma tecla padrão se repete entre os teclados', () => {
+    expect(DEFAULT_BINDINGS.kb1.horn).toEqual(['KeyH']);
+    expect(DEFAULT_BINDINGS.kb2.horn).toEqual(['KeyG']);
+    expect(DEFAULT_BINDINGS.gamepad.horn).toEqual([10]);
+    expect(BIND_ACTIONS.indexOf('horn')).toBe(BIND_ACTIONS.indexOf('pause') - 1);
+    expect(keyboardConflicts(DEFAULT_BINDINGS)).toEqual([]);
+    expect(isBindableKey('KeyH', 'horn')).toBe(true);
+    expect(isBindableButton(10, 'horn')).toBe(true);
+    expect(isBindableButton(9, 'horn')).toBe(false);
+  });
+
+  it('um mapa da M1 (10 ações) ganha a buzina no padrão e o resto fica exatamente como estava', () => {
+    const b = sanitizeBindings(m1Map());
+    expect(b).toEqual(DEFAULT_BINDINGS);
+    expect(sanitizeBindings(b)).toEqual(b);
+    // Personalização da M1 sobrevive.
+    const raw = m1Map();
+    raw.kb1.nitro = ['KeyJ'];
+    raw.gamepad.drift = [8];
+    const c = sanitizeBindings(raw);
+    expect(c.kb1.nitro).toEqual(['KeyJ']);
+    expect(c.gamepad.drift).toEqual([8]);
+    expect(c.kb1.horn).toEqual(['KeyH']);
+    expect(c.gamepad.horn).toEqual([10]);
+    expectSound(c);
+  });
+
+  it('quem já usava H, G ou L3 em outra ação não os perde: a buzina cai num código livre', () => {
+    const raw = m1Map();
+    raw.kb1.nitro = ['KeyH'];
+    raw.kb2.brake = ['KeyG'];
+    raw.gamepad.lookBack = [10];
+    const b = sanitizeBindings(raw);
+    expect(b.kb1.nitro).toEqual(['KeyH']);
+    expect(b.kb2.brake).toEqual(['KeyG']);
+    expect(b.gamepad.lookBack).toEqual([10]);
+    for (const [device, taken] of [['kb1', 'KeyH'], ['kb2', 'KeyG'], ['gamepad', 10]] as const) {
+      expect(b[device].horn, device).toHaveLength(1);
+      expect(b[device].horn[0], device).not.toBe(taken);
+    }
+    expectSound(b);
+    expect(sanitizeBindings(b)).toEqual(b);
+  });
+
+  it('pelo caminho real das opções: Settings.controls da M1 ganha a buzina, e o save novo volta igual', () => {
+    const s = sanitizeSettings({ controls: m1Map() });
+    expect(s.controls.gamepad.horn).toEqual([10]);
+    expect(s.controls.kb1.horn).toEqual(['KeyH']);
+    expect(s.controls).toEqual(DEFAULT_BINDINGS);
+    expect(sanitizeSettings(JSON.parse(JSON.stringify(s)))).toEqual(s);
+  });
+
+  it('300 mapas da M1 sorteados saem sem ação vazia nem código repetido, todos com buzina', () => {
+    let seed = 424242;
+    const next = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    const keyPool = ['ArrowUp', 'Space', 'KeyM', 'KeyN', 'KeyW', 'KeyF', 'KeyE', 'ShiftLeft', 'ShiftRight', 'KeyB', 'KeyR', 'KeyH', 'KeyG', 'KeyJ'];
+    for (let i = 0; i < 300; i++) {
+      const raw = m1Map();
+      for (const device of BIND_DEVICES) {
+        for (const a of BIND_ACTIONS) {
+          if (a === 'horn') continue;
+          if (next(4) === 0) raw[device][a] = Array.from({ length: 1 + next(2) }, () => (device === 'gamepad' ? next(16) : keyPool[next(keyPool.length)]));
+        }
+      }
+      const b = sanitizeBindings(raw);
+      expectSound(b);
+      for (const device of BIND_DEVICES) expect(b[device].horn.length, `${device}.horn`).toBeGreaterThan(0);
+      expect(sanitizeBindings(b)).toEqual(b);
+    }
+  });
+
+  it('trocar a buzina de lugar usa as mesmas regras de sempre (troca quando a outra ficaria sem nada)', () => {
+    const r = assignBinding(DEFAULT_BINDINGS, 'kb1', 'horn', 'Space');
+    expect(r.bindings.kb1.horn).toEqual(['Space']);
+    expect(r.bindings.kb1.nitro).toEqual(['KeyH']);
+    expect(r.displaced).toEqual({ action: 'nitro', codes: ['KeyH'], swapped: true });
+    expectSound(r.bindings);
+    expect(assignBinding(DEFAULT_BINDINGS, 'gamepad', 'horn', 5).bindings.gamepad.drift).toEqual([10]);
   });
 });
 

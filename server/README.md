@@ -46,8 +46,9 @@ salvo nas opções). Na mesma rede local, use o IP da máquina do relay: `ws://1
 
 ## Protocolo (resumo)
 
-JSON por mensagem, campo `t` com o tipo. Versão `PROTOCOL_VERSION = 2` (a mesma de
-`src/net/protocol.ts`; a v2 é a da M1: a entrada ganhou o bit 32, derrapar). O relay aceita a faixa **1..2**
+JSON por mensagem, campo `t` com o tipo. Versão `PROTOCOL_VERSION = 3` (a mesma de
+`src/net/protocol.ts`; a v2 é a da M1: a entrada ganhou o bit 32, derrapar; a v3 é a da N6: o bit 64, buzina, e a frase de
+provocação nos bits 8–11 — o relay não lê os bits). O relay aceita a faixa **1..3**
 (`MIN_PROTOCOL_VERSION … PROTOCOL_VERSION` em `relay.mjs`); cliente fora dela recebe `error: version`.
 
 | Cliente → relay | Relay → clientes |

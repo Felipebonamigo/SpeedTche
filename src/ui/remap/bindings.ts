@@ -4,11 +4,13 @@
 // passa por aqui: é fixa em src/ui/input.ts e src/ui/menus.ts, para ninguém se trancar fora.
 
 /**
- * As 10 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
- * `lookBack` é só de câmera — nada no núcleo o lê, só a ação existe para o jogador ter o botão. `pause` continua a última.
+ * As 11 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
+ * `lookBack` é só de câmera — nada no núcleo o lê, só a ação existe para o jogador ter o botão. `horn` (buzina) entrou na
+ * onda N (N6): só som e balão, o núcleo também não a lê; segurá-la abre a roda de frases. `pause` continua a última — a ordem
+ * decide quem fica com um código em conflito, então um mapa antigo nunca perde um botão para a buzina.
  */
-export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'pause';
-export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'pause'];
+export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'horn' | 'pause';
+export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'pause'];
 
 /** Colunas da tela de controles: os dois teclados e um mapeamento único para todos os gamepads. */
 export type BindDevice = 'kb1' | 'kb2' | 'gamepad';
@@ -68,21 +70,22 @@ function deepFreeze<T>(value: T): T {
 /**
  * O mapeamento padrão (decisão nº 9 do dono, onda M). Controle: derrapar no RB, nitro no LB (e no Y), câmbio manual no D-pad
  * ↑/↓ (o automático é o padrão), olhar para trás no R3. Teclado 1: derrapar no Shift direito; teclado 2: no Shift esquerdo
- * (códigos físicos diferentes: os dois teclados não colidem). Antes da M1 o RB era o nitro e Y/LB as marchas: os mapas salvos
- * migram em `sanitizeBindings` (LEGACY_PAD_DEFAULTS).
+ * (códigos físicos diferentes: os dois teclados não colidem). Buzina (N6): H no teclado 1, G no teclado 2, L3 no controle (os
+ * três estavam livres). Antes da M1 o RB era o nitro e Y/LB as marchas: os mapas salvos migram em `sanitizeBindings`
+ * (LEGACY_PAD_DEFAULTS); a buzina não move nenhum padrão antigo, então não precisa de migração própria.
  */
 export const DEFAULT_BINDINGS: ControlBindings = deepFreeze({
   kb1: {
     throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], drift: ['ShiftRight'], lookBack: ['KeyB'], pause: ['Escape'],
+    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], drift: ['ShiftRight'], lookBack: ['KeyB'], horn: ['KeyH'], pause: ['Escape'],
   },
   kb2: {
     throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
-    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], drift: ['ShiftLeft'], lookBack: ['KeyR'], pause: ['Escape'],
+    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], drift: ['ShiftLeft'], lookBack: ['KeyR'], horn: ['KeyG'], pause: ['Escape'],
   },
   gamepad: {
     throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15],
-    nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], pause: [9],
+    nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], horn: [10], pause: [9],
   },
 });
 
@@ -170,7 +173,8 @@ function sanitizeDevice<C extends BindCode>(raw: unknown, rules: DeviceRules<C>)
 
 /**
  * Dispositivo gravado antes da M1 (8 ações: sem `drift` nem `lookBack`): as ações do gamepad que ainda estão no padrão antigo
- * (LEGACY_PAD_DEFAULTS) passam ao padrão novo. Um mapa da M1 em diante tem as 10 ações e não migra (o RB no nitro ali é escolha).
+ * (LEGACY_PAD_DEFAULTS) passam ao padrão novo. Um mapa da M1 em diante tem as 10 ações (a N6 acrescentou a 11ª, `horn`, que só
+ * ganha o padrão) e não migra (o RB no nitro ali é escolha).
  */
 function migrateLegacyPad(raw: unknown): unknown {
   if (!isRecord(raw) || 'drift' in raw || 'lookBack' in raw) return raw;

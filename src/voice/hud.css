@@ -1,0 +1,51 @@
+/* A roda de frases e os balões de fala (N6; src/voice/hud.ts). Overlay sobre o HUD: tudo escala por --s (uiScale do viewport) e
+   o tamanho do HUD das opções (--hud-scale). Texto nunca abaixo de 12 px efetivos (piso do HUD). Balão branco de gibi, com o
+   contorno na cor de quem falou; a ponta aponta para o carro. */
+.vh-root { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; font-family: var(--font-display, inherit); }
+.vh-root.hidden { display: none; }
+.vh-vp { position: absolute; overflow: hidden; --s: 1; --accent: #ffd23f; }
+
+.vh-balloon { display: none; box-sizing: border-box; max-width: calc(300px * var(--s)); padding: calc(7px * var(--s)) calc(16px * var(--s)); border-radius: calc(18px * var(--s));
+  background: #fff; color: #10142a; border: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent)); box-shadow: 0 calc(4px * var(--s)) 0 rgba(0, 0, 0, 0.35);
+  font-weight: 800; line-height: 1.15; text-align: center; text-wrap: balance;
+  animation: vh-pop 260ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.vh-balloon.show { display: block; }
+.vh-balloon .vh-text { font-size: max(12px, calc(19px * var(--s))); }
+.vh-balloon .vh-who { display: block; font-size: max(12px, calc(12px * var(--s))); letter-spacing: 0.06em; color: color-mix(in srgb, var(--who, var(--accent)) 65%, #10142a); }
+
+/* O do próprio falante: em cima do carro dele (o carro fica no centro da tela, com o teto a ~54% da altura nas capturas), ponta para baixo. */
+.vh-own { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -100%); }
+.vh-own::after { content: ''; position: absolute; left: 50%; bottom: calc(-11px * var(--s)); width: calc(16px * var(--s)); height: calc(16px * var(--s)); background: #fff;
+  border-right: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent)); border-bottom: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent));
+  transform: translateX(-50%) rotate(45deg); }
+
+/* Os de outros (outro assento, outro computador, o rival): empilhados no canto superior direito, com o nome — o centro é do
+   balão do próprio falante e do carro. */
+.vh-top { position: absolute; right: calc(14px * var(--s)); top: calc(14px * var(--s)); display: flex; flex-direction: column; align-items: flex-end; gap: calc(6px * var(--s)); width: max-content; max-width: 48%; }
+.vh-other { position: relative; }
+/* A fala do rival é comprida: no máximo 2 linhas no balão do alto. */
+.vh-other .vh-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* A roda: 8 frases em 2 colunas, a marcada em destaque. Fica logo abaixo do painel de posição (à esquerda, entre ele e o de combustível):
+   a faixa livre ali tem ~210 unidades de altura em qualquer tamanho de viewport (a escala `--s` é por altura) e a roda cabe em ~180. */
+.vh-wheel { display: none; position: absolute; left: calc(18px * var(--s)); top: calc(188px * var(--s)); box-sizing: border-box; padding: calc(6px * var(--s)) calc(10px * var(--s));
+  border-radius: calc(16px * var(--s)); background: rgba(14, 18, 40, 0.94); border: max(2px, calc(3px * var(--s))) solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 calc(4px * var(--s)) 0 color-mix(in srgb, var(--accent) 58%, #05070f), 0 calc(8px * var(--s)) calc(18px * var(--s)) rgba(0, 0, 0, 0.45);
+  color: #f6f8ff; max-width: calc(100% - 36px * var(--s)); }
+.vh-wheel.open { display: block; animation: vh-pop 220ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.vh-title { font-size: max(12px, calc(13px * var(--s))); line-height: 1.1; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: calc(3px * var(--s)); }
+.vh-grid { display: grid; grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: calc(2px * var(--s)) calc(8px * var(--s)); }
+.vh-item { font-size: max(12px, calc(16px * var(--s))); line-height: 1.1; font-weight: 800; padding: calc(2px * var(--s)) calc(8px * var(--s)); border-radius: calc(9px * var(--s));
+  white-space: nowrap; color: #dfe4f7; }
+/* A marcada: fundo claro e contorno na cor do assento por sombra (o contorno não muda a altura da linha). */
+.vh-item.on { background: #fff; color: #10142a; box-shadow: 0 0 0 max(2px, calc(2px * var(--s))) var(--accent); }
+.vh-item.on::before { content: '▶ '; }
+.vh-wait { font-size: max(12px, calc(14px * var(--s))); line-height: 1.1; font-weight: 800; color: #ffb4a8; margin-top: calc(3px * var(--s)); }
+.vh-wait:empty { display: none; }
+.vh-wheel.wait .vh-item { opacity: 0.5; }
+.vh-hint { font-size: max(12px, calc(12px * var(--s))); line-height: 1.1; color: #b4bdd8; font-weight: 700; margin-top: calc(3px * var(--s)); }
+
+@keyframes vh-pop { 0% { transform: var(--vh-from, translate(0)) scale(0.6); opacity: 0; } 100% { opacity: 1; } }
+.vh-own { --vh-from: translate(-50%, -100%); }
+.vh-vp.calm .vh-balloon, .vh-vp.calm .vh-wheel.open { animation: none; }
+@media (prefers-reduced-motion: reduce) { .vh-balloon, .vh-wheel.open { animation: none; } }

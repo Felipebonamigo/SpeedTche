@@ -66,8 +66,11 @@ export interface LockstepStats {
   resent: number;
 }
 
-/** Entrada local ainda não enviada: o volante, os pedais e a derrapagem (botão segurado) valem o último; bordas acumulam até sair. */
-interface PendingInput { steer: number; throttle: boolean; brake: boolean; nitro: boolean; gearUp: boolean; gearDown: boolean; drift: boolean }
+/**
+ * Entrada local ainda não enviada: o volante, os pedais, a derrapagem e a buzina (botões segurados) valem o último; bordas
+ * (nitro, marchas e a frase de provocação) acumulam até sair.
+ */
+interface PendingInput { steer: number; throttle: boolean; brake: boolean; nitro: boolean; gearUp: boolean; gearDown: boolean; drift: boolean; horn: boolean; taunt?: number }
 
 export class Lockstep {
   readonly seats: readonly number[];
@@ -115,7 +118,7 @@ export class Lockstep {
 
   // ───────────────────────────── Entrada ─────────────────────────────
 
-  /** O que o jogador local está fazendo agora; bordas (nitro, marchas) ficam guardadas até serem enviadas; derrapar é nível, como o pedal. */
+  /** O que o jogador local está fazendo agora; bordas (nitro, marchas, frase) ficam guardadas até serem enviadas; derrapar e buzinar são nível, como o pedal. */
   setLocalInput(seat: number, input: PlayerInput): void {
     if (!this.localSeats.includes(seat)) return;
     const prev = this.pending.get(seat);
@@ -125,6 +128,8 @@ export class Lockstep {
       gearUp: input.gearUp || (prev?.gearUp ?? false),
       gearDown: input.gearDown || (prev?.gearDown ?? false),
       drift: input.drift === true,
+      horn: input.horn === true,
+      taunt: input.taunt ?? prev?.taunt,
     });
   }
 
@@ -186,8 +191,8 @@ export class Lockstep {
         out.push(rec);
       }
     }
-    // As bordas já saíram; o volante, os pedais e a derrapagem continuam valendo até a próxima leitura.
-    for (const [seat, p] of this.pending) this.pending.set(seat, { ...p, nitro: false, gearUp: false, gearDown: false });
+    // As bordas já saíram; o volante, os pedais, a derrapagem e a buzina continuam valendo até a próxima leitura.
+    for (const [seat, p] of this.pending) this.pending.set(seat, { ...p, nitro: false, gearUp: false, gearDown: false, taunt: undefined });
     this.lastSent = target;
     if (out.length) { this.stats.sent += out.length; this.log(out); this.transport.sendInputs(out); }
   }
