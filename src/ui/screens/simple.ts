@@ -4,23 +4,25 @@ import type { DeviceId, MenuScreen, RaceMode } from '../../game/contracts';
 import { t } from '../../i18n';
 import '../../net/strings';
 import '../../party/strings';
+import '../fonts.css';
+import { logoMarkup, type LogoSize } from '../logo';
 import '../passport/strings';
 import { button, createFocusList, h, listNav, screenFrame, type FocusItem, type ScreenApi, type ScreenInstance } from './common';
 import { startCursor } from './lobby';
 import { shouldOfferTutorial, tutorialOfferCard } from './tutorial';
 
-function wordmark(cls: string): HTMLElement {
-  return h('div', { class: `wordmark ${cls}`.trim() },
-    h('span', { class: 'wm-nitro', text: 'NITRO' }),
-    h('span', { class: 'wm-crew', text: 'CREW' }),
-  );
+/** O logo provisório (ui/logo.ts): SVG inline na fonte de exibição, no lugar do texto que dizia NITRO CREW. */
+function logo(size: LogoSize): HTMLElement {
+  const wrap = h('div', { class: `logo-wrap logo-wrap-${size}` });
+  wrap.innerHTML = logoMarkup(size); // marcação constante nossa (logo.ts), nunca dado do usuário
+  return wrap;
 }
 
 export function titleScreen(api: ScreenApi): ScreenInstance {
   const enter = () => { api.sfx('confirm'); api.go('main'); };
   const el = screenFrame('title', null,
     h('div', { class: 'title-center' },
-      wordmark('wordmark-big'),
+      logo('big'),
       h('p', { class: 'title-sub', text: t('ui.title.subtitle') }),
     ),
     h('p', { class: 'title-press pulse', text: t('ui.title.press') }),
@@ -89,7 +91,7 @@ export function mainScreen(api: ScreenApi): ScreenInstance {
   const el = screenFrame('main', null,
     h('div', { class: 'main-layout' },
       h('div', { class: 'main-left glass' },
-        wordmark('wordmark-small'),
+        logo('small'),
         h('div', { class: 'menu-list' }, buttons.map((i) => i.el)),
       ),
       h('div', { class: 'main-right' }, heroTitle, heroHint, offer ? offer.el : null),
@@ -137,7 +139,7 @@ export function creditsScreen(api: ScreenApi): ScreenInstance {
   const list = createFocusList([back], { sfx: api.sfx });
   const el = screenFrame('credits', t('ui.credits.title'),
     h('div', { class: 'credits-body glass' },
-      wordmark('wordmark-small'),
+      logo('small'),
       h('p', { class: 'credits-big', text: t('ui.credits.by') }),
       h('p', { text: t('ui.credits.inspired') }),
       h('p', { text: t('ui.credits.tech') }),

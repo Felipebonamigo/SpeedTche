@@ -199,3 +199,31 @@ indexada, cor chapada por face (COLOR_0; **hoje (até a L3)**, com o atlas de pa
    instaladas e tiradas depois.
 7. Testes: `tests/landmark-parts.test.ts` (validador, carregador, os 9 construtores com e sem a peça, orçamento,
    caches, sombreado; no conversor, o modo peça, `--length`, `--paint` e `--by-light`).
+
+## Fontes de exibição (onda L, frente L5, 10/10/2026)
+
+O HUD, os títulos de tela e o logo provisório usam uma fonte de exibição **embutida** (nada de fonte externa em tempo de
+jogo). São três candidatas, todas com a **SIL Open Font License 1.1** (uso comercial e redistribuição livres, com a licença
+junto; o texto completo de cada uma está ao lado do arquivo, em `src/assets/fonts/OFL-*.txt`). **O dono escolhe uma**:
+a escolha é **uma linha**, o `--font-display` em `src/ui/fonts.css` (a família que vem primeiro; hoje **Fredoka**). O
+`tests/fonts-hud.test.ts` confere que os arquivos, as licenças e este registro existem.
+
+Origem de todas: o repositório `github.com/google/fonts` (pasta `ofl/<fonte>/`, ramo `main`), baixadas em 10/10/2026.
+
+| Família | Arquivo em `src/assets/fonts/` | Autor (direito autoral) | Licença | URL de origem | O que foi feito |
+|---|---|---|---|---|---|
+| **Fredoka** (padrão) | `Fredoka-latin.woff2` (29 KB) | Milena Brandão, Hafontia — "Copyright 2016 The Fredoka Project Authors (github.com/hafontia/Fredoka-One)" | SIL Open Font License 1.1 (`OFL-Fredoka.txt`) | `github.com/google/fonts/tree/main/ofl/fredoka` (`Fredoka[wdth,wght].ttf`) | Variável fixada em largura normal (eixo `wdth` = 100), peso 400–700 mantido; subconjunto latino (PT e EN, `U+0020–017F`, aspas, travessões, `×`, `−`, `€`, `•`, `…`); woff2. Sem Reserved Font Name. |
+| **Baloo 2** | `Baloo2-latin.woff2` (36 KB) | Ek Type (EkType) — "Copyright 2019 The Baloo 2 Project Authors (github.com/EkType/Baloo2)" | SIL Open Font License 1.1 (`OFL-Baloo2.txt`) | `github.com/google/fonts/tree/main/ofl/baloo2` (`Baloo2[wght].ttf`) | Peso 400–800 mantido; subconjunto latino como acima, com os números tabulares (`tnum`); woff2. Sem Reserved Font Name. |
+| **Lilita One** | `LilitaOne-Regular.ttf` (28 KB) | Juan Montoreano — "Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Name Lilita" | SIL Open Font License 1.1 (`OFL-LilitaOne.txt`) | `github.com/google/fonts/tree/main/ofl/lilitaone` (`LilitaOne-Regular.ttf`) | **Nada**: o arquivo original, sem subconjunto nem renomear, porque a licença reserva o nome "Lilita" e uma versão modificada não pode usá-lo. Peso único (400): o CSS desliga o negrito sintetizado (`font-synthesis: none`). |
+
+Como o subconjunto foi feito (fora do repositório, com `fonttools` e `brotli` numa venv descartável — não é dependência do
+projeto): `fonttools varLib.instancer` para fixar os eixos e `pyftsubset --unicodes=… --flavor=woff2` para o subconjunto.
+Para outro idioma (por exemplo, caracteres fora do latino) é preciso refazer o subconjunto; hoje o jogo só tem PT e EN.
+
+Os números do HUD usam essas fontes de dígito **proporcional** (o "1" é mais estreito): os painéis dos tempos têm largura
+mínima (`min-width: 7ch`) para não balançar. Se o dono preferir dígito de largura fixa, o Baloo 2 embutido tem `tnum`
+(`font-variant-numeric: tabular-nums` já está ligado no `.nc-hud`).
+
+**Para trocar a fonte:** abra `src/ui/fonts.css` e deixe a família escolhida primeiro em `--font-display`; nada mais muda.
+**Para tirar uma candidata do pacote** (depois que o dono escolher): apague o arquivo, o `@font-face` dela e a linha da
+tabela acima (e ajuste `tests/fonts-hud.test.ts`).

@@ -8,6 +8,7 @@ import { seatColor } from '../core/data/drivers';
 import { createRace, formatTicks } from '../core/sim/race';
 import { advanceAfterFlag, type AfterFlag } from './after-flag';
 import { finishMessage } from './finish-message';
+import { lapMessage } from './lap-message';
 import { getTrack, TRACKS, trackDef } from '../core/track';
 import { hashString } from '../core/rng';
 import type { ChampionshipState, HumanEntry, PlayerInput, RaceConfig, RaceState, SimEvent, Track } from '../core/types';
@@ -369,7 +370,8 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
         r.telemetry.nitrosThisLap.set(seat, 0);
         if (!r.telemetry.offroadThisLap.has(seat) && e.lapTicks > 0) r.telemetry.perfectLap.add(seat);
         r.telemetry.offroadThisLap.delete(seat);
-        if (e.lap <= laps) pushMessage(seat, e.lap === laps ? t('session.lastLap') : t('session.lap', { n: e.lap, total: laps }), 'big', 1.5);
+        const lapText = lapMessage(e.lap, laps);
+        if (lapText) pushMessage(seat, lapText, 'big', 1.5);
         if (e.best && e.lap > 2) pushMessage(seat, t('session.bestLap', { time: formatTicks(e.lapTicks) }), 'good', 2);
         break;
       }
