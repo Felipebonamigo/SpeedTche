@@ -274,8 +274,8 @@ describe('painel: teclas do dispositivo de cada jogador', () => {
   it('teclado 1 e 2 com o padrão; controle com nomes Xbox ou PlayStation', () => {
     expect(actionKeys('kb1', 'throttle', DEFAULT_BINDINGS)).toBe('↑');
     expect(actionKeys('kb2', 'nitro', DEFAULT_BINDINGS)).toBe('F');
-    expect(actionKeys('gp0', 'nitro', DEFAULT_BINDINGS, 'Controle 1 — Xbox Wireless Controller')).toBe('RB');
-    expect(actionKeys('gp1', 'nitro', DEFAULT_BINDINGS, 'Controle 2 — DualSense Wireless Controller')).toBe('R1');
+    expect(actionKeys('gp0', 'nitro', DEFAULT_BINDINGS, 'Controle 1 — Xbox Wireless Controller')).toBe('LB / Y');
+    expect(actionKeys('gp1', 'nitro', DEFAULT_BINDINGS, 'Controle 2 — DualSense Wireless Controller')).toBe('L1 / △');
     expect(describeSeat({ ...view('nitro'), actions: ['nitro'] }, who, '', 'kb1', DEFAULT_BINDINGS).skip).toBe('Esc: pular tutorial');
     expect(describeSeat({ ...view('nitro'), actions: ['nitro'] }, who, '', 'gp0', DEFAULT_BINDINGS, 'Xbox').skip).toBe('Start: pular tutorial');
   });

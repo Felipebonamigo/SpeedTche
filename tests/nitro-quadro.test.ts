@@ -21,7 +21,7 @@ vi.mock('../src/ui/menus', () => ({
   },
 }));
 
-const BUTTON_NITRO = 5; // RB (decisão nº 9 do cronograma muda isto na M; aqui vale o mapa de hoje)
+const BUTTON_NITRO = 4; // LB (decisão nº 9, M1: o nitro saiu do RB, que agora derrapa)
 
 function fakePad() {
   return {
