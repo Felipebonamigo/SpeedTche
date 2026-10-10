@@ -3,7 +3,8 @@
 // pela silhueta. Convenção do modelo em types.ts: origem no centro da base, frente para +X, comprimento em Z.
 import * as THREE from 'three';
 import { hash2 } from '../../noise';
-import { box, cone, cyl, dodeca, gable, hip, ico, jitter, paint, sphere, tf, tintUp, tris, type Geo } from '../geom';
+import { bakeAO, bevelBox, box, cone, cyl, dodeca, gable, hip, ico, jitter, lumpy, mergeRound, mottle, paint, sphere, tf, tintUp, tintUpSoft, tris, type Geo } from '../geom';
+import { smoothNormals } from '../../normals';
 import { beam, cable, cliff, facadeBox, hill, Kit, landmarkPart, lathe } from './kit';
 import type { LandmarkRegistry } from './types';
 
@@ -68,53 +69,117 @@ function fanLeaf(r: number, n: number, color: string, m: THREE.Matrix4): Geo {
 
 // ───────────────────────────── Sudeste ─────────────────────────────
 
-/** Cristo Redentor no alto do Corcovado (skyline): morro de mata, agulha de granito e a estátua (×3, lida a 600 m+). */
-function cristoRedentor(): ReturnType<Kit['model']> {
-  const k = new Kit();
-  // Maciço com mata (largo e baixo) e a agulha de pedra por cima, mais para o fundo (a face íngreme olha a pista).
-  k.add(hill(190, 62, 150, 11, '#356f34', '#4a8a3c', 1, 0.14, 1.2, tf(-50, 0, 10)));
-  // A agulha: estreita e alta, face íngreme de granito, um pouco de mata nas saliências.
-  k.add(tintUp(hill(54, 190, 46, 12, '#8b8a82', null, 1, 0.1, 0.5, tf(-14, 0, 6)), '#4a8340', 0.7, 0.85));
-  k.add(tintUp(hill(80, 120, 70, 13, '#6f7a68', null, 1, 0.12, 0.6, tf(-40, 0, -20)), '#3f7a3a', 0.45, 1));
-  const top = 186;
-  k.add(paint(cyl(20, 26, 8, 8), '#cfc8b8', tf(-14, top + 2, 6))); // mirante
-  // Estátua: pedestal, túnica afinando para cima, braços abertos ao longo de Z (a cruz lê de frente), cabeça.
-  const S = 3; const sx = -14; const sz = 6; const y0 = top + 6;
-  const stone = '#ecebe2';
-  k.add(paint(box(8 * S, 8 * S, 8 * S), '#dcd8cc', tf(sx, y0 + 4 * S, sz)));
-  const yb = y0 + 8 * S;
-  k.add(lathe([[2.6 * S, 0], [2.2 * S, 10 * S], [1.75 * S, 20 * S], [1.5 * S, 22 * S], [0.6 * S, 23 * S]], 6, stone, tf(sx, yb, sz)));
-  const ya = yb + 20.5 * S;
-  k.add(paint(box(2.2 * S, 2.6 * S, 28 * S), stone, tf(sx, ya, sz)));
-  k.add(paint(box(2.6 * S, 4 * S, 3.4 * S), stone, tf(sx, ya - 1.6 * S, sz))); // peito
-  k.add(paint(ico(1.5 * S, 0), stone, tf(sx + 0.2 * S, ya + 3.2 * S, sz, 1, 1.2, 1)));
-  return k.model([0, top + 30 * S], 0.05, 11);
+// ───────────────────────── Heróis-régua do Rio (onda L, L4) ─────────────────────────
+// O Cristo e o Pão de Açúcar no padrão da forma redonda (docs/DIRECAO-DE-ARTE.md §2): cúpulas e túnica de revolução e de esfera
+// lisa, caixas com bisel, a oclusão assada na cor (`bakeAO`) e a normal própria de cada peça (`mergeRound`: o catálogo não a
+// reescreve). Procedurais até a arte contratada chegar. Cada um é UMA parte `flat` (≤ 2.500 triângulos, o teto do horizonte) e
+// mantém a caixa de medida do modelo de antes — a conta de enquadramento (sight.ts) lê `modelBounds`, e o lugar do marco não muda.
+
+/** Estica x e z da geometria para a caixa pedida (o herói conserva a caixa de medida do modelo de antes). */
+function fitXZ(g: Geo, minX: number, maxX: number, minZ: number, maxZ: number): Geo {
+  g.computeBoundingBox();
+  const b = g.boundingBox as THREE.Box3;
+  const sx = (maxX - minX) / (b.max.x - b.min.x); const sz = (maxZ - minZ) / (b.max.z - b.min.z);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, minX + (p.getX(i) - b.min.x) * sx, p.getY(i), minZ + (p.getZ(i) - b.min.z) * sz);
+  return g;
 }
 
-/** Pão de Açúcar e Urca no mar (skyline), com o bondinho entre os dois. */
-function paoDeAcucar(): ReturnType<Kit['model']> {
-  const k = new Kit();
-  const granite = '#7f7c74';
-  // Pão: um pão de pedra alto e inclinado para o mar; Urca: mais baixo e largo. Mata no pé e no topo.
-  k.add(tintUp(hill(78, 175, 92, 21, granite, null, 2, 0.06, 0.4, tf(-10, 0, -120, 1, 1, 1, 0, 0, -0.08)), '#4c8a3e', 0.72, 1));
-  k.add(tintUp(hill(115, 92, 95, 22, granite, null, 1, 0.1, 0.4, tf(0, 0, 135)), '#4c8a3e', 0.5, 1));
-  // Saia de mata no pé dos dois (onde a pedra encontra o mar).
-  k.add(hill(150, 26, 230, 23, '#3f7c3a', '#4f8f42', 1, 0.1, 0.8));
-  // Bondinho: cabos da praia (no pé da Urca) ao topo da Urca e dali ao Pão; as cabines vermelhas.
-  const beach: V3 = [60, 6, 240]; const urcaTop: V3 = [0, 90, 135]; const paoTop: V3 = [-10, 172, -118];
-  for (const dx of [-2.2, 2.2]) {
-    k.add(cable([beach[0] + dx, beach[1], beach[2]], [urcaTop[0] + dx, urcaTop[1], urcaTop[2]], 1.4, '#2e3238'));
-    k.add(cable([urcaTop[0] + dx, urcaTop[1], urcaTop[2]], [paoTop[0] + dx, paoTop[1], paoTop[2]], 1.4, '#2e3238'));
+/**
+ * Morro de bolhas macias: esfera de `w` × `h` gomos achatada em `rx` × `up` (acima do chão) × `down` (a saia abaixo dele) × `rz`,
+ * com a deformação suave de `lumpy`, a cor pintada por ponto (mancha larga, sem face) e a normal suave (vinco de 50°).
+ */
+function hillDome(rx: number, up: number, down: number, rz: number, seed: number, color: string, w: number, h: number, amount = 0.07, fit?: [number, number, number, number]): Geo {
+  const g = lumpy(sphere(1, w, h), amount, seed, 1.3);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setXYZ(i, p.getX(i) * rx, y >= 0 ? y * up : y * down, p.getZ(i) * rz); }
+  if (fit) fitXZ(g, ...fit);
+  return mottle(smoothNormals(paint(g, color), 50), 0.12, seed, 0.03);
+}
+
+/**
+ * Cristo Redentor no alto do Corcovado: o maciço de mata (três morros macios e a agulha de granito com mata nas saliências), o
+ * mirante e a estátua de S = 3 — pedestal de duas caixas com bisel, túnica de revolução (14 gomos), ombros e braços de seção redonda
+ * abertos ao longo de Z (a cruz lê de frente), mãos e cabeça de esfera. Frente +X. ~1.600 triângulos, a oclusão assada.
+ */
+function cristoRedentor(): ReturnType<Kit['model']> {
+  const stone = '#ecebe2'; const base = '#dcd8cc';
+  const S = 3; const sx = -14; const sz = 6; const top = 186; const y0 = top + 6; const yb = y0 + 24; const ya = yb + 20.5 * S;
+  const parts: Geo[] = [
+    // O maciço: a caixa x e z do primeiro morro é a do modelo de antes; a agulha desce a 103,31 m (o pé do modelo de antes).
+    hillDome(190, 62, 74, 150, 11, '#3a7a38', 18, 10, 0.08, [-233.68, 159.35, -135.38, 156.56]),
+    tintUpSoft(hillDome(54, 190, 103.31, 46, 12, '#8b8a82', 14, 12, 0.06).translate(-14, 0, 6), '#4a8340', 0.7, 0.85),
+    tintUpSoft(hillDome(80, 120, 72, 70, 13, '#6f7a68', 14, 10, 0.07).translate(-40, 0, -20), '#3f7a3a', 0.45, 1),
+    // Mirante (disco de pedra de borda redonda) e o pedestal em dois degraus.
+    paint(cyl(20, 26, 8, 16), '#cfc8b8', tf(sx, top + 2, sz)),
+    paint(bevelBox(26, 10, 26, 1.6), base, tf(sx, y0 + 5, sz)),
+    paint(bevelBox(20, 14, 20, 1.6), base, tf(sx, y0 + 17, sz)),
+  ];
+  // Túnica: sólido de revolução que afina para o pescoço (raio, altura a partir de `yb`).
+  const robe = new THREE.LatheGeometry([[7.8, 0], [7.2, 10], [6.0, 26], [4.9, 44], [4.3, 58], [3.6, 64], [1.4, 69]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  parts.push(paint(robe, stone, tf(sx, yb, sz)));
+  // Ombros, braços (o pulso mais fino que o ombro) e mãos; a cruz de 84 m de envergadura (28 × S) ao longo de Z.
+  parts.push(paint(cyl(3.6, 3.6, 14, 10), stone, tf(sx, ya - 0.5, sz, 1, 1, 1, Math.PI / 2, 0, 0)));
+  for (const d of [1, -1]) {
+    parts.push(paint(cyl(2.4, 3.4, 36, 10, true), stone, tf(sx, ya - 0.5, sz + d * 24, 1, 1, 1, d * (Math.PI / 2), 0, 0)));
+    parts.push(paint(sphere(2.9, 8, 6), stone, tf(sx, ya - 0.5, sz + d * 42.2)));
   }
-  const car = (t: number, a: V3, b: V3): void => {
-    const p: V3 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - 5, a[2] + (b[2] - a[2]) * t];
-    k.add(paint(box(7, 5, 10), '#e8402a', tf(p[0], p[1], p[2])));
-    k.add(paint(box(7.2, 1.6, 10.2), '#bfe6f2', tf(p[0], p[1] + 0.8, p[2])));
+  parts.push(paint(cyl(1.6, 2.1, 3.4, 8), stone, tf(sx, ya + 2.4, sz))); // pescoço
+  parts.push(paint(sphere(1, 10, 8), stone, tf(sx + 0.6, 291.69 - 4.6, sz, 3.9, 4.6, 3.9))); // cabeça: o topo do modelo de antes (291,69 m)
+  const g = mergeRound(parts);
+  bakeAO(g, { reach: 12, strength: 0.55, rays: 10, smoothDeg: 62 });
+  return { parts: [{ geometry: g, mat: 'flat' }], blob: 0 };
+}
+
+/**
+ * Pão de Açúcar e Urca no mar, com o bondinho entre os dois: duas cúpulas de granito de perfil de bala (o Pão alto, a Urca baixa e larga),
+ * mata no pé e no cocuruto, a saia de mata, os cabos, as cabines vermelhas (caixas com bisel, vidro azul) e as duas estações.
+ * ~1.700 triângulos, a oclusão assada; a caixa de antes (x e z da saia, o Pão a 176,9 m, o pé a −68,7 m, a Urca a 240,5 m em z).
+ */
+function paoDeAcucar(): ReturnType<Kit['model']> {
+  const granite = new THREE.Color('#7f7c74'); const mata = new THREE.Color('#4c8a3e'); const foot = new THREE.Color('#3f7c3a');
+  /** Cúpula de perfil de bala (raio R(y) = (1 − (y/H)^2,6)^0,55 acima do chão; elipse abaixo), pintada por altura: mata no pé e no cocuruto. */
+  const bullet = (rx: number, H: number, D: number, rz: number, cx: number, cz: number, seed: number, tilt = 0): Geo => {
+    const ys = [-D, -D * 0.87, -D * 0.6, -D * 0.28, 0, H * 0.12, H * 0.28, H * 0.46, H * 0.64, H * 0.8, H * 0.92, H * 0.98, H];
+    const pts = ys.map((y) => new THREE.Vector2(Math.max(1e-3, y >= 0 ? (1 - (y / H) ** 2.6) ** 0.55 : Math.sqrt(Math.max(0, 1 - (y / D) ** 2))), y));
+    const g = new THREE.LatheGeometry(pts, 18);
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * rx, p.getY(i), p.getZ(i) * rz);
+    lumpy(g, 0.06, seed, 1.2, true);
+    g.translate(cx, 0, cz);
+    if (tilt) g.applyMatrix4(tf(0, 0, 0, 1, 1, 1, 0, 0, tilt));
+    const painted = paint(g, '#ffffff');
+    const pos = painted.getAttribute('position') as THREE.BufferAttribute; const col = painted.getAttribute('color') as THREE.BufferAttribute;
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.max(0, Math.min(1, pos.getY(i) / H));
+      const cap = Math.max(0, Math.min(1, (t - 0.8) / 0.12)); const skirt = Math.max(0, Math.min(1, (0.16 - t) / 0.16));
+      c.copy(granite).lerp(mata, cap * cap * (3 - 2 * cap)).lerp(foot, skirt * skirt * (3 - 2 * skirt));
+      col.setXYZ(i, c.r, c.g, c.b);
+    }
+    return mottle(smoothNormals(painted, 50), 0.08, seed, 0.03);
   };
-  car(0.45, urcaTop, paoTop); car(0.6, beach, urcaTop);
-  k.add(paint(box(18, 10, 14), '#d8d4c8', tf(-4, 88, 140))); // estação da Urca
-  k.add(paint(box(16, 9, 14), '#d8d4c8', tf(-12, 168, -112))); // estação do Pão
-  return k.model([-20, 180], 0.06, 21);
+  const beach: V3 = [60, 6, 240]; const urcaTop: V3 = [0, 90, 135]; const paoTop: V3 = [-10, 172, -118];
+  const parts: Geo[] = [
+    bullet(78, 176.87, 68.66, 92, -10, -120, 21, -0.04),
+    bullet(115, 92, 40, 105, 0, 135, 22),
+    // A saia de mata em volta dos dois pés (a caixa x e z do modelo de antes).
+    hillDome(150, 26, 20, 230, 23, '#3f7c3a', 18, 8, 0.06, [-154.86, 144.26, -221.42, 229]),
+  ];
+  for (const dx of [-2.2, 2.2]) {
+    parts.push(cable([beach[0] + dx, beach[1], beach[2]], [urcaTop[0] + dx, urcaTop[1], urcaTop[2]], 1.4, '#2e3238'));
+    parts.push(cable([urcaTop[0] + dx, urcaTop[1], urcaTop[2]], [paoTop[0] + dx, paoTop[1], paoTop[2]], 1.4, '#2e3238'));
+  }
+  const cabin = (t: number, a: V3, b: V3): void => {
+    const p: V3 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - 5, a[2] + (b[2] - a[2]) * t];
+    parts.push(paint(bevelBox(7, 5, 10, 1.1), '#e8402a', tf(p[0], p[1], p[2])));
+    parts.push(paint(box(7.2, 1.6, 10.2), '#bfe6f2', tf(p[0], p[1] + 0.8, p[2])));
+  };
+  cabin(0.45, urcaTop, paoTop); cabin(0.6, beach, urcaTop);
+  parts.push(paint(bevelBox(18, 10, 14, 1.4), '#d8d4c8', tf(-4, 88, 140)), paint(bevelBox(16, 9, 14, 1.4), '#d8d4c8', tf(-12, 168, -112)));
+  const g = mergeRound(parts);
+  bakeAO(g, { reach: 12, strength: 0.5, rays: 10, smoothDeg: 62 });
+  return { parts: [{ geometry: g, mat: 'flat' }], blob: 0 };
 }
 
 /**
