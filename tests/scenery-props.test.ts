@@ -13,7 +13,9 @@ const PROPS: Array<[string, number, number, number]> = [
   ['sign:left', 0.85, 0.15, 220], ['sign:right', 0.85, 0.15, 220],
   ['billboard:0', 0.9, 0.1, 600], ['pitsign', 0.8, 0.15, 220],
   // Arquibancada: os degraus de concreto são planos por projeto; o que é redondo é o muro, a cobertura, os pilares e o alambrado.
-  ['stand:0', 0.9, 0.04, 3300], ['stand:1', 0.9, 0.04, 3600],
+  // Tetos 3.500 / 3.800 (eram 3.300 / 3.600): `cyl` de 8 a 13 lados sobe para 14 em todo o jogo (`roundSides`, a faceta da bíblia) e a arquibancada é feita de pilares e postes de alambrado cilíndricos
+  // (3.422 e 3.686 medidos). O custo que importa é o do quadro (`scenery-forma`: o pior segmento segue ≤ 900); este teto só impede que a peça volte a crescer sem aviso.
+  ['stand:0', 0.9, 0.04, 3500], ['stand:1', 0.9, 0.04, 3800],
   ['gantry', 0.95, 0.04, 1100],
   ['fence:ranch', 0.35, 0.4, 160], ['fence:rail', 0.75, 0.25, 200], ['fence:armco', 0.8, 0.2, 160],
   ['fence:stone', 0.75, 0.25, 420], ['fence:railing', 0.35, 0.4, 160],
