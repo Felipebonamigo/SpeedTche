@@ -401,22 +401,34 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
         where.textContent = 'Território do Norte · Austrália'; where.classList.remove('empty');
         cap.classList.add('show');
       }
+      // Onda L, L5: os selos que só aparecem às vezes (vácuo, pouco combustível, "+2" da ultrapassagem) forçados ligados,
+      // para medir o pior caso (eles flutuam em cima dos painéis dos cantos e não podem cobrir nada).
+      for (const vp of document.querySelectorAll('#hud .vp')) {
+        vp.querySelector('.draft')?.classList.add('on');
+        const flag = vp.querySelector('.fuel-flag'); if (flag) flag.textContent = 'BAIXO';
+        const badge = vp.querySelector('.pos-badge');
+        if (badge) { badge.textContent = '+2'; badge.style.opacity = '1'; vp.querySelector('.pos')?.classList.add('gain'); }
+      }
     });
     await page.waitForTimeout(800);
     const hud = await page.evaluate(() => {
       const px = (el) => (el ? parseFloat(getComputedStyle(el).fontSize) : null);
       return [...document.querySelectorAll('#hud .vp')].filter((v) => v.style.display !== 'none').map((vp) => {
-        const panels = [...vp.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini, :scope > .lmk')]
+        const panels = [...vp.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini, :scope > .lmk, :scope > .bl > .draft, :scope > .bl .fuel-flag, :scope > .tl .pos-badge')]
           .filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0);
         const overlaps = [];
         for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {
+          // Selo que mora dentro de um painel (o "+2" da posição, o BAIXO do combustível) cobre o canto do próprio painel de propósito.
+          if (panels[i].contains(panels[j]) || panels[j].contains(panels[i])) continue;
           const a = panels[i].getBoundingClientRect(); const b = panels[j].getBoundingClientRect();
           if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) overlaps.push(`${panels[i].className.split(' ')[0]}×${panels[j].className.split(' ')[0]}`);
         }
         return {
           nums: { pos: px(vp.querySelector('.pos-n')), of: px(vp.querySelector('.pos-of')), lap: px(vp.querySelector('.lap')), time: px(vp.querySelector('.time')),
-            laps: px(vp.querySelector('.laps')), kmh: px(vp.querySelector('.kmh')), gear: px(vp.querySelector('.gear')), landmark: px(vp.querySelector('.lmk-name')) },
-          labels: { tag: px(vp.querySelector('.tag')), label: px(vp.querySelector('.label')), unit: px(vp.querySelector('.unit')), caption: px(vp.querySelector('.lmk-where')) },
+            laps: px(vp.querySelector('.laps')), kmh: px(vp.querySelector('.kmh')), gear: px(vp.querySelector('.gear')), landmark: px(vp.querySelector('.lmk-name')),
+            gap: px(vp.querySelector('.gap-n')), fuelPct: px(vp.querySelector('.fuel-pct')), nitroN: px(vp.querySelector('.nitro-n')), badge: px(vp.querySelector('.pos-badge')) },
+          labels: { tag: px(vp.querySelector('.tag')), label: px(vp.querySelector('.label')), unit: px(vp.querySelector('.unit')), caption: px(vp.querySelector('.lmk-where')),
+            flag: px(vp.querySelector('.fuel-flag')), draft: px(vp.querySelector('.draft')) },
           overlaps,
         };
       });
