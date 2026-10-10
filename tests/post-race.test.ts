@@ -1,9 +1,10 @@
 // N4, o relógio do pós-corrida (docs/ondas/N/N4.md §5 "R"): chegada → pódio → pagamento → a decisão de "próxima", com avanço automático,
 // no máximo 15 s e pulo segurando o botão. Puro, sem DOM.
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { RaceMode } from '../src/game/contracts';
 import {
-  createHoldSkip, createPostRace, guardConfirm, HOLD_SKIP_SECONDS, planPostRace, POST_FRAME_MAX, POST_RACE_BUDGET, POST_STEP_SECONDS, planSeconds,
+  createHoldSkip, createPostRace, guardConfirm, sequenceFor, HOLD_SKIP_SECONDS, planPostRace, planSeconds, POST_FLAG_SECONDS, POST_FRAME_MAX, POST_RACE_BUDGET, POST_STEP_SECONDS,
 } from '../src/game/post-race';
 
 const ALL_MODES: RaceMode[] = ['cup', 'quick', 'timetrial', 'career', 'tournament', 'escort', 'relay'];
@@ -31,17 +32,23 @@ describe('planPostRace (R1)', () => {
 });
 
 describe('orçamento de tempo (R2)', () => {
-  it('o pior plano de cada modo cabe em 15 s', () => {
+  it('o pior plano de cada modo, mais a bandeirada de 3 s, cabe em 15 s', () => {
     expect(POST_RACE_BUDGET).toBe(15);
     for (const mode of ALL_MODES) {
-      const worst = planSeconds(planPostRace({ mode, podium: true, payout: true }));
+      const worst = POST_FLAG_SECONDS + planSeconds(planPostRace({ mode, podium: true, payout: true }));
       expect(worst, mode).toBeLessThanOrEqual(POST_RACE_BUDGET);
     }
   });
-  it('as somas esperadas: carreira 14 s, rápida 7 s, só a chegada 2,5 s', () => {
-    expect(planSeconds(['arrival', 'podium', 'payout'])).toBeCloseTo(14, 6);
-    expect(planSeconds(['arrival', 'podium'])).toBeCloseTo(7, 6);
-    expect(planSeconds(['arrival'])).toBeCloseTo(2.5, 6);
+  it('a bandeirada é a da sessão (RESULTS_DELAY): se ela mudar, o orçamento muda junto', () => {
+    const src = readFileSync(new URL('../src/game/session.ts', import.meta.url), 'utf8');
+    const m = /const RESULTS_DELAY = ([0-9.]+);/.exec(src);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[1])).toBe(POST_FLAG_SECONDS);
+  });
+  it('as somas esperadas: carreira 12 s, rápida 5,5 s, só a chegada 2 s', () => {
+    expect(planSeconds(['arrival', 'podium', 'payout'])).toBeCloseTo(12, 6);
+    expect(planSeconds(['arrival', 'podium'])).toBeCloseTo(5.5, 6);
+    expect(planSeconds(['arrival'])).toBeCloseTo(2, 6);
     expect(planSeconds([])).toBe(0);
     expect(POST_STEP_SECONDS.payout).toBeGreaterThan(0);
   });
@@ -70,8 +77,8 @@ describe('createPostRace (R3, R4)', () => {
     const post = createPostRace(['arrival', 'podium', 'payout']);
     let t = 0;
     while (!post.ready && t < 60) { post.advance(1 / 60); t += 1 / 60; }
-    expect(t).toBeGreaterThan(13.9);
-    expect(t).toBeLessThanOrEqual(POST_RACE_BUDGET);
+    expect(t).toBeGreaterThan(11.9);
+    expect(t).toBeLessThanOrEqual(POST_RACE_BUDGET - POST_FLAG_SECONDS + 0.05);
   });
   it('um quadro enorme (aba parada, engasgo) não pula passos: o dt é preso a 0,1 s', () => {
     expect(POST_FRAME_MAX).toBeCloseTo(0.1, 6);
@@ -112,7 +119,7 @@ describe('createPostRace (R3, R4)', () => {
     expect(post.stepIndex).toBe(0);
     post.advance(POST_FRAME_MAX);
     for (let i = 0; i < 30; i++) post.advance(POST_FRAME_MAX);
-    expect(post.stepIndex).toBe(1);
+    expect(post.stepIndex).toBe(1); // 3,1 s: passou dos 2 s da chegada
   });
 });
 
@@ -150,5 +157,20 @@ describe('guardConfirm (R6)', () => {
   });
   it('sem sequência (festa, contra-relógio) o confirmar sempre passa', () => {
     expect(guardConfirm(createPostRace([]))).toBe(true);
+  });
+});
+
+describe('sequenceFor (R7)', () => {
+  it('o mesmo objeto de dados dá a mesma sequência (voltar do Pagamento ou trocar o idioma não reinicia o relógio); outro objeto, outra', () => {
+    const data = {};
+    let made = 0;
+    const plan = () => { made++; return ['arrival', 'podium'] as const; };
+    const a = sequenceFor(data, () => [...plan()]);
+    a.advance(POST_FRAME_MAX);
+    const b = sequenceFor(data, () => [...plan()]);
+    expect(b).toBe(a);
+    expect(b.elapsed).toBeCloseTo(POST_FRAME_MAX, 6);
+    expect(made).toBe(1);
+    expect(sequenceFor({}, () => [...plan()])).not.toBe(a);
   });
 });

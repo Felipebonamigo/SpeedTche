@@ -1,17 +1,24 @@
 // O relógio do pós-corrida (onda N, N4; docs/ondas/N/N4.md): chegada → pódio → pagamento → a decisão de "próxima". Puro, sem DOM:
 // as telas (results.ts, payout.ts) só leem em que passo a sequência está e há quanto tempo, e o teste de Node prova o orçamento.
 //
-// Regras: avança sozinho; no máximo POST_RACE_BUDGET (15 s) até a decisão; segurar o botão pula tudo; e **a próxima corrida nunca larga
-// sozinha** (terminado o último passo a sequência fica `ready` e espera uma entrada). Só corrida de verdade (rápida, copa, carreira) tem
+// Regras: avança sozinho; no máximo POST_RACE_BUDGET (15 s, contando os 3 s da bandeirada que a sessão já dá antes do resultado) até a
+// decisão; segurar o botão pula tudo; e **a próxima corrida nunca larga sozinha** (terminado o último passo a sequência fica `ready` e
+// espera uma entrada). Só corrida de verdade (rápida, copa, carreira) tem
 // sequência; contra-relógio e modos de festa ficam como eram (pronto na hora).
 import type { RaceMode } from './contracts';
 
 export type PostStepId = 'arrival' | 'podium' | 'payout';
 
 /** Quanto cada passo dura, em segundos. */
-export const POST_STEP_SECONDS: Readonly<Record<PostStepId, number>> = { arrival: 2.5, podium: 4.5, payout: 7 };
+export const POST_STEP_SECONDS: Readonly<Record<PostStepId, number>> = { arrival: 2, podium: 3.5, payout: 6.5 };
 
-/** Do fim da corrida à decisão de "próxima": o teto de quem espera sem apertar nada (a soma do pior plano é 14 s). */
+/**
+ * A bandeirada: o tempo que a sessão deixa a corrida na tela depois de o último humano cruzar a linha, antes do resultado
+ * (`RESULTS_DELAY` em session.ts; tests/post-race.test.ts confere que os dois valores andam juntos). É a "chegada" do orçamento.
+ */
+export const POST_FLAG_SECONDS = 3;
+
+/** Da bandeirada à decisão de "próxima": o teto de quem espera sem apertar nada (a bandeirada mais o pior plano, 12 s, dá 15 s). */
 export const POST_RACE_BUDGET = 15;
 
 /** Um quadro não conta mais que isto (aba em segundo plano, engasgo do 3D por software): a sequência não pula passos. */
@@ -142,4 +149,19 @@ export function createHoldSkip(seconds: number = HOLD_SKIP_SECONDS): HoldSkip {
       return true;
     },
   };
+}
+
+const sequences = new WeakMap<object, PostRace>();
+
+/**
+ * A sequência de uma corrida, guardada pelo objeto de dados do resultado: o resultado, o Pagamento (que o resultado abre) e a volta
+ * dele (VOLTAR, troca de idioma) enxergam o MESMO relógio, em vez de recomeçar a sequência a cada vez que a tela é remontada.
+ */
+export function sequenceFor(key: object, plan: () => PostStepId[]): PostRace {
+  let post = sequences.get(key);
+  if (!post) {
+    post = createPostRace(plan());
+    sequences.set(key, post);
+  }
+  return post;
 }
