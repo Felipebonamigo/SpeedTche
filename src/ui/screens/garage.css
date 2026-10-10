@@ -288,3 +288,55 @@
 .scr-garage .gp .sel-paint .sel-value { min-width: 0; font-size: var(--fs-sm); }
 .scr-garage .gp .sel-paint.locked .sel-arrow { visibility: hidden; }
 .garage-panels.n-3 .gp .sel-paint .paint-name, .garage-panels.n-4 .gp .sel-paint .paint-name { display: none; }
+
+/* ───────────── Palco 3D (onda N, N2; docs/ondas/N/N2.md §3 e §4.4) ─────────────
+   O carro de cada painel é o modelo 3D desenhado no canvas ATRÁS do menu (src/render/stage.ts), numa janela transparente (`.gp-stage`).
+   O vidro do painel e o degradê da tela cobririam e borrariam o canvas, então no 3D (`.stage3d`): a tela fica sem o degradê (o palco
+   desenha o fundo dele), o painel não borra (o fundo do palco é um degradê liso) e o vidro é uma camada com um BURACO na medida da janela
+   (máscara; `--hx --hy --hw --hh` vêm do garage.ts a cada quadro). O nome, a etiqueta e as setas flutuam sobre a janela. */
+.screen.stage3d { background: none; }
+.stage3d .gp { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; position: relative; isolation: isolate; }
+.stage3d .gp::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass);
+  -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) var(--hx, 0px) var(--hy, 0px) / var(--hw, 0px) var(--hh, 0px) no-repeat;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) var(--hx, 0px) var(--hy, 0px) / var(--hw, 0px) var(--hh, 0px) no-repeat;
+  mask-composite: exclude;
+}
+.stage3d .gp-car { position: relative; padding: 0; background: none; border-color: transparent; }
+.stage3d .gp-car.focus { background: none; }
+.stage3d .gp-car-body { position: relative; display: block; min-height: calc(92 * var(--u)); }
+.stage3d .gp-stage { position: absolute; inset: 0; border-radius: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.stage3d .gp-car.focus .gp-stage { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 calc(24 * var(--u)) rgba(255, 90, 54, 0.3); }
+.stage3d .gp-car-name {
+  position: absolute; z-index: 3; top: 0; left: 0; right: 0; pointer-events: none;
+  padding: calc(5 * var(--u)) calc(34 * var(--u)) calc(14 * var(--u)); box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(5, 8, 13, 0.78), rgba(5, 8, 13, 0));
+  text-shadow: 0 1px calc(6 * var(--u)) rgba(0, 0, 0, 0.7);
+}
+.stage3d .gp-tag { position: absolute; z-index: 3; right: calc(36 * var(--u)); bottom: calc(6 * var(--u)); background: rgba(8, 11, 18, 0.72); pointer-events: none; }
+.stage3d .gp-car > .sel-arrow { position: absolute; z-index: 4; top: 50%; transform: translateY(-50%); color: var(--text); background: rgba(8, 11, 18, 0.55); }
+.stage3d .gp-car > .sel-arrow.prev { left: calc(4 * var(--u)); }
+.stage3d .gp-car > .sel-arrow.next { right: calc(4 * var(--u)); }
+.stage3d .gp-car.locked > .sel-arrow { visibility: hidden; }
+.gp-note { color: var(--muted); font-size: var(--fs-sm); font-weight: 700; text-align: center; align-self: center; flex: 1 1 auto; }
+/* Um piloto só: o painel ocupa a altura toda da área (uma linha `1fr`) e a janela é o que sobra na coluna do carro depois dos atributos e da frase
+   (de ~130 u a 400 u): o carro aparece grande onde há altura, e nunca empurra os atributos para fora (texto grande, 1024×640). */
+.stage3d .garage-panels.n-1 { grid-template-rows: minmax(0, 1fr); align-content: stretch; }
+.stage3d .garage-panels.n-1 .gp-left > .gp-car { flex: 1 1 0; min-height: calc(130 * var(--u)); max-height: calc(400 * var(--u)); }
+.stage3d .garage-panels.n-1 .gp-car-body { align-self: stretch; min-height: 0; }
+.stage3d .garage-panels.n-1 .gp-car-name { font-size: var(--fs-md); }
+/* 2–4 pilotos: a janela é estreita, então o nome fica no canto de cima (à esquerda) e a etiqueta no de baixo (à direita), longe do carro, que fica no meio. */
+.stage3d .garage-panels:not(.n-1) .gp-car-body { justify-items: stretch; }
+.stage3d .garage-panels:not(.n-1) .gp-car-name { padding: calc(4 * var(--u)) calc(30 * var(--u)) calc(12 * var(--u)); font-size: var(--fs-sm); letter-spacing: 0.02em; }
+.stage3d .garage-panels:not(.n-1) .gp-tag { right: calc(32 * var(--u)); bottom: calc(4 * var(--u)); padding: calc(1 * var(--u)) calc(8 * var(--u)); }
+.stage3d .garage-panels:not(.n-1) .gp-tag.ok { font-size: calc(12 * var(--u)); }
+/* A Concessionária não tem a lista de peças: o painel ocupa a altura toda da área e o carro à venda é o que sobra dela (grande). */
+.scr-dealership.stage3d .garage-panels { grid-template-rows: minmax(0, 1fr); align-content: stretch; }
+.scr-dealership.stage3d .garage-panels:not(.n-1) .gp { grid-template-rows: auto minmax(0, 1fr) auto; }
+.scr-dealership.stage3d .gp-left > .gp-car { flex: 1 1 0; min-height: calc(150 * var(--u)); max-height: calc(420 * var(--u)); }
+.scr-dealership.stage3d .gp-car-body { align-self: stretch; min-height: 0; }
+.scr-dealership .gp-go { margin-top: auto; }
+/* Texto grande com 2–4 pilotos na garagem: a janela é do tamanho do desenho que ela substitui (a garagem já está no limite da altura). */
+#ui.large-text .stage3d .garage-panels:not(.n-1) .gp-car-body { min-height: calc(74 * var(--u)); }
+#ui.large-text .scr-dealership.stage3d .gp-left > .gp-car { min-height: calc(110 * var(--u)); }

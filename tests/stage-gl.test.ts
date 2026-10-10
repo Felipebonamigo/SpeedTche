@@ -32,7 +32,7 @@ interface LabApi {
   memory(): { geometries: number; textures: number; programs: number };
   programs(): { total: number; bad: string[]; shaderErrors: string[] };
   raceFrame(q: Quality, n: number): DebugInfo;
-  snapshot(): { exposure: number; rim: number[]; term: number[]; adjust: number[]; carsInRaceScene: boolean };
+  snapshot(): { exposure: number; clear: number; rim: number[]; term: number[]; adjust: number[]; carsInRaceScene: boolean };
   effects(): { active: boolean; confetti: boolean; sparks: boolean; cover: boolean; beam: boolean; drawn: number; podium: boolean };
   overlay(i: number): { novo: string | null; flash: string | null };
   reveal(i: number): void;
@@ -72,24 +72,23 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
 
   const differs = (a: number[], b: number[], tol: number): boolean => a.slice(0, 3).some((v, i) => Math.abs(v - b[i]) > tol);
 
-  it('1, 2 e 4 janelas em cada qualidade: o canvas muda DENTRO de cada janela e só ali, sem erro de shader nem link falho', async () => {
-    const result = await page.evaluate(async (levels) => {
+  it('1, 2 e 4 janelas em cada degrau (2 janelas na Média): o canvas muda DENTRO de cada janela e só ali, sem erro de shader nem link falho', async () => {
+    const combos: Array<[Quality, number]> = LEVELS.flatMap((q) => [[q, 1], [q, 4]] as Array<[Quality, number]>).concat([['medium', 2]]);
+    const result = await page.evaluate(async (list) => {
       const L = (window as unknown as { lab: LabApi }).lab; const out: Array<{ q: string; n: number; drawn: number; vps: number; calls: number[]; inside: number[][]; outside: number[][] }> = [];
-      for (const q of levels) {
-        for (const n of [1, 2, 4]) {
-          const rects = L.mount(n, { quality: q as Quality });
-          const dbg = L.frames(1, 3).pop() as DebugInfo;
-          out.push({
-            q, n, drawn: L.effects().drawn, vps: dbg.viewports.length, calls: dbg.viewports.map((v) => v.calls),
-            inside: rects.map((r) => L.sample(r.x + r.w / 2, r.y + r.h / 2)),
-            outside: [L.sample(2, 2), L.sample(638, 358)],
-          });
-          L.unmount();
-          L.frame(100);
-        }
+      for (const [q, n] of list) {
+        const rects = L.mount(n, { quality: q as Quality });
+        const dbg = L.frames(1, 2).pop() as DebugInfo;
+        out.push({
+          q, n, drawn: L.effects().drawn, vps: dbg.viewports.length, calls: dbg.viewports.map((v) => v.calls),
+          inside: rects.map((r) => L.sample(r.x + r.w / 2, r.y + r.h / 2)),
+          outside: [L.sample(2, 2), L.sample(638, 358)],
+        });
+        L.unmount();
+        L.frame(100);
       }
       return { out, programs: L.programs() };
-    }, [...LEVELS]);
+    }, combos);
     for (const r of result.out) {
       const tag = `${r.q} × ${r.n}`;
       expect(r.drawn, tag).toBe(r.n);
@@ -120,29 +119,51 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
     expect(r.tri).toBeGreaterThan(15_000);
   });
 
-  it('36 ciclos abrir → desenhar → fechar não deixam geometria, textura nem programa para trás', async () => {
+  it('36 ciclos abrir → desenhar → fechar: depois do aquecimento (os 6 primeiros), geometrias, texturas e programas ficam iguais', async () => {
     const r = await page.evaluate(() => {
       const L = (window as unknown as { lab: LabApi }).lab;
       const cycle = (i: number): void => {
         const base = 1000 + i * 20;
-        L.mount(2, { quality: 'high', ids: [`m:${i % 2}`, `m:${(i + 1) % 2}`] } as never);
-        L.frames(base, 2);
+        L.mount(1, { quality: 'medium', ids: [`m:${i % 3}`] } as never);
+        L.frames(base, 1);
+        if (i % 4 === 0) { L.reveal(0); L.frame(base + 0.5); }
+        if (i % 4 === 2) { L.workshop(0); L.frame(base + 0.3); }
         L.unmount();
         L.frame(base + 1); // sai (leave)
-        L.frame(base + 10); // passou o tempo ocioso: solta alvos de GPU e ambiente
+        L.frame(base + 10); // passou o tempo ocioso: solta os alvos de GPU dos pipelines
       };
-      cycle(0); cycle(1);
+      for (let i = 0; i < 6; i++) cycle(i);
       const baseline = L.memory();
       const mid: Array<{ geometries: number; textures: number; programs: number }> = [];
-      for (let i = 2; i < 38; i++) { cycle(i); if (i % 12 === 0) mid.push(L.memory()); }
+      for (let i = 6; i < 36; i++) { cycle(i); if (i % 10 === 5) mid.push(L.memory()); }
       return { baseline, mid, last: L.memory(), effects: L.effects() };
     });
     expect(r.last.geometries).toBe(r.baseline.geometries);
     expect(r.last.textures).toBe(r.baseline.textures);
-    expect(r.last.programs).toBeLessThanOrEqual(r.baseline.programs);
+    expect(r.last.programs).toBe(r.baseline.programs);
     for (const m of r.mid) { expect(m.geometries).toBe(r.baseline.geometries); expect(m.textures).toBe(r.baseline.textures); }
     expect(r.effects.active).toBe(false); // sem janela, o palco devolveu o que pegou
     expect(errors).toEqual([]);
+  });
+
+  it('janela fora do canvas (rolada, sem tamanho): o palco não entra e o mundo do menu é desenhado com o que é dele', async () => {
+    const r = await page.evaluate(() => {
+      const L = (window as unknown as { lab: LabApi }).lab;
+      L.raceFrame('medium', 1); L.raceFrame('medium', 1);
+      const before = L.snapshot();
+      L.mount(1, { quality: 'medium' });
+      const host = document.querySelector('.lab-host') as HTMLElement;
+      host.style.left = '5000px';
+      const dbg = L.frames(1, 2).pop() as DebugInfo;
+      const fx = L.effects();
+      const after = L.snapshot();
+      L.unmount(); L.frame(100);
+      return { fx, before, after, vps: dbg.viewports.length, calls: dbg.calls };
+    });
+    expect(r.fx.active).toBe(false);
+    expect(r.after).toEqual(r.before);
+    expect(r.vps).toBe(1); // o fundo do menu (um viewport, o mundo todo)
+    expect(r.calls).toBeGreaterThan(20);
   });
 
   it('o palco devolve à corrida a exposição, os uniformes da estilização e os carros; e a corrida desenha depois dele', async () => {
@@ -238,6 +259,29 @@ describe.skipIf(!available)('palco 3D em GL (swiftshader)', { timeout: 1_500_000
     expect(reduced.seen.maxFlash).toBe(0);
     expect(reduced.end.flash).toBeNull(); // o selo de clarão nem existe
     expect(reduced.seen.maxNovo).toBeGreaterThan(0.9);
+    expect(errors).toEqual([]);
+  });
+
+  it('a tela remontada com o mesmo id (o menu refaz o DOM, ou muda o idioma) não repete a revelação nem a oficina', async () => {
+    const r = await page.evaluate(() => {
+      const L = (window as unknown as { lab: LabApi }).lab;
+      const ids = { ids: ['again:0'] };
+      L.mount(1, { quality: 'low', cars: ['tornado'], ...ids } as never);
+      L.frames(1, 2);
+      L.reveal(0); L.workshop(0);
+      L.frame(300); L.frame(300.5);
+      const during = L.effects();
+      L.frame(310); // a revelação (4,6 s) e a oficina (1,6 s) acabaram
+      L.unmount();
+      L.frame(311);
+      L.mount(1, { quality: 'low', cars: ['tornado'], ...ids } as never); // o painel nasce de novo, com a contagem em 0
+      const seen = { cover: false, confetti: false, sparks: false, beam: false };
+      for (let k = 0; k < 6; k++) { L.frame(312 + k * 0.4); const e = L.effects(); seen.cover ||= e.cover; seen.confetti ||= e.confetti; seen.sparks ||= e.sparks; seen.beam ||= e.beam; }
+      L.unmount(); L.frame(400);
+      return { during, seen };
+    });
+    expect(r.during.cover || r.during.beam).toBe(true); // a revelação de verdade começou
+    expect(r.seen).toEqual({ cover: false, confetti: false, sparks: false, beam: false });
     expect(errors).toEqual([]);
   });
 

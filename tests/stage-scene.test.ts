@@ -17,7 +17,11 @@ type StageT = import('../src/render/stage').Stage;
 
 /** O renderizador falso: só o que o `enter`/`leave` leem e escrevem. */
 function fakeGl(): THREE.WebGLRenderer {
-  return { toneMappingExposure: 1.7, setScissorTest() {}, info: { reset() {}, render: { calls: 0, triangles: 0 } } } as unknown as THREE.WebGLRenderer;
+  const clear = new THREE.Color(0x123456); let alpha = 0.25;
+  return {
+    toneMappingExposure: 1.7, setScissorTest() {}, info: { reset() {}, render: { calls: 0, triangles: 0 } },
+    getClearColor: (target: THREE.Color) => target.copy(clear), getClearAlpha: () => alpha, setClearColor: (c: THREE.ColorRepresentation, a = 1) => { clear.set(c); alpha = a; },
+  } as unknown as THREE.WebGLRenderer;
 }
 
 async function setup(): Promise<{ cars: CarsT; stage: StageT; raceScene: THREE.Scene; gl: THREE.WebGLRenderer; light: { v: number } }> {
@@ -164,12 +168,15 @@ describe('enter / leave: o que o palco mexe é devolvido à corrida', () => {
     expect(cars.group.parent).toBe(stage.scene);
     expect(snapshot()).not.toEqual(before);
     expect(gl.toneMappingExposure).not.toBe(1.7);
+    gl.setClearColor(0x0a0d16, 1); // o palco limpa o canvas com a cor dele durante o quadro
 
     stage.leave();
     expect(stage.active).toBe(false);
     expect(cars.group.parent).toBe(raceScene);
     expect(snapshot()).toEqual(before);
     expect(gl.toneMappingExposure).toBe(1.7);
+    expect(gl.getClearColor(new THREE.Color()).getHex()).toBe(0x123456);
+    expect(gl.getClearAlpha()).toBe(0.25);
     expect(rigsOf(cars)[0].uniforms.uHeadGlow.value).toBe(glow);
     expect(rigsOf(cars)[0].uniforms.uSelfLight.value).toBe(self);
     stage.dispose();

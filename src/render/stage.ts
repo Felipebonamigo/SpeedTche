@@ -8,6 +8,7 @@
 // renderizador: só o registro. A parte pura (mola, plano da revelação, confete, câmera de detalhe, retângulos) está em stage-plan.ts.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CARS } from '../core/data/cars';
 import type { Quality } from '../game/contracts';
 import type { Cars, DisplayCar } from './cars';
@@ -18,7 +19,7 @@ import { ViewportPipeline } from './postfx/pipeline';
 import type { LivePanel, StagePanel } from './stage-bus';
 import {
   carToWorld, CONFETTI_COUNT, confettiPiece, fitDistance, focusPose, MAX_PANELS, PLATE_TOP, podiumSlots, revealPlan,
-  stageQuality, stageViewport, STAGE_FOV, TURN_SPEED, workshopPlan, type ConfettiPiece, type PodiumSlot, type RevealPlan, type WorkshopPlan,
+  stageQuality, stageViewport, STAGE_FOV, TURN_SPEED, workshopPlan, type ConfettiPiece, type PodiumSlot, type Rect, type RevealPlan, type WorkshopPlan,
 } from './stage-plan';
 import { applyGrade, setStylizePalette, stylizeUniforms } from './stylize';
 import { canvas2d, texture } from './textures';
@@ -29,20 +30,20 @@ export { mountPodium, mountShowroom, type ShowroomOptions, type StageHandle } fr
 
 const BG = 0x0a0d16;
 /** Luz base: principal, preenchimento, contraluz e o reflexo do ambiente. */
-const BASE = { key: 3.1, fill: 0.9, rim: 3.6, env: 0.55 };
-const SPOT_MAX = 160;
+const BASE = { key: 1.5, fill: 0.35, rim: 1.7, env: 0.3 };
+const SPOT_MAX = 110;
 const PLATE_R = 3.1;
 /** Quanto a mola da oficina desce o casco (m) no ponto mais fundo. */
 const DIP_METERS = 0.075;
 const SPARKS = 90;
 /** Quanto dura a oficina na tela (s): a mola acaba em 1,5 s. */
 const WORKSHOP_SECONDS = 1.6;
-const BLOOM: [number, number, number] = [0.32, 0.5, 0.92];
+const BLOOM: [number, number, number] = [0.28, 0.5, 1.8];
 /** Segundos sem painel antes de o palco soltar os alvos de GPU e o ambiente (ir e voltar entre a Garagem e a Concessionária não os refaz). */
 export const STAGE_IDLE_RELEASE = 4;
 
 /** A paleta do estúdio: luz de dia, céu azulado, sem a tinta de bioma. Só alimenta a gradação e a luz de borda da estilização. */
-const STUDIO: Palette = { ...palette('coast', 'day'), light: 1, hemiSky: '#a9b9ff', skyGlow: '#ffe2b8', sunLight: '#fff0d8', exposure: 1, bloom: BLOOM };
+const STUDIO: Palette = { ...palette('coast', 'day'), light: 1, hemiSky: '#a9b9ff', skyGlow: '#ffe2b8', sunLight: '#fff0d8', exposure: 0.9, bloom: BLOOM };
 
 const CONFETTI_PALETTE = ['#ff5a36', '#ffd23f', '#3ddc84', '#4fc3f7', '#ff7ab6', '#ffffff'];
 const PODIUM_COLORS = ['#ffc53d', '#cfd6e0', '#d08b5b'];
@@ -97,7 +98,7 @@ interface Slot {
   ring: THREE.Color; ringKey: string;
 }
 
-interface Saved { rim: THREE.Vector3; term: THREE.Vector3; shadows: THREE.Vector3; highlights: THREE.Vector3; adjust: THREE.Vector3; exposure: number }
+interface Saved { rim: THREE.Vector3; term: THREE.Vector3; shadows: THREE.Vector3; highlights: THREE.Vector3; adjust: THREE.Vector3; exposure: number; clear: THREE.Color; clearAlpha: number }
 interface Size { width: number; height: number; dpr: number }
 
 const wrapPi = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
@@ -148,7 +149,7 @@ export class Stage {
     // ── Fundo: o domo de estúdio e o chão que se apaga em volta do prato ──
     const domeMat = this.own(new THREE.ShaderMaterial({
       vertexShader: DOME_VERT, fragmentShader: DOME_FRAG, side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { uTop: { value: new THREE.Color('#0e1330') }, uMid: { value: new THREE.Color('#1b2250') }, uHorizon: { value: new THREE.Color('#3a2a52') }, uGlow: { value: new THREE.Color('#ff8a4a') } },
+      uniforms: { uTop: { value: new THREE.Color('#080b1c') }, uMid: { value: new THREE.Color('#10163a') }, uHorizon: { value: new THREE.Color('#1f2347') }, uGlow: { value: new THREE.Color('#ff8a4a') } },
     }));
     applyGrade(domeMat);
     this.dome = new THREE.Mesh(this.own(new THREE.SphereGeometry(40, 32, 16)), domeMat);
@@ -190,7 +191,7 @@ export class Stage {
     this.spot = new THREE.SpotLight('#fff1d0', 0, 40, 0.5, 0.65, 2);
     this.spot.position.set(0, 7.2, 0.6); this.spot.target.position.set(0, 0.4, 0);
     scene.add(this.spot, this.spot.target);
-    this.cone = new THREE.Mesh(this.own(beamGeometry(7, 2.7)), this.own(new THREE.MeshBasicMaterial({
+    this.cone = new THREE.Mesh(this.own(beamGeometry(7, 2.2)), this.own(new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0, toneMapped: false,
     })));
     this.cone.name = 'stage:beam'; this.cone.position.set(0, PLATE_TOP + 3.5, 0.3); this.cone.visible = false; this.cone.renderOrder = 3;
@@ -245,7 +246,7 @@ export class Stage {
 
   /**
    * Pega emprestado o que é da corrida: o grupo dos carros muda de cena, e a estilização (luz de borda, terminador, gradação), a exposição
-   * e a luz dos carros ganham os valores do estúdio. Idempotente: um 2º `enter` não regrava o que a corrida tinha com o valor do estúdio.
+   * a cor de limpeza do canvas e a luz dos carros ganham os valores do estúdio. Idempotente: um 2º `enter` não regrava o que a corrida tinha com o valor do estúdio.
    */
   enter(): void {
     if (this.entered || this.disposed) return;
@@ -254,6 +255,7 @@ export class Stage {
     this.saved = {
       rim: u.uStylizeRim.value.clone(), term: u.uStylizeTerm.value.clone(), shadows: u.uGradeShadows.value.clone(),
       highlights: u.uGradeHighlights.value.clone(), adjust: u.uGradeAdjust.value.clone(), exposure: this.gl.toneMappingExposure,
+      clear: this.gl.getClearColor(new THREE.Color()), clearAlpha: this.gl.getClearAlpha(),
     };
     this.gl.toneMappingExposure = setStylizePalette(STUDIO).exposure;
     this.scene.add(this.cars.group);
@@ -271,6 +273,7 @@ export class Stage {
       u.uStylizeRim.value.copy(s.rim); u.uStylizeTerm.value.copy(s.term); u.uGradeShadows.value.copy(s.shadows);
       u.uGradeHighlights.value.copy(s.highlights); u.uGradeAdjust.value.copy(s.adjust);
       this.gl.toneMappingExposure = s.exposure;
+      this.gl.setClearColor(s.clear, s.clearAlpha);
     }
     this.raceScene.add(this.cars.group);
     this.cars.hide();
@@ -280,11 +283,14 @@ export class Stage {
     this.quality = null;
   }
 
-  /** Sem painel há um tempo: solta os alvos de GPU dos pipelines e o ambiente (voltam sozinhos no próximo painel). */
+  /**
+   * Sem painel há um tempo (ou com a corrida na tela): devolve o que pegou emprestado e solta os alvos de GPU dos pipelines, que são
+   * os grandes (voltam sozinhos no próximo painel). O ambiente (PMREM de 128 px) fica: refazê-lo a cada ida à garagem era o custo
+   * dominante da reabertura e ele só sai no `dispose()`.
+   */
   idleRelease(): void {
     this.leave();
     this.disposePipes();
-    if (this.envTarget) { this.scene.environment = null; this.envTarget.dispose(); this.envTarget = null; }
   }
 
   private disposePipes(): void {
@@ -298,7 +304,7 @@ export class Stage {
     if (this.envTarget) return;
     const pmrem = new THREE.PMREMGenerator(this.gl);
     const room = new RoomEnvironment();
-    this.envTarget = pmrem.fromScene(room, 0.04);
+    this.envTarget = pmrem.fromScene(room, 0.04, 0.1, 100, { size: 128 });
     this.scene.environment = this.envTarget.texture;
     this.scene.environmentIntensity = BASE.env;
     room.dispose();
@@ -312,15 +318,20 @@ export class Stage {
    * custou. Chamar só quando não há corrida.
    */
   render(time: number, size: Size, live: readonly LivePanel[]): readonly StagePanelStats[] {
-    const panels = live.slice(0, MAX_PANELS);
     this.drawn = 0;
-    if (panels.length === 0 || this.disposed) return [];
+    if (this.disposed) return [];
+    // Só as janelas que estão (ao menos em parte) dentro do canvas: uma rolada para fora, ou de tamanho zero, não é desenhada.
+    const items = live.slice(0, MAX_PANELS).flatMap((lp) => {
+      const vp = stageViewport(lp.rect, size.width, size.height);
+      return vp ? [{ lp, vp }] : [];
+    });
+    if (items.length === 0) { this.leave(); return []; } // nada a desenhar: o mundo do menu volta com o que é dele
     this.enter();
     this.ensureEnvironment();
     const dt = this.lastTime < 0 ? 1 / 60 : Math.min(0.1, Math.max(0, time - this.lastTime));
     this.lastTime = time;
-    const n = panels.length;
-    const q = stageQuality(panels[0].panel.quality, n);
+    const n = items.length;
+    const q = stageQuality(items[0].lp.panel.quality, n);
     if (q !== this.quality) {
       this.quality = q;
       this.cars.setQuality(q);
@@ -334,9 +345,9 @@ export class Stage {
     gl.setScissor(0, 0, size.width, size.height);
     gl.setClearColor(BG, 1);
     gl.clear(true, true, true);
-    for (let i = 0; i < n; i++) this.drawPanel(i, panels[i], size, plan, time, dt);
+    for (let i = 0; i < n; i++) this.drawPanel(i, items[i].lp, items[i].vp, size, plan, time, dt);
     if (this.slots.size > 2 * MAX_PANELS) {
-      const ids = new Set(panels.map((p) => p.panel.id));
+      const ids = new Set(items.map((p) => p.lp.panel.id));
       for (const id of [...this.slots.keys()]) if (!ids.has(id)) this.slots.delete(id);
     }
     return this.stats.slice(0, this.drawn);
@@ -354,18 +365,18 @@ export class Stage {
     return s;
   }
 
-  private drawPanel(i: number, lp: LivePanel, size: Size, plan: PostPlan, time: number, dt: number): void {
-    const { panel, rect } = lp;
-    const vp = stageViewport(rect, size.width, size.height);
-    if (!vp) return;
+  private drawPanel(i: number, lp: LivePanel, vp: Rect, size: Size, plan: PostPlan, time: number, dt: number): void {
+    const { panel } = lp;
     const slot = this.slotFor(panel);
     const aspect = vp.w / vp.h;
     const reduce = panel.reduceEffects;
     if (slot.ringKey !== panel.ring) { slot.ringKey = panel.ring; slot.ring.set(panel.ring); }
 
     // O que a tela pediu desde o último quadro: a revelação e a oficina começam agora.
-    if (panel.revealCount !== slot.seenReveal) { slot.seenReveal = panel.revealCount; slot.revealAt = time; }
-    if (panel.workshopCount !== slot.seenWorkshop) { slot.seenWorkshop = panel.workshopCount; slot.workshopAt = time; }
+    // Um painel solto e montado de novo (a tela remontou) volta com a contagem em 0: isso não é um pedido novo.
+    if (panel.revealCount > slot.seenReveal) slot.revealAt = time;
+    if (panel.workshopCount > slot.seenWorkshop) slot.workshopAt = time;
+    slot.seenReveal = panel.revealCount; slot.seenWorkshop = panel.workshopCount;
     let reveal: RevealPlan | null = null;
     if (slot.revealAt !== null) {
       reveal = revealPlan(time - slot.revealAt, reduce);
@@ -422,8 +433,8 @@ export class Stage {
   /** O fundo e o anel na cor do assento; a luz abaixa com a revelação e o holofote sobe. */
   private paintStudio(slot: Slot, reveal: RevealPlan | null): void {
     const u = this.dome.material.uniforms;
-    (u.uHorizon.value as THREE.Color).copy(slot.ring).multiplyScalar(0.42).lerp(this.paintTmp.set('#1a1740'), 0.45);
-    (u.uGlow.value as THREE.Color).copy(slot.ring).lerp(this.paintTmp.set('#ffffff'), 0.25).multiplyScalar(0.8);
+    (u.uHorizon.value as THREE.Color).copy(slot.ring).multiplyScalar(0.16).lerp(this.paintTmp.set('#171a3a'), 0.55);
+    (u.uGlow.value as THREE.Color).copy(slot.ring).lerp(this.paintTmp.set('#ffffff'), 0.15).multiplyScalar(0.45);
     this.ringMat.color.copy(slot.ring).multiplyScalar(1.5);
     const dim = reveal ? reveal.dim : 0;
     this.lights.key.intensity = BASE.key * (1 - 0.8 * dim);
@@ -468,7 +479,7 @@ export class Stage {
     const c = reveal.cover;
     const drop = Math.min(1, Math.max(0, age) / 0.25);
     cover.visible = true;
-    cover.scale.set(width * 0.5, height * 0.62, length * 0.5);
+    cover.scale.set(width * 0.6, height * 0.74, length * 0.6);
     const slide = reduce ? 0 : c;
     cover.position.set(0, PLATE_TOP + height * 0.42 + slide * 1.7 + (1 - drop) * (reduce ? 0 : 2.4), slide * -3.4);
     cover.rotation.set(slide * 0.5, slot.yaw, slide * 0.35, 'YXZ');
@@ -481,9 +492,9 @@ export class Stage {
     const spot = reveal ? reveal.spot : 0;
     this.spot.intensity = SPOT_MAX * spot;
     this.cone.visible = spot > 0.01;
-    this.cone.material.opacity = 0.34 * spot;
+    this.cone.material.opacity = 0.14 * spot;
     this.pool.visible = spot > 0.01;
-    this.pool.material.opacity = 0.7 * spot;
+    this.pool.material.opacity = 0.32 * spot;
     // Confete: 120 retângulos lançados no estouro (o `confetti` de `revealPlan` é o relógio dele).
     const t = reveal ? reveal.confetti : -1;
     this.confetti.visible = t >= 0;
@@ -616,14 +627,16 @@ function beamGeometry(height: number, radius: number): THREE.BufferGeometry {
   return g;
 }
 
-/** A capa: uma esfera com dobras de tecido (ondulação por `hash2`, igual a cada abertura). */
+/** A capa: uma esfera com dobras de tecido (ondulação por `hash2`, igual a cada abertura), de normais suaves (vértices soldados). */
 function coverGeometry(): THREE.BufferGeometry {
-  const g = new THREE.IcosahedronGeometry(1, 3);
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, 3);
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  g = mergeVertices(g);
   const pos = g.getAttribute('position');
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i); const y = pos.getY(i); const z = pos.getZ(i);
-    const fold = 1 + 0.045 * Math.sin(Math.atan2(z, x) * 9 + y * 3) + 0.03 * (hash2(Math.round(x * 20), Math.round(z * 20)) - 0.5);
-    pos.setXYZ(i, x * fold, Math.max(y, -0.15) * fold, z * fold);
+    const fold = 1 + 0.035 * Math.sin(Math.atan2(z, x) * 9 + y * 3) + 0.018 * (hash2(Math.round(x * 6), Math.round(z * 6)) - 0.5);
+    pos.setXYZ(i, x * fold, Math.max(y, -0.45) * fold, z * fold);
   }
   g.computeVertexNormals();
   return g;

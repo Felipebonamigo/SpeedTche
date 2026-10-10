@@ -472,7 +472,7 @@ export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
       ),
       // A frase do carro diz a troca (o que ganha, o que perde): cabe com um piloto só (garage.css).
       dealer
-        ? [h('div', { class: 'gp-left' }, carItem.el, blurb), h('div', { class: 'gp-right' }, statsHost, go, msgEl)]
+        ? [h('div', { class: 'gp-left' }, carItem.el), h('div', { class: 'gp-right' }, statsHost, blurb, go, msgEl)]
         : [h('div', { class: 'gp-left' }, carItem.el, statsHost, blurb),
           h('div', { class: 'gp-right' },
             h('div', { class: 'gp-parts' }, h('h2', { class: 'sub-title', text: t('career.garage.upgrades') }), partItems.map((p) => p.el)),

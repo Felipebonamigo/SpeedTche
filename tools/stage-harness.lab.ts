@@ -1,7 +1,7 @@
 // Laboratório GL do palco 3D (onda N, N2): as funções que tests/stage-gl.test.ts chama pelo Playwright, no Chromium com swiftshader.
 // Monta janelas de palco (divs com retângulo fixo) pelo MESMO caminho das telas (`mountShowroom`/`mountPodium` → `stageBus`) e desenha com o
 // `renderIdle` do renderizador do jogo. Nada aqui mede FPS (swiftshader não diz nada sobre GPU): só contagem, compilação e memória.
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { CARS, createRace, getTrack, seatColor, stepRace, type HumanEntry, type RaceState } from '../src/core';
 import type { Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type CarColors, type Quality, type RenderFrame } from '../src/game/contracts';
@@ -139,11 +139,12 @@ function raceFrame(quality: Quality, n: number): DebugInfo {
 }
 
 /** O que o palco mexe e tem de devolver: exposição, uniformes da estilização, pai do grupo dos carros. */
-function snapshot(): { exposure: number; rim: number[]; term: number[]; adjust: number[]; carsInRaceScene: boolean } {
+function snapshot(): { exposure: number; clear: number; rim: number[]; term: number[]; adjust: number[]; carsInRaceScene: boolean } {
   const scene = (renderer as unknown as { __scene: THREE.Scene }).__scene;
   let inRace = false;
-  scene.traverse((o) => { if (o.type === 'Group' && o.children.some((c) => (c as THREE.InstancedMesh).isInstancedMesh)) inRace = true; });
-  return { exposure: gl.toneMappingExposure, rim: stylizeUniforms.uStylizeRim.value.toArray(), term: stylizeUniforms.uStylizeTerm.value.toArray(), adjust: stylizeUniforms.uGradeAdjust.value.toArray(), carsInRaceScene: inRace };
+  // O grupo dos carros é o que tem malha instanciada com o atributo `instExtra` (cars.ts); o cenário também tem grupos instanciados.
+  scene.traverse((o) => { if (o.type === 'Group' && o.children.some((c) => (c as THREE.InstancedMesh).isInstancedMesh && (c as THREE.InstancedMesh).geometry.getAttribute('instExtra'))) inRace = true; });
+  return { exposure: gl.toneMappingExposure, clear: gl.getClearColor(new THREE.Color()).getHex(), rim: stylizeUniforms.uStylizeRim.value.toArray(), term: stylizeUniforms.uStylizeTerm.value.toArray(), adjust: stylizeUniforms.uGradeAdjust.value.toArray(), carsInRaceScene: inRace };
 }
 
 /** O estado dos efeitos da cena do palco (o que está visível agora). */

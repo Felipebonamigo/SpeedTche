@@ -7,8 +7,8 @@ import { hash2 } from './noise';
 
 /** Painéis do palco desenhados ao mesmo tempo (1 por piloto; o 5º é ignorado). */
 export const MAX_PANELS = 4;
-/** Campo de visão vertical da câmera do palco (graus): teleobjetiva suave, o carro de brinquedo sem distorcer. */
-export const STAGE_FOV = 32;
+/** Campo de visão vertical da câmera do palco (graus): uma teleobjetiva (foto de produto): a 32° a frente do carro, a 1,5 m da câmera, ficava 2× maior que o centro. */
+export const STAGE_FOV = 18;
 /** Giro do prato na vista geral (rad/s): uma volta em ~14 s. */
 export const TURN_SPEED = 0.45;
 /** Altura do topo do prato (m): o confete pousa aqui e a sombra de contato mora aqui. */
@@ -146,7 +146,7 @@ export const CONFETTI_COUNT = 120;
 export const CONFETTI_LIFE = 3;
 /** Quantas cores a paleta do confete tem (o `color` de uma peça é um índice nela). */
 export const CONFETTI_COLORS = 6;
-const CONFETTI_Y0 = 2.4;
+const CONFETTI_Y0 = 1.5;
 const CONFETTI_DRAG = 1.4;
 const CONFETTI_AIR = 2.2;
 const CONFETTI_FALL = 1.6;
@@ -160,8 +160,8 @@ export interface ConfettiPiece { x: number; y: number; z: number; rot: number; s
 export function confettiPiece(i: number, t: number, out: ConfettiPiece): ConfettiPiece {
   const h = (k: number): number => hash2(i * 8 + k, 4242);
   const angle = h(0) * Math.PI * 2;
-  const speed = 1.2 + h(1) * 3.2;
-  const up = 3.5 + h(2) * 4;
+  const speed = 0.8 + h(1) * 1.8;
+  const up = 1.5 + h(2) * 2.5;
   const spin = (h(3) - 0.5) * 14;
   const sway = h(4) * 6;
   const time = Math.max(0, t);
@@ -172,7 +172,7 @@ export function confettiPiece(i: number, t: number, out: ConfettiPiece): Confett
   const y = CONFETTI_Y0 - CONFETTI_FALL * time + ((up + CONFETTI_FALL) * (1 - Math.exp(-CONFETTI_AIR * time))) / CONFETTI_AIR;
   out.y = Math.max(PLATE_TOP + 0.02, y);
   out.rot = spin * time;
-  const base = 0.07 + h(6) * 0.05;
+  const base = 0.09 + h(6) * 0.07;
   out.scale = base * Math.min(1, Math.max(0, (CONFETTI_LIFE - time) / 0.4));
   out.color = Math.floor(h(5) * CONFETTI_COLORS);
   out.alive = t >= 0 && t < CONFETTI_LIFE;
@@ -236,7 +236,7 @@ export function focusPose(model: FocusModel, focus: StageFocus | string, aspect 
       return pose(Math.PI - 0.22, 0.14, 0.9, 0.6, [e[0], e[1], e[2]]);
     }
     default:
-      return { azimuth: 0, elevation: 0.2, distance: fit(2.3, 0.9), target: [0, Math.max(0.5, model.height * 0.42), 0], yaw: null };
+      return { azimuth: 0, elevation: 0.22, distance: fit(2.3, 0.95), target: [0, Math.max(0.45, model.height * 0.38), 0], yaw: null };
   }
 }
 
