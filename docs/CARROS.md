@@ -414,3 +414,12 @@ Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pne
 ## Garagem e Concessionária (N2)
 
 A garagem percorre só os carros do piloto (os livres e os comprados); a **Concessionária** (menu principal) percorre os 7 à venda, com preço, "faltam", antes → depois e COMPRAR (`buyCar`). Fora do Retrô o carro de cada painel é o modelo 3D do palco (a pintura escolhida aparece na hora); no Retrô fica a silhueta SVG. Sem carreira a Concessionária é vitrine só de ver.
+
+## Visual do carro (N3)
+
+A pintura virou um pacote, o `CarLook` (`src/game/cosmetics.ts`), por assento × carro: pintura da paleta, cor livre da carroceria e do detalhe, acabamento, roda, aro, faixa e cor da chama.
+
+- Cor livre: saturação HSL ≥ 0,55 e luminosidade em [0,22; 0,78]; cinza, branco e preto são da paleta. Acabamentos: brilho, metálico (flocos), perolado, fosco, cromado, camaleão. Rodas: 6 por estilo, a de fábrica primeiro (as 9 de `WHEEL_DESIGNS` no conjunto). Aros: prata, grafite, dourado, cor do detalhe. Faixa: nenhuma, A, B, A+B. Chamas: 8. Forma canônica: só o que difere do padrão.
+- No 3D tudo é por instância: acabamento nos bits 3–5 de `instExtra.w`, faixa nos bits A/B do corpo; a roda é só qual dos 9 lotes recebe as 4 instâncias; o aro é o bit B do **lote de roda** (outro bit que o da faixa B do corpo); a chama usa `instanceColor`, com `aFlame.z` = brancura do núcleo. Nenhuma chamada nova por carro; uma roda que ninguém usa na cena abre um lote (+1, teto de 9). Na Média (sem verniz) metálico, perolado e camaleão ganham um brilho de Fresnel sobre a reflexão já amostrada. O Retrô só usa as cores.
+- Onde se escolhe: botão "Visual" (ícone) no rodapé do cartão do lobby, que abre um painel por cima (um assento por vez); na sala online, linha "Visual" e editor logo abaixo.
+- `raceLooks` e `racePaints` desempatam por pintura, cores livres, faixa e acabamento. Capturas: `node tools/render-harness.mjs <porta> look_` (`looksheet=finish|wheel|wheelall|stripe|rim|flame`).

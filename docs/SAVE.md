@@ -152,3 +152,7 @@ JSON, lixo, copa salva com e sem a pintura) e `tests/paint-screens.test.ts` (as 
 | `src/game/paints.ts` | Pintura: paleta, `seatPaints` (ler, gravar, sanear), os humanos com a pintura guardada |
 | `tests/storage-full.test.ts` | `localStorage` com cota fixa: corrida e copa concluída chegam ao arquivo e a próxima abertura as lê; abertura com o local cheio; sessão relê o que gravou; pendência; disco recusando; descarte e o que nunca se descarta; aviso |
 | `scripts/playtest-save.mjs` | O mesmo no Chromium, com a cota real (`npm run preview` no ar): aviso no resultado e no menu, em PT e EN; espaço liberado grava tudo; "Electron" com `window.desktop` falso e o arquivo no Node |
+
+## Visual do carro (`seatLooks`, N3)
+
+`seatLooks: Array<Record<carId, CarLook>>` (4 assentos, só quem personalizou) substitui o `seatPaints`. Migração na leitura: cada `seatPaints[assento][carro]` válido e diferente do original vira `{paint}` quando o `seatLooks` não tem aquele carro; quem tem os dois fica com o `seatLooks`. O save regravado sai sem `seatPaints`. Copa salva: lê `look` e, na falta, o `paint` antigo. Exemplo: `"seatLooks": [{ "falcao": { "paint": "rubi", "finish": "perolado", "wheel": "mag", "stripe": "ab" } }, {}, {}, {}]`. Testes: `tests/paint.test.ts` ("migração do seatPaints para o seatLooks").

@@ -10,13 +10,14 @@ import { CUPS } from '../src/core/data/cups';
 import { hashRace } from '../src/core/serialize';
 import { createRace } from '../src/core/sim/race';
 import { getTrack } from '../src/core/track';
-import type { CoreMode, HumanEntry, RaceConfig, RaceState } from '../src/core/types';
+import type { CarLook, CoreMode, HumanEntry, RaceConfig, RaceState } from '../src/core/types';
 import { saveCupProgress, sanitizeSavedCup } from '../src/game/career-save';
 import { DEFAULT_SAVE, DEFAULT_SETTINGS, type CarColors, type RenderFrame, type SaveData, type Settings } from '../src/game/contracts';
 import {
-  nextPaint, ORIGINAL_PAINT, PAINT_IDS, PAINTS, paintColors, paintedCar, paintFromSave, racePaints, sanitizeSeatPaints, seatPaint,
-  setSeatPaint, stepSeatPaint, withoutPaint, withPaint,
+  looksFromSave, nextPaint, ORIGINAL_PAINT, PAINT_IDS, PAINTS, paintColors, paintedCar, racePaints, raceLooks, seatLook, seatPaint,
+  setSeatLook, setSeatPaint, stepSeatPaint, withLook, withoutLook,
 } from '../src/game/paints';
+import { sanitizeSeatLooks } from '../src/game/cosmetics';
 import { sanitizeSave } from '../src/game/save';
 import { setLanguage, t } from '../src/i18n';
 import { Cars } from '../src/render/cars';
@@ -55,10 +56,11 @@ function config(humans: HumanEntry[], over: Partial<RaceConfig> = {}): RaceConfi
 }
 
 function race(humans: HumanEntry[], over: Partial<RaceConfig> = {}): RaceState {
-  return createRace(config(withoutPaint(humans), over), getTrack('copacabana'));
+  return createRace(config(withoutLook(humans), over), getTrack('copacabana'));
 }
 
-const painted = (seat: number, carId: string, paint?: string): HumanEntry => withPaint(human(seat, 0, carId), paint);
+const painted = (seat: number, carId: string, paint?: string): HumanEntry => withLook(human(seat, 0, carId), paint ? { paint } : null);
+const looked = (seat: number, carId: string, look: CarLook): HumanEntry => withLook(human(seat, 0, carId), look);
 
 // ───────────────────────────── Paleta ─────────────────────────────
 
@@ -137,7 +139,7 @@ describe('paleta de pinturas', () => {
 describe('save: pintura por assento e por carro', () => {
   it('save antigo, sem o campo, carrega com a original em todo assento e carro', () => {
     const old = sanitizeSave({ seatNames: ['Ana', 'Bia', 'P3', 'P4'], seatCars: ['saci', 'tatu', 'falcao', 'trovao'], racesRun: 3 });
-    expect(old.seatPaints).toEqual([{}, {}, {}, {}]);
+    expect(old.seatLooks).toEqual([{}, {}, {}, {}]);
     for (let seat = 0; seat < 4; seat++) for (const car of CARS) expect(seatPaint(old, seat, car.id)).toBe(ORIGINAL_PAINT);
   });
 
@@ -156,23 +158,24 @@ describe('save: pintura por assento e por carro', () => {
 
   it('lixo some sem derrubar o resto', () => {
     const raw = JSON.parse('[{"falcao":"rubi","naoexiste":"rubi","trovao":"roxo","tornado":7,"__proto__":"rubi","saci":"original"},"x",null,{"camelo":"gelo"},{"falcao":"rubi"}]');
-    expect(sanitizeSeatPaints(raw)).toEqual([{ falcao: 'rubi' }, {}, {}, { camelo: 'gelo' }]);
-    expect(sanitizeSave({ seatPaints: 'x' }).seatPaints).toEqual([{}, {}, {}, {}]);
-    expect(sanitizeSave({ seatPaints: [{ falcao: 'rubi' }] }).seatPaints).toEqual([{ falcao: 'rubi' }, {}, {}, {}]);
+    expect(sanitizeSeatLooks(undefined, raw)).toEqual([{ falcao: { paint: 'rubi' } }, {}, {}, { camelo: { paint: 'gelo' } }]);
+    expect(sanitizeSave({ seatPaints: 'x' }).seatLooks).toEqual([{}, {}, {}, {}]);
+    expect(sanitizeSave({ seatLooks: 'x' }).seatLooks).toEqual([{}, {}, {}, {}]);
+    expect(sanitizeSave({ seatPaints: [{ falcao: 'rubi' }] }).seatLooks).toEqual([{ falcao: { paint: 'rubi' } }, {}, {}, {}]);
   });
 
   it('voltar à Original tira o carro do mapa (a original não ocupa o save)', () => {
     const save = freshSave();
     setSeatPaint(save, 0, 'falcao', 'rubi');
     setSeatPaint(save, 0, 'falcao', ORIGINAL_PAINT);
-    expect(save.seatPaints[0]).toEqual({});
+    expect(save.seatLooks[0]).toEqual({});
   });
 
   it('gravar a escolha não mexe no save padrão (objeto compartilhado)', () => {
     const save: SaveData = { ...DEFAULT_SAVE };
     setSeatPaint(save, 0, 'falcao', 'rubi');
     expect(seatPaint(save, 0, 'falcao')).toBe('rubi');
-    expect(DEFAULT_SAVE.seatPaints[0]).toEqual({});
+    expect(DEFAULT_SAVE.seatLooks[0]).toEqual({});
   });
 
   it('stepSeatPaint anda pela paleta e guarda só para aquele assento e aquele carro', () => {
@@ -191,14 +194,87 @@ describe('save: pintura por assento e por carro', () => {
     const humans = [painted(0, 'falcao', 'rubi'), human(1, 0, 'trovao')];
     saveCupProgress(save, createChampionship(CUPS[0].id, humans), 7, humans);
     const back = sanitizeSavedCup(JSON.parse(JSON.stringify(save.cupInProgress)));
-    expect(back?.humans[0].paint).toBe('rubi');
-    expect(back?.humans[1]).not.toHaveProperty('paint');
+    expect(back?.humans[0].look).toEqual({ paint: 'rubi' });
+    expect(back?.humans[1]).not.toHaveProperty('look');
     const old = JSON.parse(JSON.stringify(save.cupInProgress)) as { humans: Array<Record<string, unknown>> };
-    delete old.humans[0].paint;
-    old.humans[1].paint = 'cor-que-nao-existe';
+    delete old.humans[0].look;
+    old.humans[1].look = { paint: 'cor-que-nao-existe' };
     const oldBack = sanitizeSavedCup(old);
     expect(oldBack?.humans.map((h) => h.carId)).toEqual(['falcao', 'trovao']);
-    expect(oldBack?.humans.some((h) => 'paint' in h)).toBe(false);
+    expect(oldBack?.humans.some((h) => 'look' in h)).toBe(false);
+  });
+});
+
+// O save de antes do CarLook (N3): só `seatPaints`, carro → id da paleta, como `docs/SAVE.md` descreve. Fixture literal, de propósito:
+// ela não pode ser gerada pelo código novo, senão o teste confirmaria o que o código faz em vez de travar o formato antigo.
+const SAVE_ANTES_DO_LOOK = `{
+  "cupsCompleted": ["br_rj"], "racesRun": 12, "racesWon": 4,
+  "seatNames": ["Ana", "Bia", "P3", "P4"], "seatCars": ["falcao", "trovao", "tornado", "camelo"],
+  "seatPaints": [{ "falcao": "rubi", "trovao": "onix" }, { "saci": "grafite" }, {}, { "camelo": "original", "falcao": "roxo-que-nao-existe" }],
+  "tutorialDone": true
+}`;
+
+describe('save: migração do seatPaints para o seatLooks (N3)', () => {
+  it('o save de antes abre: cada pintura vira o look equivalente, e o resto do save fica como estava', () => {
+    const save = sanitizeSave(JSON.parse(SAVE_ANTES_DO_LOOK));
+    expect(save.seatLooks).toEqual([{ falcao: { paint: 'rubi' }, trovao: { paint: 'onix' } }, { saci: { paint: 'grafite' } }, {}, {}]);
+    expect(save).toMatchObject({ racesRun: 12, racesWon: 4, seatNames: ['Ana', 'Bia', 'P3', 'P4'], tutorialDone: true, cupsCompleted: ['br_rj'] });
+    expect(seatPaint(save, 0, 'falcao')).toBe('rubi');
+    expect(seatPaint(save, 1, 'saci')).toBe('grafite');
+    expect(seatLook(save, 3, 'camelo')).toBeNull(); // a Original nunca ocupou o save
+  });
+
+  it('regravado, sai sem seatPaints e com seatLooks; abrir de novo dá o mesmo save (a migração é idempotente)', () => {
+    const once = sanitizeSave(JSON.parse(SAVE_ANTES_DO_LOOK));
+    const written = JSON.parse(JSON.stringify(once)) as Record<string, unknown>;
+    expect(written).not.toHaveProperty('seatPaints');
+    expect(written).toHaveProperty('seatLooks');
+    expect(sanitizeSave(written)).toEqual(once);
+  });
+
+  it('nada se perde: com os dois campos, o look vence no mesmo carro e a pintura antiga dos outros carros fica', () => {
+    const save = sanitizeSave({
+      seatLooks: [{ falcao: { paint: 'cobalto', finish: 'cromado' } }, {}, {}, {}],
+      seatPaints: [{ falcao: 'rubi', trovao: 'onix' }, {}, {}, {}],
+    });
+    expect(save.seatLooks[0]).toEqual({ falcao: { paint: 'cobalto', finish: 'cromado' }, trovao: { paint: 'onix' } });
+  });
+
+  it('lixo no look de um carro não leva embora a pintura antiga dele', () => {
+    const save = sanitizeSave({ seatLooks: [{ falcao: { finish: 'inexistente', wheel: 'x' } }, 'lixo', null, 7], seatPaints: [{ falcao: 'rubi' }, {}, {}, {}] });
+    expect(save.seatLooks[0]).toEqual({ falcao: { paint: 'rubi' } });
+    expect(save.seatLooks.slice(1)).toEqual([{}, {}, {}]);
+  });
+
+  it('o save novo guarda o look inteiro e volta igual (JSON), por assento e por carro', () => {
+    const save = freshSave();
+    setSeatLook(save, 0, 'falcao', { paint: 'rubi', color: '#2346d6', finish: 'perolado', wheel: 'mag', rim: 'dourado', stripe: 'ab', flame: 'roxa' });
+    setSeatLook(save, 1, 'falcao', { wheel: 'dish' });
+    const back = sanitizeSave(JSON.parse(JSON.stringify(save)));
+    expect(back.seatLooks).toEqual(save.seatLooks);
+    expect(seatLook(back, 0, 'falcao')).toEqual({ paint: 'rubi', color: '#2346d6', finish: 'perolado', wheel: 'mag', rim: 'dourado', stripe: 'ab', flame: 'roxa' });
+    expect(seatLook(back, 1, 'falcao')).toEqual({ wheel: 'dish' });
+    expect(seatLook(back, 2, 'falcao')).toBeNull();
+  });
+
+  it('mexer na pintura da paleta não perde o acabamento, a roda nem a faixa', () => {
+    const save = freshSave();
+    setSeatLook(save, 0, 'falcao', { finish: 'fosco', stripe: 'a', wheel: 'mag' });
+    expect(stepSeatPaint(save, 0, 'falcao', 1)).toBe(PAINT_IDS[1]);
+    expect(seatLook(save, 0, 'falcao')).toEqual({ paint: PAINT_IDS[1], finish: 'fosco', wheel: 'mag', stripe: 'a' });
+  });
+
+  it('copa salva só com o `paint` antigo vira look; o look salvo vence; lixo no look sai e o resto fica', () => {
+    const save = freshSave();
+    const humans = [painted(0, 'falcao', 'rubi'), human(1, 0, 'trovao'), human(2, 0, 'saci')];
+    saveCupProgress(save, createChampionship(CUPS[0].id, humans), 7, humans);
+    const raw = JSON.parse(JSON.stringify(save.cupInProgress)) as { humans: Array<Record<string, unknown>> };
+    delete raw.humans[0].look; raw.humans[0].paint = 'rubi'; // formato de antes do look
+    raw.humans[1].look = { paint: 'cobalto', finish: 'camaleao' }; raw.humans[1].paint = 'gelo'; // os dois: o look vence
+    raw.humans[2].look = { finish: 'nao-existe', stripe: 'ab' }; // lixo num campo
+    const back = sanitizeSavedCup(raw);
+    expect(back?.humans.map((h) => h.look)).toEqual([{ paint: 'rubi' }, { paint: 'cobalto', finish: 'camaleao' }, { stripe: 'ab' }]);
+    expect(back?.humans.some((h) => 'paint' in h)).toBe(false);
   });
 });
 
@@ -221,40 +297,41 @@ describe('quem corre com qual pintura', () => {
     setSeatPaint(save, 1, 'trovao', 'gelo'); // escolhida para outro carro: não vale para o Falcão do P2
     const falcao = CARS.findIndex((c) => c.id === 'falcao');
     const humans = lobbyHumans(lobbyApi(save, [{ seat: 0, carIndex: falcao }, { seat: 1, carIndex: falcao }]));
-    expect(humans[0].paint).toBe('rubi');
-    expect(humans[1]).not.toHaveProperty('paint');
+    expect(humans[0].look).toEqual({ paint: 'rubi' });
+    expect(humans[1]).not.toHaveProperty('look');
   });
 
   it('tutorial: a pintura guardada do carro que o assento lembra', () => {
     const save = freshSave();
     setSeatPaint(save, 1, save.seatCars[1], 'gelo');
     const humans = tutorialHumans({ cars: CARS, save, settings: DEFAULT_SETTINGS as Settings }, [0, 1]);
-    expect(humans[0]).not.toHaveProperty('paint');
-    expect(humans[1].paint).toBe('gelo');
+    expect(humans[0]).not.toHaveProperty('look');
+    expect(humans[1].look).toEqual({ paint: 'gelo' });
   });
 
-  it('carreira e humanos montados do save: paintFromSave usa a escolha do assento para aquele carro', () => {
+  it('carreira e humanos montados do save: looksFromSave usa a escolha do assento para aquele carro', () => {
     const save = freshSave();
     setSeatPaint(save, 1, 'saci', 'limao');
     setSeatPaint(save, 0, 'trovao', 'onix');
-    const out = paintFromSave([human(0, 0, 'falcao'), human(1, 0, 'saci')], save);
-    expect(out[0]).not.toHaveProperty('paint');
-    expect(out[1].paint).toBe('limao');
+    setSeatLook(save, 1, 'saci', { paint: 'limao', finish: 'cromado' });
+    const out = looksFromSave([human(0, 0, 'falcao'), human(1, 0, 'saci')], save);
+    expect(out[0]).not.toHaveProperty('look');
+    expect(out[1].look).toEqual({ paint: 'limao', finish: 'cromado' });
   });
 
-  it('withoutPaint tira a pintura sem mexer no resto nem no original', () => {
-    const list = [{ ...painted(0, 'falcao', 'rubi'), assist: 'brake' as const }, human(1)];
-    const out = withoutPaint(list);
-    expect(out[0]).not.toHaveProperty('paint');
+  it('withoutLook tira o look sem mexer no resto nem no original', () => {
+    const list = [{ ...looked(0, 'falcao', { paint: 'rubi', finish: 'perolado' }), assist: 'brake' as const }, human(1)];
+    const out = withoutLook(list);
+    expect(out[0]).not.toHaveProperty('look');
     expect(out[0]).toMatchObject({ seat: 0, carId: 'falcao', assist: 'brake' });
-    expect(list[0].paint).toBe('rubi');
+    expect(list[0].look).toEqual({ paint: 'rubi', finish: 'perolado' });
   });
 
-  it('o estado da corrida não carrega pintura: mesma impressão de quem correu de fábrica', () => {
-    const withPaints = race([painted(0, 'falcao', 'rubi'), painted(1, 'trovao', 'cobalto')]);
+  it('o estado da corrida não carrega visual: mesma impressão de quem correu de fábrica', () => {
+    const withLooks = race([painted(0, 'falcao', 'rubi'), looked(1, 'trovao', { paint: 'cobalto', finish: 'camaleao', stripe: 'ab', wheel: 'steel' })]);
     const plain = race([human(0, 0, 'falcao'), human(1, 0, 'trovao')]);
-    expect(JSON.stringify(withPaints)).not.toContain('paint');
-    expect(hashRace(withPaints)).toBe(hashRace(plain));
+    expect(JSON.stringify(withLooks)).not.toMatch(/paint|"look"|camaleao|"stripe"|"wheel"/);
+    expect(hashRace(withLooks)).toBe(hashRace(plain));
   });
 });
 
@@ -301,6 +378,49 @@ describe('racePaints: a pintura de cada carro na pista', () => {
     expect(p[human0(s, 1)]).toEqual(paintColors('rubi'));
     expect(p[human0(s, 2)]).toEqual(paintColors('gelo'));
     expect(p[human0(s, 3)]).toBeNull();
+  });
+
+  it('N3 — mesma pintura e FAIXA diferente: já se distinguem, ninguém é trocado', () => {
+    const humans = [looked(0, 'falcao', { paint: 'rubi', stripe: 'a' }), looked(1, 'falcao', { paint: 'rubi', stripe: 'b' }), looked(2, 'falcao', { paint: 'rubi', stripe: 'nenhuma' }), painted(3, 'falcao', 'rubi')];
+    const s = race(humans);
+    const looks = raceLooks(s.cars, humans);
+    expect(looks[human0(s, 0)]).toEqual({ paint: 'rubi', stripe: 'a' });
+    expect(looks[human0(s, 1)]).toEqual({ paint: 'rubi', stripe: 'b' });
+    expect(looks[human0(s, 2)]).toEqual({ paint: 'rubi', stripe: 'nenhuma' });
+    expect(looks[human0(s, 3)]).toEqual({ paint: 'rubi' });
+    expect(racePaints(s.cars, humans).every((c, i) => s.cars[i].seat < 0 || c !== null)).toBe(true);
+  });
+
+  it('N3 — mesma pintura, mesma faixa e mesmo acabamento: o de assento maior é trocado, perde as cores livres e guarda roda e acabamento', () => {
+    const mine = { paint: 'rubi', stripe: 'ab', finish: 'perolado', wheel: 'mag', color: '#2346d6' };
+    const humans = [looked(0, 'falcao', mine), looked(1, 'falcao', mine)];
+    const s = race(humans);
+    const looks = raceLooks(s.cars, humans);
+    expect(looks[human0(s, 0)]).toEqual(mine);
+    expect(looks[human0(s, 1)]).toEqual({ paint: nextPaint('rubi', 1), stripe: 'ab', finish: 'perolado', wheel: 'mag' });
+    expect(humans[1].look).toEqual(mine); // a escolha dele não muda
+  });
+
+  it('N3 — mesma pintura e ACABAMENTO diferente também se distinguem', () => {
+    const humans = [looked(0, 'falcao', { paint: 'rubi', finish: 'metalico' }), looked(1, 'falcao', { paint: 'rubi', finish: 'fosco' })];
+    const s = race(humans);
+    const looks = raceLooks(s.cars, humans);
+    expect(looks[human0(s, 0)]?.paint).toBe('rubi');
+    expect(looks[human0(s, 1)]?.paint).toBe('rubi');
+  });
+
+  it('N3 — o look só de roda/aro/chama não pinta (as cores continuam as de fábrica) mas chega inteiro ao renderizador', () => {
+    const humans = [looked(0, 'falcao', { wheel: 'mag', rim: 'dourado', flame: 'verde' })];
+    const s = race(humans);
+    expect(racePaints(s.cars, humans)[human0(s, 0)]).toBeNull();
+    expect(raceLooks(s.cars, humans)[human0(s, 0)]).toEqual({ wheel: 'mag', rim: 'dourado', flame: 'verde' });
+  });
+
+  it('N3 — a IA e o VIP seguem de fábrica; look inválido nos humanos (adulterado) é saneado, não lança', () => {
+    const bad = { seat: 0, name: 'P1', carId: 'falcao', teamId: 0, color: '#fff', look: { paint: 'nao-existe', finish: 'brilho', wheel: 'steel', extra: 1 } } as unknown as HumanEntry;
+    const s = race([bad]);
+    const looks = raceLooks(s.cars, [bad]);
+    s.cars.forEach((c, i) => expect(looks[i], c.name).toBeNull());
   });
 
   it('revezamento: o carro da dupla tem a pintura de quem larga com ele; escolta: o VIP fica com a cor dele', () => {

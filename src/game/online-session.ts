@@ -12,19 +12,20 @@ import { seatColor } from '../core/data/drivers';
 import { deserializeRace, serializeRace } from '../core/serialize';
 import { ASSIST_LEVELS } from '../core/sim/assist';
 import { TRACKS } from '../core/track';
-import { NEUTRAL_INPUT, type AssistLevel, type HumanEntry, type PlayerInput, type RaceConfig, type RaceState } from '../core/types';
+import { NEUTRAL_INPUT, type AssistLevel, type CarLook, type HumanEntry, type PlayerInput, type RaceConfig, type RaceState } from '../core/types';
 import { NetClient, type SocketFactory } from '../net/client';
 import { Lockstep, type DesyncReport } from '../net/lockstep';
 import {
   DEFAULT_INPUT_DELAY, isTakeover, MAX_HUMANS, MAX_INPUT_DELAY, MAX_LOCAL_PLAYERS, MAX_RECORDS_PER_MESSAGE, MIN_INPUT_DELAY, normalizeRoomCode,
-  packRecords, PROTOCOL_VERSION, RECONNECT_WINDOW_MS, unpackRecordList, withAssist,
+  packRecords, PROTOCOL_VERSION, RECONNECT_WINDOW_MS, unpackRecordList, withAssist, withLookField,
   type ClientInfo, type ClientMessage, type ContentRules, type ErrorCode, type InputRecord, type RoomSettings,
   type RoomView, type SeatAssignment, type ServerMessage, type Snapshot, type StartConfig,
 } from '../net/protocol';
 import { carAvailable } from './career-save';
 import { onlineFingerprint } from './content-version';
 import type { DeviceId, InputProvider, RaceDriver, ResultsScreenData, SaveData, Settings } from './contracts';
-import { seatPaint, stepSeatPaint, withoutPaint, withPaint } from './paints';
+import { ORIGINAL_PAINT, seatLook, setSeatLook, stepSeatPaint, withoutLook } from './paints';
+import { stepLook, type LookField } from './cosmetics';
 
 // A impressão do conteúdo mora em content-version.ts (o fantasma e os recordes também a usam); daqui só reexportada.
 export { contentFingerprint, fingerprintContent, onlineFingerprint } from './content-version';
@@ -45,8 +46,8 @@ export interface LocalPlayer {
   device: DeviceId;
   name: string;
   car: string;
-  /** Pintura do carro (id da paleta): a que o assento local guardou para ele (save.seatPaints). */
-  paint: string;
+  /** Visual do carro: o que o assento local guardou para ele (save.seatLooks); null = o de fábrica. */
+  look: CarLook | null;
 }
 
 export interface WaitingSeat { seat: number; name: string; color: string; lost: boolean }
@@ -138,22 +139,23 @@ export function assignSeats(room: RoomView): SeatAssignment[] {
   for (const c of [...room.clients].sort((a, b) => a.id - b.id)) {
     for (const p of c.info?.players ?? []) {
       if (out.length >= MAX_HUMANS) return out;
-      out.push(withPaint(withAssist({ seat: out.length, client: c.id, name: seatName(p.name, out.length), car: p.car }, p.assist), p.paint));
+      out.push(withLookField(withAssist({ seat: out.length, client: c.id, name: seatName(p.name, out.length), car: p.car }, p.assist), p.look));
     }
   }
   return out;
 }
 
-/** Os humanos da largada como a sessão os mostra: com a pintura de cada um (só aparência). */
+/** Os humanos da largada como a sessão os mostra: com o visual de cada um (só aparência). */
 export function startHumans(cfg: StartConfig): HumanEntry[] {
-  return cfg.seats.map((s) => withPaint(withAssist({
-    seat: s.seat, name: s.name, carId: s.car, teamId: cfg.versus ? s.seat : 0, color: seatColor(s.seat),
-  }, s.assist), s.paint));
+  return cfg.seats.map((s) => {
+    const human = withAssist({ seat: s.seat, name: s.name, carId: s.car, teamId: cfg.versus ? s.seat : 0, color: seatColor(s.seat) }, s.assist);
+    return s.look ? { ...human, look: s.look } : human;
+  });
 }
 
-/** A configuração da corrida que todas as máquinas montam a partir da largada (sem a pintura: o estado não a carrega). */
+/** A configuração da corrida que todas as máquinas montam a partir da largada (sem o visual: o estado não o carrega). */
 export function raceConfigFrom(cfg: StartConfig): RaceConfig {
-  const humans = withoutPaint(startHumans(cfg));
+  const humans = withoutLook(startHumans(cfg));
   return {
     trackId: cfg.trackId, laps: cfg.laps, humans, totalCars: Math.max(cfg.totalCars, humans.length),
     difficulty: cfg.difficulty, manualGear: cfg.manualGear, assists: { ...cfg.assists }, seed: cfg.seed,
@@ -301,7 +303,7 @@ export class OnlineController implements RaceDriver {
     const choices = this.carChoices();
     const saved = save.seatCars[index] ?? choices[0];
     const car = choices.includes(saved) ? saved : choices[0];
-    return { device, name: (save.seatNames[index] ?? `P${index + 1}`).slice(0, 12), car, paint: seatPaint(save, index, car) };
+    return { device, name: (save.seatNames[index] ?? `P${index + 1}`).slice(0, 12), car, look: seatLook(save, index, car) };
   }
 
   /** Garante o jogador 1 deste computador (com o dispositivo que abriu a tela). */
@@ -340,14 +342,19 @@ export class OnlineController implements RaceDriver {
     if (!p || this.ready) return;
     const ids = this.carChoices();
     p.car = ids[(ids.indexOf(p.car) + dir + ids.length) % ids.length];
-    // Cada carro volta com a pintura que este assento guardou para ele.
-    p.paint = seatPaint(this.host.save, index, p.car);
+    // Cada carro volta com o visual que este assento guardou para ele.
+    p.look = seatLook(this.host.save, index, p.car);
     this.publishInfo();
   }
 
-  /** Pintura do jogador local `index` (a Original se ele não existe). */
+  /** Visual do jogador local `index` (null = o de fábrica, ou jogador que não existe). */
+  lookOf(index: number): CarLook | null {
+    return this.locals[index]?.look ?? null;
+  }
+
+  /** Pintura (id da paleta) do jogador local `index` (a Original se ele não existe). */
   paintOf(index: number): string {
-    return this.locals[index]?.paint ?? seatPaint(this.host.save, index, this.locals[index]?.car ?? '');
+    return this.locals[index]?.look?.paint ?? ORIGINAL_PAINT;
   }
 
   /**
@@ -357,7 +364,21 @@ export class OnlineController implements RaceDriver {
   cyclePaint(index: number, dir: -1 | 1): void {
     const p = this.locals[index];
     if (!p || this.ready || this.phase !== 'lobby') return;
-    p.paint = stepSeatPaint(this.host.save, index, p.car, dir);
+    stepSeatPaint(this.host.save, index, p.car, dir);
+    p.look = seatLook(this.host.save, index, p.car);
+    this.host.persistSave?.();
+    this.publishInfo();
+  }
+
+  /**
+   * ←/→ num campo do visual (acabamento, roda, aro, faixa, chama, cores livres): grava para o assento local e o carro, como a pintura,
+   * e avisa a sala. Travado com o "pronto" dado e fora da sala, como o carro.
+   */
+  stepLookField(index: number, field: LookField, dir: -1 | 1): void {
+    const p = this.locals[index];
+    if (!p || this.ready || this.phase !== 'lobby') return;
+    p.look = stepLook(p.look, field, dir, p.car);
+    setSeatLook(this.host.save, index, p.car, p.look);
     this.host.persistSave?.();
     this.publishInfo();
   }
@@ -388,7 +409,7 @@ export class OnlineController implements RaceDriver {
   private info(): ClientInfo {
     return {
       // A assistência de cada jogador local é a do assento local dele nas opções (P1, P2).
-      players: this.locals.map((p, i) => withPaint(withAssist({ name: p.name.trim() || `P${i + 1}`, car: p.car }, this.assistOf(i)), p.paint)),
+      players: this.locals.map((p, i) => withLookField(withAssist({ name: p.name.trim() || `P${i + 1}`, car: p.car }, this.assistOf(i)), p.look)),
       ready: this.ready,
     };
   }

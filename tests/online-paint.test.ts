@@ -1,7 +1,8 @@
 // Pintura no online: cada jogador local escolhe a sua na sala (começa com a guardada para aquele assento e
-// carro), a escolha vai no `info` (LobbyPlayer.paint) e na largada (SeatAssignment.paint), e cada computador
-// monta a mesma corrida — a config sem a pintura (o estado não carrega cosmético) e os humanos da sessão com
-// ela, para todos desenharem cada carro na cor que o dono escolheu. Partes puras e o controlador com socket falso.
+// carro), a escolha vai no `info` (LobbyPlayer.look.paint) e na largada (SeatAssignment.look.paint), e cada computador
+// monta a mesma corrida — a config sem o visual (o estado não carrega cosmético) e os humanos da sessão com
+// ele, para todos desenharem cada carro na cor que o dono escolheu. Partes puras e o controlador com socket falso.
+// (N3: o campo `paint` virou `look.paint`; o visual inteiro está em tests/online-look.test.ts.)
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRace } from '../src/core/sim/race';
 import { getTrack } from '../src/core/track';
@@ -74,7 +75,7 @@ function roomMsg(infos: Record<number, { players: Array<Record<string, unknown>>
   };
 }
 
-type Info = { players: Array<{ name: string; car: string; paint?: string }>; ready: boolean };
+type Info = { players: Array<{ name: string; car: string; look?: { paint?: string } }>; ready: boolean };
 const lastInfo = (sock: FakeSocket): Info => {
   const m = [...sock.sent].reverse().find((x) => x.t === 'info' || x.t === 'create' || x.t === 'join');
   return (m as { info: Info }).info;
@@ -86,26 +87,28 @@ const START_BASE = {
 } as const;
 
 describe('protocolo: a pintura do jogador na sala e na largada', () => {
-  it('vai e volta; ausente fica ausente; desconhecida, de outro tipo ou a Original viram a de fábrica sem recusar a mensagem', () => {
-    const info = (paint: unknown) => parseClientInfo({ players: [{ name: 'Ana', car: 'falcao', paint }], ready: false }, CONTENT_RULES);
-    expect(info('rubi')?.players[0].paint).toBe('rubi');
-    for (const bad of [undefined, 'roxo-que-nao-existe', 42, null, { a: 1 }, ORIGINAL_PAINT]) {
-      const p = info(bad);
-      expect(p, String(bad)).not.toBeNull();
-      expect(p?.players[0], String(bad)).not.toHaveProperty('paint');
+  it('vai e volta; ausente ou a Original ficam ausentes; pintura que não existe RECUSA (N3: o saneador da rede é o estrito)', () => {
+    const info = (look: unknown) => parseClientInfo({ players: [{ name: 'Ana', car: 'falcao', look }], ready: false }, CONTENT_RULES);
+    expect(info({ paint: 'rubi' })?.players[0].look).toEqual({ paint: 'rubi' });
+    for (const ok of [undefined, { paint: ORIGINAL_PAINT }, {}]) {
+      const p = info(ok);
+      expect(p, String(ok)).not.toBeNull();
+      expect(p?.players[0], String(ok)).not.toHaveProperty('look');
     }
-    const cfg = (paint: unknown) => parseStartConfig({ ...START_BASE, seats: [{ seat: 0, client: 0, name: 'Ana', car: 'falcao', paint }] }, CONTENT_RULES);
-    expect(cfg('gelo')?.seats[0].paint).toBe('gelo');
-    expect(cfg('xyz')?.seats[0]).not.toHaveProperty('paint');
-    expect(cfg(7)).not.toBeNull();
+    for (const bad of [{ paint: 'roxo-que-nao-existe' }, { paint: 42 }, null, 'rubi', ['rubi']]) expect(info(bad), JSON.stringify(bad)).toBeNull();
+    const cfg = (look: unknown) => parseStartConfig({ ...START_BASE, seats: [{ seat: 0, client: 0, name: 'Ana', car: 'falcao', look }] }, CONTENT_RULES);
+    expect(cfg({ paint: 'gelo' })?.seats[0].look).toEqual({ paint: 'gelo' });
+    expect(cfg(undefined)?.seats[0]).not.toHaveProperty('look');
+    expect(cfg({ paint: 'xyz' })).toBeNull();
+    expect(cfg(7)).toBeNull();
   });
 
-  it('cada computador monta a config sem a pintura (estado sem cosmético) e os humanos da sessão com ela', () => {
-    const start: StartConfig = { ...START_BASE, seats: [{ seat: 0, client: 0, name: 'Ana', car: 'falcao', paint: 'rubi' }, { seat: 1, client: 1, name: 'Bia', car: 'falcao' }] };
+  it('cada computador monta a config sem o visual (estado sem cosmético) e os humanos da sessão com ele', () => {
+    const start: StartConfig = { ...START_BASE, seats: [{ seat: 0, client: 0, name: 'Ana', car: 'falcao', look: { paint: 'rubi' } }, { seat: 1, client: 1, name: 'Bia', car: 'falcao' }] };
     const config = raceConfigFrom(start);
-    expect(config.humans.some((h) => 'paint' in h)).toBe(false);
+    expect(config.humans.some((h) => 'look' in h)).toBe(false);
     const humans = startHumans(start);
-    expect(humans.map((h) => h.paint)).toEqual(['rubi', undefined]);
+    expect(humans.map((h) => h.look?.paint)).toEqual(['rubi', undefined]);
     // As duas máquinas pintam igual: a mesma função pura sobre a mesma largada.
     const a = createRace(config, getTrack('copacabana'));
     const b = createRace(raceConfigFrom(JSON.parse(JSON.stringify(start)) as StartConfig), getTrack('copacabana'));
@@ -135,15 +138,15 @@ describe('online: cada jogador local escolhe a própria pintura', () => {
   it('começa com a guardada (assento + carro); trocar publica na sala e grava no save', () => {
     const { sock, host, ctl } = setup(1, (h) => setSeatPaint(h.save, 0, 'falcao', 'gelo'));
     expect(ctl.paintOf(0)).toBe('gelo');
-    expect(lastInfo(sock).players[0]).toMatchObject({ name: 'Ana', car: 'falcao', paint: 'gelo' });
+    expect(lastInfo(sock).players[0]).toMatchObject({ name: 'Ana', car: 'falcao', look: { paint: 'gelo' } });
     ctl.cyclePaint(0, 1);
     expect(ctl.paintOf(0)).toBe(nextPaint('gelo', 1));
-    expect(lastInfo(sock).players[0].paint).toBe(nextPaint('gelo', 1));
+    expect(lastInfo(sock).players[0].look?.paint).toBe(nextPaint('gelo', 1));
     expect(seatPaint(host.save, 0, 'falcao')).toBe(nextPaint('gelo', 1));
     expect(host.saved).toBe(1);
     // De volta à Original: o campo some da mensagem (a de quem não pinta é a de antes).
     while (ctl.paintOf(0) !== ORIGINAL_PAINT) ctl.cyclePaint(0, 1);
-    expect(lastInfo(sock).players[0]).not.toHaveProperty('paint');
+    expect(lastInfo(sock).players[0]).not.toHaveProperty('look');
   });
 
   it('trocar de carro traz a pintura guardada daquele carro', () => {
@@ -152,13 +155,13 @@ describe('online: cada jogador local escolhe a própria pintura', () => {
     ctl.cycleCar(0, 1);
     expect(ctl.locals[0].car).toBe('trovao');
     expect(ctl.paintOf(0)).toBe('onix');
-    expect(lastInfo(sock).players[0]).toMatchObject({ car: 'trovao', paint: 'onix' });
+    expect(lastInfo(sock).players[0]).toMatchObject({ car: 'trovao', look: { paint: 'onix' } });
   });
 
   it('o segundo jogador deste computador tem a sua (a do P2 local no save)', () => {
     const { sock, ctl } = setup(1, (h) => setSeatPaint(h.save, 1, h.save.seatCars[1], 'flamingo'));
     expect(ctl.addLocal('gp0')).toBe(true);
-    expect(lastInfo(sock).players.map((p) => p.paint)).toEqual([undefined, 'flamingo']);
+    expect(lastInfo(sock).players.map((p) => p.look?.paint)).toEqual([undefined, 'flamingo']);
   });
 
   it('com o "pronto" dado, não muda', () => {
@@ -173,15 +176,15 @@ describe('online: cada jogador local escolhe a própria pintura', () => {
 
   it('a pintura do convidado aparece para o anfitrião, vai na largada e chega à corrida de todos', () => {
     const { sock, host, ctl } = setup(0);
-    sock.push(roomMsg({ 1: { players: [{ name: 'Bia', car: 'trovao', paint: 'flamingo' }], ready: true } }));
+    sock.push(roomMsg({ 1: { players: [{ name: 'Bia', car: 'trovao', look: { paint: 'flamingo' } }], ready: true } }));
     const seats = assignSeats(ctl.room as RoomView);
-    expect(seats.map((s) => s.paint)).toEqual([undefined, 'flamingo']);
+    expect(seats.map((s) => s.look?.paint)).toEqual([undefined, 'flamingo']);
     expect(ctl.startRace()).toBe(true);
     const start = sock.sent.find((m) => m.t === 'start') as { cfg: StartConfig };
-    expect(start.cfg.seats.map((s) => s.paint)).toEqual([undefined, 'flamingo']);
+    expect(start.cfg.seats.map((s) => s.look?.paint)).toEqual([undefined, 'flamingo']);
     sock.push({ t: 'start', from: 0, cfg: start.cfg });
-    expect(host.config?.humans.some((h) => 'paint' in h)).toBe(false);
-    expect(host.humans?.map((h) => h.paint)).toEqual([undefined, 'flamingo']);
+    expect(host.config?.humans.some((h) => 'look' in h)).toBe(false);
+    expect(host.humans?.map((h) => h.look?.paint)).toEqual([undefined, 'flamingo']);
     const state = host.state as RaceState;
     const paints = racePaints(state.cars, host.humans ?? []);
     expect(paints[state.cars.findIndex((c) => c.seat === 1)]).toEqual(paintColors('flamingo'));
@@ -194,7 +197,7 @@ describe('online: cada jogador local escolhe a própria pintura', () => {
     ctl.cyclePaint(0, 1);
     expect(ctl.startRace()).toBe(true);
     const start = sock.sent.find((m) => m.t === 'start') as { cfg: StartConfig };
-    expect(start.cfg.seats[0]).toMatchObject({ seat: 0, client: 0, paint: nextPaint(ORIGINAL_PAINT, 1) });
-    expect(parseStartConfig(JSON.parse(JSON.stringify(start.cfg)), CONTENT_RULES)?.seats[0].paint).toBe(nextPaint(ORIGINAL_PAINT, 1));
+    expect(start.cfg.seats[0]).toMatchObject({ seat: 0, client: 0, look: { paint: nextPaint(ORIGINAL_PAINT, 1) } });
+    expect(parseStartConfig(JSON.parse(JSON.stringify(start.cfg)), CONTENT_RULES)?.seats[0].look?.paint).toBe(nextPaint(ORIGINAL_PAINT, 1));
   });
 });

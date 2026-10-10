@@ -84,7 +84,7 @@ describe('recomeçar a copa (K1)', () => {
     s.input.bindSeat(0, 'kb1');
     s.input.bindSeat(1, 'gp0');
     const humans: HumanEntry[] = [
-      { seat: 0, name: 'Ana', carId: 'trovao', teamId: 0, color: '#fff', paint: 'rubi' },
+      { seat: 0, name: 'Ana', carId: 'trovao', teamId: 0, color: '#fff', look: { paint: 'rubi' } },
       { seat: 1, name: 'Bia', carId: 'tornado', teamId: 0, color: '#fff' },
     ];
     s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans });
@@ -109,7 +109,7 @@ describe('recomeçar a copa (K1)', () => {
     expect(s.race?.mode).toBe('cup');
     expect(s.race?.state.config.trackId).toBe('copacabana');
     expect(s.race?.humans).toEqual(d.humans);
-    expect(s.race?.humans[0].paint).toBe('rubi');
+    expect(s.race?.humans[0].look).toEqual({ paint: 'rubi' });
     expect(s.input.seatDevice(0)).toBe('kb1');
     expect(s.input.seatDevice(1)).toBe('gp0');
     expect(saved().cupInProgress?.champ.raceIndex).toBe(0);
