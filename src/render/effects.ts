@@ -17,6 +17,8 @@ import { fxPlan } from './fx/plan';
 import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
 import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
+import { Pows, powSize } from './fx/pow';
+import { Shockwaves } from './fx/shockwave';
 import { markStrength, TireMarks, type MarkCarState } from './fx/marks';
 import { hash2 } from './noise';
 import type { Palette } from './palette';
@@ -163,6 +165,8 @@ export class Effects {
   readonly streaks = new Streaks(900);
   /** Marcas de pneu: o buffer é em coordenada de pista (teto por degrau) e cada viewport o reprojeta. */
   private readonly marks = new TireMarks(MARKS_MAX);
+  private readonly waves = new Shockwaves();
+  private readonly pows = new Pows();
   private readonly markCar: MarkCarState = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, collisionCooldown: 0, launch: 0 };
   private markClock = 0;
   private readonly cues: FxCue[] = [];
@@ -179,7 +183,7 @@ export class Effects {
   private lastTime = -1;
   private seed = 0;
 
-  constructor() { this.group.add(this.marks.mesh, this.dust.points, this.streaks.mesh); }
+  constructor() { this.group.add(this.marks.mesh, this.waves.mesh, this.dust.points, this.streaks.mesh, this.pows.mesh); }
 
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
@@ -237,7 +241,12 @@ export class Effects {
     for (const cue of observeCues(this.cueMemory, state, this.cues)) {
       const c = state.cars[cue.car]?.id === cue.car ? state.cars[cue.car] : state.cars.find((o) => o.id === cue.car);
       if (!c) continue;
-      if (cue.kind === 'hit') {
+      if (cue.kind === 'go' && plan.shockwave) {
+        this.waves.spawn(cue.perfect ? 'perfect' : 'ground', c.z, c.x, 0.05);
+      } else if (cue.kind === 'nitro' && plan.shockwave) {
+        this.waves.spawn('halo', c.z - 70, c.x, 0.55);
+      } else if (cue.kind === 'hit') {
+        if (plan.pow) this.pows.spawn(c.z + 20, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5);
         emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);
         if (c.seat >= 0 && c.seat < 4) this.shakeAmp[c.seat] = Math.min(1, this.shakeAmp[c.seat] + 0.6 + 0.4 * (c.speed / c.stats.topSpeed));
       } else if (cue.kind === 'boost') {
@@ -256,6 +265,8 @@ export class Effects {
     }
     this.dust.step(dt);
     this.sparks.step(dt);
+    this.waves.step(dt);
+    this.pows.step(dt);
     for (let s = 0; s < 4; s++) this.shakeAmp[s] *= Math.exp(-4.5 * dt);
   }
 
@@ -267,15 +278,20 @@ export class Effects {
     this.sparks.pose(rf, track, st);
     st.end();
     this.marks.pose(rf, track, this.markClock);
+    this.waves.pose(rf, track);
+    this.pows.pose(rf, track);
   }
 
   /** Contagens vivas (relatório e testes): bolhas, faíscas e traços escritos na última pose. */
-  counts(): { puffs: number; sparks: number; streaks: number; marks: number } { return { puffs: this.dust.alive(), sparks: this.sparks.alive(), streaks: this.streaks.count, marks: this.marks.buffer.count() }; }
+  counts(): { puffs: number; sparks: number; streaks: number; marks: number; waves: number; pows: number } {
+    return { puffs: this.dust.alive(), sparks: this.sparks.alive(), streaks: this.streaks.count, marks: this.marks.buffer.count(), waves: this.waves.alive(), pows: this.pows.alive() };
+  }
 
   clear(): void {
     this.dust.clear(); this.sparks.clear(); this.shakeAmp.fill(0); this.lastTime = -1; this.cueMemory.tick = -1;
     this.streaks.begin(); this.streaks.end();
     this.marks.buffer.clear(); this.marks.mesh.visible = false;
+    this.waves.clear(); this.pows.clear();
   }
 
   /** Deslocamento da câmera pelo chacoalho do assento (zero se desligado nas opções). */
@@ -287,5 +303,5 @@ export class Effects {
     return out;
   }
 
-  dispose(): void { this.dust.dispose(); this.streaks.dispose(); this.marks.dispose(); }
+  dispose(): void { this.dust.dispose(); this.streaks.dispose(); this.marks.dispose(); this.waves.dispose(); this.pows.dispose(); }
 }
