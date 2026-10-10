@@ -184,6 +184,11 @@ const [paintsHost, paintsGuest] = [JSON.parse(await racePaints(host)), JSON.pars
 check(JSON.stringify(paintsHost) === JSON.stringify(paintsGuest) && paintsHost.guest !== null,
   `os dois computadores pintam o carro do convidado igual (${JSON.stringify(paintsHost.guest)})`);
 check(JSON.stringify(h.seats) === '[0]' && JSON.stringify(g.seats) === '[1]', `assentos: anfitrião ${JSON.stringify(h.seats)}, convidado ${JSON.stringify(g.seats)}`);
+// Onda N, N1: a contagem (luzes, bipes e o "JÁ!") anda adiantada pelo atraso de entrada da sala, nos dois computadores — é o que faz o aperto no
+// instante em que se vê o zero valer no tick do JÁ com qualquer atraso (a largada-foguete; tests/largada.test.ts prova o resultado).
+const lead = (p) => p.evaluate(() => ({ lead: window.nc.session.race.inputLead, delay: window.nc.session.online.status().delayTicks }));
+const [leadHost, leadGuest] = [await lead(host), await lead(guest)];
+check(leadHost.lead > 0 && leadHost.lead === leadHost.delay && leadGuest.lead === leadGuest.delay, `a contagem anda adiantada pelo atraso de entrada (anfitrião ${leadHost.lead}/${leadHost.delay}, convidado ${leadGuest.lead}/${leadGuest.delay})`);
 const vps = await guest.evaluate(() => document.querySelectorAll('#hud > *').length);
 console.log('elementos no HUD do convidado:', vps);
 await shot(guest, '04-countdown-guest');

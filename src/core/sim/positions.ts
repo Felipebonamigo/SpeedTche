@@ -1,7 +1,8 @@
 // Voltas, progresso, posições, chegada e resultado final.
-import { FINISH_GRACE_TICKS, POINTS_TABLE } from '../constants';
+import { FINISH_GRACE_TICKS, NITRO_GAIN_OVERTAKE, NITRO_LOCK_OVERTAKE_TICKS, OVERTAKE_GRACE_TICKS, POINTS_TABLE } from '../constants';
 import { countsAsHuman } from '../modes';
 import type { CarState, RaceResultRow, RaceState, Track } from '../types';
+import { grantNitro } from './stats';
 
 /** Detecta a passagem pela linha (z deu a volta) comparando com o z anterior. */
 export function updateLaps(state: RaceState, track: Track, car: CarState, prevZ: number): void {
@@ -39,7 +40,37 @@ export function updatePositions(state: RaceState, track: Track): void {
     if (a.finished && b.finished) return a.finishTick - b.finishTick;
     return b.progress - a.progress;
   });
+  // As posições de antes ficam de lado só para ver quem passou quem: só com a corrida andando (a contagem e o fim não têm ultrapassagem).
+  const before = state.phase === 'racing' ? state.cars.map((c) => c.position) : null;
   order.forEach((c, i) => { c.position = i + 1; });
+  if (before) detectOvertakes(state, before);
+}
+
+/**
+ * A ultrapassagem, calculada no núcleo (N1): `a` passou `b` se `b` estava à frente de `a` antes deste tick e agora está atrás.
+ * Trocar de lugar com o companheiro humano do mesmo time não conta (no co-op seria farmar nitro entre os dois). Cada carro passado
+ * gera um `overtake`; é LIMPA se `a` não está se recuperando de uma batida (`collisionCooldown`), não terminou e anda. Limpa, passada a
+ * bagunça do grid (OVERTAKE_GRACE_TICKS) e fora do anti-farm (`gainLock`), enche NITRO_GAIN_OVERTAKE por carro passado (os do mesmo tick somam).
+ */
+function detectOvertakes(state: RaceState, before: readonly number[]): void {
+  const cars = state.cars;
+  for (let i = 0; i < cars.length; i++) {
+    const a = cars[i];
+    if (a.finished || a.position >= before[i]) continue;
+    const clean = a.collisionCooldown === 0 && a.speed > 0;
+    let cleanPasses = 0;
+    for (let j = 0; j < cars.length; j++) {
+      const b = cars[j];
+      if (j === i || b.finished || before[j] >= before[i] || b.position <= a.position) continue;
+      if (a.seat >= 0 && b.seat >= 0 && a.teamId === b.teamId) continue;
+      state.events.push({ type: 'overtake', carId: a.id, otherId: b.id, clean });
+      if (clean) cleanPasses++;
+    }
+    if (cleanPasses > 0 && a.gainLock === 0 && state.tick - state.startTick >= OVERTAKE_GRACE_TICKS) {
+      grantNitro(state, a, 'overtake', NITRO_GAIN_OVERTAKE * cleanPasses);
+      a.gainLock = NITRO_LOCK_OVERTAKE_TICKS;
+    }
+  }
 }
 
 /** A corrida acaba quando todos os humanos (e o VIP da escolta) terminam ou o tempo de tolerância expira. */

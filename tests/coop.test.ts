@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NITRO_PER_RACE, SEGMENT_LENGTH, TEAM_DRAFT_TOP_MULT, DRAFT_TOP_MULT } from '../src/core/constants';
+import { NITRO_CHARGE_COST, NITRO_START_METER, SEGMENT_LENGTH, TEAM_DRAFT_TOP_MULT, DRAFT_TOP_MULT } from '../src/core/constants';
 import { carDef } from '../src/core/data/cars';
 import { computeModifiers } from '../src/core/sim/coop';
 import { effectiveTopSpeed } from '../src/core/sim/physics';
@@ -9,19 +9,19 @@ import { ALL_ASSISTS, NO_ASSISTS, human, humanCar, quickRace, run, skipCountdown
 describe('cooperativo', () => {
   it('nitro compartilhado: a equipe tem um cofre único que qualquer um gasta', () => {
     const { state, track } = quickRace({ track: syntheticTrack(), totalCars: 2, humans: [human(0), human(1)], assists: ALL_ASSISTS });
-    expect(state.teamNitro[0]).toBe(NITRO_PER_RACE * 2);
+    expect(state.teamNitro[0]).toBe(NITRO_START_METER * 2);
     run(state, track, 60 * 5);
     run(state, track, 1, (_, seat) => ({ ...NEUTRAL_INPUT, throttle: true, nitro: seat === 1 }));
-    expect(state.teamNitro[0]).toBe(NITRO_PER_RACE * 2 - 1);
+    expect(state.teamNitro[0]).toBe(NITRO_START_METER * 2 - NITRO_CHARGE_COST);
     expect(humanCar(state, 1).nitroTicks).toBeGreaterThan(0);
-    expect(humanCar(state, 0).nitroLeft).toBe(NITRO_PER_RACE); // a carga individual não é tocada
+    expect(humanCar(state, 0).nitroMeter).toBe(NITRO_START_METER); // a barra individual não é tocada
   });
 
   it('sem o cofre, cada um gasta as próprias cargas', () => {
     const { state, track } = quickRace({ track: syntheticTrack(), totalCars: 2, humans: [human(0), human(1)], assists: NO_ASSISTS });
     run(state, track, 60 * 5);
     run(state, track, 1, (_, seat) => ({ ...NEUTRAL_INPUT, throttle: true, nitro: seat === 1 }));
-    expect(humanCar(state, 1).nitroLeft).toBe(NITRO_PER_RACE - 1);
+    expect(humanCar(state, 1).nitroMeter).toBe(NITRO_START_METER - NITRO_CHARGE_COST);
     expect(state.teamNitro[0]).toBeUndefined();
   });
 

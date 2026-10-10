@@ -11,7 +11,7 @@
 import { OFFROAD_X, SEGMENT_LENGTH, SPEED_TO_KMH } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import { holdableSpeedFraction } from '../core/sim/physics';
-import { carStats } from '../core/sim/stats';
+import { carStats, nitroCharges } from '../core/sim/stats';
 import type { CarState, PlayerInput, RaceState } from '../core/types';
 import { NEUTRAL_INPUT } from '../core/types';
 import type { BindAction } from '../ui/remap/bindings';
@@ -111,10 +111,6 @@ function segmentOf(car: CarState): number {
 export function strongCurveEntryLimit(car: CarState): number {
   const s = carStats(car);
   return holdableSpeedFraction(s, STRONG_CURVE) * s.topSpeed * BRAKE_MARGIN;
-}
-
-function nitroCharges(state: RaceState, car: CarState): number {
-  return state.config.assists.sharedNitro ? (state.teamNitro[car.teamId] ?? 0) : car.nitroLeft;
 }
 
 function advance(p: SeatProgress, events: TutorialEvent[]): void {

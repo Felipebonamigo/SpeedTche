@@ -46,8 +46,15 @@ export function run(state: RaceState, track: Track, ticks: number, input: InputF
   }
 }
 
-/** Avança até a contagem acabar. */
+/**
+ * Avança até a contagem acabar, com todos os pedais soltos. A largada-foguete (N1) fica decidida SEM bônus para todo carro
+ * que ainda esperava: um teste que solta o acelerador na contagem e o aperta no tick seguinte não está testando a largada, e um
+ * arranque de nitro de 1,5 s (de um humano ou de uma IA que acertou o sorteio) mudaria as medidas de quase toda a suíte. Os testes
+ * da largada (tests/largada.test.ts) guiam a contagem tick a tick e não usam esta função.
+ */
 export function skipCountdown(state: RaceState, track: Track): void {
+  // Fecha a largada ANTES de contar: ninguém aperta na janela e a IA nem sorteia (o rng anda como andava antes da N1).
+  for (const c of state.cars) if (c.launch === 0) c.launch = 2;
   while (state.phase === 'countdown') stepRace(state, track, []);
 }
 

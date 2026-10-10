@@ -709,7 +709,7 @@ describe('vibração', () => {
 
 function car(id: number, seat: number, over: Partial<CarState> = {}): CarState {
   return {
-    id, seat, name: `c${id}`, teamId: 0, carId: 'falcao', z: 0, x: 0, speed: 3000, gear: 3, fuel: 1, nitroLeft: 3, nitroTicks: 0,
+    id, seat, name: `c${id}`, teamId: 0, carId: 'falcao', z: 0, x: 0, speed: 3000, gear: 3, fuel: 1, nitroMeter: 1000, throttleHeld: 0, launch: 2, draftTicks: 0, gainLock: 0, nitroTicks: 0,
     lap: 1, lapTicks: [], lapStartTick: 0, finished: false, finishTick: 0, position: 1, progress: 0, inPit: false,
     collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, driftBoostTicks: 0, ai: null, stats: effectiveStats(carDef('falcao')), ...over,
   };

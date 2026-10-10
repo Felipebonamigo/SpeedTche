@@ -18,7 +18,7 @@ const S = () => page.evaluate(() => {
     menu: s.menus.current(), paused: s.paused,
     race: r ? { phase: r.state.phase, tick: r.state.tick, cars: r.state.cars.length, viewports: r.humans.length,
       teamNitro: r.state.teamNitro,
-      humans: r.state.cars.filter((c) => c.seat >= 0).map((c) => ({ seat: c.seat, z: Math.round(c.z), x: +c.x.toFixed(2), speed: Math.round(c.speed), lap: c.lap, pos: c.position, nitro: c.nitroLeft, nitroActive: c.nitroTicks > 0, fuel: +c.fuel.toFixed(2) })) } : null,
+      humans: r.state.cars.filter((c) => c.seat >= 0).map((c) => ({ seat: c.seat, z: Math.round(c.z), x: +c.x.toFixed(2), speed: Math.round(c.speed), lap: c.lap, pos: c.position, nitro: c.nitroMeter, nitroActive: c.nitroTicks > 0, fuel: +c.fuel.toFixed(2) })) } : null,
   };
 });
 const humans = (n) => Array.from({ length: n }, (_, i) => ({ seat: i, name: `P${i + 1}`, carId: ['falcao', 'trovao', 'tornado', 'camelo'][i], teamId: 0, color: ['#ffd23f', '#3ddc84', '#4fc3f7', '#ff7ab6'][i] }));

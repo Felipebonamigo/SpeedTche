@@ -126,10 +126,10 @@ const humans: HumanEntry[] = [
 describe('a derrapagem renova as versões (M1)', () => {
   const BEFORE = { revision: 1, lap: '91f7285b', lapRota66Trovao: '9b8a49fc', online: '9f6ec609' };
 
-  it('a revisão da física subiu: 1 → 2 (presa ao hash do contra-relógio pelo sim-golden)', () => {
+  it('a revisão da física subiu: 1 → 2 (presa ao hash do contra-relógio pelo sim-golden; a N1 a subiu para 3, ver abaixo)', () => {
     expect(BEFORE.revision).toBe(1);
-    expect(PHYSICS_REVISION).toBe(2);
-    expect(lapContent('copacabana', 'falcao')).toMatchObject({ physics: 2 });
+    expect(PHYSICS_REVISION).toBeGreaterThanOrEqual(2);
+    expect(lapContent('copacabana', 'falcao')).toMatchObject({ physics: PHYSICS_REVISION });
   });
 
   it('a impressão de uma volta mudou, em qualquer pista e carro: recorde e fantasma de antes viram "versão anterior"', () => {
@@ -150,6 +150,25 @@ describe('a derrapagem renova as versões (M1)', () => {
     const content = lapContent('copacabana', 'falcao');
     expect(content).not.toBeNull();
     expect(contentFingerprint({ ...content, physics: PHYSICS_REVISION - 1 })).not.toBe(lapFingerprint('copacabana', 'falcao'));
+  });
+});
+
+// Onda N, N1: o nitro que se ganha e a largada-foguete mudam a física de quem corre (constantes novas, a economia do nitro, o estado). Os valores
+// abaixo são os de 640538f, ANTES da N1: um recorde ou fantasma gravado com eles tem de virar "versão anterior" (docs/ondas/N/N1.md, §4.10).
+describe('o nitro que se ganha renova as versões (N1)', () => {
+  const BEFORE_N1 = { revision: 2, lap: '4fb0f246', lapRota66Trovao: '0df4070d', online: '5b13a09a' };
+
+  it('a revisão da física subiu: 2 → 3 (presa ao hash do contra-relógio pelo sim-golden)', () => {
+    expect(BEFORE_N1.revision).toBe(2);
+    expect(PHYSICS_REVISION).toBe(3);
+  });
+
+  it('a impressão de uma volta e a do online mudaram: recorde, fantasma e sala de antes viram "versão anterior"', () => {
+    expect(lapFingerprint('copacabana', 'falcao')).not.toBe(BEFORE_N1.lap);
+    expect(lapFingerprint('rota_66', 'trovao')).not.toBe(BEFORE_N1.lapRota66Trovao);
+    expect(onlineFingerprint()).not.toBe(BEFORE_N1.online);
+    const old: BestLap = { ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-09', fp: BEFORE_N1.lap };
+    expect(recordFromOtherVersion(old, 'copacabana')).toBe(true);
   });
 });
 

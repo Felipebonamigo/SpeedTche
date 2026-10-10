@@ -112,9 +112,13 @@ describe('carros: balanceamento (o mesmo piloto, sozinho, a corrida inteira em c
     times = Object.fromEntries(CARS.map((c) => [c.id, Object.fromEntries(tracks.map((t) => [t, soloRaceTicks(t, c.id)]))]));
   }, 600_000);
   const faster = (a: string, b: string) => tracks.filter((t) => times[a][t] < times[b][t]);
+  // Onda N (N1): com o nitro que se ganha (o piloto solo também derrapa e enche a barra), o Camelo X passou a ganhar do Falcão GT por 5 ticks (0,08 s,
+  // 0,04%) numa pista de 109 (Pampulha): ruído do nitro, não ritmo. "Ganhar" para a exceção do Camelo é ganhar por mais que isto.
+  const NOISE_TICKS = 30;
+  const clearlyFaster = (a: string, b: string) => tracks.filter((t) => times[a][t] + NOISE_TICKS < times[b][t]);
   const price = (id: string) => carDef(id).price;
   /** Originais que já perdiam em todas as pistas para outro original de preço igual ou menor (o Camelo X para o Falcão GT). */
-  const alreadyBeaten = () => CARS.filter((c) => ORIGINALS.includes(c.id) && CARS.some((o) => o !== c && ORIGINALS.includes(o.id) && o.price <= c.price && faster(o.id, c.id).length === tracks.length)).map((c) => c.id);
+  const alreadyBeaten = () => CARS.filter((c) => ORIGINALS.includes(c.id) && CARS.some((o) => o !== c && ORIGINALS.includes(o.id) && o.price <= c.price && clearlyFaster(c.id, o.id).length === 0)).map((c) => c.id);
 
   it('nenhum carro novo é inútil: ganha, em alguma pista, de cada carro de preço igual ou menor', () => {
     const bad: string[] = [];

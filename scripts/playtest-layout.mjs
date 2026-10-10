@@ -405,6 +405,9 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
       // para medir o pior caso (eles flutuam em cima dos painéis dos cantos e não podem cobrir nada).
       for (const vp of document.querySelectorAll('#hud .vp')) {
         vp.querySelector('.draft')?.classList.add('on');
+        // Onda N, N1: o selo LARGADA PERFEITA (nos primeiros 2,5 s da corrida) e a barra de nitro queimando, também no pior caso.
+        vp.querySelector('.launch-seal')?.classList.add('show');
+        vp.querySelector('.nbar')?.classList.add('burn');
         const flag = vp.querySelector('.fuel-flag'); if (flag) flag.textContent = 'BAIXO';
         const badge = vp.querySelector('.pos-badge');
         if (badge) { badge.textContent = '+2'; badge.style.opacity = '1'; vp.querySelector('.pos')?.classList.add('gain'); }
@@ -414,7 +417,7 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
     const hud = await page.evaluate(() => {
       const px = (el) => (el ? parseFloat(getComputedStyle(el).fontSize) : null);
       return [...document.querySelectorAll('#hud .vp')].filter((v) => v.style.display !== 'none').map((vp) => {
-        const panels = [...vp.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini, :scope > .lmk, :scope > .bl > .draft, :scope > .bl .fuel-flag, :scope > .tl .pos-badge')]
+        const panels = [...vp.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini, :scope > .lmk, :scope > .launch-seal, :scope > .bl > .draft, :scope > .bl .fuel-flag, :scope > .tl .pos-badge')]
           .filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0);
         const overlaps = [];
         for (let i = 0; i < panels.length; i++) for (let j = i + 1; j < panels.length; j++) {
@@ -428,7 +431,7 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
             laps: px(vp.querySelector('.laps')), kmh: px(vp.querySelector('.kmh')), gear: px(vp.querySelector('.gear')), landmark: px(vp.querySelector('.lmk-name')),
             gap: px(vp.querySelector('.gap-n')), fuelPct: px(vp.querySelector('.fuel-pct')), nitroN: px(vp.querySelector('.nitro-n')), badge: px(vp.querySelector('.pos-badge')) },
           labels: { tag: px(vp.querySelector('.tag')), label: px(vp.querySelector('.label')), unit: px(vp.querySelector('.unit')), caption: px(vp.querySelector('.lmk-where')),
-            flag: px(vp.querySelector('.fuel-flag')), draft: px(vp.querySelector('.draft')) },
+            flag: px(vp.querySelector('.fuel-flag')), draft: px(vp.querySelector('.draft')), seal: px(vp.querySelector('.launch-seal')) },
           overlaps,
         };
       });

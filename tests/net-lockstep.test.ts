@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng, nextFloat, nextInt, type RngState } from '../src/core/rng';
 import { deserializeRace, hashRace, serializeRace } from '../src/core/serialize';
+import { COUNTDOWN_TICKS } from '../src/core/constants';
 import { createRace, stepRace } from '../src/core/sim/race';
 import { getTrack } from '../src/core/track';
 import type { PlayerInput, RaceConfig, RaceState, Track } from '../src/core/types';
@@ -20,11 +21,14 @@ function config(humans: number, seed = 99): RaceConfig {
 }
 
 /** Piloto de teste: volante com fração (testa a quantização), freio de vez em quando, nitro em borda e derrapagem em fases (nível, não borda). */
-function pilot(seat: number, frame: number): PlayerInput {
+function pilot(seat: number, frame: number, tick = COUNTDOWN_TICKS + 99): PlayerInput {
   const phase = (frame + seat * 53) % 240;
+  // Largada (N1): na contagem cada assento aperta o acelerador num tick diferente (G−12, G−4, G+12, G+20), pelo tick do núcleo
+  // do cliente quando lê o piloto; o aperto vale 3 ticks depois (o atraso). Os dois primeiros caem na janela, os outros não.
+  const launching = tick < COUNTDOWN_TICKS + 30;
   return {
     steer: phase < 80 ? 0.37 : phase < 160 ? -0.61 : 0.05 * (seat + 1),
-    throttle: phase % 97 !== 0,
+    throttle: launching ? tick >= COUNTDOWN_TICKS - 12 + seat * 8 + (seat >= 2 ? 8 : 0) : phase % 97 !== 0,
     brake: phase > 225,
     nitro: frame % 700 === 100 + seat * 20,
     gearUp: false, gearDown: false,
@@ -98,7 +102,7 @@ function makeClient(net: Net, id: number, seats: number[], allSeats: number[], c
 /** Um "quadro" do cliente: lê o piloto e tenta rodar até `budget` ticks (sem passar de `limit`). */
 function frame(c: SimClient, budget: number, limit: number, now: number): number {
   c.frames++;
-  for (const s of c.seats) c.ls.setLocalInput(s, pilot(s, c.frames));
+  for (const s of c.seats) c.ls.setLocalInput(s, pilot(s, c.frames, c.state.tick));
   let n = 0;
   while (n < budget && c.state.tick < limit && c.ls.step(c.state, now, (inputs) => stepRace(c.state, TRACK, inputs))) { n++; if (anyHumanDrifting(c.state)) c.drifted++; }
   return n;
@@ -142,6 +146,20 @@ describe('lockstep em rede simulada', () => {
       expect(c.state.tick).toBe(2400);
       expect(c.drifted, `cliente ${c.id} nunca viu um humano derrapar`).toBeGreaterThan(100);
       expect(c.drifted).toBe(clients[0].drifted);
+      expect(hashRace(c.state)).toBe(hashRace(clients[0].state));
+      expect(c.desyncs).toEqual([]);
+    }
+  }, 60_000);
+
+  it('a largada-foguete atravessa a rede: 4 clientes, atraso e reordenação sorteados — os mesmos carros acertam a janela em todos e o hash fecha', () => {
+    const net = new Net(createRng(515), 5);
+    const seats = [0, 1, 2, 3];
+    const clients = seats.map((s) => makeClient(net, s, [s], seats, config(4)));
+    runAll(net, clients, 420);
+    const launches = (c: SimClient) => c.state.cars.filter((x) => x.seat >= 0).map((x) => x.launch);
+    for (const c of clients) {
+      expect(c.state.tick).toBe(420);
+      expect(launches(c), `cliente ${c.id}`).toEqual([1, 1, 2, 2]);
       expect(hashRace(c.state)).toBe(hashRace(clients[0].state));
       expect(c.desyncs).toEqual([]);
     }

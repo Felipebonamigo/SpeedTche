@@ -11,7 +11,7 @@ for (let i = 0; i < 60 * 120; i++) {
 }
 for (const c of state.cars) {
   const seg = segmentAt(track, c.z);
-  console.log(`#${c.id} ${c.name.padEnd(14)} seat=${c.seat} lap=${c.lap} pos=${c.position} z=${c.z.toFixed(0)} seg=${seg.index} curve=${seg.curve.toFixed(2)} x=${c.x.toFixed(2)} v=${(c.speed / carDef(c.carId).topSpeed).toFixed(2)} fuel=${c.fuel.toFixed(2)} pit=${c.inPit} nitro=${c.nitroLeft} skill=${c.ai?.skill.toFixed(2)} lane=${c.ai?.laneX.toFixed(2)}`);
+  console.log(`#${c.id} ${c.name.padEnd(14)} seat=${c.seat} lap=${c.lap} pos=${c.position} z=${c.z.toFixed(0)} seg=${seg.index} curve=${seg.curve.toFixed(2)} x=${c.x.toFixed(2)} v=${(c.speed / carDef(c.carId).topSpeed).toFixed(2)} fuel=${c.fuel.toFixed(2)} pit=${c.inPit} nitro=${c.nitroMeter} skill=${c.ai?.skill.toFixed(2)} lane=${c.ai?.laneX.toFixed(2)}`);
 }
 console.log(log.filter((l) => l.includes('crash')).length, 'crashes;', log.filter((l) => l.includes('pit_enter')).length, 'pit entries');
 console.log(log.slice(-15).join('\n'));

@@ -1,10 +1,10 @@
 // O que o HUD mostra, em números (src/render/hud-model.ts, onda L, L5): distância em segundos para o carro da frente e
 // o de trás, e os modelos de combustível e nitro (percentual, marcas, rótulo e forma, além da cor). Puro.
 import { describe, expect, it } from 'vitest';
-import { REFERENCE_SPEED } from '../src/core/constants';
+import { NITRO_CHARGE_COST, NITRO_METER_MAX, REFERENCE_SPEED } from '../src/core/constants';
 import type { CarState } from '../src/core/types';
 import {
-  formatGap, FUEL_LOW_FRACTION, fuelModel, MAX_GAP_SECONDS, nitroModel, timeGaps,
+  countdownDisplayTick, formatGap, FUEL_LOW_FRACTION, fuelModel, MAX_GAP_SECONDS, nitroModel, timeGaps,
 } from '../src/render/hud-model';
 import { quickRace } from './helpers';
 
@@ -87,22 +87,41 @@ describe('combustível: percentual, marcas e rótulo (não só a cor)', () => {
   });
 });
 
-describe('nitro: cargas e número', () => {
-  it('2 de 3 cargas: 2 raios cheios e o número 2', () => {
-    const n = nitroModel(2);
+describe('nitro: barra, cargas e número', () => {
+  it('2 cargas cheias e meia: 2 raios cheios, o número 2 e a fração da barra', () => {
+    const n = nitroModel(NITRO_CHARGE_COST * 2.5);
     expect(n.filled).toBe(2);
     expect(n.count).toBe(2);
     expect(n.extra).toBe('');
+    expect(n.fraction).toBeCloseTo((NITRO_CHARGE_COST * 2.5) / NITRO_METER_MAX, 9);
   });
 
-  it('mais de 3 cargas: 3 raios cheios e "×N" (o que o HUD já fazia)', () => {
-    const n = nitroModel(5);
+  it('a barra da equipe (teto de 6 cargas) com 5 cheias: 3 raios cheios, "×5" e a fração sobre o teto da equipe', () => {
+    const n = nitroModel(NITRO_CHARGE_COST * 5, NITRO_METER_MAX * 2);
     expect(n.filled).toBe(3);
+    expect(n.count).toBe(5);
     expect(n.extra).toBe('×5');
+    expect(n.fraction).toBeCloseTo(5 / 6, 9);
   });
 
-  it('sem carga: nenhum raio cheio', () => {
+  it('meia carga não acende raio nenhum e a barra cheia é fração 1', () => {
+    expect(nitroModel(NITRO_CHARGE_COST - 1).filled).toBe(0);
+    expect(nitroModel(NITRO_CHARGE_COST - 1).count).toBe(0);
+    expect(nitroModel(NITRO_METER_MAX).fraction).toBe(1);
+  });
+
+  it('vazio e lixo: nenhum raio, fração 0 (e nunca acima de 1)', () => {
     expect(nitroModel(0).filled).toBe(0);
     expect(nitroModel(-1).count).toBe(0);
+    expect(nitroModel(Number.NaN).fraction).toBe(0);
+    expect(nitroModel(NITRO_METER_MAX * 9).fraction).toBe(1);
+  });
+});
+
+describe('contagem desenhada adiantada (N1)', () => {
+  it('o tick desenhado é o do núcleo mais o atraso de entrada; atraso negativo ou lixo vale 0', () => {
+    expect(countdownDisplayTick(50, 12)).toBe(62);
+    expect(countdownDisplayTick(50, -3)).toBe(50);
+    expect(countdownDisplayTick(50, Number.NaN)).toBe(50);
   });
 });

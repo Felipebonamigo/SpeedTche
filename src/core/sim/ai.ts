@@ -12,7 +12,9 @@ import { wrappedDelta } from './collisions';
 import { distanceToFinish, fuelTight, fuelToSkipPit, markFuel, measuredBurn, PIT_LOOKAHEAD, skipPitBurn } from './fuel';
 import { blockLane, curveZoneStart, missesBraking, tuningOf } from './personality';
 import { centrifugalRate, holdableSpeedFraction, PIT_LANE_X, steerRate } from './physics';
-import { carStats } from './stats';
+import { carStats, nitroCharges } from './stats';
+
+export { launchChance } from './stats';
 
 export const DIFFICULTY_SPEED: Record<Difficulty, number> = { amador: 0.86, profissional: 0.94, campeao: 1.0 };
 export const DIFFICULTY_SKILL: Record<Difficulty, [number, number]> = {
@@ -334,8 +336,7 @@ export function aiInput(state: RaceState, track: Track, car: CarState): PlayerIn
 
   // ── Nitro: reta livre, velocidade alta, ninguém colado na frente (o limpo só em reta longa; o
   // agressivo mais cedo, mais vezes e com curva leve à frente).
-  const nitroAvailable = state.config.assists.sharedNitro && car.seat >= 0 ? (state.teamNitro[car.teamId] ?? 0) : car.nitroLeft;
-  if (nitroAvailable > 0 && car.nitroTicks === 0 && !car.finished && !wantsPit && curveAhead < tune.nitroCurveMax && speedFrac > tune.nitroMinSpeed) {
+  if (nitroCharges(state, car) > 0 && car.nitroTicks === 0 && !car.finished && !wantsPit && curveAhead < tune.nitroCurveMax && speedFrac > tune.nitroMinSpeed) {
     const blocked = nearestAhead(state, track, car, 0.45, SEGMENT_LENGTH * 4);
     if (!blocked && nextFloat(state.rng) < tune.nitroBase + brain.aggression * tune.nitroAggression) input.nitro = true;
   }
