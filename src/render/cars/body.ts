@@ -327,15 +327,16 @@ export function buildCabin(b: MeshBuilder, spec: CabinSpec): void {
 }
 
 /**
- * Cabine bolha (M4): a lateral sobe quase reta e o teto abaúla, em vez de a cabine afunilar para cima. `k` é quanto da diferença
- * entre a largura da base e a do teto se fecha (0 = como estava, 1 = paredes retas); o teto ganha `crownBoost` de abaulado e a
- * borda do teto fica mais redonda. As seções planas (a base que assenta na carroceria) não mudam.
+ * Cabine bolha (M4): a lateral sobe quase reta, o teto abaúla e a cabine fica um pouco mais alta, em vez de afunilar para cima.
+ * `k` é quanto da diferença entre a largura da base e a do teto se fecha (0 = como estava, 1 = paredes retas); o teto ganha
+ * `crownBoost` de abaulado e `lift` de altura (0 onde o carro já está no teto de altura, como a picape), e a borda do teto fica mais
+ * redonda. As seções planas (a base que assenta na carroceria) não mudam.
  */
-export function bubble(spec: CabinSpec, k = 0.7, crownBoost = 0.03): CabinSpec {
+export function bubble(spec: CabinSpec, k = 0.7, crownBoost = 0.03, lift = 0.07): CabinSpec {
   return {
     ...spec,
     edge: Math.max(spec.edge ?? 0.07, 0.1),
-    secs: spec.secs.map((s) => (s.yt - s.yb > 0.3 ? { ...s, hwt: s.hwt + (s.hwb - s.hwt) * k, crown: (s.crown ?? 0.03) + crownBoost } : s)),
+    secs: spec.secs.map((s) => (s.yt - s.yb > 0.3 ? { ...s, hwt: s.hwt + (s.hwb - s.hwt) * k, yt: s.yt + lift, crown: (s.crown ?? 0.03) + crownBoost } : s)),
   };
 }
 

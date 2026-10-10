@@ -63,7 +63,7 @@ export function buildHatch(lod: Lod = 0): CarModel {
   const rear = buildRear(b, {
     exhausts: [{ x: 0.17, y: 0.3, z: 2.16, r: 0.07 }, { x: -0.17, y: 0.3, z: 2.16, r: 0.07 }],
     diffuser: { y: 0.27, z: 2.0, w: 1.2, fins: 5 },
-    wing: { z: 1.8, y: 1.33, span: 1.36, chord: 0.42, thick: 0.07, pitch: 0.12, brush: ACCENT, plate: ACCENT, strut: null },
+    wing: { z: 1.8, y: 1.4, span: 1.36, chord: 0.42, thick: 0.07, pitch: 0.12, brush: ACCENT, plate: ACCENT, strut: null },
   });
   return finish('hatch', b, { wheel: 'multi', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [LIVERY_B, LIVERY_A] });
 }

@@ -52,7 +52,7 @@ export function buildPickup(lod: Lod = 0): CarModel {
     side: () => GLASS,
     // Parede de trás da cabine: a tampa do loft, no contorno da cabine (borda do teto redonda).
     capBack: PAINT,
-  });
+  }, 0.7, 0.03, 0); // sem `lift`: a picape já está a 1,91 m do teto de 1,95
   buildCabin(b, cab);
   box(b, [0, 1.47, BED0 - 0.005], [1.12, 0.3, 0.02], GLASS); // vidro traseiro
   b.mirrored(() => {
