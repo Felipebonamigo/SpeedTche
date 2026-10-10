@@ -385,3 +385,106 @@ export const PALETTE_TABLE: Readonly<Record<PaletteKey, Readonly<Palette>>> = Ob
 export function palette(scenery: SceneryId, time: TimeOfDay): Palette {
   return PALETTE_TABLE[paletteKey(scenery, time)] as Palette;
 }
+
+// ───────────────────────────── A corrida que muda (M6, b) ─────────────────────────────
+// docs/ondas/M/M6.md. O período anda durante a corrida: dia → entardecer na última volta, entardecer → noite nas duas últimas, interpolando campo a campo as
+// combinações da `PALETTE_TABLE`. Só visual: a física não lê nada daqui. Tudo puro (sem Three, sem DOM) para os testes e para o renderizador entregar uniformes.
+
+/** Quando e entre quais períodos o céu anda: fração da corrida (0..1) em que a transição começa e termina. */
+export interface PeriodPlan { from: TimeOfDay; to: TimeOfDay; start: number; end: number }
+
+/**
+ * Plano da pista: dia → entardecer na ÚLTIMA volta; entardecer → noite nas DUAS últimas (os dois números são provisórios, do dono); a noite não anda (null).
+ * Termina na bandeirada (fração 1): o fim da corrida é o outro período por inteiro.
+ */
+export function racePeriodPlan(time: TimeOfDay, laps: number): PeriodPlan | null {
+  const l = Math.max(1, Math.floor(laps));
+  if (time === 'day') return { from: 'day', to: 'dusk', start: Math.max(0, (l - 1) / l), end: 1 };
+  if (time === 'dusk') return { from: 'dusk', to: 'night', start: Math.max(0, (l - 2) / l), end: 1 };
+  return null;
+}
+
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+const smooth = (x: number): number => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+
+/** O `t` (0..1) da transição na fração `fraction` da corrida: `smoothstep` do plano, monótona e contínua (sem ponta dura nas duas pontas). */
+export function racePeriodBlend(plan: PeriodPlan | null, fraction: number): number {
+  if (!plan || plan.end <= plan.start) return 0;
+  return smooth((fraction - plan.start) / (plan.end - plan.start));
+}
+
+/** Uma queda maior que isto (fração da corrida) é corrida nova: o relógio zera. */
+const NEW_RACE_DROP = 0.1;
+
+/** O relógio do período nunca anda para trás (líder trocado de viewport, respawn): máximo corrente, que recomeça numa corrida nova. */
+export function advanceRaceProgress(prev: number, now: number): number {
+  return now < prev - NEW_RACE_DROP ? now : Math.max(prev, now);
+}
+
+/** Fração da corrida (0..1) do líder entre os carros que a tela mostra: `progress` de cada carro (volta × comprimento + z, núcleo) sobre voltas × comprimento. */
+export function raceFraction(progresses: readonly number[], laps: number, length: number): number {
+  const total = laps * length;
+  if (progresses.length === 0 || total <= 0) return 0;
+  let best = -Infinity;
+  for (const p of progresses) if (p > best) best = p;
+  return clamp01(best / total);
+}
+
+function blendValue(a: unknown, b: unknown, t: number): unknown {
+  if (a === null || b === null || a === undefined || b === undefined) return a ?? b ?? null; // um só nulo: o valor do outro lado (nada pisca em 0,5)
+  if (typeof a === 'number' && typeof b === 'number') return a + (b - a) * t;
+  if (typeof a === 'boolean') return t >= 0.5 ? b : a;
+  if (typeof a === 'string' && typeof b === 'string') return a === b ? a : mix(a, b, t);
+  if (Array.isArray(a) && Array.isArray(b)) return a.map((v, i) => blendValue(v, b[i], t));
+  return a;
+}
+
+/**
+ * A paleta entre duas combinações do mesmo bioma, campo a campo: cor por canal (`mix`), número, tupla; booleano vira em t = 0,5; nulo nos dois = nulo e um só nulo =
+ * o valor do outro lado (o sol/lua, as nuvens e a poça de luz têm a cor do corpo celeste em `livePalette`, que mistura as duas pontas). `t ≤ 0` devolve `a` e
+ * `t ≥ 1` devolve `b` (as próprias entradas da tabela, a mesma referência).
+ */
+export function blendPalette(a: Palette, b: Palette, t: number): Palette {
+  if (t <= 0) return a;
+  if (t >= 1) return b;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(a) as Array<keyof Palette>) out[key] = blendValue(a[key], b[key], t);
+  return out as unknown as Palette;
+}
+
+/** A cor do corpo celeste (sol de dia e entardecer, lua à noite). */
+export function bodyColor(p: Pick<Palette, 'sun' | 'moon'>): string { return p.sun ?? p.moon ?? '#ffffff'; }
+
+/** A paleta no instante da corrida: as duas pontas (cada uma uma entrada da tabela), o `t` e a interpolada. */
+export interface LivePalette {
+  a: Palette; b: Palette; t: number;
+  /** `blendPalette(a, b, t)`: a própria `a` com t = 0 e a própria `b` com t = 1. */
+  p: Palette;
+  /** Cor do disco (sol → lua) interpolada entre as duas pontas: o sol do entardecer não pode virar a lua num salto ao chegar a `t = 1`. */
+  body: string;
+}
+
+/**
+ * A paleta ao vivo de uma pista (bioma + período + voltas) na fração `fraction` da corrida. Pista de noite não anda (`a === b`, t = 0).
+ */
+export function livePalette(scenery: SceneryId, time: TimeOfDay, laps: number, fraction: number): LivePalette {
+  const a = palette(scenery, time);
+  const plan = racePeriodPlan(time, laps);
+  if (!plan) return { a, b: a, t: 0, p: a, body: bodyColor(a) };
+  const b = palette(scenery, plan.to);
+  const t = racePeriodBlend(plan, fraction);
+  const body = t <= 0 ? bodyColor(a) : t >= 1 ? bodyColor(b) : mix(bodyColor(a), bodyColor(b), t);
+  return { a, b, t, p: blendPalette(a, b, t), body };
+}
+
+/**
+ * Quanto das luzes feitas pelo homem (janelas, postes, faróis) está aceso, de `light` (1 dia · 0,7 entardecer · 0,32 noite): 0 de dia, 0,6 no entardecer (o que o
+ * cenário já faz hoje) e 1 à noite, contínua e monótona. Acende a partir de 0,9 (o céu começando a cair) e termina a 0,32.
+ */
+export function lightsAmount(light: number): number {
+  if (light >= 0.7) return 0.6 * smooth((0.9 - light) / 0.2);
+  return 0.6 + 0.4 * smooth((0.7 - light) / 0.38);
+}
+
+/** A opacidade das estrelas de `light`: nenhuma até o entardecer, todas à noite. */
+export function starAlpha(light: number): number { return smooth((0.62 - light) / 0.3); }
