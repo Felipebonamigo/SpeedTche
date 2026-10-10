@@ -120,7 +120,11 @@ export interface CarStats {
   brake: number;
   handling: number;
   fuelPerUnit: number;
-  /** Cargas de nitro com que o carro larga. */
+  /**
+   * Nível de enchimento da barra de nitro (onda N, N1): 1 de fábrica, +1 por nível da peça de nitro da carreira (1 a 4). Cada nível
+   * faz a barra encher +UPGRADE_NITRO_FILL (15%) mais por ganho (`nitroFillMult`, sim/stats.ts). Inteiro de propósito: a garagem
+   * desenha um pontinho por unidade.
+   */
   nitro: number;
 }
 
@@ -276,7 +280,23 @@ export interface CarState {
   speed: number;
   gear: number;
   fuel: number;
-  nitroLeft: number;
+  /**
+   * A barra de nitro (onda N, N1; docs/ondas/N/N1.md), em unidades inteiras: NITRO_CHARGE_COST (1000) é uma carga, NITRO_METER_MAX o teto.
+   * Larga com NITRO_START_METER (1 carga) e enche com o mini-turbo, o estilingue do vácuo, o raspão, a ultrapassagem limpa e a largada
+   * perfeita. Substitui o `nitroLeft` (cargas). Com `assists.sharedNitro` o humano gasta e ganha na barra da equipe (`teamNitro`).
+   */
+  nitroMeter: number;
+  /**
+   * Acelerador apertado, em ticks seguidos, enquanto a largada ainda não foi decidida (zera ao soltar e quando ela é decidida):
+   * a janela da largada-foguete e o dado do motor subindo na contagem (N6).
+   */
+  throttleHeld: number;
+  /** A largada-foguete: LAUNCH_PENDING (0), LAUNCH_PERFECT (1: arranque de nitro e a barra enche) ou LAUNCH_NONE (2). Decide uma vez por corrida. */
+  launch: number;
+  /** Ticks seguidos no vácuo. Negativo = resfriamento do estilingue (sobe 1 por tick até 0, no vácuo ou fora dele). */
+  draftTicks: number;
+  /** Ticks até poder ganhar nitro de novo por raspão ou ultrapassagem (anti-farm; um só para os dois). */
+  gainLock: number;
   nitroTicks: number;
   /** Volta atual (1 = primeira). */
   lap: number;
@@ -314,6 +334,9 @@ export interface CarState {
 
 export type RacePhase = 'countdown' | 'racing' | 'finished';
 
+/** De onde veio um ganho da barra de nitro. */
+export type NitroSource = 'drift' | 'sling' | 'scrape' | 'overtake' | 'launch';
+
 export type SimEvent =
   | { type: 'countdown'; value: number }
   | { type: 'go' }
@@ -334,6 +357,12 @@ export type SimEvent =
   | { type: 'drift_charge'; carId: number; level: number }
   /** Derrapagem: soltou o botão com carga; o impulso de saída do nível `level` começou. */
   | { type: 'drift_boost'; carId: number; level: number }
+  /** A barra de nitro encheu `amount` (o que realmente entrou, já com a peça e o teto) por `source`. */
+  | { type: 'nitro_gain'; carId: number; source: NitroSource; amount: number }
+  /** O carro `carId` passou o carro `otherId` (calculado no núcleo, positions.ts). `clean`: sem batida recente e andando. */
+  | { type: 'overtake'; carId: number; otherId: number; clean: boolean }
+  /** Largada-foguete perfeita (só ela emite): o arranque de nitro começou. */
+  | { type: 'launch'; carId: number }
   /** Revezamento (src/core/modes.ts): a volta fechou e a troca está liberada no box. */
   | { type: 'relay_due'; carId: number }
   /** Revezamento: o controle do carro passou de um assento para o outro, no box. */
@@ -363,7 +392,7 @@ export interface RaceState {
   trackLength: number;
   cars: CarState[];
   rng: RngState;
-  /** Cofre de nitro por time (só usado com assists.sharedNitro). */
+  /** A barra de nitro da equipe, em unidades (só usada com assists.sharedNitro): 1 carga por humano do time na largada, teto NITRO_METER_MAX por humano. */
   teamNitro: Record<number, number>;
   /** Tick em que a corrida começou de fato (fim da contagem). */
   startTick: number;

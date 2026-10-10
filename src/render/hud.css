@@ -87,9 +87,21 @@
 .nc-hud .caps i.on svg { fill: #4fc3f7; stroke: #e6f9ff; opacity: 1; filter: drop-shadow(0 0 calc(4px * var(--s)) #4fc3f7); }
 .nc-hud .caps .extra { font-size: calc(13px * var(--s)); font-weight: 800; color: #b3ecff; margin-left: calc(2px * var(--s)); }
 .nc-hud .nitro-n { color: #b3ecff; }
-.nc-hud .nbar { height: calc(5px * var(--s)); margin-top: calc(4px * var(--s)); background: rgba(255, 255, 255, 0.12); border-radius: 3px; overflow: hidden; opacity: 0; transition: opacity 150ms; }
-.nc-hud .nbar.on { opacity: 1; }
-.nc-hud .nbar .fill { height: 100%; background: linear-gradient(90deg, #4fc3f7, #ffffff); box-shadow: 0 0 calc(8px * var(--s)) #4fc3f7; }
+/* A barra de nitro (N1): sempre visível; cada marca é uma carga (--cap = quantas cabem, 3 no carro, 3 por humano na equipe). O fio de baixo
+   (.nburn) é o nitro aceso queimando; com ele aceso a barra brilha (.burn). */
+.nc-hud .nbar { position: relative; height: max(7px, calc(10px * var(--s))); margin-top: calc(4px * var(--s)); background: rgba(255, 255, 255, 0.14); border-radius: calc(5px * var(--s)); overflow: hidden; --cap: 3; }
+.nc-hud .nbar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #4fc3f7, #b3ecff); transition: width 160ms ease-out; }
+.nc-hud .nbar.burn .fill { background: linear-gradient(90deg, #4fc3f7, #ffffff); box-shadow: 0 0 calc(8px * var(--s)) #4fc3f7; }
+.nc-hud .nbar::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent calc(100% - max(1.5px, calc(2px * var(--s)))), rgba(14, 18, 40, 0.9) 0) 0 0 / calc(100% / var(--cap)) 100%; }
+.nc-hud .nbar .nburn { position: absolute; left: 0; bottom: 0; height: max(2px, calc(3px * var(--s))); width: 0; background: #ffd23f; opacity: 0; }
+.nc-hud .nbar.burn .nburn { opacity: 1; }
+/* Selo LARGADA PERFEITA (N1): pílula amarela no meio, em cima do JÁ, nos primeiros 2,5 s. */
+.nc-hud .launch-seal { position: absolute; left: 50%; top: 21%; transform: translateX(-50%); display: none; align-items: center; padding: calc(3px * var(--s)) calc(20px * var(--s)); border-radius: 999px;
+  background: #ffd23f; color: #3b1500; border: max(2px, calc(3px * var(--s))) solid #fff; box-shadow: 0 calc(4px * var(--s)) 0 rgba(0, 0, 0, 0.4); font-size: calc(26px * var(--s)); font-weight: 900; letter-spacing: 0.08em;
+  line-height: 1.2; white-space: nowrap; pointer-events: none; }
+.nc-hud .launch-seal.show { display: inline-flex; animation: nc-msg-in 280ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.nc-hud .calm .launch-seal.show, .nc-hud .vp.calm .launch-seal.show, .nc-hud.reduce-fx .launch-seal.show { animation: none; }
 /* Vácuo: pílula que flutua em cima do painel (não mexe na altura dele quando liga). */
 .nc-hud .draft { position: absolute; left: calc(10px * var(--s)); bottom: calc(100% + 9px * var(--s)); display: none; align-items: center; gap: calc(5px * var(--s)); padding: calc(1px * var(--s)) calc(10px * var(--s)) calc(1px * var(--s)) calc(7px * var(--s));
   border-radius: 999px; background: #53cfff; color: #04263a; border: max(2px, calc(2.5px * var(--s))) solid #fff; box-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.4); font-size: calc(13px * var(--s)); font-weight: 900; letter-spacing: 0.08em; line-height: 1.25; white-space: nowrap; }

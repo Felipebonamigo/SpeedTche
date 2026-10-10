@@ -9,7 +9,7 @@ import './hud.css';
 import './hud-rival.css';
 import '../rivals/strings';
 import './strings';
-import { COUNTDOWN_TICKS, GEAR_TOP, NITRO_DURATION_TICKS, TICK_RATE } from '../core/constants';
+import { COUNTDOWN_TICKS, GEAR_TOP, LAUNCH_PERFECT, NITRO_CHARGE_COST, NITRO_DURATION_TICKS, TICK_RATE } from '../core/constants';
 import { seatColor, type ColorPalette } from '../core/data/drivers';
 import { trackTitle } from '../core/data/places';
 import '../access/strings';
@@ -17,13 +17,14 @@ import { seatAssist } from '../access/humans';
 import { VIP_COLOR } from '../core/modes';
 import { computeModifiers } from '../core/sim/coop';
 import { formatTicks } from '../core/sim/race';
+import { nitroCap, nitroMeterOf } from '../core/sim/stats';
 import type { CarState, RaceState, Track } from '../core/types';
 import type { HudMessage, RenderFrame, ViewportSpec } from '../game/contracts';
 import { getLanguage, t } from '../i18n';
 import { captionName, captionPlace } from './caption/names';
 import './caption/caption.css';
 import { GhostDelta } from './ghost-hud';
-import { formatGap, fuelModel, nitroModel, NITRO_SLOTS, timeGaps } from './hud-model';
+import { countdownDisplayTick, formatGap, fuelModel, nitroModel, NITRO_SLOTS, timeGaps } from './hud-model';
 import {
   newDraftHold, newLastLapBand, newPositionMotion, stepDraft, stepLastLapBand, stepPositionMotion, type DraftHold, type LastLapBand, type PositionMotion,
 } from './hud-motion';
@@ -31,9 +32,17 @@ import { spareCell, uiScale, viewportRects, type Rect } from './layout';
 import { outlinePoint, trackOutline, type Outline } from './minimap';
 import { ordinalSuffix } from './strings';
 
+/**
+ * O quadro que o HUD lê: o `RenderFrame` mais o atraso de entrada do online, em ticks (N1). Declarado aqui para o HUD valer com ou sem o
+ * campo no contrato (`RenderFrame.inputLead`, game/contracts.ts, que a sessão preenche): ausente, a contagem é a do núcleo.
+ */
+export type HudFrame = RenderFrame & { readonly inputLead?: number };
+
 const SVG = 'http://www.w3.org/2000/svg';
 const MAX_CARS = 20;
 const MAP_SIZE = 120;
+/** O selo LARGADA PERFEITA fica nos primeiros 2,5 s da corrida. */
+const LAUNCH_SEAL_TICKS = 150;
 const RPM_LEN = 2 * Math.PI * 42 * 0.75;
 
 function el(tag: string, cls: string, parent: HTMLElement): HTMLElement {
@@ -197,7 +206,8 @@ class SeatHud {
   private readonly mates: HTMLElement; private readonly mateRows: Array<{ row: HTMLElement; dot: HTMLElement; name: HTMLElement; assist: HTMLElement; pos: HTMLElement }> = [];
   private readonly fuel: HTMLElement; private readonly fuelLabel: HTMLElement; private readonly fuelFill: HTMLElement; private readonly fuelPct: HTMLElement; private readonly fuelFlag: HTMLElement;
   private readonly nitroLabel: HTMLElement; private readonly nitroN: HTMLElement; private readonly caps: HTMLElement[] = []; private readonly extra: HTMLElement;
-  private readonly nbar: HTMLElement; private readonly nfill: HTMLElement;
+  private readonly nbar: HTMLElement; private readonly nfill: HTMLElement; private readonly nburn: HTMLElement;
+  private readonly seal: HTMLElement;
   private readonly rpmFg: SVGPathElement; private readonly kmh: HTMLElement; private readonly unit: HTMLElement; private readonly gear: HTMLElement; private readonly gearLabel: HTMLElement;
   private readonly mini: MiniMap;
   private readonly topMsgs: MessageSlots; private readonly centerMsgs: MessageSlots;
@@ -250,7 +260,8 @@ class SeatHud {
       this.caps.push(cap);
     }
     this.extra = el('span', 'extra', caps);
-    this.nbar = el('div', 'nbar', nitro); this.nfill = el('div', 'fill', this.nbar);
+    // A barra de nitro (N1): sempre visível; cada marca é uma carga. O fio de baixo mostra o nitro aceso queimando.
+    this.nbar = el('div', 'nbar', nitro); this.nfill = el('div', 'fill', this.nbar); this.nburn = el('div', 'nburn', this.nbar);
     // Vácuo: pílula flutuando em cima do painel (não mexe na altura dele quando liga).
     this.draft = el('div', 'draft', bl);
     const wind = svg('svg', this.draft, { class: 'ico wind', viewBox: '0 0 24 24', 'aria-hidden': 'true' });
@@ -265,6 +276,7 @@ class SeatHud {
     this.gear = el('div', 'gear', br); this.gearLabel = el('small', '', this.gear); this.gear.appendChild(document.createTextNode(''));
     this.mini = new MiniMap(this.root, 'mini glass');
     this.caption = new LandmarkCaption(this.root);
+    this.seal = el('div', 'launch-seal', this.root); this.seal.setAttribute('role', 'status');
     this.finalBand = el('div', 'final-band', this.root); this.finalBand.setAttribute('role', 'status');
     el('i', 'stripes', this.finalBand); this.finalLabel = el('span', '', this.finalBand); el('i', 'stripes', this.finalBand);
     const top = el('div', 'top-msgs', this.root); this.topMsgs = new MessageSlots(top, 2);
@@ -272,7 +284,7 @@ class SeatHud {
     this.pause = el('div', 'pause', this.root);
   }
 
-  update(frame: RenderFrame, vp: ViewportSpec, rect: Rect, caption?: LandmarkCaptionState): void {
+  update(frame: HudFrame, vp: ViewportSpec, rect: Rect, caption?: LandmarkCaptionState): void {
     const { state, track } = frame;
     const car: CarState | undefined = state.cars[vp.carIndex];
     const r = this.root;
@@ -348,19 +360,25 @@ class SeatHud {
     setClass(this.fuel, 'low', fm.level !== 'ok'); setAttr(this.fuel, 'data-level', fm.level);
     setText(this.fuelPct, `${fm.percent}%`);
     setText(this.fuelFlag, fm.level === 'low' ? t('hud.fuelLowShort') : fm.level === 'empty' ? t('hud.fuelEmptyShort') : '');
-    // Nitro: cofre da equipe ou cargas próprias.
-    // Mesma regra da física: com sharedNitro o humano gasta do cofre do time, mesmo sozinho.
+    // Nitro: a barra da equipe ou a do carro (onda N, N1). Mesma regra da física (stats.ts: nitroMeterOf): com sharedNitro o humano
+    // gasta e ganha na barra do time, mesmo sozinho. Um raio por carga cheia, o número de cargas e a barra com a fração.
     const shared = state.config.assists.sharedNitro;
-    const charges = shared ? (state.teamNitro[car.teamId] ?? 0) : car.nitroLeft;
+    const cap = nitroCap(state, car);
     setText(this.nitroLabel, shared && frame.coop ? `${t('hud.nitro')} · ${t('hud.team')}` : t('hud.nitro'));
-    const nm = nitroModel(charges);
+    const nm = nitroModel(nitroMeterOf(state, car), cap);
     for (let i = 0; i < NITRO_SLOTS; i++) setClass(this.caps[i], 'on', i < nm.filled);
     setText(this.extra, nm.extra); setText(this.nitroN, String(nm.count));
+    setStyle(this.nbar, '--cap', String(cap / NITRO_CHARGE_COST));
+    setStyle(this.nfill, 'width', `${(nm.fraction * 100).toFixed(1)}%`);
     // Vácuo: o ícone fica um instante a mais para não piscar (hud-motion.ts: DRAFT_HOLD_SECONDS).
     const drafting = racing && !car.finished && computeModifiers(state, track, car).draft;
     setClass(this.draft, 'on', stepDraft(this.draftHold, drafting, frame.time)); setText(this.draftLabel, t('hud.draft'));
-    setClass(this.nbar, 'on', car.nitroTicks > 0);
-    setStyle(this.nfill, 'width', `${((car.nitroTicks / NITRO_DURATION_TICKS) * 100).toFixed(1)}%`);
+    setClass(this.nbar, 'burn', car.nitroTicks > 0);
+    setStyle(this.nburn, 'width', `${((car.nitroTicks / NITRO_DURATION_TICKS) * 100).toFixed(1)}%`);
+    // Selo LARGADA PERFEITA: derivado do estado (car.launch), nos primeiros 2,5 s da corrida; o mesmo selo em todo cliente.
+    const sinceGo = state.tick - state.startTick;
+    setText(this.seal, t('hud.perfectLaunch'));
+    setClass(this.seal, 'show', car.launch === LAUNCH_PERFECT && state.phase !== 'countdown' && sinceGo >= 0 && sinceGo < LAUNCH_SEAL_TICKS && !frame.paused);
     setClass(this.lines, 'on', car.nitroTicks > 0 && !frame.paused && !frame.options.reduceEffects);
     // Velocímetro: RPM = posição da velocidade dentro da marcha.
     const sf = car.speed / car.stats.topSpeed;
@@ -380,7 +398,9 @@ class SeatHud {
     // Mensagens: 'info' no topo; as outras no centro. Na contagem, as "big" com o número
     // ficam de fora (a contagem grande já cobre).
     this.topList.length = 0; this.centerList.length = 0;
-    const counting = state.phase === 'countdown';
+    // A contagem é desenhada no tick do núcleo + o atraso de entrada (online): o aperto no instante do zero cai no tick do JÁ (N1).
+    const shownTick = countdownDisplayTick(state.tick, frame.inputLead ?? 0);
+    const counting = state.phase === 'countdown' && shownTick < COUNTDOWN_TICKS;
     for (const msg of vp.messages) {
       if (msg.kind === 'info') this.topList.push(msg);
       else if (!(counting && msg.kind === 'big')) this.centerList.push(msg);
@@ -389,7 +409,7 @@ class SeatHud {
     this.centerMsgs.update(this.centerList);
     // Contagem regressiva.
     if (counting) {
-      const n = Math.ceil((COUNTDOWN_TICKS - state.tick) / TICK_RATE);
+      const n = Math.ceil((COUNTDOWN_TICKS - shownTick) / TICK_RATE);
       const text = n > 3 ? t('hud.countdown') : String(Math.max(1, n));
       if (text !== this.lastCount) {
         this.lastCount = text;
@@ -466,7 +486,7 @@ export class Hud {
   }
 
   /** `captions`: a legenda dos marcos de cada viewport, na ordem de `frame.viewports` (ausente = sem legenda). */
-  update(frame: RenderFrame, width: number, height: number, captions?: ReadonlyArray<LandmarkCaptionState>): void {
+  update(frame: HudFrame, width: number, height: number, captions?: ReadonlyArray<LandmarkCaptionState>): void {
     if (!this.visible) { this.visible = true; this.root.classList.remove('hidden'); }
     const n = frame.viewports.length;
     while (this.seats.length < n) this.seats.push(new SeatHud(this.root));

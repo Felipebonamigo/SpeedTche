@@ -152,7 +152,7 @@ describe('termômetro de emoção: cada medida pelo estado', () => {
     expect(f.battleSeconds + f.aloneSeconds).toBeLessThanOrEqual(f.seconds + 0.02);
     expect(f.flatOutPct).toBeGreaterThanOrEqual(50);
     expect(f.nitroPct).toBeGreaterThanOrEqual(0.5);
-    expect(f.nitroPct).toBeLessThanOrEqual(10);
+    expect(f.nitroPct).toBeLessThanOrEqual(25); // N1: o nitro se ganha (era ≤ 10 com 3 cargas dadas; a meta da onda N é 10–15% de média nas 109 pistas)
     expect(f.scrapes).toBeGreaterThanOrEqual(1);
     expect(f.rearHits).toBeGreaterThanOrEqual(1);
   }, 60_000);

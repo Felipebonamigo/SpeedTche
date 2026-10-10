@@ -9,7 +9,7 @@ registerStrings('hud', {
     finished: 'CHEGOU', lowFuel: 'COMBUSTÍVEL BAIXO', noNitro: 'SEM NITRO', pitStop: 'NO BOX',
     countdown: 'PREPARAR', timeTrial: 'CONTRA-RELÓGIO', spectating: 'ASSISTINDO', lapShort: 'V{n}', of: '/{total}',
     draft: 'VÁCUO', fuelLowShort: 'BAIXO', fuelEmptyShort: 'VAZIO',
-    gapAhead: 'Distância para o carro da frente:', gapBehind: 'Distância do carro de trás:',
+    gapAhead: 'Distância para o carro da frente:', gapBehind: 'Distância do carro de trás:', perfectLaunch: 'LARGADA PERFEITA',
   },
   en: {
     lap: 'LAP', lapOf: 'LAP {n}/{total}', lastLap: 'FINAL LAP', position: 'POSITION', positionOf: '{pos}/{total}',
@@ -18,7 +18,7 @@ registerStrings('hud', {
     finished: 'FINISHED', lowFuel: 'LOW FUEL', noNitro: 'NO NITRO', pitStop: 'IN PIT',
     countdown: 'READY', timeTrial: 'TIME TRIAL', spectating: 'SPECTATING', lapShort: 'L{n}', of: '/{total}',
     draft: 'DRAFT', fuelLowShort: 'LOW', fuelEmptyShort: 'EMPTY',
-    gapAhead: 'Gap to the car ahead:', gapBehind: 'Gap to the car behind:',
+    gapAhead: 'Gap to the car ahead:', gapBehind: 'Gap to the car behind:', perfectLaunch: 'PERFECT LAUNCH',
   },
 });
 

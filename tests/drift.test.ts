@@ -393,10 +393,11 @@ describe('derrapagem: determinismo e serialização', () => {
 // ───────────────────────────── Guarda: quem não derrapa anda como antes ─────────────────────────────
 
 describe('derrapagem: quem não derrapa anda bit a bit como antes', () => {
-  // Valores gravados em 2ce0f48, ANTES de qualquer mudança de física: o hash legado (a fórmula antiga do hashRace, sem os
-  // campos novos) de corridas só de humanos sem derrapar. Passa antes e tem de passar depois: é a prova de que `× 1` na
-  // centrífuga e o volante puro fora da derrapagem não mudaram nenhum bit.
-  const RECORDED: Record<string, string> = { 'guarda-contra-relogio': '26959b71', 'guarda-3-humanos-manual': '54bd603a' };
+  // Valores gravados em 640538f, ANTES de qualquer mudança da N1: o hash legado (a fórmula antiga do hashRace, sem os campos
+  // novos e sem o do nitro) de corridas só de humanos sem derrapar e sem nitro. Passa antes e tem de passar depois: é a prova
+  // de que `× 1` na centrífuga, o volante puro fora da derrapagem e a largada sem aperto na janela não mudaram nenhum bit.
+  // (Eram '26959b71' e '54bd603a', gravados em 2ce0f48 com o nitro dos roteiros; o nitro mudou de propósito na N1.)
+  const RECORDED: Record<string, string> = { 'guarda-contra-relogio': '7cdd19af', 'guarda-3-humanos-manual': '01fc925c' };
   for (const s of GUARD_SCENARIOS) {
     it(`${s.name}: ${GUARD_TICKS} ticks, hash legado de cada tick`, () => {
       expect(legacyTrace(s, GUARD_TICKS)).toBe(RECORDED[s.name]);

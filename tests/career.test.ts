@@ -10,8 +10,8 @@ import {
 } from '../src/core/career';
 import { applyRaceResult, createChampionship, nextTrackId } from '../src/core/championship';
 import {
-  HANDLING_MAX, NITRO_PER_RACE, POINTS_TABLE, SPRITE_CRASH_SPEED_FACTOR, TICK_RATE, TOW_MIN_SPEED_FACTOR, UPGRADE_BRAKES,
-  UPGRADE_ENGINE_TOP, UPGRADE_MAX_LEVEL, UPGRADE_NITRO_CHARGES, UPGRADE_TANK_FUEL, UPGRADE_TIRES_HANDLING, UPGRADE_TURBO_ACCEL,
+  HANDLING_MAX, NITRO_START_METER, POINTS_TABLE, SPRITE_CRASH_SPEED_FACTOR, TICK_RATE, TOW_MIN_SPEED_FACTOR, UPGRADE_BRAKES,
+  UPGRADE_ENGINE_TOP, UPGRADE_MAX_LEVEL, UPGRADE_TANK_FUEL, UPGRADE_TIRES_HANDLING, UPGRADE_TURBO_ACCEL,
 } from '../src/core/constants';
 import { AI_CAR_POOL, CARS, carDef } from '../src/core/data/cars';
 import { CUPS } from '../src/core/data/cups';
@@ -124,7 +124,7 @@ describe('atributos efetivos (núcleo)', () => {
   const changed = (a: CarStats, b: CarStats) => (Object.keys(a) as Array<keyof CarStats>).filter((k) => a[k] !== b[k]);
 
   it('sem melhoria, os atributos são os do carro', () => {
-    expect(base).toEqual({ topSpeed: def.topSpeed, accel: def.accel, brake: def.brake, handling: def.handling, fuelPerUnit: def.fuelPerUnit, nitro: NITRO_PER_RACE });
+    expect(base).toEqual({ topSpeed: def.topSpeed, accel: def.accel, brake: def.brake, handling: def.handling, fuelPerUnit: def.fuelPerUnit, nitro: 1 });
   });
 
   it('cada melhoria muda o atributo certo, e só ele', () => {
@@ -139,7 +139,7 @@ describe('atributos efetivos (núcleo)', () => {
     expect(s3.brake).toBeCloseTo(def.brake * (1 + 3 * UPGRADE_BRAKES), 6);
     expect(s3.handling).toBeCloseTo(Math.min(HANDLING_MAX, def.handling + 3 * UPGRADE_TIRES_HANDLING), 6);
     expect(s3.fuelPerUnit).toBeCloseTo(def.fuelPerUnit * (1 - 3 * UPGRADE_TANK_FUEL), 12);
-    expect(s3.nitro).toBe(NITRO_PER_RACE + 3 * UPGRADE_NITRO_CHARGES);
+    expect(s3.nitro).toBe(1 + 3); // nível de enchimento da barra (N1): 1 de fábrica, +1 por nível (+15% cada)
     // Melhorar sempre ajuda: mais rápido, mais aceleração, mais freio, mais aderência, menos consumo.
     expect(s3.topSpeed).toBeGreaterThan(base.topSpeed);
     expect(s3.fuelPerUnit).toBeLessThan(base.fuelPerUnit);
@@ -152,6 +152,7 @@ describe('atributos efetivos (núcleo)', () => {
     const agile = CARS.reduce((a, b) => (b.handling > a.handling ? b : a));
     expect(effectiveStats(agile, lv({ tires: 3 })).handling).toBeLessThanOrEqual(HANDLING_MAX);
     expect(Number.isInteger(effectiveStats(def, lv({ nitro: 1.7 })).nitro)).toBe(true);
+    expect(effectiveStats(def, lv({ nitro: 1.7 })).nitro).toBe(2); // o nível 1,7 vale 1 (a peça só conta nível inteiro)
   });
 
   it('a IA melhora por nível (motor, turbo, pneus, freios), fracionário, sem mexer em tanque e nitro', () => {
@@ -162,7 +163,7 @@ describe('atributos efetivos (núcleo)', () => {
     expect(a3.fuelPerUnit).toBe(a0.fuelPerUnit); expect(a3.nitro).toBe(a0.nitro);
   });
 
-  it('createRace guarda os atributos de cada carro no estado (JSON) e o nitro extra entra nas cargas e no cofre', () => {
+  it('createRace guarda os atributos de cada carro no estado (JSON); todo carro larga com 1 carga e a peça de nitro só muda o enchimento (N1)', () => {
     const up = lv({ engine: 2, nitro: 2 });
     const humans = [{ ...human(0), upgrades: up }, human(1)];
     const track = syntheticTrack();
@@ -171,11 +172,12 @@ describe('atributos efetivos (núcleo)', () => {
     const p1 = humanCar(state, 0); const p2 = humanCar(state, 1);
     expect(carStats(p1)).toEqual(effectiveStats(carDef(p1.carId), up));
     expect(carStats(p2)).toEqual(effectiveStats(carDef(p2.carId), null));
-    expect(p1.nitroLeft).toBe(NITRO_PER_RACE + 2);
-    expect(p2.nitroLeft).toBe(NITRO_PER_RACE);
+    expect(carStats(p1).nitro).toBe(1 + 2);
+    expect(p1.nitroMeter).toBe(NITRO_START_METER);
+    expect(p2.nitroMeter).toBe(NITRO_START_METER);
     for (const c of state.cars.filter((x) => x.seat < 0)) expect(carStats(c)).toEqual(aiStats(carDef(c.carId), 2));
     expect(JSON.parse(serializeRace(state)).cars[0].stats).toEqual(state.cars[0].stats);
-    expect(mk(ALL_ASSISTS).teamNitro[0]).toBe(NITRO_PER_RACE * 2 + 2);
+    expect(mk(ALL_ASSISTS).teamNitro[0]).toBe(NITRO_START_METER * 2);
   });
 
   it('colisões e reboque leem os atributos da corrida (car.stats), não os de fábrica', () => {

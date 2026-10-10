@@ -4,7 +4,7 @@
 // que o estado diz chega aos nós.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setLanguage } from '../src/i18n';
-import { SEGMENT_LENGTH } from '../src/core/constants';
+import { COUNTDOWN_TICKS, NITRO_CHARGE_COST, NITRO_DURATION_TICKS, NITRO_METER_MAX, SEGMENT_LENGTH } from '../src/core/constants';
 import type { RenderFrame } from '../src/game/contracts';
 import { Hud } from '../src/render/hud';
 import { human, quickRace, run, skipCountdown } from './helpers';
@@ -82,15 +82,17 @@ function scene() {
   c.position = 4; c.progress = 10_000; c.speed = 3000; c.x = -0.9;
   a.x = -0.9; a.z = 40_000; b.z = 17_000; c.z = 5000;
   let time = 5;
+  let lead = 0;
   const root = new FakeEl('div');
   const hud = new Hud(root as unknown as HTMLElement);
   const frame = (): RenderFrame => ({
     state, track, time, paused: false, coop: false, showHud: true,
     viewports: [{ seat: 0, carIndex: 0, color: '#ffd23f', name: 'P1', messages: [] }],
     options: { quality: 'high', showMinimap: true, screenShake: true, reduceEffects: false, palette: 'default' },
+    ...(lead > 0 ? { inputLead: lead } : {}),
   });
   const draw = (advance = 0) => { time += advance; state.tick += Math.round(advance * 60); hud.update(frame(), 1280, 720); };
-  return { state, track, me, others: { a, b, c }, root, hud, draw };
+  return { state, track, me, others: { a, b, c }, root, hud, draw, setLead: (n: number) => { lead = n; } };
 }
 
 describe('HUD: segundos para o carro da frente e o de trás', () => {
@@ -166,13 +168,103 @@ describe('HUD: combustível e nitro legíveis sem depender da cor', () => {
     expect(textOf(one(s.root, 'fuel-flag'))).toBe('BAIXO');
   });
 
-  it('o nitro traz o número de cargas e um raio por carga', () => {
+  it('o nitro traz o número de cargas cheias, um raio por carga cheia e a barra com a fração (N1)', () => {
     const s = scene();
-    s.me.nitroLeft = 2;
+    s.me.nitroMeter = NITRO_CHARGE_COST * 2 + NITRO_CHARGE_COST / 2;
     s.draw();
     expect(textOf(one(s.root, 'nitro-n'))).toBe('2');
     const caps = all(one(s.root, 'caps'), (e) => e.tag === 'i');
     expect(caps).toHaveLength(3);
     expect(caps.filter((c) => c.classList.contains('on'))).toHaveLength(2);
+    const fill = one(one(s.root, 'nbar'), 'fill');
+    expect(fill.style.getPropertyValue('width')).toBe(`${((2.5 * NITRO_CHARGE_COST * 100) / NITRO_METER_MAX).toFixed(1)}%`);
+    expect(one(s.root, 'nbar').classList.contains('burn'), 'sem nitro aceso').toBe(false);
+  });
+
+  it('com o nitro aceso a barra brilha e o fio mostra o tempo que falta', () => {
+    const s = scene();
+    s.me.nitroMeter = NITRO_CHARGE_COST; s.me.nitroTicks = NITRO_DURATION_TICKS / 2;
+    s.draw();
+    expect(one(s.root, 'nbar').classList.contains('burn')).toBe(true);
+    expect(one(s.root, 'nburn').style.getPropertyValue('width')).toBe('50.0%');
+    s.me.nitroTicks = 0;
+    s.draw(0.1);
+    expect(one(s.root, 'nbar').classList.contains('burn')).toBe(false);
+  });
+
+  it('o nitro da equipe (co-op) usa o teto da equipe: 5 cargas de 6 = 3 raios, "×5" e 83,3% da barra', () => {
+    const s = scene();
+    s.state.config.assists = { sharedNitro: true, tow: false, teamDraft: false, catchup: false }; // um objeto novo: o NO_ASSISTS do helper é compartilhado
+    s.me.seat = 1; s.me.teamId = 0; // o carro da cena é de IA; com o humano de verdade (assento 0, time 0) são dois no time: o teto da equipe é 2 × NITRO_METER_MAX
+    s.state.teamNitro[0] = NITRO_CHARGE_COST * 5;
+    s.draw();
+    expect(textOf(one(s.root, 'nitro-n'))).toBe('5');
+    expect(textOf(one(s.root, 'extra'))).toBe('×5');
+    expect(one(one(s.root, 'nbar'), 'fill').style.getPropertyValue('width')).toBe('83.3%');
+  });
+});
+
+describe('HUD: selo LARGADA PERFEITA (N1)', () => {
+  it('aparece nos primeiros 2,5 s da corrida de quem fez a largada perfeita e some depois; quem não fez não vê', () => {
+    const s = scene();
+    s.me.launch = 1; s.state.startTick = s.state.tick - 30;
+    s.draw();
+    const seal = one(s.root, 'launch-seal');
+    expect(seal.classList.contains('show')).toBe(true);
+    expect(textOf(seal)).toBe('LARGADA PERFEITA');
+    s.state.startTick = s.state.tick - 160;
+    s.draw(0.1);
+    expect(seal.classList.contains('show'), 'depois dos 150 ticks').toBe(false);
+    s.me.launch = 2; s.state.startTick = s.state.tick - 30;
+    s.draw(0.1);
+    expect(seal.classList.contains('show'), 'sem largada perfeita').toBe(false);
+  });
+});
+
+/** A contagem: o jogador no grid, o núcleo ainda em `countdown`. */
+function countdownScene() {
+  const { state, track } = quickRace({ humans: [human(0)], totalCars: 4, laps: 2 });
+  let lead = 0;
+  const root = new FakeEl('div');
+  const hud = new Hud(root as unknown as HTMLElement);
+  const messages: Array<{ text: string; kind: 'big' | 'good' | 'warn' | 'info'; ttl: number }> = [];
+  const draw = (tick: number) => {
+    state.tick = tick;
+    hud.update({
+      state, track, time: 1, paused: false, coop: false, showHud: true,
+      viewports: [{ seat: 0, carIndex: 0, color: '#ffd23f', name: 'P1', messages }],
+      options: { quality: 'high', showMinimap: false, screenShake: true, reduceEffects: false, palette: 'default' },
+      ...(lead > 0 ? { inputLead: lead } : {}),
+    } as RenderFrame, 1280, 720);
+  };
+  return { state, root, draw, messages, setLead: (n: number) => { lead = n; } };
+}
+
+describe('HUD: a contagem desenhada adiantada pelo atraso de entrada (N1)', () => {
+  it('sem atraso a luz some no tick do zero; com atraso 12 ela já sumiu 12 ticks antes e o "JÁ!" já pode aparecer', () => {
+    const c = countdownScene();
+    c.draw(COUNTDOWN_TICKS - 12);
+    expect(one(c.root, 'count').classList.contains('show'), 'sem atraso: ainda contando 12 ticks antes do zero').toBe(true);
+    const c12 = countdownScene();
+    c12.setLead(12);
+    c12.draw(COUNTDOWN_TICKS - 12);
+    expect(one(c12.root, 'count').classList.contains('show'), 'atraso 12: o tick desenhado já é o zero').toBe(false);
+    c12.messages.push({ text: 'JÁ!', kind: 'big', ttl: 1 });
+    c12.draw(COUNTDOWN_TICKS - 11);
+    const go = all(c12.root, (e) => e.classList.contains('msg') && e.classList.contains('show') && textOf(e) === 'JÁ!');
+    expect(go, 'o "JÁ!" não fica escondido nos ticks em que o núcleo ainda está em contagem').toHaveLength(1);
+    const c0 = countdownScene();
+    c0.messages.push({ text: 'JÁ!', kind: 'big', ttl: 1 });
+    c0.draw(COUNTDOWN_TICKS - 11);
+    expect(all(c0.root, (e) => e.classList.contains('msg') && e.classList.contains('show') && textOf(e) === 'JÁ!'), 'sem atraso a "big" da contagem continua escondida').toHaveLength(0);
+  });
+
+  it('o número da luz é o do tick desenhado: com atraso 3, no tick do núcleo 3 ticks antes de virar o 1, já mostra o 1', () => {
+    const c = countdownScene();
+    c.setLead(3);
+    c.draw(COUNTDOWN_TICKS - 3 - 61); // desenhado: G − 61 ⇒ faltam 61 ticks ⇒ ainda "2"
+    expect(textOf(one(c.root, 'count'))).toBe('2');
+    c.draw(COUNTDOWN_TICKS - 3 - 59); // desenhado: G − 59 ⇒ faltam 59 ticks ⇒ "1"
+    expect(textOf(one(c.root, 'count'))).toBe('1');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GEAR_TOP, NITRO_PER_RACE, OFFROAD_LIMIT_FACTOR, NITRO_SPEED_MULT } from '../src/core/constants';
+import { GEAR_TOP, NITRO_CHARGE_COST, NITRO_START_METER, OFFROAD_LIMIT_FACTOR, NITRO_SPEED_MULT } from '../src/core/constants';
 import { carDef } from '../src/core/data/cars';
 import { holdableSpeedFraction } from '../src/core/sim/physics';
 import { NEUTRAL_INPUT } from '../src/core/types';
@@ -65,7 +65,7 @@ describe('física do carro', () => {
     run(state, track, 60 * 12);
     const car = humanCar(state);
     run(state, track, 1, () => ({ ...NEUTRAL_INPUT, throttle: true, nitro: true }));
-    expect(car.nitroLeft).toBe(NITRO_PER_RACE - 1);
+    expect(car.nitroMeter).toBe(NITRO_START_METER - NITRO_CHARGE_COST);
     run(state, track, 140);
     expect(car.speed).toBeGreaterThan(carDef(car.carId).topSpeed * 1.1);
     expect(car.speed).toBeLessThanOrEqual(carDef(car.carId).topSpeed * NITRO_SPEED_MULT + 1e-6);
@@ -76,7 +76,7 @@ describe('física do carro', () => {
   it('sem cargas, apertar nitro gera o evento de negado', () => {
     const { state, track } = quickRace({ track: straight(), totalCars: 1 });
     run(state, track, 60 * 5);
-    for (let i = 0; i < NITRO_PER_RACE; i++) { run(state, track, 1, () => ({ ...NEUTRAL_INPUT, throttle: true, nitro: true })); run(state, track, 160); }
+    for (let i = 0; i < NITRO_START_METER / NITRO_CHARGE_COST; i++) { run(state, track, 1, () => ({ ...NEUTRAL_INPUT, throttle: true, nitro: true })); run(state, track, 160); }
     run(state, track, 1, () => ({ ...NEUTRAL_INPUT, throttle: true, nitro: true }));
     expect(state.events.some((e) => e.type === 'nitro_denied')).toBe(true);
   });

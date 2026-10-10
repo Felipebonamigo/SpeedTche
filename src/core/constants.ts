@@ -52,10 +52,62 @@ export const OFFROAD_LIMIT_FACTOR = 0.35; // velocidade máxima fora da pista, f
 export const OFFROAD_DECEL_FACTOR = 0.6;  // desaceleração fora da pista, fração da máxima por s
 export const OFFROAD_X = 1.05;            // |x| a partir do qual o carro está na grama
 
-export const NITRO_PER_RACE = 3;
 export const NITRO_DURATION_TICKS = 150;  // 2,5 s
+/** Consumo de combustível com o nitro aceso, por tick (além do que a velocidade maior já gasta). */
+export const NITRO_FUEL_MULT = 1.6;
 export const NITRO_SPEED_MULT = 1.28;
 export const NITRO_ACCEL_MULT = 2.2;
+
+/*
+ * Barra de nitro (onda N, frente N1; o design e a razão de cada número estão em docs/ondas/N/N1.md). O nitro deixa de ser 3 cargas dadas
+ * na largada: é uma barra, em unidades inteiras, que larga com 1 carga e enche com o que se pilota bem. Uma carga custa
+ * NITRO_CHARGE_COST; o nitro aceso (150 ticks, 1,28 ×, 2,2 ×) é o de sempre. Os NITRO_GAIN_*, os resfriamentos e as constantes da
+ * largada são PROVISÓRIOS: o `npm run balance` os ajusta e a calibragem final é da onda O2.
+ */
+/** Uma carga de nitro, em unidades da barra. */
+export const NITRO_CHARGE_COST = 1000;
+/** Todo carro larga com 1 carga cheia (no co-op com barra da equipe: 1 por humano do time). */
+export const NITRO_START_METER = NITRO_CHARGE_COST;
+/** Teto da barra de um carro: 3 cargas (na barra da equipe, 3 por humano do time). */
+export const NITRO_METER_MAX = NITRO_CHARGE_COST * 3;
+/** Mini-turbo: o que soltar a derrapagem enche, por nível (azul, laranja, roxa). */
+export const NITRO_GAIN_DRIFT: readonly number[] = [150, 300, 500];
+/** Estilingue do vácuo: sair do vácuo depois de NITRO_SLING_TICKS dentro dele. */
+export const NITRO_GAIN_SLING = 300;
+/** Raspão de lado sem bater (o contato que não é batida traseira). */
+export const NITRO_GAIN_SCRAPE = 100;
+/** Ultrapassagem limpa, por carro passado. */
+export const NITRO_GAIN_OVERTAKE = 150;
+/** Largada perfeita. */
+export const NITRO_GAIN_LAUNCH = 500;
+/** Tempo seguido no vácuo para o estilingue valer ao sair: 1,5 s. */
+export const NITRO_SLING_TICKS = 90;
+/** Depois do estilingue o vácuo não rende outro por este tempo (4 s): sem isto, ziguezaguear atrás de um carro lento enchia ~1 carga a cada 6 s. */
+export const NITRO_SLING_COOLDOWN_TICKS = 240;
+/** Depois de ganhar com um raspão ou uma ultrapassagem o carro não ganha com os dois por este tempo (anti-farm). */
+export const NITRO_LOCK_SCRAPE_TICKS = 60;
+export const NITRO_LOCK_OVERTAKE_TICKS = 120;
+/** Nos primeiros ticks da corrida a bagunça do grid não é ultrapassagem (4 s). */
+export const OVERTAKE_GRACE_TICKS = 240;
+/** Peça de nitro da carreira: a barra enche +15% a mais por nível (CarStats.nitro = 1 + nível). */
+export const UPGRADE_NITRO_FILL = 0.15;
+
+/*
+ * Largada-foguete (onda N, N1). Janela de aperto, em ticks do núcleo, em torno do tick do "JÁ" (COUNTDOWN_TICKS): o ÚLTIMO aperto do
+ * acelerador (de solto para apertado) vale se cair em [JÁ − EARLY, JÁ + LATE] e o pedal ainda estiver apertado; quem segura desde o começo
+ * da contagem, aperta cedo demais e segura, ou aperta tarde demais, larga normal. O arranque perfeito liga o nitro por LAUNCH_BOOST_TICKS
+ * (sem gastar a barra) e enche NITRO_GAIN_LAUNCH. A IA sorteia uma vez, no tick do JÁ, com a chance crescente na habilidade.
+ */
+export const LAUNCH_PENDING = 0;
+export const LAUNCH_PERFECT = 1;
+export const LAUNCH_NONE = 2;
+export const LAUNCH_WINDOW_EARLY_TICKS = 18;  // 0,30 s antes do JÁ
+export const LAUNCH_WINDOW_LATE_TICKS = 6;    // 0,10 s depois
+export const LAUNCH_BOOST_TICKS = 90;         // 1,5 s de arranque (o nitro dura 2,5 s)
+/** Chance da IA: 0 até esta habilidade, sobe reto até LAUNCH_AI_MAX_CHANCE em LAUNCH_AI_FULL_SKILL. */
+export const LAUNCH_AI_MIN_SKILL = 0.85;
+export const LAUNCH_AI_FULL_SKILL = 1.0;
+export const LAUNCH_AI_MAX_CHANCE = 0.5;
 
 /*
  * Derrapagem (onda M, frente M1; o design e a razão de cada número estão em docs/ondas/M/M1.md). Segura-se o botão com o
@@ -115,8 +167,11 @@ export const FUEL_EMPTY_SPEED_FACTOR = 0.2;
  * voltas em aceleração total. Proporcional à volta porque um nível fixo (eram 25%) chega tarde nas
  * voltas longas; acima de 1 porque o jogador de pé no fundo gasta ~0,95–1,0 disso por volta, e a
  * sobra (0,15 volta, ~12 s) é o tempo de ver o aviso e ir para o box (sim/fuel.ts, tests/fuel.test.ts).
+ * Onda N (N1): 1,15 → 1,25 (PROVISÓRIO, o combustível das 109 pistas é da O2). Com a barra de nitro o jogador que aperta o nitro
+ * sempre que pode passou de 3 cargas para quase todas as que enche, e o nitro gasta ×NITRO_FUEL_MULT: a pior antecedência do aviso
+ * (23 pistas) caiu de 0,143 volta para 0,049; com 1,25 ela volta a 0,125 (mínimo 0,10 no tests/fuel.test.ts).
  */
-export const FUEL_LOW_LAPS = 1.15;
+export const FUEL_LOW_LAPS = 1.25;
 /** Folga da IA sobre o consumo medido ao decidir se passa reto pelo box (sim/fuel.ts). */
 export const FUEL_PIT_MARGIN = 1.15;
 export const PIT_X = 1.55;                 // centro do box, em `x` normalizado
@@ -193,8 +248,6 @@ export const HANDLING_MAX = 1;
 export const UPGRADE_BRAKES = 0.12;
 /** Tanque: consumo −10% por nível. */
 export const UPGRADE_TANK_FUEL = 0.1;
-/** Nitro: +1 carga por nível. */
-export const UPGRADE_NITRO_CHARGES = 1;
 
 // Personalidades e rivais da IA (sim/personality.ts, docs/RIVAIS.md). A tabela de cada personalidade
 // mora em data/drivers.ts (PERSONALITY_TUNING).
