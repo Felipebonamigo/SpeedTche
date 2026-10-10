@@ -1,7 +1,7 @@
 // Banco de prova (?bench=1 no navegador; --bench no Electron chega como ?bench=1&uncapped=1…): uma corrida nova por
 // cena × nível, 1 tick por quadro, quadros medidos pelos carimbos do rAF. JSON speed-tche-bench/1 (metrics.ts).
-// O nível Ultra (src/bench/ultra.ts) é desenhado em 2560×1440 (ou no `res=` pedido) com a qualidade Alta: enquanto os
-// efeitos da L2 não existem, o número dele é a folga da Alta em 1440p, e o relatório diz isso (benchWarnings).
+// O nível Ultra (src/bench/ultra.ts) é desenhado em 2560×1440 (ou no `res=` pedido) com a qualidade Ultra (L2: AO em resolução cheia);
+// o relatório diz quantos efeitos do registro existem (benchWarnings). A resolução dinâmica fica desligada.
 import '../i18n/core';
 import './strings';
 import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type HumanEntry } from '../core';
@@ -32,6 +32,7 @@ export async function runBench(search: string, deps: BenchDeps): Promise<void> {
     if (!opts) throw new Error('runBench sem bench=1');
     setLanguage(loadSettings().language); // só leitura (src/game/settings.ts)
     const r = createRenderer(deps.canvas, deps.hud);
+    r.setDynamicResolution(false); // o banco de prova mede a resolução pedida, nunca a que o controle automático escolheria
     const runs: BenchRun[] = [];
     const total = opts.scenes.length * opts.qualities.length;
     for (const scene of opts.scenes) for (const level of opts.qualities) {

@@ -17,7 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const url = process.argv[2] ?? 'http://localhost:4174/?nosurvey=1';
+// dynres=0: a resolução dinâmica (L2) fica desligada, como sob automação: a sessão tem de ser reprodutível.
+const url = process.argv[2] ?? 'http://localhost:4174/?nosurvey=1&dynres=0';
 const out = process.argv[3] ?? 'scratch/mem';
 const BLOCKS = Number(process.argv[4] ?? 36);
 const exe = process.env.CHROME_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -25,7 +26,7 @@ fs.mkdirSync(path.dirname(out), { recursive: true }); // scratch/ não vem no cl
 
 /** Pistas do roteiro (cenários e horários diferentes: costa/dia, cidade/noite, deserto, alpino, tropical, savana). */
 const TRACKS = ['copacabana', 'sampa_noite', 'canion', 'monte_fuji', 'daintree', 'kruger'];
-/** Blocos até o roteiro se repetir: mmc(6 pistas, 4 lotações, 3 qualidades) = 12. */
+/** Blocos até o roteiro se repetir: mmc(6 pistas, 4 lotações, 12 = 4 qualidades em fatias de 3) = 12. */
 const CYCLE = 12;
 /** Telas visitadas no menu a cada bloco (as que abrem sem dados de corrida). */
 const SCREENS = ['lobby', 'cups', 'tracks', 'options', 'controls', 'records', 'credits', 'party', 'access'];
@@ -121,7 +122,8 @@ async function measure() {
 async function block(k) {
   const track = TRACKS[k % TRACKS.length];
   const n = 1 + (k % 4);
-  const quality = k % 3 === 2 ? 'high' : 'low';
+  // As quatro qualidades em fatias de 3 blocos (período 12, o do CYCLE): cada uma passa por todas as lotações e pistas.
+  const quality = ['low', 'medium', 'high', 'ultra'][Math.floor(k / 3) % 4];
   const finish = k % 4 === 3;
   const seed = (k % CYCLE) * 4;
   // Nos blocos que vão até o resultado, o P1 (teclado, direção assistida completa) acelera e termina; os

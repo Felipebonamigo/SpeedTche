@@ -5,7 +5,7 @@
 import type { Quality } from '../game/contracts';
 
 /** O que o renderizador conta por viewport (os nomes são os de `DebugInfo.viewports`, src/render/renderer.ts). */
-export interface GateViewport { calls: number; triangles: number; passes: number; postPx: number; targetW: number; targetH: number }
+export interface GateViewport { calls: number; triangles: number; passes: number; postPx: number; targetW: number; targetH: number; samples: number }
 export interface GateSample { scene: string; quality: Quality; viewports: GateViewport[] }
 
 /** `postPxRatio` = pixels escritos pelos passes de pós ÷ pixels do alvo da cena: não depende da resolução em que se mediu. */
@@ -20,8 +20,39 @@ export const GATE_SCENES: ReadonlyArray<{ id: string; track: string; humans: num
   { id: 'sampa-4p', track: 'sampa_noite', humans: 4 },
 ];
 
-/** Limites provisórios por cena e qualidade (preenchidos com a contagem medida + margem). */
-export const GATE_LIMITS: GateLimits = {};
+/**
+ * Limites provisórios por cena e qualidade: a contagem medida no swiftshader (10/10/2026, tools/render-harness.lab.ts, 640×360, a
+ * largada de 300 ticks) com margem de 25% em chamadas e triângulos, +1 passe (o desfoque radial só liga em velocidade alta) e +1× no
+ * preenchimento de pós (o mesmo motivo) mais 10%. A Baixa não tem pós: passes e pixels 0. NÃO são metas de FPS: quem diz se cabe no
+ * Deck é o `--bench` do dono. Cena nova ou degrau novo: medir (`node tools/render-harness.collect.mjs`, docs/ondas/L/L2.md §11) e escrever aqui.
+ */
+export const GATE_LIMITS: GateLimits = {
+  'copa-1p': {
+    low: { calls: 38, triangles: 173000, passes: 0, postPxRatio: 0 },
+    medium: { calls: 75, triangles: 315000, passes: 5, postPxRatio: 5.8 },
+    high: { calls: 78, triangles: 340000, passes: 5, postPxRatio: 7.1 },
+    ultra: { calls: 78, triangles: 340000, passes: 5, postPxRatio: 8.7 },
+  },
+  'copa-2p': {
+    low: { calls: 39, triangles: 174000, passes: 0, postPxRatio: 0 },
+    medium: { calls: 77, triangles: 315000, passes: 5, postPxRatio: 5.8 },
+    high: { calls: 79, triangles: 340000, passes: 5, postPxRatio: 7.1 },
+    ultra: { calls: 79, triangles: 340000, passes: 5, postPxRatio: 8.7 },
+  },
+  'copa-4p': {
+    low: { calls: 42, triangles: 174000, passes: 0, postPxRatio: 0 },
+    medium: { calls: 79, triangles: 316000, passes: 5, postPxRatio: 5.8 },
+    high: { calls: 78, triangles: 340000, passes: 4, postPxRatio: 5.4 },
+    ultra: { calls: 82, triangles: 340000, passes: 5, postPxRatio: 8.7 },
+  },
+  'sampa-4p': {
+    low: { calls: 50, triangles: 160000, passes: 0, postPxRatio: 0 },
+    medium: { calls: 89, triangles: 306000, passes: 5, postPxRatio: 5.8 },
+    high: { calls: 88, triangles: 323000, passes: 4, postPxRatio: 5.4 },
+    ultra: { calls: 92, triangles: 323000, passes: 5, postPxRatio: 8.7 },
+  },
+};
+
 
 const LEVELS: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
@@ -45,33 +76,27 @@ export function checkGate(samples: readonly GateSample[], limits: GateLimits): s
   return out;
 }
 
-/** O pior viewport de uma amostra em cada conta. */
-function worst(s: GateSample): { calls: number; passes: number; postPxRatio: number } {
-  let calls = 0; let passes = 0; let postPxRatio = 0;
-  for (const v of s.viewports) {
-    calls = Math.max(calls, v.calls); passes = Math.max(passes, v.passes);
-    postPxRatio = Math.max(postPxRatio, v.postPx / Math.max(1, v.targetW * v.targetH));
-  }
-  return { calls, passes, postPxRatio };
+/** Preenchimento por pixel do viewport: a cena (× as amostras do MSAA) mais o que os passes de pós escrevem. */
+export function fillCost(v: GateViewport): number {
+  const target = Math.max(1, v.targetW * v.targetH);
+  return Math.max(1, v.samples) + v.postPx / target;
 }
 
 /**
- * A ordem de custo entre degraus vizinhos, por cena: passes e pixels de pós nunca caem de um degrau para o seguinte, e a Média não
- * chama mais que a Alta (o Ultra pode: o AO em resolução cheia não acrescenta chamadas, mas a Alta ganha o desfoque radial só no passe).
+ * A ordem de custo entre degraus vizinhos, por cena: o preenchimento por pixel (`fillCost`) nunca cai de um degrau para o seguinte. Não
+ * se compara passe a passe nem pixel de pós a pixel de pós: a Média troca o MSAA por um FXAA (um passe cheio a mais, nenhuma amostra a
+ * mais) e pode escrever mais pixels de pós que a Alta sem AO, e a Alta ainda custa mais pelas amostras do alvo.
  */
 export function checkCostOrder(samples: readonly GateSample[]): string[] {
   const out: string[] = [];
   const scenes = [...new Set(samples.map((s) => s.scene))];
   for (const scene of scenes) {
-    const byLevel = new Map<Quality, ReturnType<typeof worst>>();
-    for (const s of samples) if (s.scene === scene) byLevel.set(s.quality, worst(s));
+    const byLevel = new Map<Quality, number>();
+    for (const s of samples) if (s.scene === scene) byLevel.set(s.quality, Math.max(...s.viewports.map(fillCost)));
     for (let i = 1; i < LEVELS.length; i++) {
-      const a = byLevel.get(LEVELS[i - 1]); const b = byLevel.get(LEVELS[i]);
-      if (!a || !b) continue;
-      const lo = LEVELS[i - 1]; const hi = LEVELS[i];
-      if (a.passes > b.passes) out.push(`${scene}: passes ${lo} (${a.passes}) > ${hi} (${b.passes})`);
-      if (a.postPxRatio > b.postPxRatio + 1e-9) out.push(`${scene}: pixels de pós ${lo} (${a.postPxRatio.toFixed(2)}×) > ${hi} (${b.postPxRatio.toFixed(2)}×)`);
-      if (lo === 'medium' && a.calls > b.calls) out.push(`${scene}: chamadas ${lo} (${a.calls}) > ${hi} (${b.calls})`);
+      const lo = byLevel.get(LEVELS[i - 1]); const hi = byLevel.get(LEVELS[i]);
+      if (lo === undefined || hi === undefined) continue;
+      if (lo > hi + 1e-9) out.push(`${scene}: preenchimento ${LEVELS[i - 1]} (${lo.toFixed(2)}×) > ${LEVELS[i]} (${hi.toFixed(2)}×)`);
     }
   }
   return out;

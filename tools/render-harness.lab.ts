@@ -115,7 +115,7 @@ function collect(): { samples: GateSample[]; frames: Array<{ scene: string; qual
         return {
           calls: Math.max(...vs.map((v) => v.calls)), triangles: Math.max(...vs.map((v) => v.triangles)),
           passes: Math.max(...vs.map((v) => v.passes)), postPx: Math.max(...vs.map((v) => v.postPx)),
-          targetW: vs[0].targetW, targetH: vs[0].targetH,
+          targetW: vs[0].targetW, targetH: vs[0].targetH, samples: vs[0].samples,
         };
       });
       samples.push({ scene: s.id, quality, viewports });

@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { checkCostOrder, checkGate, GATE_LIMITS, GATE_SCENES, type GateSample } from '../src/bench/gate';
+import { checkCostOrder, checkGate, fillCost, GATE_LIMITS, GATE_SCENES, type GateSample } from '../src/bench/gate';
 import type { Quality } from '../src/game/contracts';
 import type { DebugInfo } from '../src/render/renderer';
 
@@ -151,7 +151,7 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
     }
   });
 
-  it('cada degrau com pós tem passes e pixels de alvo; a Baixa não tem nenhum', async () => {
+  it('cada degrau com pós tem passes e pixels de alvo, o preenchimento sobe a cada degrau e a Baixa não tem pós', async () => {
     const data = await collect();
     for (const s of GATE_SCENES) {
       const por = (q: Quality) => data.samples.find((x) => x.scene === s.id && x.quality === q);
@@ -159,10 +159,11 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
       if (!low || !medium || !high || !ultra) throw new Error(`faltou amostra de ${s.id}`);
       for (const v of low.viewports) expect([v.passes, v.postPx], `${s.id} baixa`).toEqual([0, 0]);
       for (const v of medium.viewports) { expect(v.passes, `${s.id} média`).toBeGreaterThanOrEqual(3); expect(v.postPx, `${s.id} média`).toBeGreaterThan(0); }
-      const px = (x: GateSample) => Math.max(...x.viewports.map((v) => v.postPx / (v.targetW * v.targetH)));
-      expect(px(high), `${s.id}: pixels de pós alta > média`).toBeGreaterThan(px(medium));
-      // O Ultra com AO cheio escreve mais pixels que a Alta quando a Alta tem AO em meia resolução (1 e 2 jogadores) ou nenhum (3 e 4).
-      expect(px(ultra), `${s.id}: pixels de pós ultra > alta`).toBeGreaterThan(px(high));
+      // O preenchimento por pixel (cena × amostras + pixels de pós) sobe a cada degrau; o Ultra tem o AO cheio a mais.
+      const fill = (x: GateSample) => Math.max(...x.viewports.map(fillCost));
+      expect(fill(medium), `${s.id}: média > baixa`).toBeGreaterThan(fill(low));
+      expect(fill(high), `${s.id}: alta > média`).toBeGreaterThan(fill(medium));
+      expect(fill(ultra), `${s.id}: ultra > alta`).toBeGreaterThan(fill(high));
     }
   });
 

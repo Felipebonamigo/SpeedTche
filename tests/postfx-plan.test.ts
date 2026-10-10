@@ -178,7 +178,7 @@ describe('sombra por viewport', () => {
 });
 
 describe('checkGate: a régua das contagens por viewport', () => {
-  const vp = { calls: 40, triangles: 100000, passes: 4, postPx: 2_000_000, targetW: 1280, targetH: 720 };
+  const vp = { calls: 40, triangles: 100000, passes: 4, postPx: 2_000_000, targetW: 1280, targetH: 720, samples: 4 };
   const sample = (over: Partial<typeof vp> = {}, quality: Quality = 'high'): GateSample => ({ scene: 'copa-1p', quality, viewports: [{ ...vp, ...over }] });
   const limits: GateLimits = { 'copa-1p': { high: { calls: 50, triangles: 120000, passes: 6, postPxRatio: 3 } } };
 
@@ -204,14 +204,13 @@ describe('checkGate: a régua das contagens por viewport', () => {
     expect(checkGate([{ ...sample(), scene: 'marte' }], limits).join('\n')).toMatch(/sem limite para marte\/high/);
   });
 
-  it('a ordem de custo: passes e pixels de pós nunca caem de um degrau para o seguinte, e a Média não chama mais que a Alta', () => {
+  it('a ordem de custo: o preenchimento por pixel (cena × amostras do MSAA + pixels de pós) nunca cai de um degrau para o seguinte', () => {
     const mk = (quality: Quality, over: Partial<typeof vp>): GateSample => sample(over, quality);
-    const bom = [mk('low', { passes: 0, postPx: 0, calls: 30 }), mk('medium', { passes: 6, postPx: 1e6, calls: 40 }), mk('high', { passes: 10, postPx: 3e6, calls: 50 }), mk('ultra', { passes: 14, postPx: 5e6, calls: 50 })];
+    // A Média troca o MSAA por FXAA (um passe a mais, nenhuma amostra a mais): ela pode ter MAIS pixels de pós que a Alta sem AO, e o
+    // preenchimento total continua subindo.
+    const bom = [mk('low', { passes: 0, postPx: 0, samples: 0 }), mk('medium', { passes: 4, postPx: 4.2 * 921600, samples: 0 }), mk('high', { passes: 3, postPx: 3.9 * 921600, samples: 4 }), mk('ultra', { passes: 4, postPx: 6.9 * 921600, samples: 4 })];
     expect(checkCostOrder(bom)).toEqual([]);
-    const ruim = [mk('low', { passes: 0, postPx: 0 }), mk('medium', { passes: 9, postPx: 4e6, calls: 60 }), mk('high', { passes: 8, postPx: 3e6, calls: 50 })];
-    const erros = checkCostOrder(ruim).join('\n');
-    expect(erros).toMatch(/copa-1p.*passes.*medium.*high/);
-    expect(erros).toMatch(/copa-1p.*pixels de pós.*medium.*high/);
-    expect(erros).toMatch(/copa-1p.*chamadas.*medium.*high/);
+    const ruim = [mk('low', { passes: 0, postPx: 0, samples: 0 }), mk('medium', { passes: 9, postPx: 6 * 921600, samples: 0 }), mk('high', { passes: 3, postPx: 3 * 921600, samples: 0 })];
+    expect(checkCostOrder(ruim).join('\n')).toMatch(/copa-1p: preenchimento medium \(7\.00×\) > high \(4\.00×\)/);
   });
 });
