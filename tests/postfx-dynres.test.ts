@@ -1,7 +1,7 @@
 // Onda L, L2: a resolução dinâmica (controle puro; o renderizador a aplica no alvo de tamanho fixo, conferido em tests/gl-render.test.ts).
 // Degraus, histerese LONGA (cair só depois de ~2 s lentos, subir só depois de ~6 s de folga), um degrau por vez, sem oscilar.
 import { describe, expect, it } from 'vitest';
-import { DYNRES_STEPS, DynamicResolution } from '../src/render/postfx/dynres';
+import { DYNRES_STEPS, DynamicResolution, dynamicResolutionDefault } from '../src/render/postfx/dynres';
 
 /** Alimenta o controle com quadros de `ms` por `seconds` segundos e devolve a escala no fim. */
 function feed(dr: DynamicResolution, ms: number, seconds: number): number {
@@ -86,5 +86,16 @@ describe('DynamicResolution', () => {
     const lento30 = new DynamicResolution({ targetMs: 1000 / 30 });
     expect(feed(lento30, 25, 6)).toBe(1); // 40 fps é folga para quem mira 30
     expect(feed(lento30, 45, 2.2)).toBe(0.85);
+  });
+});
+
+describe('dynamicResolutionDefault: desligada onde a imagem tem de ser reprodutível', () => {
+  it('liga no jogo, desliga sob automação (Playwright) e obedece ?dynres=0|1', () => {
+    expect(dynamicResolutionDefault('', false)).toBe(true);
+    expect(dynamicResolutionDefault('?nosurvey=1', false)).toBe(true);
+    expect(dynamicResolutionDefault('', true)).toBe(false);
+    expect(dynamicResolutionDefault('?dynres=0', false)).toBe(false);
+    expect(dynamicResolutionDefault('?x=1&dynres=1', true)).toBe(true);
+    expect(dynamicResolutionDefault('?dynres=10', false)).toBe(true); // valor torto: cai no padrão
   });
 });

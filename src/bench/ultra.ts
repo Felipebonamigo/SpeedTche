@@ -1,7 +1,8 @@
 // O nível Ultra no banco de prova (pedido do dono, 09/10/2026; docs/CRONOGRAMA.md, "Revisão visual", R1): alvo de uma
 // RTX 4070 Ti a 1440p com 120 fps ou mais. Aqui mora SÓ o registro (nome, meta, efeitos previstos e os parâmetros que
-// se espera deles) e a régua de medida. Os efeitos em si são da onda L (L2): enquanto `implemented` for falso em todos,
-// o Ultra mede a qualidade Alta desenhada em 1440p — a folga que sobra antes de pôr o primeiro efeito.
+// se espera deles) e a régua de medida. Os efeitos em si são da onda L (L2): `implemented` é verdadeiro só para o que tem código no
+// renderizador (src/render/postfx/; hoje o GTAO) e tests/postfx-plan.test.ts cobra que o registro bata com o plano do Ultra. O que
+// ainda é falso o Ultra não faz: o número dele é o dos efeitos que existem, e o aviso do relatório diz quantos são.
 // Puro: sem DOM e sem three (tests/bench.test.ts).
 import type { Quality } from '../game/contracts';
 
@@ -24,7 +25,7 @@ export interface UltraEffect {
 }
 
 export const ULTRA_EFFECTS: readonly UltraEffect[] = [
-  { id: 'gtao', label: 'Oclusão de ambiente (GTAO)', params: { samples: 16, radius: 1.2, resolutionScale: 1, denoise: true }, implemented: false },
+  { id: 'gtao', label: 'Oclusão de ambiente (GTAO)', params: { samples: 16, radius: 1.2, resolutionScale: 1, denoise: true }, implemented: true },
   { id: 'ssr', label: 'Reflexo em tela (água e asfalto molhado)', params: { maxSteps: 64, maxDistance: 80, resolutionScale: 0.5, surfaces: 'water,wet-asphalt' }, implemented: false },
   { id: 'volumetric-rays', label: 'Raios de sol volumétricos', params: { samples: 48, density: 0.35, resolutionScale: 0.5 }, implemented: false },
   { id: 'dof', label: 'Profundidade de campo (menus e pódio)', params: { where: 'menus+podium', bokehScale: 3, maxBlurPx: 12 }, implemented: false },

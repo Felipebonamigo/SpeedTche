@@ -346,6 +346,6 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     setDynamicResolution: (on: boolean) => { dynamic.setEnabled(on); if (!on) lastScale = 1; },
     pinDynamicScale: (scale: number | null) => { pinned = scale; },
     /** Só para depuração no harness (não faz parte do contrato). */
-    __scene: scene, __gl: renderer, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
+    __scene: scene, __gl: renderer, __pipes: pipes, __cams: cameras.map((c) => c.camera), __idle: idleCamera.camera,
   } as GameRenderer;
 }

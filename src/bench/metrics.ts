@@ -152,7 +152,7 @@ export function benchWarnings(r: BenchReport): string[] {
   if (r.ultra && r.runs.some((x) => x.quality === 'ultra')) {
     const { effectsPlanned: planned, effectsActive: active } = r.ultra;
     if (active.length < planned.length) {
-      out.push(`ultra: ${active.length} de ${planned.length} efeitos implementados; o número do Ultra é o da Alta desenhada em 1440p (a folga antes dos efeitos), não o do Ultra final`);
+      out.push(`ultra: ${active.length} de ${planned.length} efeitos implementados (ativos: ${active.join(', ') || 'nenhum'}); o número do Ultra é o dos efeitos que existem, não o do Ultra final`);
     }
   }
   return out;

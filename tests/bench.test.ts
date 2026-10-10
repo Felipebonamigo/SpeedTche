@@ -188,12 +188,13 @@ describe('Ultra: registro do nível', () => {
     expect(FLOOR_TARGET_FPS).toBe(60);
   });
 
-  it('os 7 efeitos previstos, ids únicos, cada um com parâmetros, e nenhum implementado ainda (é da L)', () => {
+  it('os 7 efeitos previstos, ids únicos, cada um com parâmetros; a L2 ligou só os que têm código (o GTAO), os outros ficam honestos', () => {
     expect(ULTRA_EFFECTS.map((e) => e.id)).toEqual(['gtao', 'ssr', 'volumetric-rays', 'dof', 'motion-blur', 'csm', 'taa']);
     for (const e of ULTRA_EFFECTS) expect(Object.keys(e.params).length, e.id).toBeGreaterThan(0);
     const csm = ULTRA_EFFECTS.find((e) => e.id === 'csm');
     expect(csm?.params).toMatchObject({ cascades: 4, mapSize: 4096 });
-    expect(ultraEffectsActive()).toEqual([]);
+    expect(ultraEffectsActive()).toContain('gtao');
+    for (const falta of ['ssr', 'csm', 'taa']) expect(ultraEffectsActive(), falta).not.toContain(falta);
   });
 
   it('o Ultra é uma qualidade do renderizador (L2): o nível e a qualidade são a mesma coisa', () => {

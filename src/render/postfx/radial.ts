@@ -22,8 +22,8 @@ void main() {
   vec2 d = vUv - uCenter;
   float r = length(d * vec2(uAspect, 1.0));
   // Nada no miolo; cheio perto da borda.
-  float mask = smoothstep(0.25, 0.85, r);
-  float k = uStrength * mask * 0.085;
+  float mask = smoothstep(0.3, 0.9, r);
+  float k = uStrength * mask * 0.05;
   vec3 acc = vec3(0.0);
   for (int i = 0; i < TAPS; i++) {
     float t = float(i) / float(TAPS - 1);
