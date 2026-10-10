@@ -1,0 +1,47 @@
+/* A roda de frases e os balões de fala (N6; src/voice/hud.ts). Overlay sobre o HUD: tudo escala por --s (uiScale do viewport) e
+   o tamanho do HUD das opções (--hud-scale). Texto nunca abaixo de 12 px efetivos (piso do HUD). Balão branco de gibi, com o
+   contorno na cor de quem falou; a ponta aponta para o carro. */
+.vh-root { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; font-family: var(--font-display, inherit); }
+.vh-root.hidden { display: none; }
+.vh-vp { position: absolute; overflow: hidden; --s: 1; --accent: #ffd23f; }
+
+.vh-balloon { display: none; box-sizing: border-box; max-width: calc(300px * var(--s)); padding: calc(7px * var(--s)) calc(16px * var(--s)); border-radius: calc(18px * var(--s));
+  background: #fff; color: #10142a; border: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent)); box-shadow: 0 calc(4px * var(--s)) 0 rgba(0, 0, 0, 0.35);
+  font-weight: 800; line-height: 1.15; text-align: center; text-wrap: balance;
+  animation: vh-pop 260ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.vh-balloon.show { display: block; }
+.vh-balloon .vh-text { font-size: max(12px, calc(19px * var(--s))); }
+.vh-balloon .vh-who { display: block; font-size: max(12px, calc(12px * var(--s))); letter-spacing: 0.06em; color: color-mix(in srgb, var(--who, var(--accent)) 65%, #10142a); }
+
+/* O do próprio falante: em cima do carro dele (o carro fica no centro da tela, um pouco abaixo do meio), ponta para baixo. */
+.vh-own { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -100%); }
+.vh-own::after { content: ''; position: absolute; left: 50%; bottom: calc(-11px * var(--s)); width: calc(16px * var(--s)); height: calc(16px * var(--s)); background: #fff;
+  border-right: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent)); border-bottom: max(2px, calc(3px * var(--s))) solid var(--who, var(--accent));
+  transform: translateX(-50%) rotate(45deg); }
+
+/* Os de outros (outro assento, outro computador, o rival): no alto, com o nome. */
+.vh-top { position: absolute; left: 50%; top: calc(150px * var(--s)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: calc(6px * var(--s)); width: max-content; max-width: 86%; }
+.vh-other { position: relative; }
+
+/* A roda: 8 frases em 2 colunas, a marcada em destaque. */
+.vh-wheel { display: none; position: absolute; left: calc(18px * var(--s)); top: 50%; transform: translateY(-50%); box-sizing: border-box; padding: calc(10px * var(--s)) calc(12px * var(--s));
+  border-radius: calc(18px * var(--s)); background: rgba(14, 18, 40, 0.92); border: max(2px, calc(3px * var(--s))) solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 calc(5px * var(--s)) 0 color-mix(in srgb, var(--accent) 58%, #05070f), 0 calc(9px * var(--s)) calc(20px * var(--s)) rgba(0, 0, 0, 0.45);
+  color: #f6f8ff; max-width: calc(100% - 36px * var(--s)); }
+.vh-wheel.open { display: block; animation: vh-pop 220ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.vh-title { font-size: max(12px, calc(13px * var(--s))); font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: calc(6px * var(--s)); }
+.vh-grid { display: grid; grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: calc(4px * var(--s)) calc(8px * var(--s)); }
+.vh-item { font-size: max(12px, calc(16px * var(--s))); font-weight: 800; padding: calc(3px * var(--s)) calc(10px * var(--s)); border-radius: calc(10px * var(--s));
+  border: max(2px, calc(2px * var(--s))) solid transparent; white-space: nowrap; color: #dfe4f7; }
+.vh-item.on { background: #fff; color: #10142a; border-color: var(--accent); }
+.vh-item.on::before { content: '▶ '; }
+.vh-wait { font-size: max(12px, calc(14px * var(--s))); font-weight: 800; color: #ffb4a8; margin-top: calc(6px * var(--s)); }
+.vh-wait:empty { display: none; }
+.vh-wheel.wait .vh-item { opacity: 0.5; }
+.vh-hint { font-size: max(12px, calc(12px * var(--s))); color: #b4bdd8; font-weight: 700; margin-top: calc(6px * var(--s)); }
+
+@keyframes vh-pop { 0% { transform: var(--vh-from, translate(0)) scale(0.6); opacity: 0; } 100% { opacity: 1; } }
+.vh-own { --vh-from: translate(-50%, -100%); }
+.vh-wheel { --vh-from: translateY(-50%); }
+.vh-vp.calm .vh-balloon, .vh-vp.calm .vh-wheel.open { animation: none; }
+@media (prefers-reduced-motion: reduce) { .vh-balloon, .vh-wheel.open { animation: none; } }

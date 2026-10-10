@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionAudio } from '../src/audio/audio';
 import type { MenuContext, MenuNav, MenuScreen, Menus, Renderer } from '../src/game/contracts';
 import { createSession, type Session } from '../src/game/session';
+import { createRivalTalk } from '../src/game/rival-talk';
 import { TAUNT_MIN_GAP_TICKS, TAUNT_SHOW_SECONDS, WHEEL_OPEN_SECONDS, tauntText } from '../src/voice/voice';
 import { human } from './helpers';
 
@@ -208,5 +209,44 @@ describe('sessão: a roda e a frase', () => {
     w.down('Escape'); frame(); w.up('Escape'); frame();
     expect(session.paused).toBe(true);
     expect(voice().wheels[0].open).toBe(false);
+  });
+});
+
+describe('sessão: o rival da copa responde', () => {
+  it('depois de uma provocação, de vez em quando o rival responde com um balão dele (e uma buzinada do carro dele); sem rival, nunca', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.37);
+    startRacing();
+    const r = session.race!;
+    const me = r.state.cars.find((c) => c.seat === 0)!;
+    /** O rival é o carro da IA mais perto do humano (a resposta só vale a até 3 posições), com a conversa dele ligada. */
+    const pickRival = () => {
+      const rival = r.state.cars.filter((c) => c.seat < 0).sort((a, b) => Math.abs(a.position - me.position) - Math.abs(b.position - me.position))[0];
+      r.state.config.rival = rival.name;
+      r.talk = createRivalTalk(null);
+      r.talk.introDone = true; // a apresentação dele é outra fala, e já passou
+      return rival;
+    };
+    const say = () => { w.down('KeyH'); frames(Math.ceil(WHEEL_OPEN_SECONDS * 60) + 3); w.down('KeyM'); frame(); w.up('KeyM'); frame(); w.up('KeyH'); frames(3); };
+    // Sem rival (corrida rápida): ninguém responde.
+    r.state.config.rival = undefined;
+    r.talk = null;
+    say();
+    expect(voice().balloons.map((b) => b.seat)).toEqual([0]);
+    session.debugStep(TAUNT_MIN_GAP_TICKS + 120);
+    let reply: { seat: number; name: string; text: string; own: boolean } | undefined;
+    let rival = pickRival();
+    for (let attempt = 0; attempt < 40 && !reply; attempt++) {
+      rival = pickRival();
+      say();
+      reply = voice().balloons.find((b) => b.seat === -1);
+      if (!reply) session.debugStep(TAUNT_MIN_GAP_TICKS + 30);
+    }
+    expect(reply, 'o rival nunca respondeu em 40 tentativas').toBeDefined();
+    expect(reply).toMatchObject({ seat: -1, name: rival.name, own: false });
+    expect(reply?.text.length).toBeGreaterThan(5);
+    expect(horn).toHaveBeenCalledWith(rival.carId, expect.any(Number));
+    // A resposta conta como fala dele: a conversa guarda o intervalo mínimo.
+    expect(session.race?.talk?.lines).toBe(1);
+    vi.restoreAllMocks();
   });
 });

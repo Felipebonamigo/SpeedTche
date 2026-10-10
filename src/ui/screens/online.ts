@@ -22,6 +22,7 @@ import { icon, medal } from './icons';
 import './online.css';
 import { paintSelector, paintSwatch } from './paint';
 import { assistMark } from './results';
+import { createMuteModel } from '../../voice/mute';
 
 type View = 'connect' | 'connecting' | 'lobby' | 'quit' | 'results' | 'error';
 
@@ -277,7 +278,14 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
       refreshers.push(() => { hint.textContent = online!.ready ? t('online.lobby.guestReady') : t('online.lobby.guestHint'); });
     }
     const leaveBtn = button(t('online.lobby.leave'), () => online!.leave(), 'btn-danger btn-online-leave');
-    items.push(mainBtn, leaveBtn);
+    // Voz dos outros (N6): silenciar a buzina e as frases de um jogador de outro computador, só neste computador (voice/prefs.ts).
+    const muteModel = createMuteModel(remoteNames);
+    const muteSel = selector(muteModel.label(), () => muteModel.value(), (d) => muteModel.step(d), {
+      sfx: api.sfx, cls: 'online-mute', onActivate: () => { muteModel.toggle(); muteSel.refresh(); api.sfx('confirm'); },
+    });
+    muteSel.el.title = t('voice.mute.title');
+    refreshers.push(() => muteSel.refresh());
+    items.push(muteSel, mainBtn, leaveBtn);
 
     // Lista da sala (quem está em cada computador).
     const roster = h('div', { class: 'online-roster' });
@@ -317,6 +325,7 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
           ),
           h('h2', { class: 'sub-title online-players-title' }, h('span', { text: t('online.lobby.players') }), count),
           roster,
+          muteSel.el,
         ),
       ),
     );
@@ -334,6 +343,15 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
 
   function deviceLabel(device: DeviceId): string {
     return ctx.input.devices().find((d) => d.id === device)?.label ?? device;
+  }
+
+  /** Os nomes (como a sala os mostra) dos jogadores de OUTROS computadores: a quem o jogador pode silenciar a voz. */
+  function remoteNames(): string[] {
+    const room = online!.room;
+    if (!room) return [];
+    const seats = assignSeats(room);
+    return [...room.clients].filter((c) => c.id !== online!.myId).sort((a, b) => a.id - b.id).flatMap((c) =>
+      (c.info?.players ?? []).map((p, i) => seatName(p.name, seats.filter((s) => s.client === c.id)[i]?.seat ?? 0)));
   }
 
   function renderRoster(root: HTMLElement): void {

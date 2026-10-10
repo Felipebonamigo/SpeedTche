@@ -19,10 +19,11 @@ registerStrings('voice', {
     'wheel.label': 'Roda de frases de {name}',
     'balloon.label': '{name} diz: {text}',
 
-    'mute.on': 'Silenciar',
-    'mute.off': 'Ouvir',
-    'mute.title': 'Silenciar a buzina e as frases de {name} neste computador',
-    'mute.titleOff': 'Voltar a ouvir a buzina e as frases de {name}',
+    'mute.label': 'Voz dos outros',
+    'mute.heard': '{name}: ouvindo',
+    'mute.silenced': '{name}: silenciado',
+    'mute.none': '—',
+    'mute.title': 'Setas escolhem o jogador; Enter silencia ou volta a ouvir a buzina e as frases dele neste computador',
   },
   en: {
     'taunt.0': 'Eat my dust!',
@@ -40,9 +41,10 @@ registerStrings('voice', {
     'wheel.label': '{name}’s phrase wheel',
     'balloon.label': '{name} says: {text}',
 
-    'mute.on': 'Mute',
-    'mute.off': 'Unmute',
-    'mute.title': 'Mute {name}’s horn and phrases on this computer',
-    'mute.titleOff': 'Hear {name}’s horn and phrases again',
+    'mute.label': 'Others’ voice',
+    'mute.heard': '{name}: heard',
+    'mute.silenced': '{name}: muted',
+    'mute.none': '—',
+    'mute.title': 'Arrows pick the player; Enter mutes or unmutes their horn and phrases on this computer',
   },
 });

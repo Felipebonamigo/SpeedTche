@@ -9,7 +9,8 @@ import type { RaceState } from '../src/core/types';
 import { setLanguage } from '../src/i18n';
 import { rivalLine } from '../src/game/rivals';
 import {
-  createRivalTalk, HOLD_TICKS, INTRO_DELAY_TICKS, MAX_LINES, MIN_GAP_SECONDS, observeRivalTalk, rivalByName, rivalTalkText,
+  createRivalTalk, HOLD_TICKS, INTRO_DELAY_TICKS, MAX_LINES, MIN_GAP_SECONDS, observeRivalTalk, REPLY_PERCENT, REPLY_RANGE, replyRoll, rivalByName,
+  rivalReply, rivalTalkText,
 } from '../src/game/rival-talk';
 import { human, quickRace, skipCountdown } from './helpers';
 
@@ -135,5 +136,113 @@ describe('o texto da fala', () => {
     for (const kind of ['intro', 'taunt', 'respect', 'revenge'] as const) {
       expect(rivalTalkText(rival, kind)).not.toMatch(/rivals\./);
     }
+  });
+});
+
+// ───────────────────────────── N6: o rival responde à provocação ─────────────────────────────
+// Quando um humano manda uma frase (balão), o rival da copa, se está por perto, responde de vez em quando — com o mesmo intervalo
+// mínimo (25 s) e o mesmo teto (4 falas) das falas dele, e com um dado que sai do tick (sem `state.rng`: é só apresentação).
+
+describe('o rival responde à provocação (N6)', () => {
+  /** Avança o relógio até um tick em que o dado manda (ou não) responder. */
+  function atRoll(state: RaceState, seat: number, want: 'yes' | 'no'): void {
+    while ((replyRoll(state.tick, seat) < REPLY_PERCENT) !== (want === 'yes')) state.tick++;
+  }
+
+  it('o dado é determinístico, vai de 0 a 99 e manda responder em ~60% dos ticks', () => {
+    let yes = 0;
+    for (let tick = 0; tick < 3000; tick++) {
+      const r = replyRoll(tick, 0);
+      expect(r).toBe(replyRoll(tick, 0));
+      expect(r).toBeGreaterThanOrEqual(0);
+      expect(r).toBeLessThan(100);
+      if (r < REPLY_PERCENT) yes++;
+    }
+    expect(REPLY_PERCENT).toBe(60);
+    expect(yes / 3000).toBeGreaterThan(0.5);
+    expect(yes / 3000).toBeLessThan(0.7);
+  });
+
+  it('responde quando o dado manda, com a fala "taunt" se está à frente e "revenge" se está atrás', () => {
+    const s = scene();
+    s.state.tick += 1000;
+    atRoll(s.state, 0, 'yes');
+    s.setAhead(0, true);
+    expect(rivalReply(s.mem, s.state, 0)).toBe('taunt');
+    const t = scene();
+    t.state.tick += 1000;
+    atRoll(t.state, 0, 'yes');
+    t.setAhead(0, false);
+    expect(rivalReply(t.mem, t.state, 0)).toBe('revenge');
+  });
+
+  it('quando o dado manda calar, não responde — e não gasta o intervalo nem o teto', () => {
+    const s = scene();
+    s.state.tick += 1000;
+    atRoll(s.state, 0, 'no');
+    expect(rivalReply(s.mem, s.state, 0)).toBeNull();
+    expect(s.mem.lines).toBe(0);
+    atRoll(s.state, 0, 'yes');
+    expect(rivalReply(s.mem, s.state, 0)).not.toBeNull();
+  });
+
+  it('só responde a quem está a até REPLY_RANGE posições dele', () => {
+    const s = scene();
+    s.state.tick += 1000;
+    atRoll(s.state, 0, 'yes');
+    s.rivalCar.position = s.humans[0].position + REPLY_RANGE + 1;
+    expect(rivalReply(s.mem, s.state, 0)).toBeNull();
+    s.rivalCar.position = s.humans[0].position + REPLY_RANGE;
+    expect(rivalReply(s.mem, s.state, 0)).not.toBeNull();
+  });
+
+  it('respeita o intervalo mínimo de 25 s e o teto de falas por corrida (as falas normais contam junto)', () => {
+    const s = scene();
+    s.state.tick += 1000;
+    atRoll(s.state, 0, 'yes');
+    expect(rivalReply(s.mem, s.state, 0)).not.toBeNull();
+    expect(s.mem.lines).toBe(1);
+    const first = s.state.tick;
+    // Dentro do intervalo: calado em todo tick em que o dado mandaria responder.
+    let tried = 0;
+    for (let tick = first + 1; tick < first + MIN_GAP_SECONDS * TICK_RATE; tick++) {
+      if (replyRoll(tick, 0) >= REPLY_PERCENT) continue;
+      s.state.tick = tick;
+      expect(rivalReply(s.mem, s.state, 0), `tick +${tick - first}`).toBeNull();
+      tried++;
+    }
+    expect(tried).toBeGreaterThan(500);
+    s.state.tick = first + MIN_GAP_SECONDS * TICK_RATE;
+    atRoll(s.state, 0, 'yes');
+    expect(rivalReply(s.mem, s.state, 0)).not.toBeNull();
+    // Teto: com MAX_LINES falas já ditas, nunca mais.
+    s.mem.lines = MAX_LINES;
+    s.state.tick += 100 * TICK_RATE;
+    atRoll(s.state, 0, 'yes');
+    expect(rivalReply(s.mem, s.state, 0)).toBeNull();
+  });
+
+  it('sem rival, com o rival fora do grid ou já na linha de chegada, ou fora da corrida, não responde', () => {
+    const base = () => { const s = scene(); s.state.tick += 1000; atRoll(s.state, 0, 'yes'); return s; };
+    const a = base(); a.state.config.rival = undefined;
+    expect(rivalReply(a.mem, a.state, 0)).toBeNull();
+    const b = base(); b.state.config.rival = 'Ninguém Aqui';
+    expect(rivalReply(b.mem, b.state, 0)).toBeNull();
+    const c = base(); c.rivalCar.finished = true;
+    expect(rivalReply(c.mem, c.state, 0)).toBeNull();
+    const d = base(); d.state.phase = 'countdown';
+    expect(rivalReply(d.mem, d.state, 0)).toBeNull();
+    const e = base(); e.humans[0].finished = true;
+    expect(rivalReply(e.mem, e.state, 0)).toBeNull();
+    expect(rivalReply(base().mem, base().state, 3)).toBeNull(); // assento que não existe
+  });
+
+  it('não mexe no estado da corrida', () => {
+    const s = scene();
+    s.state.tick += 1000;
+    atRoll(s.state, 0, 'yes');
+    const before = JSON.stringify(s.state);
+    rivalReply(s.mem, s.state, 0);
+    expect(JSON.stringify(s.state)).toBe(before);
   });
 });

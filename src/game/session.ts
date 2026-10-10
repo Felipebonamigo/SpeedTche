@@ -27,6 +27,7 @@ import { createInput } from '../ui/input';
 import { createMenus } from '../ui/menus';
 import { createOnlineHud } from '../ui/screens/online';
 import { addBalloon, ageBalloons, audibleFor, createVoiceRace, hornGain, newWheel, observeVoice, stepWheel, tauntCooldownTicks, tauntText, TAUNT_SHOW_SECONDS, type VoiceCue, type VoiceRace } from '../voice/voice';
+import { createVoiceHud, type VoiceHud } from '../voice/hud';
 import { isMuted } from '../voice/prefs';
 import { createTutorialPanel } from '../ui/screens/tutorial';
 import { newTelemetry, type RaceTelemetry } from './achievements';
@@ -36,8 +37,8 @@ import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menu
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
-import { cupDuels, gridRival } from './rivals';
-import { createRivalTalk, observeRivalTalk, rivalByName, rivalTalkText, type RivalTalk } from './rival-talk';
+import { cupDuels, gridRival, rivalLine } from './rivals';
+import { createRivalTalk, observeRivalTalk, rivalByName, rivalReply, rivalTalkText, type RivalTalk } from './rival-talk';
 import { createOnlineController, type OnlineController } from './online-session';
 import { createPartySession, isPartyRaceMode } from './party-session';
 import { racePaints, withoutPaint } from './paints';
@@ -56,6 +57,10 @@ const MAX_STEPS_PER_FRAME = 4;
 const RESULTS_DELAY = 3.0;
 /** Quanto tempo a fala do rival fica no HUD (uma frase de ~80 caracteres, lida do sofá). */
 const RIVAL_LINE_TTL = 4.5;
+/** A resposta do rival à provocação (N6) é uma fala dele, mais comprida que as frases prontas: o balão dura mais, e a buzinada dele soa mais baixo. */
+const RIVAL_REPLY_TTL = 3.5;
+const RIVAL_REPLY_HORN_GAIN = 0.5;
+const RIVAL_COLOR = '#ff4d4d';
 /** Conquista no HUD: fica até o resultado cobrir a corrida. */
 const ACHIEVEMENT_TTL = RESULTS_DELAY + 0.5;
 
@@ -152,6 +157,8 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   let elapsed = 0;
   let running = false;
   let rafId = 0;
+  /** Roda de frases e balões (voice/hud.ts): criado na primeira vez que alguém fala ou abre a roda; nunca em Node. */
+  let voiceHud: VoiceHud | null = null;
   let idleTrack: Track = getTrack(TRACKS[0].id);
   let idleTimer = 0;
 
@@ -495,6 +502,15 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     if (!audibleFor(local, name, isMuted)) return;
     if (cue.type === 'horn') { audio.horn?.(cue.carId, hornGain(local)); return; } // dublês de teste podem não ter
     addBalloon(r.voice, { seat: cue.seat, name, color: seatColor(cue.seat, settings.colorPalette), text: tauntText(cue.index), ttl: TAUNT_SHOW_SECONDS, own: local });
+    // O rival da copa responde de vez em quando a quem o provoca (rival-talk.ts: mesmo intervalo mínimo e teto das falas dele).
+    const rivalName = r.state.config.rival;
+    const kind = local && r.talk && rivalName ? rivalReply(r.talk, r.state, cue.seat) : null;
+    if (kind && rivalName) {
+      const rival = rivalByName(rivalName);
+      addBalloon(r.voice, { seat: -1, name: rival.name, color: RIVAL_COLOR, text: rivalLine(rival, kind), ttl: RIVAL_REPLY_TTL, own: false });
+      const rivalCar = r.state.cars.find((c) => c.seat < 0 && c.name === rivalName);
+      if (rivalCar) audio.horn?.(rivalCar.carId, RIVAL_REPLY_HORN_GAIN);
+    }
   }
 
   function stepOnce(r: ActiveRace, inputs: PlayerInput[]): void {
@@ -537,6 +553,21 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       ghost: r.ghost?.frame(r.state),
       paints: r.paints,
     };
+  }
+
+  /** O overlay de voz: só nasce quando há algo a mostrar (roda aberta ou balão vivo) e some com a corrida. */
+  function drawVoice(r: ActiveRace | null, f: RenderFrame | null): void {
+    if (!r || !f) { voiceHud?.hide(); return; }
+    const wheels = f.viewports.map((vp) => {
+      const w = r.voice.wheels[vp.seat];
+      if (!w || !w.open) return null;
+      return { selected: w.selected, wait: tauntCooldownTicks(r.voice.mem, vp.seat, r.state.tick) / TICK_RATE };
+    });
+    if (!voiceHud && (r.voice.balloons.length > 0 || wheels.some((w) => w !== null))) voiceHud = createVoiceHud(hudRoot);
+    voiceHud?.update({
+      width: window.innerWidth, height: window.innerHeight, viewports: f.viewports.map((vp) => ({ seat: vp.seat, color: vp.color, name: vp.name })), wheels,
+      balloons: r.voice.balloons, paused: session.paused || !f.showHud, reduceEffects: f.options.reduceEffects === true,
+    });
   }
 
   function frame(now: number): void {
@@ -593,10 +624,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       const f = buildFrame(r);
       renderer.render(f);
       audio.update(session.paused ? { ...f, paused: true } : f, dtRaw);
+      drawVoice(r, f);
     } else {
       idleTimer += dtRaw;
       renderer.renderIdle(idleTimer, idleTrack);
       audio.update(null, dtRaw);
+      drawVoice(null, null);
     }
 
     // Só o menu que já estava aberto recebe as bordas deste quadro: a pausa (ou o resultado) que

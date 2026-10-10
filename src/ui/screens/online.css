@@ -248,3 +248,4 @@
   .online-room { grid-column: 1 / 3; }
   /* Os dois cartões (criar/entrar) seguem lado a lado: a caixa mede o mesmo em --u, e empilhados o VOLTAR saía da tela em 1024×640. */
 }
+.online-mute { margin-top: calc(8 * var(--u)); }
