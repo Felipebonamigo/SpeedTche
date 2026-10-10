@@ -689,7 +689,7 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         const lat = 26 + h(201) * 50;
         const id = pickWeighted(recipe.scatter, h(202));
         const r = footprintOf(id);
-        if (!(inner && lat < 60 && (id.startsWith('cactus:saguaro') || id === 'termite')) && occ.free(i, side, lat - r, lat + r, 0)) {
+        if (!(inner && lat < 60 && (id.startsWith('cactus:saguaro') || id === 'cactus:mandacaru' || id === 'termite')) && occ.free(i, side, lat - r, lat + r, 0)) {
           const sc = 0.7 + h(203) * 0.6;
           put(i, id, side * lat, h(204), { yaw: h(205) * 6.28, sx: sc, sy: sc, sz: sc, maxAhead: 150, rank: 0.02 + h(206) * 0.98 });
           occ.mark(i, side, lat - r, lat + r, 0);

@@ -34,15 +34,21 @@ function flat(geometry: Geo, blob: number, shadow = true): Model {
  * achatado. Bolha pequena (< 0,45 m, poucos pixels) fica com o de 20 faces.
  */
 function blob(r: number, x: number, y: number, z: number, color: string, seed: number, sy = 0.8, amount = 0.12): Geo {
-  return paint(lumpy(ico(r, r < 0.45 ? 0 : 1), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
+  return paint(lumpy(ico(r, cloudDetail(r)), amount, seed), color, tf(x, y, z, 1, sy, 1, 0, hash2(seed, 3) * 6.28, 0));
 }
+
+/**
+ * Detalhe do icosaedro de uma bolha de copa pelo raio (vegetação-nuvem, M3): a bolha grande (≥ 0,9 m) é a que mostra a silhueta e vai a 180 faces
+ * (faceta 13°; a de 80 faces tinha 20°); a média (0,45 a 0,9 m) fica em 80, a pequena em 20 (poucos pixels).
+ */
+export function cloudDetail(r: number): 0 | 1 | 2 { return r < 0.45 ? 0 : r < 0.9 ? 1 : 2; }
 
 /** Uma bolha de copa (os parâmetros de `blob`). */
 interface Puff { r: number; x: number; y: number; z: number; color: string; seed: number; sy?: number; amount?: number }
 
 /** O sólido garantido dentro da bolha: o elipsoide dela encolhido pela deformação e pela corda das faces. */
 function puffCore(b: Puff): Ellipsoid {
-  const m = (1 - 1.1 * (b.amount ?? 0.12)) * (b.r < 0.45 ? 0.78 : 0.92);
+  const m = (1 - 1.1 * (b.amount ?? 0.12)) * (b.r < 0.45 ? 0.78 : b.r < 0.9 ? 0.92 : 0.96);
   return { x: b.x, y: b.y, z: b.z, rx: b.r * m, ry: b.r * (b.sy ?? 0.8) * m, rz: b.r * m };
 }
 
@@ -103,6 +109,17 @@ function mound(reach: number, h: number, colors: string[], seed: number): Geo[] 
   return [mottle(g, 0.14, seed)];
 }
 
+/**
+ * Touceira de terra seca no pé de um cacto do sertão: um domo baixo de 14 lados cujo anel de baixo JÁ está na pegada e cuja parede sobe a 9 cm (acima
+ * do 5 cm em que a faixa do carro começa) antes de se fechar — sem o relevo sorteado da `mound`, que num domo de 30 cm deixava a borda na faixa a 75%
+ * do raio. Mesma pegada em qualquer giro (14 lados: a menor borda é 97,5% do raio).
+ */
+function soil(reach: number, h: number, colors: string[], seed: number): Geo[] {
+  const prof = [[reach, -0.03], [reach * 0.99, 0.09 * h / 0.3], [reach * 0.62, h * 0.8], [0.0001, h]].map(([r, y]) => new THREE.Vector2(r, y));
+  const g = paint(new THREE.LatheGeometry(prof, 14), colors[0], tf(0, 0, 0, 1, 1, 1, 0, hash2(seed, 71) * 0.4, 0));
+  return [mottle(g, 0.12, seed, 1.4)];
+}
+
 /** Samambaia/folhagem rasteira: `n` folhas que alcançam `reach` a partir do centro. */
 function fernRing(n: number, reach: number, w: number, colors: string[], seed: number, rise = 0.55, droop = 0.45, pieces = 3): Geo[] {
   const out: Geo[] = [];
@@ -131,6 +148,68 @@ function topTint(g: Geo, y0: number, y1: number, color: string): Geo {
  */
 function finish(g: Geo, h: number, lo = 0.72, hi = 1.12, spec = 0.05, seed = 1): Geo {
   return mottle(shadeY(g, 0, h, lo, hi), spec * 1.6, seed, 0.7);
+}
+
+// ───────────────────────────── Tubo redondo e disco (flora do Brasil, M3) ─────────────────────────────
+
+export interface TubeOptions {
+  /** Lados da seção (14+ para ficar redondo à luz: 12 lados = 15°, 14 = 12,9°, 16 = 11,2°). */
+  sides?: number;
+  /** Canelas (cacto): nº de costelas e o quanto a COR escurece nas ranhuras (0..1). A forma não muda: costela em geometria de 14 lados dobra a faceta para 18°. */
+  ribs?: number;
+  ribShade?: number;
+  /** Fecha a ponta em cúpula (um anel a 70% do raio e o bico). */
+  dome?: boolean;
+}
+
+/**
+ * Tubo de seção circular ao longo de uma curva (`path`, de 2 pontos em diante), com o raio de cada ponto em `radii`: os anéis seguem o quadro
+ * transportado em paralelo (sem torção), então um braço que dobra no cotovelo é UMA superfície contínua, sem esfera de emenda. Não indexado, aberto
+ * no pé (que entra no chão ou no tronco). A volta dos triângulos deixa a normal para fora (conferido em tests/scenery-flora-brasil.test.ts).
+ */
+export function tube(path: ReadonlyArray<readonly [number, number, number]>, radii: readonly number[], color: string, o: TubeOptions = {}): Geo {
+  const sides = o.sides ?? 14; const ribs = o.ribs ?? 0; const ribShade = o.ribShade ?? 0;
+  const P = path.map((q) => new THREE.Vector3(q[0], q[1], q[2]));
+  const T = P.map((_, j) => P[Math.min(P.length - 1, j + 1)].clone().sub(P[Math.max(0, j - 1)]).normalize());
+  const axis = Math.abs(T[0].x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  let u = axis.clone().sub(T[0].clone().multiplyScalar(axis.dot(T[0]))).normalize();
+  const rings: THREE.Vector3[][] = [];
+  const shade = Array.from({ length: sides }, (_, k) => 1 - ribShade * (0.5 + 0.5 * Math.cos(ribs * (k / sides) * Math.PI * 2)));
+  const ringAt = (c: THREE.Vector3, r: number, uu: THREE.Vector3, vv: THREE.Vector3): THREE.Vector3[] => Array.from({ length: sides }, (_, k) => {
+    const a = (k / sides) * Math.PI * 2;
+    return c.clone().addScaledVector(uu, Math.cos(a) * r).addScaledVector(vv, Math.sin(a) * r);
+  });
+  let lastU = u; let lastV = T[0].clone().cross(u);
+  P.forEach((c, j) => {
+    if (j > 0) u = lastU.clone().sub(T[j].clone().multiplyScalar(lastU.dot(T[j]))).normalize();
+    lastU = u; lastV = T[j].clone().cross(u);
+    rings.push(ringAt(c, radii[j] ?? radii[radii.length - 1], u, lastV));
+  });
+  let apex: THREE.Vector3 | null = null;
+  if (o.dome) {
+    const j = P.length - 1; const r = radii[j] ?? radii[radii.length - 1];
+    rings.push(ringAt(P[j].clone().addScaledVector(T[j], r * 0.7), r * 0.714, lastU, lastV));
+    apex = P[j].clone().addScaledVector(T[j], r * 1.02);
+  }
+  const out: number[] = []; const shades: number[] = [];
+  const put = (v: THREE.Vector3, sh: number): void => { out.push(v.x, v.y, v.z); shades.push(sh); };
+  for (let j = 0; j + 1 < rings.length; j++) {
+    for (let k = 0; k < sides; k++) {
+      const k1 = (k + 1) % sides;
+      put(rings[j][k], shade[k]); put(rings[j][k1], shade[k1]); put(rings[j + 1][k], shade[k]);
+      put(rings[j][k1], shade[k1]); put(rings[j + 1][k1], shade[k1]); put(rings[j + 1][k], shade[k]);
+    }
+  }
+  if (apex) {
+    const last = rings[rings.length - 1];
+    for (let k = 0; k < sides; k++) { put(last[k], shade[k]); put(last[(k + 1) % sides], shade[(k + 1) % sides]); put(apex, 1 - ribShade * 0.5); }
+  }
+  const g = paint(tris(out), color);
+  if (ribShade > 0) { // a canela é cor por PONTO (função da posição): contínua entre as faces, sem salto na aresta lisa
+    const c = g.getAttribute('color') as THREE.BufferAttribute;
+    for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * shades[i], c.getY(i) * shades[i], c.getZ(i) * shades[i]);
+  }
+  return g;
 }
 
 // ───────────────────────────── Árvores (sprite `tree`) ─────────────────────────────
@@ -277,6 +356,57 @@ export function cypress(seed: number, R = TREE_R): Model {
   parts.push(paint(cone(0.55, 1.6, 10), '#2a5232', tf(0, 8.1, 0)));
   parts.push(...mound(R, 0.6, ['#4a6a3a', '#5a7a40'], seed));
   return flat(finish(merge(parts), 9, 0.68, 1.12, 0.04, seed), 1.3);
+}
+
+// ───────────────────────────── Sertão do Brasil (árvores): carnaúba, juazeiro, umbuzeiro ─────────────────────────────
+
+/** Carnaúba: palmeira do sertão, tronco reto e alto e a copa de leques rígidos, verde-azulados, com a saia de folhas secas; a touceira no pé é a pegada. */
+export function carnauba(seed: number, R = TREE_R): Model {
+  const H = 8.4 + hash2(seed, 1) * 1.6;
+  const parts: Geo[] = [tube([[0, -0.2, 0], [0, H * 0.5, 0], [0, H, 0]], [0.36, 0.3, 0.26], '#b2a285', { sides: 14 })];
+  const cy = H + 0.15;
+  // Folhas secas penduradas em volta do topo do tronco (a saia da carnaúba), palha.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + hash2(seed, k + 60) * 0.5;
+    parts.push(paint(cone(0.62, 0.1, 10), k % 2 ? '#a8945a' : '#b7a36a', lean(Math.cos(a) * 0.55, cy - 0.85, Math.sin(a) * 0.55, a, 2.15)));
+  }
+  // O leque: 14 folhas em forma de disco, a face para fora e para cima, em duas voltas.
+  for (let k = 0; k < 14; k++) {
+    const ring = k < 8 ? 0 : 1;
+    const a = (k / (ring ? 6 : 8)) * Math.PI * 2 + hash2(seed, k) * 0.35 + ring * 0.4;
+    const reach = ring ? 0.75 : 1.45; const tilt = ring ? 0.6 : 0.95 + hash2(seed, k + 20) * 0.25;
+    parts.push(paint(cone(1.05 - ring * 0.12, 0.17, 12), (k + ring) % 2 ? '#6f9b78' : '#7fa886', lean(Math.cos(a) * reach, cy + 0.25 + ring * 0.55, Math.sin(a) * reach, a, tilt)));
+  }
+  parts.push(...mound(R, 0.7, ['#9a9060', '#a89c68'], seed + 31), ...fernRing(4, R, 0.4, ['#8a9a50', '#9aa85a'], seed + 32, 0.7, 0.7));
+  return flat(finish(merge(parts), H + 1.5, 0.78, 1.1, 0.04, seed), 2.2);
+}
+
+/** Juazeiro: a árvore verde o ano todo do sertão, copa larga, redonda e densa (uma nuvem de bolhas) sobre um tronco curto. */
+export function juazeiro(seed: number, R = TREE_R): Model {
+  const g = ['#2a6a34', '#357a3a', '#245e30'];
+  const parts: Geo[] = [trunk(0.3, 0.44, 1.9, '#6a5a48', 12)];
+  const crown: Puff[] = [{ r: 2.4, x: 0, y: 4.1, z: 0, color: g[0], seed, sy: 0.78, amount: 0.1 }];
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.7;
+    crown.push({ r: 1.7, x: Math.cos(a) * 1.8, y: 3.4 + hash2(seed, k + 5) * 0.4, z: Math.sin(a) * 1.8, color: g[(k + 1) % 3], seed: seed + k + 1, sy: 0.74, amount: 0.1 });
+  }
+  parts.push(...puffs(crown));
+  parts.push(...mound(R, 0.7, ['#6a8a3a', '#7a9a44'], seed));
+  return flat(finish(merge(parts), 6.4, 0.66, 1.14, 0.05, seed), 2.6);
+}
+
+/** Umbuzeiro: tronco grosso e baixo (a caixa-d'água do sertão) e a copa em guarda-chuva, larga e achatada, verde-oliva. */
+export function umbuzeiro(seed: number, R = TREE_R): Model {
+  const g = ['#8a9f4a', '#7a9040', '#97a855'];
+  const parts: Geo[] = [trunk(0.42, 0.62, 1.7, '#7a6c58', 14)];
+  const crown: Puff[] = [{ r: 3.2, x: 0, y: 3.5, z: 0, color: g[0], seed, sy: 0.38, amount: 0.08 }];
+  for (let k = 0; k < 2; k++) {
+    const a = k * Math.PI + hash2(seed, k) * 0.8;
+    crown.push({ r: 2.1, x: Math.cos(a) * 2.5, y: 3.15 + k * 0.2, z: Math.sin(a) * 2.5, color: g[k + 1], seed: seed + k + 1, sy: 0.42, amount: 0.08 });
+  }
+  parts.push(...puffs(crown));
+  parts.push(...mound(R, 0.6, ['#8a8a50', '#9a9a58'], seed));
+  return flat(finish(merge(parts), 5, 0.72, 1.1, 0.05, seed), 2.8);
 }
 
 // ───────────────────────────── Coníferas (sprite `pine`) ─────────────────────────────
@@ -603,6 +733,80 @@ export function rosette(seed: number, leaf: string, flower: string, stalk: numbe
   return flat(finish(merge(parts), stalk, 0.82, 1.1, 0.04, seed), 1.1);
 }
 
+// ───────────────────────────── Sertão do Brasil (cactos): mandacaru, xique-xique, coroa-de-frade, palma ─────────────────────────────
+
+/** Terra seca da touceira no pé dos cactos do sertão (a pegada de colisão). */
+const SERTAO_SOIL = ['#9a8a5a', '#a8985c'];
+
+/**
+ * Mandacaru: a coluna grossa e canelada, de bico redondo, com o candelabro de quatro braços que saem de lado e sobem; flor branca nas pontas e frutos
+ * vermelhos. A touceira de terra no pé chega à pegada (CACTUS_R); os braços ficam dentro dela.
+ */
+export function mandacaru(seed: number): Model {
+  const H = 4.9 + hash2(seed, 1) * 0.9;
+  const green = '#4f8c4a'; const armGreen = '#5a9850';
+  const ribbed = { sides: 16, ribs: 8, ribShade: 0.16 };
+  const parts: Geo[] = [tube([[0, -0.1, 0], [0, H * 0.5, 0], [0, H, 0]], [0.36, 0.31, 0.25], green, { ...ribbed, dome: true })];
+  const tips: Array<[number, number, number]> = [[0, H + 0.2, 0]];
+  const base = [1.5, 2.0, 2.45, 2.85];
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2 + hash2(seed, k + 10) * 0.6;
+    const c = Math.cos(a); const s = Math.sin(a);
+    const h0 = base[k] * (H / 5.4); const up = 1.3 + hash2(seed, k + 20) * 0.9;
+    parts.push(tube([[c * 0.2, h0, s * 0.2], [c * 0.66, h0 + 0.2, s * 0.66], [c * 0.88, h0 + 0.85, s * 0.88], [c * 0.9, h0 + 0.85 + up, s * 0.9]], [0.17, 0.17, 0.16, 0.14], armGreen, { sides: 14, ribs: 7, ribShade: 0.14, dome: true }));
+    tips.push([c * 0.9, h0 + 0.85 + up + 0.18, s * 0.9]);
+  }
+  for (const [x, y, z] of tips) parts.push(paint(new THREE.OctahedronGeometry(0.1, 0), '#f6f2e4', tf(x, y, z)));
+  for (let k = 0; k < 3; k++) parts.push(paint(new THREE.OctahedronGeometry(0.085, 0), '#d8304a', tf(Math.cos(k * 2.1 + 0.5) * 0.3, H * 0.82 - k * 0.15, Math.sin(k * 2.1 + 0.5) * 0.3)));
+  parts.push(...soil(CACTUS_R, 0.28, SERTAO_SOIL, seed + 7));
+  return flat(finish(merge(parts), H, 0.8, 1.1, 0.03, seed), 1.3);
+}
+
+/** Xique-xique: a touceira baixa e rasteira de braços cilíndricos que saem do centro e se abrem para os lados, verde-acinzentada, de bico claro. */
+export function xiqueXique(seed: number): Model {
+  const parts: Geo[] = [];
+  const n = 5;
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2 + hash2(seed, k) * 0.6;
+    const c = Math.cos(a); const s = Math.sin(a);
+    const reach = 0.7 + hash2(seed, k + 9) * 0.25; const up = 0.5 + hash2(seed, k + 3) * 0.2;
+    parts.push(tube([[c * 0.1, -0.05, s * 0.1], [c * reach * 0.62, up * 0.55, s * reach * 0.62], [c * reach, up + 0.3, s * reach]], [0.16, 0.16, 0.13], k % 2 ? '#7f9f82' : '#78987b', { sides: 16, ribs: 8, ribShade: 0.12, dome: true }));
+  }
+  parts.push(...soil(CACTUS_R, 0.3, SERTAO_SOIL, seed + 11));
+  return flat(finish(merge(parts), 1.2, 0.82, 1.14, 0.04, seed), 1.1);
+}
+
+/** Coroa-de-frade: a bola canelada, achatada, com a coroa (cefálio) vermelha no topo. */
+export function coroaDeFrade(seed: number): Model {
+  const body = sphere(0.38, 18, 9);
+  const p = body.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { // costelas: o raio de cada ponto sobe e desce com o azimute (9 costelas), contínuo entre faces
+    const x = p.getX(i); const z = p.getZ(i);
+    const f = 1 + 0.07 * Math.cos(9 * Math.atan2(z, x));
+    p.setXYZ(i, x * f, p.getY(i) * 0.86, z * f);
+  }
+  const parts: Geo[] = [paint(body, '#5f9150', tf(0, 0.33, 0))];
+  parts.push(tube([[0, 0.5, 0], [0, 0.7, 0]], [0.19, 0.17], '#d4304a', { sides: 14, dome: true }));
+  parts.push(tube([[0, 0.49, 0], [0, 0.55, 0]], [0.205, 0.205], '#f2d6d0', { sides: 14 }));
+  parts.push(...soil(CACTUS_R, 0.22, SERTAO_SOIL, seed + 13));
+  return flat(finish(merge(parts), 0.95, 0.82, 1.12, 0.03, seed), 1.0);
+}
+
+/** Palma (a forrageira do agreste): raquetes achatadas e redondas empilhadas e abertas para os lados, com os frutos vermelhos. */
+export function palma(seed: number): Model {
+  const parts: Geo[] = [];
+  const pad = (x: number, y: number, z: number, s: number, yaw: number, roll: number, k: number): void => {
+    parts.push(paint(sphere(1, 10, 6), k % 3 ? '#5f9a4a' : '#6aa650', tf(x, y, z, 0.42 * s, 0.42 * s * 1.25, 0.42 * s * 0.28, 0, yaw, roll)));
+  };
+  pad(0, 0.5, 0, 1.1, 0, 0, 0);
+  pad(0.5, 0.95, 0, 1, 0.2, -0.5, 1); pad(-0.5, 0.9, 0.05, 1, -0.2, 0.5, 2);
+  pad(0.1, 1.5, 0, 0.9, 0.5, -0.2, 3); pad(0, 0.95, 0.5, 0.85, Math.PI / 2, -0.3, 4);
+  pad(-0.35, 1.45, -0.2, 0.7, 1.2, 0.3, 5);
+  for (let k = 0; k < 5; k++) parts.push(paint(new THREE.OctahedronGeometry(0.08, 0), '#d8386a', tf(-0.3 + k * 0.2, 1.95 - Math.abs(k - 2) * 0.12, 0.05)));
+  parts.push(...soil(CACTUS_R, 0.3, SERTAO_SOIL, seed + 15));
+  return flat(finish(merge(parts), 2, 0.8, 1.1, 0.03, seed), 1.1);
+}
+
 // ───────────────────────────── Arbustos (sprite `bush`, não sólido) ─────────────────────────────
 
 /** Moita baixa (≤ 1,1 m: o carro passa por cima dela sem parecer atravessar uma parede). */
@@ -749,6 +953,15 @@ export function farSaguaro(): Model {
   const g = merge([
     paint(box(0.6, 4.6, 0.6), '#4f8a4a', tf(0, 2.3, 0)), paint(box(0.4, 1.9, 0.4), '#4f8a4a', tf(0.78, 1.7, 0)),
     paint(box(0.4, 2.4, 0.4), '#4f8a4a', tf(-0.78, 2.0, 0)),
+  ]);
+  return { parts: [{ geometry: g, mat: 'flat' }], blob: 1 };
+}
+
+/** Mandacaru distante: a coluna e os quatro braços em caixas (≈ 60 triângulos). */
+export function farMandacaru(): Model {
+  const g = merge([
+    paint(box(0.7, 5.6, 0.7), '#4f8c4a', tf(0, 2.8, 0)), paint(box(0.38, 2.6, 0.38), '#5a9850', tf(0.8, 3.7, 0)),
+    paint(box(0.38, 2.2, 0.38), '#5a9850', tf(-0.8, 3.3, 0)), paint(box(0.38, 2.0, 0.38), '#5a9850', tf(0, 3.0, 0.8)),
   ]);
   return { parts: [{ geometry: g, mat: 'flat' }], blob: 1 };
 }
