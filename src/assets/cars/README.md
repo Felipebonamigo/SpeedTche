@@ -10,5 +10,5 @@ quebra o jogo: fica de fora, com o motivo no console (`[carros] … recusado`). 
 `docs/ARTE.md` ("Licenças dos carros baixados"): um teste reprova a suíte sem ela. Contrato do arquivo (nós, atlas 256², LOD, `seat`, `kit_*`,
 `decal_*`): `docs/CONTRATO-DO-ASSET.md`; passo a passo e o conversor do Kenney: `docs/ARTE.md`.
 
-`falcao.glb` vem do Kenney Car Kit (CC0) pelo `npm run convert-car` — é o carro-régua que prova o caminho; o conversor está em
+`art/cars/falcao-kenney.glb` (não instalado: o procedural ainda é mais bonito) vem do Kenney Car Kit (CC0) pelo `npm run convert-car` — é o carro-régua que prova o caminho; o conversor está em
 `scripts/convert-car.ts`.

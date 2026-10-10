@@ -57,7 +57,7 @@ saída do conversor (`scripts/convert-car.ts`), não o original.
 
 | Arquivo no jogo | Origem (página, arquivo, autor) | Licença | Data |
 |---|---|---|---|
-| `src/assets/cars/falcao.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
+| `art/cars/falcao-kenney.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
 
 ## Cenário e horizonte — falta (os marcos turísticos já têm o caminho: abaixo)
 Mesmo caminho (convenção na seção Especificação do briefing); para árvores, prédios e horizonte o carregador ainda não existe.

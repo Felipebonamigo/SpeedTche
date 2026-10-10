@@ -171,21 +171,28 @@ describe('pipeline de arte: o carro de verdade (Kenney Car Kit, CC0)', () => {
   });
 });
 
-describe('pipeline de arte: os arquivos instalados em src/assets/cars/', () => {
-  const dir = join(__dirname, '..', 'src', 'assets', 'cars');
-  const files = readdirSync(dir).filter((f) => f.endsWith('.glb'));
+describe('pipeline de arte: os carros .glb (instalados em src/assets/cars/ e o carro-régua em art/cars/)', () => {
+  // O Falcão do Kenney (CC0) é o carro-régua: prova o caminho de ponta a ponta, mas hoje o procedural é mais bonito, então
+  // ele fica em art/cars/ (não instalado). Para instalar um, mova para src/assets/cars/ com o nome do carro ou do estilo.
+  const roots = [
+    { dir: join(__dirname, '..', 'src', 'assets', 'cars'), rel: 'src/assets/cars', suffix: '' },
+    { dir: join(__dirname, '..', 'art', 'cars'), rel: 'art/cars', suffix: '-kenney' },
+  ];
+  const files = roots.flatMap((r) => readdirSync(r.dir).filter((f) => f.endsWith('.glb')).map((f) => ({ ...r, file: f })));
   const arte = readFileSync(join(__dirname, '..', 'docs', 'ARTE.md'), 'utf8');
 
-  it.each(files)('%s passa no validador do jogo e tem a licença registrada em docs/ARTE.md', async (file) => {
-    const name = file.replace(/\.glb$/, '');
+  it('há pelo menos um .glb para provar o pipeline (o carro-régua)', () => { expect(files.length).toBeGreaterThan(0); });
+
+  it.each(files.map((f) => [`${f.rel}/${f.file}`, f] as const))('%s passa no validador do jogo e tem a licença registrada em docs/ARTE.md', async (_label, f) => {
+    const name = f.file.replace(/\.glb$/, '').replace(f.suffix, '');
     const car = CARS.find((c) => c.id === name);
-    expect(car ?? CAR_BODIES.includes(name as never), `${file}: o nome é um carro ou um estilo`).toBeTruthy();
-    const { model, problems } = await parseCarGlb(car ? car.body : (name as never), ab(readFileSync(join(dir, file))), car ? { carId: car.id } : {});
+    expect(car ?? CAR_BODIES.includes(name as never), `${f.file}: o nome é um carro ou um estilo`).toBeTruthy();
+    const { model, problems } = await parseCarGlb(car ? car.body : (name as never), ab(readFileSync(join(f.dir, f.file))), car ? { carId: car.id } : {});
     expect(problems).toEqual([]);
     expect(model && checkCarModel(model)).toEqual([]);
     // Uma linha da tabela de licenças cita o arquivo e uma licença (CC0, CC-BY…).
-    const row = arte.split('\n').find((l) => l.startsWith('|') && l.includes(`src/assets/cars/${file}`));
-    expect(row, `docs/ARTE.md: linha da tabela de licenças com "src/assets/cars/${file}"`).toBeTruthy();
+    const row = arte.split('\n').find((l) => l.startsWith('|') && l.includes(`${f.rel}/${f.file}`));
+    expect(row, `docs/ARTE.md: linha da tabela de licenças com "${f.rel}/${f.file}"`).toBeTruthy();
     expect(row).toMatch(/CC0|CC-BY|CC BY/);
   }, 60_000);
 });
