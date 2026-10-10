@@ -173,37 +173,37 @@ interface Base {
 const BASES: Record<SceneryId, Base> = {
   // Mata atlântica: verde fundo, terra vermelha na beira, serra azulada ao longe.
   tropical: {
-    sky: ['#1a5cb8', '#3a9ede', '#c8f0dc'], asphalt: '#3e434b', shoulder: '#7a6654', verge: '#c8784a',
+    sky: ['#1a5cb8', '#3a9ede', '#c8f0dc'], asphalt: '#4b5059', shoulder: '#8a7460', verge: '#c8784a',
     groundLow: '#34a844', groundHigh: '#238c4c', rock: '#7c6a52', sand: '#e8d49a',
     layers: ['#23814f', '#3c8f82', '#76a9c2'], waterDeep: '#1a6aa8', waterShallow: '#2fd0c4',
   },
   // Deserto: areia dourada, rocha vermelha nas encostas, mesas no horizonte.
   desert: {
-    sky: ['#1c5cc2', '#58a2e8', '#ffc98a'], asphalt: '#4a4745', shoulder: '#a08a6c', verge: '#eec486',
+    sky: ['#1c5cc2', '#58a2e8', '#ffc98a'], asphalt: '#59565a', shoulder: '#a08a6c', verge: '#eec486',
     groundLow: '#e9b464', groundHigh: '#d9964f', rock: '#bb5a36', sand: '#f0c77e',
     layers: ['#c56a3a', '#d08c62', '#dcae96'], waterDeep: '#1a6aa0', waterShallow: '#3ec0c0',
   },
   // Cidade: calçada clara, grama de praça, prédios no fundo (a skyline vem do terrain.ts).
   city_night: {
-    sky: ['#3a6ec4', '#86b2e6', '#d5e2f2'], asphalt: '#3a3d45', shoulder: '#7a7a7c', verge: '#bdbbb4',
-    groundLow: '#4e8f40', groundHigh: '#3e7a3a', rock: '#6c6c74', sand: '#c8c0a8',
+    sky: ['#3a6ec4', '#86b2e6', '#d5e2f2'], asphalt: '#484b54', shoulder: '#7a7a7c', verge: '#bdbbb4',
+    groundLow: '#4e8f40', groundHigh: '#46853f', rock: '#6c6c74', sand: '#c8c0a8',
     layers: ['#3e4c70', '#5a6892', '#8a94ba'], waterDeep: '#123a6a', waterShallow: '#2a7a9a',
   },
   // Montanha: prado verde, pedra azulada, neve no alto e nos picos do horizonte.
   alpine: {
-    sky: ['#2352c0', '#6498e2', '#d2e6ff'], asphalt: '#40444c', shoulder: '#827c72', verge: '#a0968a',
-    groundLow: '#4aab4c', groundHigh: '#318454', rock: '#868b98', sand: '#c8c0a8',
+    sky: ['#2352c0', '#6498e2', '#d2e6ff'], asphalt: '#4d515a', shoulder: '#827c72', verge: '#a0968a',
+    groundLow: '#4aab4c', groundHigh: '#378d5a', rock: '#868b98', sand: '#c8c0a8',
     layers: ['#2c6a4c', '#4a6aa0', '#7a8ccc'], waterDeep: '#1a5a8a', waterShallow: '#3aa0b0',
   },
   // Litoral: mar turquesa, praia clara, morros verdes e ilhas ao longe.
   coast: {
-    sky: ['#2070d2', '#43b0f5', '#a6e6ff'], asphalt: '#43464d', shoulder: '#b0a080', verge: '#ecd49c',
-    groundLow: '#4aa848', groundHigh: '#2f8a4a', rock: '#9a8a72', sand: '#f3dca0',
+    sky: ['#2070d2', '#43b0f5', '#a6e6ff'], asphalt: '#50545c', shoulder: '#b0a080', verge: '#ecd49c',
+    groundLow: '#4aa848', groundHigh: '#359552', rock: '#9a8a72', sand: '#f3dca0',
     layers: ['#2a8a5a', '#3a8ab0', '#6aa8dc'], waterDeep: '#1a68b0', waterShallow: '#22d4cf',
   },
   // Savana/planície: capim dourado-esverdeado, terra avermelhada, chapadas baixas.
   savanna: {
-    sky: ['#3280d6', '#8cc8ee', '#f2ecb0'], asphalt: '#46433f', shoulder: '#957a58', verge: '#c89456',
+    sky: ['#3280d6', '#8cc8ee', '#f2ecb0'], asphalt: '#55524e', shoulder: '#957a58', verge: '#c89456',
     groundLow: '#b5b547', groundHigh: '#86993b', rock: '#a07650', sand: '#e0c88a',
     layers: ['#768a3c', '#9a8c62', '#bcae94'], waterDeep: '#1e6a86', waterShallow: '#40b8a8',
   },
@@ -325,9 +325,9 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   const fog = mix(sky[2], sky[1], time === 'day' ? 0.28 : time === 'dusk' ? 0.32 : 0.2);
   // À noite o chão alto sobe um pouco (a mata e a montanha escuras engoliam a pista) e o asfalto leva menos azul que o resto: o carro
   // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
-  const groundLow = time === 'night' ? liftTo(g(b.groundLow), 0.115) : g(b.groundLow);
-  const groundHigh = time === 'night' ? liftTo(g(b.groundHigh), 0.11) : g(b.groundHigh);
-  const asphalt = time === 'night' ? shade(mix(b.asphalt, GRADE.night.tint, 0.17), 0.95) : g(b.asphalt);
+  const groundLow = time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow);
+  const groundHigh = time === 'night' ? liftTo(g(b.groundHigh), 0.12) : g(b.groundHigh);
+  const asphalt = time === 'night' ? shade(mix(b.asphalt, GRADE.night.tint, 0.17), 0.87) : g(b.asphalt);
   // Os planos do horizonte puxam para o céu do período (o rosa do entardecer, o azul da noite).
   const skyPull = time === 'day' ? 0 : time === 'dusk' ? 0.28 : 0.5;
   const layers = b.layers.map((c, i) => mix(g(c), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];

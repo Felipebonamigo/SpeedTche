@@ -71,7 +71,7 @@ async function capturaUm(port: string, dir: string, shot: Shot): Promise<number>
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  page.setDefaultTimeout(240000);
+  page.setDefaultTimeout(600000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !IGNORE.test(m.text())) errors.push(`console: ${m.text()}`); });
@@ -80,7 +80,7 @@ async function capturaUm(port: string, dir: string, shot: Shot): Promise<number>
     const q = new URLSearchParams({ track: shot.track, seg: String(shot.seg), hud: '0', frames: '24' });
     if (shot.forced) { q.set('tod', shot.tod); q.set('scenery', shot.scenery); }
     await page.goto(`http://localhost:${port}/tools/render-harness.html?${q}`);
-    ready = await page.waitForFunction(() => (window as unknown as { ready?: boolean }).ready, null, { timeout: 240000 }).then(() => true, () => false);
+    ready = await page.waitForFunction(() => (window as unknown as { ready?: boolean }).ready, null, { timeout: 600000 }).then(() => true, () => false);
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${dir}/${shot.name}.png` });
     const png = readFileSync(`${dir}/${shot.name}.png`).toString('base64');
@@ -132,9 +132,13 @@ async function main(): Promise<void> {
     const feitos: string[] = [];
     for (const [i, shot] of shots.entries()) {
       // Cada captura sob a trava: a fila espera a vez; o orquestrador não segura a vaga entre uma e outra.
-      const r = spawnSync('flock', [LOCK, process.execPath, '--import', 'tsx', self, '--um', port, dir, JSON.stringify(shot)], { stdio: 'inherit', timeout: 900000 });
       const arq = `${dir}/${shot.name}`;
-      const ok = r.status === 0 && existsSync(`${arq}.png`);
+      let ok = false;
+      // Sob carga de CPU (swiftshader) o quadro pode não ficar pronto no tempo: uma segunda tentativa antes de contar a falha.
+      for (let tentativa = 0; tentativa < 2 && !ok; tentativa++) {
+        const r = spawnSync('flock', [LOCK, process.execPath, '--import', 'tsx', self, '--um', port, dir, JSON.stringify(shot)], { stdio: 'inherit', timeout: 1500000 });
+        ok = r.status === 0 && existsSync(`${arq}.png`);
+      }
       if (!ok) falhas++;
       if (existsSync(`${arq}.json`)) medidas[shot.name] = JSON.parse(readFileSync(`${arq}.json`, 'utf8'));
       if (existsSync(`${arq}.png`)) feitos.push(`${arq}.png`);

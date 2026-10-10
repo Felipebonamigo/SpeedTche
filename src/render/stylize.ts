@@ -144,13 +144,14 @@ const GRADE_GLSL = /* glsl */ `
 uniform vec3 uGradeShadows;
 uniform vec3 uGradeHighlights;
 uniform vec3 uGradeAdjust;
-// Gradação por período (uniformes em 0 = identidade): saturação, contraste, tinta nas sombras e ganho nas luzes, em ~gama 2.
+// Gradação por período (uniformes em 0 = identidade): saturação, contraste, tinta nas sombras (nem no preto nem nas luzes) e ganho nas luzes, em ~gama 2.
 vec3 stylizeGrade( vec3 c ) {
   vec3 g = sqrt( max( c, vec3( 0.0 ) ) );
   float l = dot( g, vec3( 0.2126, 0.7152, 0.0722 ) );
   g = mix( vec3( l ), g, 1.0 + uGradeAdjust.x );
   g = ( g - 0.45 ) * ( 1.0 + uGradeAdjust.y ) + 0.45;
-  g += uGradeShadows * ( 1.0 - smoothstep( 0.0, 0.6, l ) );
+  // A tinta das sombras some no preto (M2): somada em gama sem esse pé, o asfalto escuro virava azul-marinho puro (R = 0) com o céu azul de dia.
+  g += uGradeShadows * smoothstep( 0.0, 0.22, l ) * ( 1.0 - smoothstep( 0.22, 0.6, l ) );
   g *= vec3( 1.0 ) + uGradeHighlights * smoothstep( 0.4, 1.0, l );
   g = clamp( g, 0.0, 1.0 );
   return g * g;
