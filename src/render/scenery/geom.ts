@@ -487,6 +487,8 @@ function hemisphere(n: number): Array<[number, number, number]> {
  */
 export function bakeAO(geo: Geo, o: AoOptions = {}): Geo {
   if (geo.index) throw new Error('bakeAO: a malha tem de ser não indexada');
+  if (!geo.getAttribute('color')) throw new Error('bakeAO: a malha tem de ter cor por vértice (a oclusão vai na cor)');
+  if (!geo.getAttribute('normal')) geo.computeVertexNormals();
   const rays = o.rays ?? 14; const reach = o.reach ?? 3; const strength = o.strength ?? 0.6;
   const ground = o.ground ?? true; const groundY = o.groundY ?? 0;
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
@@ -517,6 +519,24 @@ export function bakeAO(geo: Geo, o: AoOptions = {}): Geo {
       rad[t] = Math.max(Math.hypot(ax - ctr[a], ay - ctr[a + 1], az - ctr[a + 2]), Math.hypot(bx - ctr[a], by - ctr[a + 1], bz - ctr[a + 2]), Math.hypot(cx - ctr[a], cy - ctr[a + 1], cz - ctr[a + 2]));
     }
   }
+  // Grade espacial (célula = alcance): cada triângulo entra nas células que a esfera dele toca; o vértice só olha as vizinhas.
+  const cell = Math.max(0.5, reach);
+  const cellKey = (ix: number, iy: number, iz: number): number => ((Math.max(-500, Math.min(500, ix)) + 512) * 1024 + (Math.max(-500, Math.min(500, iy)) + 512)) * 1024 + (Math.max(-500, Math.min(500, iz)) + 512);
+  const grid = new Map<number, number[]>();
+  for (let q = 0; q < T; q++) {
+    if (rad[q] < 0) continue;
+    const a = q * 3;
+    for (let ix = Math.floor((ctr[a] - rad[q]) / cell); ix <= Math.floor((ctr[a] + rad[q]) / cell); ix++) {
+      for (let iy = Math.floor((ctr[a + 1] - rad[q]) / cell); iy <= Math.floor((ctr[a + 1] + rad[q]) / cell); iy++) {
+        for (let iz = Math.floor((ctr[a + 2] - rad[q]) / cell); iz <= Math.floor((ctr[a + 2] + rad[q]) / cell); iz++) {
+          const k = cellKey(ix, iy, iz);
+          const list = grid.get(k);
+          if (list) list.push(q); else grid.set(k, [q]);
+        }
+      }
+    }
+  }
+  const seen = new Int32Array(T); let stamp = 0;
   const dirs = hemisphere(rays);
   const cosSmooth = (o.smoothDeg ?? 62) >= 180 ? -2 : Math.cos(((o.smoothDeg ?? 62) * Math.PI) / 180); // 180° = todas (cos = −1 exato falha em float)
   const cache = new Map<string, number>();
@@ -536,10 +556,14 @@ export function bakeAO(geo: Geo, o: AoOptions = {}): Geo {
     // Origem um pouco acima da superfície (a própria face não tapa); a base do hemisfério gira com a normal.
     const ox = px + nx * 0.04; const oy = py + ny * 0.04; const oz = pz + nz * 0.04;
     near.length = 0;
-    for (let t2 = 0; t2 < T; t2++) {
-      if (rad[t2] < 0) continue;
-      const a = t2 * 3;
-      if (Math.hypot(ctr[a] - px, ctr[a + 1] - py, ctr[a + 2] - pz) < reach + rad[t2]) near.push(t2);
+    stamp++;
+    for (let ix = Math.floor((px - reach) / cell); ix <= Math.floor((px + reach) / cell); ix++) {
+      for (let iy = Math.floor((py - reach) / cell); iy <= Math.floor((py + reach) / cell); iy++) {
+        for (let iz = Math.floor((pz - reach) / cell); iz <= Math.floor((pz + reach) / cell); iz++) {
+          const list = grid.get(cellKey(ix, iy, iz));
+          if (list) for (const q of list) if (seen[q] !== stamp) { seen[q] = stamp; near.push(q); }
+        }
+      }
     }
     const hx = Math.abs(nx) < 0.9 ? 1 : 0; const hy = hx ? 0 : 1;
     // tangente = normalize(h × n), bitangente = n × tangente

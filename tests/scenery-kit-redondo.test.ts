@@ -40,6 +40,17 @@ describe('kit redondo: caixa com bisel', () => {
     }
   });
 
+  it('o enrolamento de cada triângulo concorda com as normais dos vértices (a face aponta para fora: o AO e a luz dependem disso)', () => {
+    const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
+    for (let t = 0; t < tris(g); t++) {
+      a.copy(P(g, t * 3)); b.copy(P(g, t * 3 + 1)); c.copy(P(g, t * 3 + 2));
+      const face = b.clone().sub(a).cross(c.clone().sub(a));
+      if (face.lengthSq() < 1e-12) continue; // face degenerada (o pico do canto): não conta
+      const avg = N(g, t * 3).add(N(g, t * 3 + 1)).add(N(g, t * 3 + 2));
+      expect(face.normalize().dot(avg.normalize()), `triângulo ${t}`).toBeGreaterThan(0.5);
+    }
+  });
+
   it('o meio da face é reto (x = w/2) e o canto é arredondado: nada a menos de r(√3−1) da quina viva', () => {
     let nearCorner = Infinity;
     const corner = new THREE.Vector3(5, 10, 3);
