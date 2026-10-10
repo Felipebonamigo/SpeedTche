@@ -57,6 +57,20 @@ interface CarAnim {
   motion: Motion;
 }
 
+/**
+ * Um carro posto à mostra, fora da corrida (o palco 3D, N2): posição e giro no mundo do palco, sem `RaceState` nem `RoadFrame`.
+ * `dip` é a mola da oficina (m, só o casco desce; a roda fica no chão); `steer` esterça as rodas da frente e `spin` as gira.
+ */
+export interface DisplayCar {
+  carId: string;
+  paint?: CarColors | null;
+  x: number; y: number; z: number;
+  yaw: number;
+  dip?: number;
+  steer?: number;
+  spin?: number;
+}
+
 export class Cars {
   readonly group = new THREE.Group();
   /** O material comum (rigs[0]) e um por modelo com atlas de paleta; luz e qualidade vão para todos. */
@@ -82,6 +96,8 @@ export class Cars {
   /** Aparência por carro (estilo, cores, pintura), recalculada só quando o carro ou a pintura escolhida mudam. */
   private readonly looks: Array<CarLook | null> = [];
   private readonly lookIds: string[] = [];
+  /** Aparência dos carros do palco, por carro × pintura (o palco pousa poucos de cada vez; teto 64). */
+  private readonly displayLooks = new Map<string, CarLook>();
   /** Pintura de cada carro no quadro atual (RenderFrame.paints; ausente = todos de fábrica). */
   private paints: ReadonlyArray<CarColors | null> | undefined;
   /** Etiquetas por assento (0..3) e, no índice VIP_LABEL, a do VIP da escolta; denso de propósito. */
@@ -465,6 +481,94 @@ export class Cars {
     return { styles, wheels };
   }
 
+  // ───────────── Palco 3D (N2): carros à mostra, fora da corrida ─────────────
+  // Acréscimos para o `stage.ts`; `pose`/`look` não mudam. atalho: o laço das rodas e o fecho dos lotes repetem os de `pose()` — extrair um
+  // método comum mexeria nas linhas que a M4 e a N3 editam; quando as duas pousarem, unificar aqui.
+
+  /** O modelo do carro (eixos, escapes, altura): o palco mira a câmera nas medidas dele. Carro que não existe lança. */
+  modelOf(carId: string): CarModel {
+    const def = CARS.find((c) => c.id === carId);
+    if (!def) throw new Error(`Carro que não existe no palco: ${carId}`);
+    return this.styleOf(def).model;
+  }
+
+  /** Faróis do palco: 0 = os do dia, 1 = acesos como de noite (farol escamoteável sobe junto). Vale para todos os carros até o próximo `setLight`. */
+  setHeadlights(glow: number): void {
+    const g = Math.min(1, Math.max(0, glow));
+    for (const { uniforms } of this.rigs) { uniforms.uHeadGlow.value = 0.35 + (2.6 - 0.35) * g; uniforms.uPopup.value = g; }
+  }
+
+  private displayLook(carId: string, chosen: CarColors | null): CarLook {
+    const key = chosen ? `${carId}|${chosen.color}|${chosen.accent}` : carId;
+    const cached = this.displayLooks.get(key);
+    if (cached) return cached;
+    const def = CARS.find((c) => c.id === carId);
+    if (!def) throw new Error(`Carro que não existe no palco: ${carId}`);
+    const style = this.styleOf(def);
+    const paint = carPaint(def, CARS, style.model.liveries, chosen);
+    const look: CarLook = { style, color: new THREE.Color(paint.color), accent: new THREE.Color(paint.accent), livery: paint.livery, flame: flameColorFor(paint.accent) };
+    if (this.displayLooks.size >= 64) this.displayLooks.clear();
+    this.displayLooks.set(key, look);
+    return look;
+  }
+
+  /**
+   * Posa carros no mundo do palco (substitui o que estava posado, inclusive o que a corrida deixou): casco inteiro (nunca o LOD1), rodas de
+   * desenho completo, mancha de contato no chão e nada de chama, estrela ou etiqueta. A frente do carro é -Z com `yaw = 0`.
+   */
+  poseDisplay(items: readonly DisplayCar[]): void {
+    const d = this.dummy;
+    const w = this.wheelDummy;
+    let nBlob = 0;
+    for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
+    for (const wb of this.wheelBatches) wb.count = 0;
+    for (const s of this.labels) if (s) s.visible = false;
+    this.ghost.visible = false;
+    for (const it of items) {
+      if (nBlob >= MAX_CARS) break;
+      const look = this.displayLook(it.carId, it.paint ?? null);
+      const model = look.style.model;
+      // O casco leva a mola; as rodas e a sombra ficam no chão.
+      d.position.set(it.x, it.y + (it.dip ?? 0), it.z);
+      d.rotation.set(0, it.yaw, 0, 'YXZ');
+      d.scale.set(1, 1, 1);
+      d.updateMatrix();
+      this.put(look.style, d.matrix, look, look.livery);
+      d.position.set(it.x, it.y, it.z);
+      d.updateMatrix();
+      this.m.copy(d.matrix);
+      this.blob.setMatrixAt(nBlob++, d.matrix);
+      const wheels = look.style.wheels;
+      for (let ax = 0; ax < 2; ax++) {
+        const axle = model.axles[ax];
+        const spin = it.spin ?? 0;
+        const steer = ax === 0 ? (it.steer ?? 0) : 0;
+        for (const sx of SIDES) {
+          w.position.set(sx * axle.x, axle.r, axle.z);
+          if (sx > 0) w.rotation.set(-spin, -steer, 0, 'YXZ');
+          else w.rotation.set(spin, Math.PI - steer, 0, 'YXZ');
+          w.scale.set(axle.w, axle.r, axle.r);
+          w.updateMatrix();
+          this.mw.multiplyMatrices(this.m, w.matrix);
+          this.put(wheels, this.mw, look, look.livery);
+        }
+      }
+    }
+    for (const b of this.batches) {
+      b.mesh.count = b.count;
+      b.mesh.visible = b.count > 0;
+      if (b.count > 0) {
+        b.mesh.instanceMatrix.needsUpdate = true;
+        if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
+        b.extra.needsUpdate = true;
+      }
+    }
+    this.blob.count = nBlob; this.blob.visible = nBlob > 0;
+    if (nBlob > 0) this.blob.instanceMatrix.needsUpdate = true;
+    this.flames.count = 0; this.flames.visible = false;
+    this.stars.count = 0; this.stars.visible = false;
+  }
+
   dispose(): void {
     for (const im of this.instanced) { im.geometry.dispose(); im.dispose(); }
     for (const { material } of this.rigs) material.dispose();
@@ -475,5 +579,6 @@ export class Cars {
     this.ghostMaterial.dispose(); // a geometria é a de um estilo, já liberada acima
     for (const s of this.labels) if (s) { if (s.material.map) s.material.map.dispose(); s.material.dispose(); }
     for (const s of this.spots) s.dispose();
+    this.displayLooks.clear();
   }
 }
