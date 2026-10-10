@@ -6,13 +6,16 @@
 // absoluto do carro: é a única coisa "fixa no mundo".
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { TimeOfDay } from '../core/types';
+import type { SceneryId, TimeOfDay } from '../core/types';
 import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
-import type { Palette } from './palette';
+import { buildLensFlare } from './lensflare';
+import { palette, type Palette } from './palette';
 import { applyGrade } from './stylize';
+
+export { FLARE_ELEMENTS, flareFade, lensFlareLayout } from './lensflare';
 
 const SKY_RADIUS = 1400;
 /**
@@ -99,18 +102,27 @@ void main() {
 
 interface SunSetup { dir: THREE.Vector3; size: number; halo: number; glow: number; disc: number; moon: boolean }
 
-/** Direção absoluta do sol/lua (x direita, y cima, −z frente na largada) e o desenho do disco. */
-export function sunSetup(time: TimeOfDay): SunSetup {
-  const fromAngles = (elevDeg: number, azDeg: number) => {
-    const el = elevDeg * Math.PI / 180; const az = azDeg * Math.PI / 180;
-    return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
-  };
-  // Dia: sol a 34° (sombras longas que desenham o relevo, halo no alto da tela).
-  if (time === 'day') return { dir: fromAngles(34, -42), size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false };
-  // Entardecer: sol grande e baixo, à frente na largada, com o horizonte em brasa em volta.
-  if (time === 'dusk') return { dir: fromAngles(9, 22), size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false };
-  // Noite: lua grande a 20°, para aparecer na tela nas retas que apontam para ela.
-  return { dir: fromAngles(20, -28), size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true };
+/** O disco e o halo do período (o tamanho cresce no pôr do sol); a direção vem da paleta (`sunAz`, `sunEl`). */
+function sunLook(time: TimeOfDay): Omit<SunSetup, 'dir'> {
+  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false }; // sol a 34°: sombras longas, halo no alto da tela
+  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false }; // sol grande e baixo, à frente, horizonte em brasa
+  return { size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true }; // lua grande a 20°, para aparecer nas retas que apontam para ela
+}
+
+/** Direção absoluta (x direita, y cima, −z frente na largada) do azimute e da elevação em graus. */
+function fromAngles(elevDeg: number, azDeg: number): THREE.Vector3 {
+  const el = elevDeg * Math.PI / 180; const az = azDeg * Math.PI / 180;
+  return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
+}
+
+/** O sol/lua de uma paleta (M2: o azimute e a elevação são dado da paleta, por bioma × período, e a M6 os interpola). */
+export function sunOf(p: Pick<Palette, 'sunAz' | 'sunEl'>, time: TimeOfDay): SunSetup {
+  return { dir: fromAngles(p.sunEl, p.sunAz), ...sunLook(time) };
+}
+
+/** Direção absoluta do sol/lua e o desenho do disco. O bioma só muda o entardecer (o anel de montanhas, ver `palette.ts`). */
+export function sunSetup(time: TimeOfDay, scenery?: SceneryId): SunSetup {
+  return sunOf(palette(scenery ?? 'coast', time), time);
 }
 
 function buildStars(): THREE.Points {
@@ -205,6 +217,11 @@ export class Sky {
   private readonly clouds: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   /** Nuvens por qualidade: redondas na alta, facetadas (¼ dos triângulos) na média e na baixa. */
   private readonly cloudGeo: [THREE.BufferGeometry, THREE.BufferGeometry] = [buildClouds(0), buildClouds(1)];
+  /** Reflexo de lente do entardecer (lensflare.ts): uma malha, visível só quando a paleta, a qualidade e o jogador deixam. */
+  readonly flare: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> = buildLensFlare();
+  private flareStrength = 0;
+  private flareQualityOk = true;
+  private flareAllowed = true;
   private readonly pmrem: THREE.PMREMGenerator;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private paletteKey = '';
@@ -242,6 +259,7 @@ export class Sky {
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = -9;
     this.group.add(this.clouds);
+    this.group.add(this.flare); // a posição dele é em tela (a câmera de cada viewport): o giro do grupo não conta
     scene.add(this.group);
 
     this.sun = new THREE.DirectionalLight('#ffffff', 3);
@@ -273,12 +291,24 @@ export class Sky {
     }
     this.fogBase = FOG_DENSITY[q];
     this.fog.density = this.fogBase * this.fogMul;
+    this.flareQualityOk = atLeast(q, 'medium'); // a Baixa não paga os pixels aditivos do reflexo
+    this.syncFlare();
+  }
+
+  /** O jogador liga e desliga o reflexo de lente (Reduzir efeitos): vale para as próximas pistas também. */
+  setFlare(on: boolean): void {
+    this.flareAllowed = on;
+    this.syncFlare();
+  }
+
+  private syncFlare(): void {
+    this.flare.visible = this.flareAllowed && this.flareQualityOk && this.flareStrength > 0;
   }
 
   setPalette(p: Palette, time: TimeOfDay, key: string): void {
     if (key === this.paletteKey) return;
     this.paletteKey = key;
-    const s = sunSetup(time);
+    const s = sunOf(p, time);
     this.night = time === 'night';
     this.sunDirAbs.copy(s.dir);
     const u = this.dome.material.uniforms;
@@ -307,6 +337,11 @@ export class Sky {
     this.fog.color.set(p.fog);
     this.fogMul = p.fogDensity;
     this.fog.density = this.fogBase * this.fogMul;
+    this.flareStrength = p.flare;
+    const fu = this.flare.material.uniforms;
+    fu.uStrength.value = p.flare;
+    (fu.uColor.value as THREE.Color).set(p.flareColor);
+    this.syncFlare();
     this.scene.environmentIntensity = p.envIntensity;
     this.rebuildEnvironment();
   }
@@ -328,6 +363,7 @@ export class Sky {
     const c = Math.cos(absHeading); const s = Math.sin(absHeading);
     this.sunDirLocal.set(d.x * c + d.z * s, d.y, -d.x * s + d.z * c);
     this.sun.position.copy(this.sunDirLocal).multiplyScalar(260).add(this.target.position);
+    (this.flare.material.uniforms.uSunDir.value as THREE.Vector3).copy(this.sunDirLocal);
   }
 
   get isNight(): boolean { return this.night; }
@@ -337,6 +373,7 @@ export class Sky {
     this.stars.geometry.dispose(); (this.stars.material as THREE.Material).dispose();
     for (const g of this.cloudGeo) g.dispose();
     this.clouds.material.dispose();
+    this.flare.geometry.dispose(); this.flare.material.dispose();
     if (this.envTarget) this.envTarget.dispose();
     this.pmrem.dispose();
     if (this.sun.shadow.map) this.sun.shadow.map.dispose();

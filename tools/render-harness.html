@@ -61,7 +61,9 @@ const styleCars = CAR_BODIES.map(carForBody);
 
 const baseTrack = getTrack(trackId);
 const tod = ['day', 'dusk', 'night'].includes(q.get('tod')) ? q.get('tod') : null;
-const track = tod ? { ...baseTrack, def: { ...baseTrack.def, timeOfDay: tod } } : baseTrack;
+// scenery=<bioma> (M2): troca o bioma da pista só para ver as combinações que nenhuma pista usa (tropical/deserto/montanha/savana à noite, cidade de dia).
+const scenery = ['tropical', 'desert', 'city_night', 'alpine', 'coast', 'savanna'].includes(q.get('scenery')) ? q.get('scenery') : null;
+const track = tod || scenery ? { ...baseTrack, def: { ...baseTrack.def, ...(tod ? { timeOfDay: tod } : {}), ...(scenery ? { scenery } : {}) } } : baseTrack;
 const paintIds = (q.get('paints') ?? '').split(',');
 const humans = Array.from({ length: humanCount }, (_, i) => ({ seat: i, name: `P${i + 1}`, carId: CARS[i % 8].id, teamId: 0, color: seatColor(i), ...(paintIds[i] ? { paint: paintIds[i] } : {}) }));
 // A config vai sem a pintura (como na sessão: o estado da corrida não carrega cosmético).
