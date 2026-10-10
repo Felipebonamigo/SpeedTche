@@ -533,3 +533,13 @@ A troca de pista (layout + modelos, uma vez na largada) fica na mesma ordem: Cop
 201 / **827 mil**; city-night 269 / **829 mil** (antes da onda I o pior caso era Paris 4p, 689 mil: +20%). Chamadas,
 geometrias, texturas e programas iguais — só triângulos sobem. Continua barato para qualquer placa recente; a medição
 no Steam Deck (roteiro acima) segue com o Felipe.
+
+## Palco 3D da garagem (N2, contagens em swiftshader, sem FPS)
+
+| Degrau | Chamadas | Triângulos | Passes |
+|---|---|---|---|
+| Baixa | 8 | ~8,4 mil | 0 |
+| Média | 24 | ~8,4 mil | 4 |
+| Alta e Ultra | 26 | ~8,4 mil | 4, MSAA 4× |
+
+Com 3–4 janelas na Alta não há AO (23 chamadas, 3 passes). Pódio de 3 carros: 31 chamadas e ~16,1 mil triângulos; revelação 28; oficina 25. Os tetos do `stage-gl` (≤ 60 chamadas e ≤ 60 mil triângulos por janela) são provisórios até o bench do dono.

@@ -410,3 +410,7 @@ falso: a prévia muda, o save guarda e volta), `tests/paint-session.test.ts` (se
 ## Rodas, traseira e cabine (M4)
 
 Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo. O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.
+
+## Garagem e Concessionária (N2)
+
+A garagem percorre só os carros do piloto (os livres e os comprados); a **Concessionária** (menu principal) percorre os 7 à venda, com preço, "faltam", antes → depois e COMPRAR (`buyCar`). Fora do Retrô o carro de cada painel é o modelo 3D do palco (a pintura escolhida aparece na hora); no Retrô fica a silhueta SVG. Sem carreira a Concessionária é vitrine só de ver.
