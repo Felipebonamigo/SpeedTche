@@ -64,7 +64,12 @@ await key('ArrowDown', await mainIndex(page, '^controles$'));
 await key('Enter');
 check((await menu()) === 'controls', `Controles abre pelo menu (${await menu()})`);
 const grid = await page.evaluate(() => ({ cells: document.querySelectorAll('.bind-cell').length, restore: document.querySelectorAll('.btn-restore').length, first: document.querySelector('.bind-cell')?.textContent }));
-check(grid.cells === 24 && grid.restore === 3 && grid.first === '↑', `grade 8×3 com restaurar (${JSON.stringify(grid)})`);
+// 10 ações (derrapar e olhar para trás entraram na M1) × 3 dispositivos = 30 células, mais um "Padrão" por coluna.
+const ROWS = 10;
+check(grid.cells === ROWS * 3 && grid.restore === 3 && grid.first === '↑', `grade 10×3 com restaurar (${JSON.stringify(grid)})`);
+// A grade inteira cabe na tela (a 1280×720 do roteiro): a última linha e o "Padrão" ficam dentro da janela, sem rolar a página.
+const fit = await page.evaluate(() => { const r = document.querySelector('.btn-restore')?.getBoundingClientRect(); return r ? { bottom: Math.round(r.bottom), height: innerHeight } : null; });
+check(fit !== null && fit.bottom <= fit.height, `a grade de 10 linhas cabe na janela (${JSON.stringify(fit)})`);
 check((await focused()) === 'throttle:kb1', `foco começa em Acelerar/Teclado 1 (${await focused()})`);
 await frames(2);
 await shot('01-tela');
@@ -139,7 +144,7 @@ await shot('06-controle');
 await pad(7, false);
 
 // ── Captura no gamepad pelo próprio controle: A abre, o A segurado não conta, LT vira o nitro ──
-// foco: Frear/teclado 1 (3) → Nitro/controles (14)
+// foco: Frear/teclado 1 (linha 1) → Nitro/controles (linha 4, coluna 3)
 await key('ArrowDown', 3);
 await key('ArrowRight', 2);
 check((await focused()) === 'nitro:gamepad', `foco em Nitro/Controles (${await focused()})`);
@@ -160,12 +165,18 @@ await pad(9);
 check((await capturing()) === null && JSON.stringify((await controls()).gamepad.nitro) === '[6]', `Start cancela a captura do controle (${await statusText()})`);
 await pad(9, false);
 
-// ── Restaurar padrão do controle (teclado segue remapeado) ──
-await key('ArrowDown', 4);
-check((await focused())?.toString().length > 0 && (await page.evaluate(() => document.querySelector('.scr-controls .focus')?.dataset.restore)) === 'gamepad', 'foco no Padrão dos controles');
+// ── O foco percorre as linhas novas (marchas → Derrapar → Olhar para trás → Pausa → Padrão), na coluna dos controles ──
+await key('ArrowDown', 3);
+check((await focused()) === 'drift:gamepad', `foco desce até Derrapar/Controles (${await focused()})`);
+await key('ArrowDown');
+check((await focused()) === 'lookBack:gamepad', `e até Olhar para trás/Controles (${await focused()})`);
+// ── Restaurar padrão do controle (teclado segue remapeado): da Olhar para trás ainda faltam Pausa e a linha do Padrão ──
+await key('ArrowDown', 2);
+check((await page.evaluate(() => document.querySelector('.scr-controls .focus')?.dataset.restore)) === 'gamepad', `foco no Padrão dos controles (${await focused()})`);
 await key('Enter');
 c = await controls();
-check(JSON.stringify(c.gamepad.nitro) === '[5]' && JSON.stringify(c.gamepad.brake) === '[2,1,6]' && JSON.stringify(c.kb1.throttle) === '["KeyR"]', `Padrão restaura só os controles (${JSON.stringify(c.gamepad.nitro)})`);
+// Nitro volta a LB e Y ([4,3]) — não ao RB, que agora é o derrapar —, o freio recupera o LT, e derrapar/olhar para trás seguem no padrão.
+check(JSON.stringify(c.gamepad.nitro) === '[4,3]' && JSON.stringify(c.gamepad.brake) === '[2,1,6]' && JSON.stringify(c.gamepad.drift) === '[5]' && JSON.stringify(c.gamepad.lookBack) === '[11]' && JSON.stringify(c.kb1.throttle) === '["KeyR"]', `Padrão restaura só os controles (${JSON.stringify(c.gamepad)})`);
 
 // ── Mouse: clicar numa célula captura; clicar fora cancela ──
 await page.click('.bind-cell[data-action="gearUp"][data-device="kb2"]');
@@ -242,9 +253,9 @@ await page.evaluate(() => window.nc.session.debugStep(60 * 4));
 let calls = await page.evaluate(() => window.__pad.calls.map((c) => `${c.type}:${c.strongMagnitude}:${c.duration}`));
 check(calls.some((c) => c.startsWith('dual-rumble:0.55')), `largada vibra o controle (${calls.slice(0, 4).join(', ')})`);
 await page.waitForTimeout(400);
-await pad(5);
+await pad(4); // LB = nitro (o RB, botão 5, é o derrapar desde a M1)
 await page.evaluate(() => window.nc.session.debugStep(2));
-await pad(5, false);
+await pad(4, false);
 calls = await page.evaluate(() => window.__pad.calls.map((c) => `${c.type}:${c.strongMagnitude}:${c.duration}`));
 check(calls.some((c) => c.startsWith('dual-rumble:0.35:110')), `nitro dá um tremor curto (${calls.join(', ')})`);
 // Grama: acelerando e virando tudo para a esquerda, o carro sai do asfalto; pulsos fracos e espaçados.
@@ -256,9 +267,9 @@ calls = await page.evaluate(() => window.__pad.calls.map((c) => `${c.type}:${c.s
 const grass = calls.filter((c) => c.startsWith('dual-rumble:0.16:'));
 check(grass.length > 0 && grass.length < 60 * 4 / 5, `grama vibra fraco e com limite de frequência (${grass.length} pulsos em 4 s; batidas: ${calls.filter((c) => c.startsWith('dual-rumble:1:')).length})`);
 await page.evaluate(() => { const s = window.nc.session; s.settings.vibration = false; window.__pad.calls.length = 0; });
-await pad(5);
+await pad(4);
 await page.evaluate(() => window.nc.session.debugStep(60 * 3));
-await pad(5, false);
+await pad(4, false);
 calls = await page.evaluate(() => window.__pad.calls.length);
 check(calls === 0, `vibração desligada: nenhuma chamada (${calls})`);
 await pad(7, false);
