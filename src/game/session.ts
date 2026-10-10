@@ -34,12 +34,13 @@ import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menu
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
-import { gridRival } from './rivals';
+import { cupDuels, gridRival } from './rivals';
+import { createRivalTalk, observeRivalTalk, rivalByName, rivalTalkText, type RivalTalk } from './rival-talk';
 import { createOnlineController, type OnlineController } from './online-session';
 import { createPartySession, isPartyRaceMode } from './party-session';
 import { racePaints, withoutPaint } from './paints';
 import { carIndexOfSeat } from '../core/modes';
-import { createFeelTracker, observeFeel, type FeelTracker } from './race-feel';
+import { createFeelTracker, createScrapeMemory, observeFeel, observeScrapes, type FeelTracker, type ScrapeCue, type ScrapeMemory } from './race-feel';
 import { getActivePlaylog, playlogRace } from './playlog';
 import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
@@ -51,6 +52,8 @@ const DT = 1 / TICK_RATE;
 const MAX_STEPS_PER_FRAME = 4;
 /** Depois do último humano cruzar a linha, quanto tempo a corrida fica na tela antes do resultado. */
 const RESULTS_DELAY = 3.0;
+/** Quanto tempo a fala do rival fica no HUD (uma frase de ~80 caracteres, lida do sofá). */
+const RIVAL_LINE_TTL = 4.5;
 /** Conquista no HUD: fica até o resultado cobrir a corrida. */
 const ACHIEVEMENT_TTL = RESULTS_DELAY + 0.5;
 
@@ -80,6 +83,9 @@ interface ActiveRace {
   /** Termômetro de emoção por carro humano local (race-feel.ts) e se a corrida já foi para o diário (playlog.ts). */
   feel: Record<number, FeelTracker>;
   logged: boolean;
+  /** Raspão de lado derivado do estado (race-feel.ts: observeScrapes) e a conversa do rival (rival-talk.ts; null sem rival). Só visual: fora do estado. */
+  scrapes: ScrapeMemory;
+  talk: RivalTalk | null;
   heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown'> | undefined>;
 }
 
@@ -254,6 +260,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       state, track, mode, humans, messages, telemetry: newTelemetry(), overFor: 0, seed: config.seed, outcome: null, driver: net?.driver ?? null, localSeats, ghost,
       paints: racePaints(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
+      scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null,
     };
     getActivePlaylog()?.raceStarted({ mode, trackId: config.trackId, humans: localSeats.length });
     session.paused = false;
@@ -262,6 +269,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     const music = settings.music === 'auto' ? songForScenery(track.def.scenery, track.def.timeOfDay) : settings.music;
     audio.setMusic(music === 'off' ? null : music);
     getDesktop()?.richPresence(`${track.def.name} · ${humans.length}P`).catch(() => undefined);
+  }
+
+  /** O rival da copa terminou à frente do melhor humano na corrida anterior? (a "revanche" do rival na pista). null = sem dado. */
+  function previousDuel(c: ChampionshipState | null): boolean | null {
+    const duels = c ? cupDuels(c) : [];
+    return duels.length ? duels[duels.length - 1] : null;
   }
 
   function startQuick(trackId: string, laps: number, humans: HumanEntry[], timeTrial = false): void {
@@ -452,7 +465,18 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     for (const f of Object.values(r.feel)) observeFeel(f, r.state);
     for (const e of events) handleEvent(r, e);
     r.ghost?.afterTick(r.state);
-    for (const c of rumbleCues(r.state, rumbleMemory)) input.rumble(c.seat, c.strength, c.ms);
+    // Sinais que o núcleo não emite: o raspão de lado (derivado do estado) e a fala do rival na pista. Só visual e sonoro.
+    const scrapes = observeScrapes(r.scrapes, r.state);
+    for (const sc of scrapes) if (involvesLocalSeat(r, sc)) audio.scrape?.(sc.strength); // dublês de teste podem não ter
+    for (const c of rumbleCues(r.state, rumbleMemory, scrapes)) input.rumble(c.seat, c.strength, c.ms);
+    if (r.talk && r.state.config.rival) {
+      const rival = rivalByName(r.state.config.rival);
+      for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind), 'info', RIVAL_LINE_TTL);
+    }
+  }
+
+  function involvesLocalSeat(r: ActiveRace, sc: ScrapeCue): boolean {
+    return [sc.a, sc.b].some((id) => { const c = r.state.cars.find((x) => x.id === id); return c !== undefined && c.seat >= 0 && r.localSeats.includes(c.seat); });
   }
 
   function buildFrame(r: ActiveRace): RenderFrame {

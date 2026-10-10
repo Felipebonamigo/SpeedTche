@@ -1,12 +1,15 @@
 // Efeitos por evento da simulação e sons de interface. Cada efeito é uma receita curta de
 // playTone/noiseBurst agendada no tempo do contexto; nada fica vivo depois da cauda.
 import type { SimEvent, SpriteKind } from '../core/types';
+import type { SampleBank } from './samples';
 import { ENV_HIT, ENV_PAD, ENV_PLUCK, noiseBurst, playTone } from './synth';
 
 export interface Sfx {
   /** `localSeat` ≥ 0 = evento de um jogador local; -1 = carro da IA (só alguns tocam, baixinho). */
   play(event: SimEvent, localSeat: number): void;
   ui(kind: 'move' | 'confirm' | 'back'): void;
+  /** Raspão de lado (race-feel.ts: observeScrapes) de um jogador local; `strength` 0..1 pela velocidade. */
+  scrape(strength: number): void;
 }
 
 /** Ganho dos eventos de carros da IA em relação aos dos jogadores. */
@@ -23,7 +26,11 @@ const C5 = 523.25, E5 = 659.25, G5 = 783.99, A5 = 880.0, C6 = 1046.5, E6 = 1318.
 /** Colisão com o que quebra (vidro/metal) soa mais agudo do que madeira e pedra. */
 const GLASSY: ReadonlySet<SpriteKind> = new Set(['building', 'tower', 'lamp', 'billboard', 'sign_left', 'sign_right', 'pit_sign']);
 
-export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode): Sfx {
+/**
+ * `samples`: o banco de amostras CC0 (samples.ts). Cada efeito principal toca a gravação quando ela já está pronta e cai na
+ * síntese de sempre quando não (carregando, sem decodificador, sem arquivo): sem banco, o som é todo sintético, como antes.
+ */
+export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode, samples?: SampleBank): Sfx {
   const lastAiAt = new Map<SimEvent['type'], number>();
 
   const tone = (freq: number, dur: number, gain: number, at: number, type: OscillatorType = 'square', extra: Partial<Parameters<typeof playTone>[2]> = {}) =>
@@ -93,12 +100,14 @@ export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode)
 
   function collision(at: number, g: number, strength: number): void {
     const s = Math.max(0.2, Math.min(1, strength));
+    if (samples?.play(s >= 0.6 ? 'collisionHeavy' : 'collisionMed', { at, gain: (0.4 + 0.6 * s) * g, rate: 0.94 + Math.random() * 0.12 })) return;
     thud(at, 0.5 * s * g);
     noiseBurst(ctx, dest, { dur: 0.08, gain: 0.25 * s * g, at, filter: { type: 'lowpass', freq: 900 } });
   }
 
   function crash(at: number, g: number, sprite: SpriteKind): void {
     const glassy = GLASSY.has(sprite);
+    if (samples?.play(glassy ? 'crashGlass' : 'crashSoft', { at, gain: 0.9 * g, rate: 0.95 + Math.random() * 0.1 })) return;
     thud(at, 0.55 * g);
     noiseBurst(ctx, dest, {
       dur: 0.3, gain: 0.3 * g, at, filter: { type: 'bandpass', freq: glassy ? 3200 : 1400, q: 0.7 },
@@ -110,6 +119,16 @@ export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode)
         noiseBurst(ctx, dest, { dur: 0.02, gain: 0.12 * g, at: at + 0.04 + i * 0.05 + Math.random() * 0.02, filter: { type: 'highpass', freq: 5000 } });
       }
     }
+  }
+
+  /** Metal arrastando: a gravação (mais aguda e forte com a velocidade) ou, sem ela, um chiado de ruído filtrado. */
+  function scrapeMetal(at: number, g: number, strength: number): void {
+    const s = Math.max(0, Math.min(1, strength));
+    if (samples?.play('scrape', { at, gain: (0.25 + 0.5 * s) * g, rate: 0.8 + 0.5 * s })) return;
+    noiseBurst(ctx, dest, {
+      dur: 0.14, gain: (0.08 + 0.14 * s) * g, at, filter: { type: 'bandpass', freq: 2600 + 1400 * s, q: 1.4 },
+      env: { attack: 0.004, decay: 0.08, sustain: 0.3, release: 0.06 },
+    });
   }
 
   function gravel(at: number, g: number): void {
@@ -188,6 +207,8 @@ export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode)
 
   function ui(kind: 'move' | 'confirm' | 'back'): void {
     const now = ctx.currentTime;
+    const id = kind === 'move' ? 'uiMove' : kind === 'confirm' ? 'uiConfirm' : 'uiBack';
+    if (samples?.play(id, { at: now, gain: kind === 'move' ? 0.5 : 0.7, dest: uiDest })) return;
     switch (kind) {
       case 'move':
         playTone(ctx, uiDest, { freq: A5, dur: 0.03, gain: 0.12, at: now, type: 'triangle', env: ENV_HIT });
@@ -202,5 +223,5 @@ export function createSfx(ctx: AudioContext, dest: AudioNode, uiDest: AudioNode)
     }
   }
 
-  return { play, ui };
+  return { play, ui, scrape: (strength) => scrapeMetal(ctx.currentTime, 1, strength) };
 }

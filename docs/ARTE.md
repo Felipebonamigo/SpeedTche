@@ -227,3 +227,36 @@ mínima (`min-width: 7ch`) para não balançar. Se o dono preferir dígito de la
 **Para trocar a fonte:** abra `src/ui/fonts.css` e deixe a família escolhida primeiro em `--font-display`; nada mais muda.
 **Para tirar uma candidata do pacote** (depois que o dono escolher): apague o arquivo, o `@font-face` dela e a linha da
 tabela acima (e ajuste `tests/fonts-hud.test.ts`).
+
+## Efeitos sonoros em amostra (onda L, frente L5, 10/10/2026)
+
+Os efeitos principais tocam uma gravação CC0 por `decodeAudioData` (`src/audio/samples.ts`, `sample-assets.ts`); **a síntese
+de `src/audio/sfx.ts` continua sendo a reserva** e cobre tudo o que a amostra não cobre (carregando, formato que o navegador
+não decodifica, arquivo ausente: o `play` devolve `false` e o efeito sai sintetizado, como antes). Os arquivos entram como
+data URL (`?inline`), pelo mesmo motivo dos `.glb`: o Electron carrega a página por `file://`, onde `fetch` de arquivo é
+bloqueado. Todos pequenos (≤ 12 KB, 69 KB no total). O `tests/audio-samples.test.ts` confere que cada arquivo existe, é Ogg,
+é pequeno, e **está listado aqui** com a licença junto (`LICENSE-Kenney-*-CC0.txt` ao lado dos arquivos).
+
+Origem: **Kenney** (www.kenney.nl), pacotes "Impact Sounds 1.0" (19/12/2019, `kenney.nl/assets/impact-sounds`) e "Interface
+Sounds 1.0" (11/02/2020, `kenney.nl/assets/interface-sounds`). Licença: **Creative Commons Zero (CC0 1.0)**
+(`creativecommons.org/publicdomain/zero/1.0/`): uso livre, inclusive comercial; o crédito a Kenney é gentileza, não
+obrigação. Baixados do site do autor em 10/10/2026 e copiados **sem alteração**.
+
+| Arquivo em `src/assets/audio/` | Pacote (autor) | Licença | Papel no jogo (`SampleId`) |
+|---|---|---|---|
+| `impactPlate_medium_000.ogg` (11 KB) | Impact Sounds (Kenney) | CC0 | batida entre carros, fraca e média (`collisionMed`) |
+| `impactPlate_heavy_000.ogg` (10 KB) | Impact Sounds (Kenney) | CC0 | batida entre carros, forte (`collisionHeavy`) |
+| `impactPunch_heavy_000.ogg` (12 KB) | Impact Sounds (Kenney) | CC0 | batida no cenário: árvore, pedra, mureta (`crashSoft`) |
+| `impactGlass_heavy_000.ogg` (7 KB) | Impact Sounds (Kenney) | CC0 | batida no cenário: prédio, torre, poste, placa (`crashGlass`) |
+| `impactMetal_light_000.ogg` (8 KB) | Impact Sounds (Kenney) | CC0 | raspão de lado, o metal arrastando (`scrape`) |
+| `tick_001.ogg` (4 KB) | Interface Sounds (Kenney) | CC0 | interface: mover o foco (`uiMove`) |
+| `confirmation_001.ogg` (9 KB) | Interface Sounds (Kenney) | CC0 | interface: confirmar (`uiConfirm`) |
+| `back_001.ogg` (7 KB) | Interface Sounds (Kenney) | CC0 | interface: voltar (`uiBack`) |
+
+**O que não veio em amostra e fica na síntese (pedido registrado).** O pedido do cronograma lista impacto, pneu, zum,
+interface, metal e torcida. Os pacotes de Kenney acima cobrem impacto, metal e interface; **pneu** (derrapagem e freada),
+**"zum"** da ultrapassagem colada (e o `whoosh` do nitro) e **torcida** não existem nesses pacotes, e a rede deste ambiente só
+alcançou o site do Kenney (sem conta, não se baixa do Freesound). Ficam sintéticos (`sfx.ts`: `nitro`, `gravel`, `tow`…);
+candidatas a procurar em CC0/royalty-free: pacotes de som de corrida do OpenGameArt e do Freesound com licença CC0 (conferir
+a licença **de cada arquivo**) para pneu e torcida. Também continuam sintéticos o motor (`engine.ts`) e a música
+(`music.ts`).
