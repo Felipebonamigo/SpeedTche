@@ -19,8 +19,8 @@
   /* Cada coluna tem pelo menos a largura do seu título e a ação a do rótulo inteiro (nada de "Virar à esquer…");
      a de controles é mais larga porque "X / B / LT" quebrava em duas linhas e empurrava o VOLTAR para fora. */
   grid-template-columns: minmax(max-content, 1.05fr) repeat(2, minmax(min-content, 0.85fr)) minmax(min-content, 1.3fr);
-  /* 10 linhas desde a M1 (derrapar e olhar para trás): gap e células enxutos para a grade + VOLTAR caberem em 1024×640 e 1280×800, com texto grande. */
-  gap: calc(3 * var(--u)) calc(6 * var(--u));
+  /* 11 linhas desde a N6 (a buzina; 10 desde a M1): gap e células enxutos para a grade + VOLTAR caberem em 1024×640 e 1280×800, com texto grande. */
+  gap: calc(2 * var(--u)) calc(6 * var(--u));
   align-items: center;
 }
 .remap-h {
@@ -55,8 +55,8 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: calc(26 * var(--u));
-  padding: calc(1 * var(--u)) calc(6 * var(--u)) calc(1 * var(--u)) calc(12 * var(--u));
+  min-height: calc(22 * var(--u));
+  padding: 0 calc(6 * var(--u)) 0 calc(12 * var(--u));
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: var(--r-sm);

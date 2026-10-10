@@ -28,6 +28,8 @@ export interface DeviceRaw {
   gearDown: boolean;
   /** Derrapar (M1): o botão SEGURADO. É nível, não borda: fica de fora de `EDGE_KEYS`. */
   drift: boolean;
+  /** Buzina (N6): o botão SEGURADO. Nível, como derrapar: fora de `EDGE_KEYS`. */
+  horn: boolean;
   up: boolean;
   down: boolean;
   left: boolean;
@@ -39,7 +41,7 @@ export interface DeviceRaw {
 }
 
 export const NEUTRAL_RAW: Readonly<DeviceRaw> = Object.freeze({
-  steer: 0, throttle: false, brake: false, nitro: false, gearUp: false, gearDown: false, drift: false,
+  steer: 0, throttle: false, brake: false, nitro: false, gearUp: false, gearDown: false, drift: false, horn: false,
   up: false, down: false, left: false, right: false, confirm: false, back: false, start: false, pause: false,
 });
 
@@ -65,7 +67,7 @@ export function applyDeadzone(v: number, dz = DEADZONE): number {
 }
 
 /**
- * Botões "standard": 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 LT, 7 RT, 9 Start, 11 R3, 12–15 d-pad. A pilotagem
+ * Botões "standard": 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 LT, 7 RT, 9 Start, 10 L3, 11 R3, 12–15 d-pad. A pilotagem
  * segue `bindings.gamepad`; o analógico esquerdo sempre vira, e d-pad/analógico, A, B e Start sempre
  * navegam os menus. Start sempre pausa, além do botão de pausa escolhido.
  */
@@ -87,6 +89,7 @@ export function mapGamepad(buttons: readonly boolean[], axes: readonly number[],
     gearUp: any(g.gearUp),
     gearDown: any(g.gearDown),
     drift: any(g.drift),
+    horn: any(g.horn),
     up: b(12) || y < -0.5,
     down: b(13) || y > 0.5,
     left: b(14) || x < -0.5,
@@ -144,6 +147,7 @@ export function mapKeyboard(keys: ReadonlySet<string>, layout: KeyboardId, bindi
     gearUp: any(B.gearUp),
     gearDown: any(B.gearDown),
     drift: any(B.drift),
+    horn: any(B.horn),
     up: any(N.up), down: any(N.down), left: any(N.left), right: any(N.right),
     confirm: any(N.confirm),
     back: any(N.back),
@@ -175,7 +179,7 @@ export function repeatEdge(held: boolean, last: number | null, nowMs: number, in
 }
 
 export function toPlayerInput(raw: DeviceRaw, edges: DeviceEdges): PlayerInput {
-  return { steer: raw.steer, throttle: raw.throttle, brake: raw.brake, nitro: edges.nitro, gearUp: edges.gearUp, gearDown: edges.gearDown, drift: raw.drift };
+  return { steer: raw.steer, throttle: raw.throttle, brake: raw.brake, nitro: edges.nitro, gearUp: edges.gearUp, gearDown: edges.gearDown, drift: raw.drift, horn: raw.horn };
 }
 
 export function isKeyboard(id: DeviceId): id is KeyboardId {
