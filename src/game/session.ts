@@ -191,6 +191,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       const r = session.race;
       if (!r || session.paused) return;
       input.poll();
+      stepVoice(r, 0); // este poll() também fecha as bordas (uma marcha da roda): quem faz o poll dá o passo da roda
       const inputs = readInputs(r);
       if (r.driver) { r.driver.force(ticks, inputs, (i) => stepOnce(r, i)); for (const list of r.messages.values()) list.length = 0; return; }
       for (let i = 0; i < ticks && r.state.phase !== 'finished'; i++) {
@@ -558,6 +559,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   /** O overlay de voz: só nasce quando há algo a mostrar (roda aberta ou balão vivo) e some com a corrida. */
   function drawVoice(r: ActiveRace | null, f: RenderFrame | null): void {
     if (!r || !f) { voiceHud?.hide(); return; }
+    if (!voiceHud && r.voice.balloons.length === 0 && !r.voice.wheels.some((w) => w?.open)) return; // nada a mostrar e nada criado: nem aloca
     const wheels = f.viewports.map((vp) => {
       const w = r.voice.wheels[vp.seat];
       if (!w || !w.open) return null;

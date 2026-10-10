@@ -161,6 +161,18 @@ describe('sessão: a roda e a frase', () => {
     expect(voice().balloons).toHaveLength(0);
   });
 
+  it('o gancho de playtest (debugStep) também lê a roda: o toque de marcha que ele fecha no próprio poll não se perde', () => {
+    startRacing();
+    openWheel();
+    w.down('KeyM'); w.up('KeyM'); // o toque cai entre dois quadros: quem fizer o próximo poll() fecha a borda
+    session.debugStep(1);
+    expect(voice().wheels[0].selected).toBe(0);
+    w.up('KeyH');
+    session.debugStep(2);
+    expect(voice().balloons).toHaveLength(1);
+    expect(voice().balloons[0].text).toBe(tauntText(0));
+  });
+
   it('com a roda aberta, a marcha é da roda e não chega à física; fechada, o câmbio manual troca de marcha normalmente', () => {
     session.settings.manualGear = true;
     startRacing();

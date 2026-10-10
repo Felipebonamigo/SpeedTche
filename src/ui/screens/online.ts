@@ -285,7 +285,7 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
     });
     muteSel.el.title = t('voice.mute.title');
     refreshers.push(() => muteSel.refresh());
-    items.push(muteSel, mainBtn, leaveBtn);
+    items.push(mainBtn, leaveBtn, muteSel); // por último: o foco que já existia (nome, carro, pintura, direção, opções, PRONTO/LARGAR, sair) não se desloca
 
     // Lista da sala (quem está em cada computador).
     const roster = h('div', { class: 'online-roster' });
