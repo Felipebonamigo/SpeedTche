@@ -236,7 +236,7 @@ export function focusPose(model: FocusModel, focus: StageFocus | string, aspect 
       return pose(Math.PI - 0.22, 0.14, 0.9, 0.6, [e[0], e[1], e[2]]);
     }
     default:
-      return { azimuth: 0, elevation: 0.22, distance: fit(2.3, 0.95), target: [0, Math.max(0.45, model.height * 0.38), 0], yaw: null };
+      return { azimuth: 0, elevation: 0.22, distance: fit(2.3, 1.08), target: [0, Math.max(0.45, model.height * 0.4), 0], yaw: null };
   }
 }
 
