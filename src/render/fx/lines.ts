@@ -28,10 +28,12 @@ export function lineCount(max: number, strength: number): number {
   return Math.min(max, Math.ceil(max * Math.min(1, strength)));
 }
 
-/** A volta de uma linha: de 12 m atrás do carro (atrás da câmera) a 70 m à frente. */
+/** A volta de uma linha: de 12 m atrás do carro (atrás da câmera) a 48 m à frente (mais longe que isso a linha de 10 cm some no miolo da tela). */
 const NEAR = -12;
-const FAR = 70;
+const FAR = 48;
 const SPAN = FAR - NEAR;
+/** O comprimento (m) da volta de uma linha de velocidade: a cada tanto de deslocamento ela reaparece lá longe. */
+export const SPEED_LINE_SPAN = SPAN;
 
 /**
  * A linha `k` de `count`, com o carro tendo andado `travel` m (soma contínua, sem volta de pista) a `speedMs` m/s. Falso se `k` não existe ou a
@@ -41,14 +43,14 @@ export function speedLine(k: number, count: number, travel: number, speedMs: num
   if (k < 0 || k >= count || strength <= 0) return false;
   const h1 = hash2(k, 101); const h2 = hash2(k, 202); const h3 = hash2(k, 303); const h4 = hash2(k, 404); const h5 = hash2(k, 505); const h6 = hash2(k, 606);
   const dz = NEAR + mod(h2 * SPAN - travel, SPAN);
-  const fade = smoothstep(FAR, FAR - 18, dz) * smoothstep(NEAR, NEAR + 8, dz);
+  const fade = smoothstep(FAR, FAR - 14, dz) * smoothstep(NEAR, NEAR + 8, dz);
   out.dz = dz;
   out.tail = dz + 2 + 0.07 * speedMs * (0.7 + 0.6 * h6);
-  out.lat = (h1 < 0.5 ? -1 : 1) * (2.3 + 6.5 * h4);
-  out.h = 0.5 + 5.5 * h3 * h3;
-  out.width = 0.025 + 0.03 * h5;
-  out.r = 0.85; out.g = 0.95; out.b = 1.1;
-  out.a = (0.18 + 0.4 * clamp01(strength)) * fade;
+  out.lat = (h1 < 0.5 ? -1 : 1) * (2.6 + 8.4 * h4);
+  out.h = 0.4 + 5.6 * h3 * h3;
+  out.width = 0.09 + 0.11 * h5; // de 9 a 20 cm: 1 a 5 px a 10–30 m de distância; mais fino que isso some na tela
+  out.r = 1.0; out.g = 1.0; out.b = 1.15;
+  out.a = (0.3 + 0.45 * clamp01(strength)) * fade;
   return true;
 }
 
@@ -71,8 +73,8 @@ export function draftLine(k: number, count: number, travel: number, time: number
   out.tail = dz + 3 + 0.05 * speedMs * (0.7 + 0.6 * h4);
   out.lat = r * Math.cos(theta);
   out.h = 0.8 + 0.75 * r * Math.sin(theta);
-  out.width = 0.03 + 0.02 * h2;
-  out.r = 0.9; out.g = 0.97; out.b = 1.0;
-  out.a = 0.5 * clamp01(intensity) * fade;
+  out.width = 0.07 + 0.06 * h2;
+  out.r = 0.95; out.g = 1.0; out.b = 1.05;
+  out.a = 0.65 * clamp01(intensity) * fade;
   return true;
 }

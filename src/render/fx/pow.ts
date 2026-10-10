@@ -116,6 +116,7 @@ export class Pows {
   private readonly z = new Float32Array(POW_MAX); private readonly x = new Float32Array(POW_MAX); private readonly h = new Float32Array(POW_MAX);
   private readonly size = new Float32Array(POW_MAX); private readonly roll = new Float32Array(POW_MAX);
   private readonly age = new Float32Array(POW_MAX).fill(-1);
+  private readonly owner = new Int32Array(POW_MAX).fill(-1);
   private next = 0;
   private readonly pop: THREE.InstancedBufferAttribute;
   private readonly pt: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
@@ -140,10 +141,19 @@ export class Pows {
     this.mesh.name = 'fx-pow';
   }
 
-  /** Estoura um POW em (z, x, altura em m), de `size` m de lado e girado `roll` rad. O mais velho cai se já há 6. */
-  spawn(z: number, x: number, h: number, size: number, roll: number): void {
+  /**
+   * Estoura um POW em (z, x, altura em m), de `size` m de lado e girado `roll` rad. O mais velho cai se já há 6. `owner` (id do carro, −1 = nenhum): o
+   * quadrinho acompanha esse carro enquanto dura (`follow`); fixo no mundo, ele ficaria para trás e passaria rente à câmera, enorme.
+   */
+  spawn(z: number, x: number, h: number, size: number, roll: number, owner = -1): void {
     const i = this.next; this.next = (this.next + 1) % POW_MAX;
-    this.z[i] = z; this.x[i] = x; this.h[i] = h; this.size[i] = size; this.roll[i] = roll; this.age[i] = 0;
+    this.z[i] = z; this.x[i] = x; this.h[i] = h; this.size[i] = size; this.roll[i] = roll; this.age[i] = 0; this.owner[i] = owner;
+  }
+
+  /** Leva os POW do carro `owner` para (z, x): a posição que ele tem agora. */
+  follow(owner: number, z: number, x: number): void {
+    if (owner < 0) return;
+    for (let i = 0; i < POW_MAX; i++) if (this.age[i] >= 0 && this.owner[i] === owner) { this.z[i] = z; this.x[i] = x; }
   }
 
   step(dt: number): void {

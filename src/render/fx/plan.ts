@@ -28,7 +28,7 @@ export interface FxPlan {
 const SPARKS = [0.5, 0.75, 1, 1] as const;
 const SMOKE = [0.5, 0.8, 1, 1] as const;
 const MARKS = [192, 640, 1280, 2048] as const;
-const SPEED_LINES = [10, 18, 28, 40] as const;
+const SPEED_LINES = [14, 24, 36, 48] as const;
 const DRAFT_LINES = [0, 10, 16, 24] as const;
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];

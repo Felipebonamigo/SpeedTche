@@ -25,6 +25,35 @@ export function shockPose(kind: ShockKind, age: number): { radius: number; alpha
   return { radius: sp.r0 + (sp.r1 - sp.r0) * (1 - (1 - t) * (1 - t)), alpha: (1 - t) * (1 - t) };
 }
 
+/**
+ * O anel macio: três voltas de vértices (raio 0,78 / 0,9 / 1) com cor de vértice 0 / 1 / 0 — com mistura aditiva o preto não soma nada, então as duas bordas
+ * somem e o miolo brilha, em vez de uma faixa chapada (a primeira captura mostrou um aro bege duro). 160 triângulos.
+ */
+export function buildShockRingGeometry(segments = 40): THREE.BufferGeometry {
+  const radii = [0.78, 0.9, 1];
+  const level = [0, 1, 0];
+  const pos: number[] = []; const col: number[] = []; const idx: number[] = [];
+  for (let r = 0; r < radii.length; r++) {
+    for (let k = 0; k <= segments; k++) {
+      const a = (k / segments) * Math.PI * 2;
+      pos.push(Math.cos(a) * radii[r], Math.sin(a) * radii[r], 0);
+      col.push(level[r], level[r], level[r]);
+    }
+  }
+  const row = segments + 1;
+  for (let r = 0; r < radii.length - 1; r++) {
+    for (let k = 0; k < segments; k++) {
+      const a = r * row + k; const b = a + 1; const c = a + row; const d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 export class Shockwaves {
   readonly mesh: THREE.InstancedMesh;
   private readonly kind = new Uint8Array(SHOCK_MAX);
@@ -39,8 +68,8 @@ export class Shockwaves {
   private readonly material: THREE.MeshBasicMaterial;
 
   constructor() {
-    this.material = new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    this.mesh = new THREE.InstancedMesh(new THREE.RingGeometry(0.82, 1, 40), this.material, SHOCK_MAX);
+    this.material = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    this.mesh = new THREE.InstancedMesh(buildShockRingGeometry(), this.material, SHOCK_MAX);
     this.mesh.setColorAt(0, this.color.setRGB(0, 0, 0)); // aloca o instanceColor
     this.mesh.count = 0;
     this.mesh.visible = false;

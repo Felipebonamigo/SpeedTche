@@ -33,6 +33,10 @@ const driftLevelForced = Number(q.get('driftlevel') ?? 0);
 const topForced = Number(q.get('top') ?? 0);
 const draftForced = q.get('draft') === '1';
 const reduceFx = q.get('reduce') === '1';
+// win=<segundos>: o carro do jogador cruzou a linha em 1º há tantos segundos (a órbita da vitória da câmera, M5).
+// nitroat=<quadro>: o nitro engata nesse quadro (nitro=1 o liga desde o 1º, e o 1º quadro só guarda o estado: sem anel de engate).
+const nitroAt = Number(q.get('nitroat') ?? -1);
+const winSeconds = q.get('win') === null ? -1 : Number(q.get('win'));
 // carview=side|rear34|front34|rear: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
 // showroom=1: os 13 estilos em grade na pista (carview escolhe o lado, padrão front34);
 // sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros;
@@ -97,6 +101,7 @@ function tick() { stepRace(state, track, []); for (const e of state.events) hand
 function ageMessages(dt) { for (const l of messages.values()) for (let i = l.length - 1; i >= 0; i--) { l[i].ttl -= dt; if (l[i].ttl <= 0) l.splice(i, 1); } }
 for (let i = 0; i < preTicks; i++) { tick(); ageMessages(1 / 60); }
 const me = state.cars.find((c) => c.seat === 0);
+if (winSeconds >= 0) { me.finished = true; me.position = 1; me.finishTick = state.tick - Math.round(winSeconds * 60); }
 const SEG_M = 4 / 200; // metros por unidade de pista
 // seg=<n>: o carro do jogador vai para o início do segmento n (ver um marco turístico, um trecho de pista); os outros saem da frente.
 // together=1: os outros humanos vão junto (lado a lado, 2 segmentos atrás um do outro) — a legenda dos marcos em cada viewport.
@@ -214,7 +219,7 @@ function loop(now) {
     if (frames + 1 >= readyAt) renderSheet(); else renderer.render(raceFrame());
   } else if (!idleNow) {
     if (!forcePause) for (let k = 0; k < speedMul; k++) tick();
-    for (const c of state.cars) if (c.seat >= 0) { if (forceNitro) c.nitroTicks = 100; if (forceSkid) { c.x = 1.35; c.skidTicks = 6; } }
+    for (const c of state.cars) if (c.seat >= 0) { if (forceNitro || (nitroAt >= 0 && frames >= nitroAt)) c.nitroTicks = 100; if (forceSkid) { c.x = 1.35; c.skidTicks = 6; } }
     // brake=1: o carro do jogador "freia" a cada quadro (só a velocidade cai; parado no lugar) — lanternas de freio.
     if (q.get('brake') === '1') { me.speed = Math.max(400, 5000 - frames * 250); me.collisionCooldown = 0; }
     if (forceDrift) { me.driftDir = forceDrift; me.driftTicks = 30; if (driftLevelForced > 0) me.driftCharge = [45, 100, 160][driftLevelForced - 1]; }

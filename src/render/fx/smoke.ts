@@ -32,8 +32,8 @@ export function emitTireSmoke(c: PuffCar, dt: number, f: number, rnd: () => numb
       const big = rnd() < 0.3 ? 1.35 : 1; // de vez em quando uma bolha maior junto (o cacho do cartum)
       out(puff({
         z: c.z - WHEEL_Z + (rnd() - 0.5) * 20, x: c.x + side * WHEEL_X + (rnd() - 0.5) * 0.02, h: 0.15 + 0.15 * rnd(),
-        vz: c.speed * (0.45 + 0.15 * rnd()), vx: side * (0.15 + 0.25 * rnd()), vh: 0.8 + 1.0 * rnd(),
-        life: (0.6 + 0.5 * rnd()) * big, size: (0.45 + 0.25 * rnd()) * big, grow: 1.3 + 0.8 * rnd(), r, g, b,
+        vz: c.speed * (0.6 + 0.15 * rnd()), vx: side * (0.15 + 0.25 * rnd()), vh: 0.6 + 0.8 * rnd(),
+        life: (0.55 + 0.4 * rnd()) * big, size: (0.28 + 0.16 * rnd()) * big, grow: 0.7 + 0.5 * rnd(), r, g, b,
       }));
     }
   }

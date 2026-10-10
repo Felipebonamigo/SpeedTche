@@ -98,5 +98,8 @@ describe('pool de bolhas (Effects)', () => {
     expect(pts.material.depthWrite).toBe(false);
     expect(pts.material.fragmentShader).toContain('// bolha');
     expect(pts.material.fragmentShader).toContain('discard');
+    // a bolha que passa rente à câmera apaga e para de crescer (ajuste visual depois da captura: a fumaça virava um disco do tamanho da tela)
+    const u = (pts.material as unknown as { uniforms: { uNearFade: { value: number } } }).uniforms.uNearFade.value;
+    expect(u).toBeGreaterThan(3);
   });
 });

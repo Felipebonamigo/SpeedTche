@@ -30,13 +30,15 @@ import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 
 const VERT = /* glsl */ `
 attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
-uniform float uScale;
+uniform float uScale; uniform float uNearFade;
 varying float vAlpha; varying vec3 vColor;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = aSize * uScale / max(0.5, -mv.z);
+  // uNearFade > 0 (as bolhas): perto da câmera a partícula para de crescer (profundidade mínima de 3 m) e apaga — a fumaça que passa rente à lente não vira um disco do tamanho da tela.
+  float depth = uNearFade > 0.0 ? max(3.0, -mv.z) : max(0.5, -mv.z);
+  gl_PointSize = aSize * uScale / depth;
   gl_Position = projectionMatrix * mv;
-  vAlpha = aAlpha; vColor = aColor;
+  vAlpha = aAlpha * (uNearFade > 0.0 ? smoothstep(uNearFade * 0.3, uNearFade, -mv.z) : 1.0); vColor = aColor;
 }`;
 
 const FRAG = /* glsl */ `
@@ -59,11 +61,11 @@ void main() {
   float d = length(p);
   float edge = 1.0 - smoothstep(0.86, 1.0, d);
   if (edge < 0.01) discard;
-  float rim = smoothstep(0.66, 0.92, d);
-  float shade = mix(0.72, 1.06, clamp(0.5 + 0.5 * dot(p, vec2(-0.45, 0.89)), 0.0, 1.0));
-  float glint = smoothstep(0.42, 0.0, length(p - vec2(-0.34, 0.4)));
+  float rim = smoothstep(0.7, 0.93, d);
+  float shade = mix(0.7, 1.12, clamp(0.5 + 0.5 * dot(p, vec2(-0.45, 0.89)), 0.0, 1.0));
+  float glint = smoothstep(0.45, 0.0, length(p - vec2(-0.34, 0.4)));
   vec3 col = vColor * shade;
-  col = mix(col, vColor * 0.5, rim * 0.55) + glint * 0.16;
+  col = mix(col, vColor * vec3(0.34, 0.37, 0.46), rim * 0.65) + glint * 0.2;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -98,7 +100,7 @@ class Pool {
     geo.setDrawRange(0, 0);
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: bubble ? FRAG_BUBBLE : FRAG, transparent: true, depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, uniforms: { uScale: { value: 400 } },
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, uniforms: { uScale: { value: 400 }, uNearFade: { value: bubble ? 5 : 0 } },
     });
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
@@ -160,6 +162,8 @@ class Pool {
 const MARKS_MAX = 2048;
 /** A que distância (unidades de pista) de um viewport uma batida ainda ganha o quadrinho POW: 8.000 = 160 m. */
 const NEAR_VIEWER = 8000;
+/** O POW fica 0,4 m (20 unidades) à frente do centro do carro que bateu, e vai com ele. */
+const POW_AHEAD = 20;
 
 /** O que cada viewport guarda entre quadros para as linhas: intensidades suavizadas e a posição do carro dele. */
 interface ViewFx { lineS: number; draftI: number; z: number; x: number; travel: number; speedMs: number; time: number }
@@ -255,6 +259,7 @@ export class Effects {
         else this.marks.buffer.breakStrip(i * 2 + w);
       }
       this.prevSpeed[i] = c.speed;
+      this.pows.follow(c.id, c.z + POW_AHEAD, c.x);
       // Faíscas das rodas na derrapagem, na cor da carga (azul, laranja, roxa).
       if (plan.wheelSparks && state.phase !== 'countdown') emitWheelSparks(this.sparkCarOf(c), driftLevel(c.driftCharge), dt, plan.sparks, rnd, this.emitSpark);
       // Rastro do nitro: traços curtos e discretos (a chama em si é a malha de cars.ts).
@@ -270,7 +275,7 @@ export class Effects {
         // O halo é do carro de quem joga: o dos rivais (até 19) tomaria as 8 vagas dos anéis que se veem.
         if (c.seat >= 0) this.waves.spawn('halo', c.z - 70, c.x, 0.55);
       } else if (cue.kind === 'hit') {
-        if (plan.pow && this.nearViewer(frame, c.z)) this.pows.spawn(c.z + 20, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5);
+        if (plan.pow && this.nearViewer(frame, c.z)) this.pows.spawn(c.z + POW_AHEAD, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5, c.id);
         emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);
         if (c.seat >= 0 && c.seat < 4) this.shakeAmp[c.seat] = Math.min(1, this.shakeAmp[c.seat] + 0.6 + 0.4 * (c.speed / c.stats.topSpeed));
       } else if (cue.kind === 'boost') {

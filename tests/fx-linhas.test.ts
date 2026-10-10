@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { getTrack } from '../src/core/track';
 import type { Quality, RenderFrame } from '../src/game/contracts';
 import { Effects } from '../src/render/effects';
-import { draftLine, lineCount, SPEED_LINES_START, speedLine, speedLineStrength, type LineSpec } from '../src/render/fx/lines';
+import { draftLine, lineCount, SPEED_LINE_SPAN, SPEED_LINES_START, speedLine, speedLineStrength, type LineSpec } from '../src/render/fx/lines';
 import { fxPlan } from '../src/render/fx/plan';
 import { buildRoadFrame } from '../src/render/roadframe';
 import { human, quickRace } from './helpers';
@@ -41,17 +41,17 @@ describe('intensidade das linhas de velocidade', () => {
 });
 
 describe('linhas de velocidade 3D', () => {
-  it('cada linha fica fora da silhueta do carro, na janela da pista (de 12 m atrás a 70 m à frente), fina e comprida', () => {
+  it('cada linha fica fora da silhueta do carro, na janela da pista (de 12 m atrás a 48 m à frente), de 9 a 20 cm de largura e comprida', () => {
     for (const travel of [0, 13.7, 500.25]) {
       const l = all(40, travel, 1);
       expect(l).toHaveLength(40);
       for (const s of l) {
         expect(Math.hypot(s.lat, s.h - 0.8), `lat ${s.lat} h ${s.h}`).toBeGreaterThanOrEqual(2.2);
-        expect(s.h).toBeGreaterThanOrEqual(0.45);
-        expect(s.dz).toBeGreaterThanOrEqual(-12 - 1e-9); expect(s.dz).toBeLessThanOrEqual(70 + 1e-9);
+        expect(s.h).toBeGreaterThanOrEqual(0.4);
+        expect(s.dz).toBeGreaterThanOrEqual(-12 - 1e-9); expect(s.dz).toBeLessThanOrEqual(48 + 1e-9);
         expect(s.tail - s.dz).toBeGreaterThanOrEqual(2); expect(s.tail - s.dz).toBeLessThanOrEqual(14);
-        expect(s.width).toBeGreaterThanOrEqual(0.025); expect(s.width).toBeLessThanOrEqual(0.07);
-        expect(s.a).toBeGreaterThanOrEqual(0); expect(s.a).toBeLessThanOrEqual(0.6);
+        expect(s.width).toBeGreaterThanOrEqual(0.09); expect(s.width).toBeLessThanOrEqual(0.2);
+        expect(s.a).toBeGreaterThanOrEqual(0); expect(s.a).toBeLessThanOrEqual(0.75 + 1e-9);
         expect(Math.max(s.r, s.g, s.b)).toBeGreaterThan(0.8); expect(s.b).toBeGreaterThanOrEqual(s.r); // azul-branco
       }
     }
@@ -62,28 +62,28 @@ describe('linhas de velocidade 3D', () => {
     expect(l.filter((s) => s.lat < 0).length).toBeGreaterThan(10); expect(l.filter((s) => s.lat > 0).length).toBeGreaterThan(10);
     expect(new Set(l.map((s) => s.lat.toFixed(2))).size).toBeGreaterThan(30);
     expect(new Set(l.map((s) => s.h.toFixed(2))).size).toBeGreaterThan(30);
-    expect(Math.max(...l.map((s) => s.dz)) - Math.min(...l.map((s) => s.dz))).toBeGreaterThan(40);
+    expect(Math.max(...l.map((s) => s.dz)) - Math.min(...l.map((s) => s.dz))).toBeGreaterThan(30);
   });
 
-  it('são fixas no mundo: andar 1 m puxa cada linha 1 m para a câmera (só salta, uma volta de 82 m, ao reaparecer lá longe)', () => {
+  it('são fixas no mundo: andar 1 m puxa cada linha 1 m para a câmera (só salta, uma volta inteira, ao reaparecer lá longe)', () => {
     let saltos = 0;
     for (let travel = 0; travel < 300; travel += 0.37) {
       const a = all(40, travel, 1); const b = all(40, travel + 1, 1);
       a.forEach((s, k) => {
         const d = s.dz - b[k].dz; // 1 m, ou 1 − 82 quando a linha deu a volta
         if (Math.abs(d - 1) < 1e-6) return;
-        expect(Math.abs(d - 1 + 82) < 1e-6, `linha ${k} em ${travel}: ${d}`).toBe(true);
+        expect(Math.abs(d - 1 + SPEED_LINE_SPAN) < 1e-6, `linha ${k} em ${travel}: ${d}`).toBe(true);
         saltos++;
       });
     }
     expect(saltos).toBeGreaterThan(0); // e as voltas existem (nem todas as linhas ficam paradas no mesmo ciclo)
-    expect(saltos).toBeLessThan(40 * 810 * 0.02); // uma por linha a cada 82 m de deslocamento
+    expect(saltos).toBeLessThan(40 * 811 * (1 / SPEED_LINE_SPAN) * 1.01); // uma por linha a cada volta de deslocamento
   });
 
   it('apagam nas pontas (reaparecem sem piscar) e o brilho sobe com a intensidade', () => {
     const l = all(40, 300, 1);
-    const longe = l.filter((s) => s.dz > 60); const perto = l.filter((s) => s.dz < -8);
-    const meio = l.filter((s) => s.dz > 5 && s.dz < 40);
+    const longe = l.filter((s) => s.dz > 42); const perto = l.filter((s) => s.dz < -8);
+    const meio = l.filter((s) => s.dz > 5 && s.dz < 30);
     expect(meio.length).toBeGreaterThan(0);
     for (const s of [...longe, ...perto]) expect(s.a).toBeLessThan(Math.min(...meio.map((m) => m.a)) + 1e-9);
     const fraco = all(40, 300, 0.2); const forte = all(40, 300, 1);
@@ -117,7 +117,8 @@ describe('túnel de ar do vácuo', () => {
       expect(s.dz).toBeGreaterThanOrEqual(-9 - 1e-9); expect(s.dz).toBeLessThanOrEqual(46);
       expect(s.tail - s.dz).toBeGreaterThanOrEqual(3);
       expect(Math.min(s.r, s.g, s.b)).toBeGreaterThan(0.7); // claro
-      expect(s.a).toBeGreaterThan(0);
+      expect(s.width).toBeGreaterThanOrEqual(0.07); expect(s.width).toBeLessThanOrEqual(0.13); // visível na tela (a captura mostrou que 3 cm some)
+      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.65 + 1e-9);
     }
     expect(l.filter((s) => s.lat < 0).length).toBeGreaterThan(5); expect(l.filter((s) => s.lat > 0).length).toBeGreaterThan(5);
     expect(l.filter((s) => s.h > 0.8).length).toBeGreaterThan(5); expect(l.filter((s) => s.h < 0.8).length).toBeGreaterThan(5);

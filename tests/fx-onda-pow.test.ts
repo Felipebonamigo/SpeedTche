@@ -86,6 +86,18 @@ describe('onda de choque: o anel', () => {
     expect(Math.abs(n.z)).toBeCloseTo(Math.abs(Math.cos(pt.heading)), 3);
   });
 
+  it('o anel é macio: transparente nas duas bordas e mais brilhante no meio (cor de vértice, aditivo), e leve', () => {
+    const w = new Shockwaves();
+    const g = w.mesh.geometry;
+    const col = g.getAttribute('color');
+    expect(col).toBeDefined();
+    const vals = Array.from({ length: col.count }, (_, i) => col.getX(i));
+    expect(Math.min(...vals)).toBe(0); expect(Math.max(...vals)).toBe(1);
+    expect(vals.filter((v) => v === 0).length).toBeGreaterThan(vals.filter((v) => v === 1).length); // duas bordas para um miolo
+    expect((g.getIndex()?.count ?? 0) / 3).toBeLessThanOrEqual(200);
+    expect((w.mesh.material as THREE.MeshBasicMaterial).vertexColors).toBe(true);
+  });
+
   it('o brilho vai pela cor da instância (aditivo) e cai com a idade; fora da janela da pista não aparece', () => {
     const w = new Shockwaves();
     const mat = w.mesh.material as THREE.MeshBasicMaterial;
@@ -138,6 +150,22 @@ describe('POW da batida', () => {
     expect(pop.getX(0)).toBeCloseTo(2.5 * powPose(0.2)!.scale, 4); expect(pop.getY(0)).toBeCloseTo(powPose(0.2)!.alpha, 4); expect(pop.getZ(0)).toBeCloseTo(0.2, 4);
     p.step(1); p.pose(rf, track);
     expect(p.alive()).toBe(0); expect(p.mesh.visible).toBe(false);
+  });
+
+  it('o POW acompanha o carro que bateu enquanto dura (senão o carro anda e deixa o quadrinho para trás, perto da câmera, enorme)', () => {
+    const p = new Pows();
+    p.spawn(3000, 0.2, 1.6, 2.5, 0, 7);
+    p.follow(7, 3300, 0.1); // o carro 7 andou 6 m
+    p.follow(8, 9999, 0.9); // outro dono: não mexe
+    p.step(0.1); p.pose(rf, track);
+    const m = new THREE.Matrix4(); p.mesh.getMatrixAt(0, m);
+    const pos = new THREE.Vector3().setFromMatrixPosition(m);
+    expect(pos.z).toBeCloseTo(-(300 / 50), 3); expect(pos.x).toBeCloseTo(0.1 * 7, 3); // rf está em z = 3000: 300 unidades à frente = 6 m
+    p.spawn(3000, 0, 1.6, 2.5, 0); // sem dono: fica onde nasceu
+    p.follow(-1, 5000, 0.5);
+    p.pose(rf, track);
+    p.mesh.getMatrixAt(1, m);
+    expect(new THREE.Vector3().setFromMatrixPosition(m).z).toBeCloseTo(0, 3);
   });
 
   it('é um billboard instanciado, por cima de tudo (sem teste de profundidade), de mistura normal', () => {
@@ -215,6 +243,13 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     const s = cena('high'); s.state.phase = 'racing'; s.state.tick = 600; tick(s); s.car.speed = 5000; tick(s);
     s.car.speed = 3000; s.car.collisionCooldown = 17; tick(s);
     expect(pows(s.fx)).toBe(1);
+    // o carro anda 6 m nos próximos quadros e o quadrinho vai junto, 0,4 m à frente do centro dele
+    const z0 = s.car.z;
+    s.car.z = (z0 + 300) % s.state.trackLength; s.car.speed = 3000; tick(s);
+    const pose = (s.fx as unknown as { pows: Pows }).pows;
+    pose.pose(buildRoadFrame(s.frame.track, s.car.z, 30, 200), s.frame.track);
+    const mm = new THREE.Matrix4(); pose.mesh.getMatrixAt(0, mm);
+    expect(new THREE.Vector3().setFromMatrixPosition(mm).z).toBeCloseTo(-20 / 50, 2);
     for (let i = 0; i < 40; i++) tick(s);
     expect(pows(s.fx)).toBe(0);
     const r = cena('high', true); r.state.phase = 'racing'; tick(r); r.car.speed = 5000; tick(r); r.car.collisionCooldown = 20; r.car.speed = 3000; tick(r);
