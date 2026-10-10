@@ -108,17 +108,17 @@ describe('túnel de ar do vácuo', () => {
     return l;
   };
 
-  it('um anel de traços claros em volta do eixo do carro, do lado de trás da câmera até o carro da frente, comprido na direção da pista', () => {
+  it('um anel de traços claros em volta do carro, do lado de trás da câmera até o carro da frente, comprido na direção da pista', () => {
     const l = tunel(24, 50, 3, 1);
     expect(l).toHaveLength(24);
     for (const s of l) {
       const r = Math.hypot(s.lat, (s.h - 0.8) / 0.75);
-      expect(r).toBeGreaterThanOrEqual(1.2); expect(r).toBeLessThanOrEqual(1.9); // o tubo abraça o carro
+      expect(r).toBeGreaterThanOrEqual(1.9); expect(r).toBeLessThanOrEqual(2.8); // o tubo emoldura o carro (a 1,5 m a captura mostrou o tubo escondido atrás da carroceria)
       expect(s.dz).toBeGreaterThanOrEqual(-9 - 1e-9); expect(s.dz).toBeLessThanOrEqual(46);
       expect(s.tail - s.dz).toBeGreaterThanOrEqual(3);
       expect(Math.min(s.r, s.g, s.b)).toBeGreaterThan(0.7); // claro
-      expect(s.width).toBeGreaterThanOrEqual(0.07); expect(s.width).toBeLessThanOrEqual(0.13); // visível na tela (a captura mostrou que 3 cm some)
-      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.65 + 1e-9);
+      expect(s.width).toBeGreaterThanOrEqual(0.09); expect(s.width).toBeLessThanOrEqual(0.16); // visível na tela (a captura mostrou que 3 cm some)
+      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.8 + 1e-9);
     }
     expect(l.filter((s) => s.lat < 0).length).toBeGreaterThan(5); expect(l.filter((s) => s.lat > 0).length).toBeGreaterThan(5);
     expect(l.filter((s) => s.h > 0.8).length).toBeGreaterThan(5); expect(l.filter((s) => s.h < 0.8).length).toBeGreaterThan(5);
