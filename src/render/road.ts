@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { Segment, Track } from '../core/types';
 import type { Palette } from './palette';
+import { applyGrade, applyStylize } from './stylize';
 import {
   ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintShoulder, paintStartDecal, PIT_REPEAT_M,
   PIT_X0, PIT_X1, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND,
@@ -173,6 +174,12 @@ export class Road {
       roughness: 0.7, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       emissive: '#ffffff', emissiveIntensity: 0,
     });
+    // Luz estilizada (stylize.ts): rampa suave + terminador tingido; sem luz de borda no chão (brilharia no horizonte).
+    applyStylize(this.asphaltMaterial, 'road');
+    applyStylize(this.shoulderMaterial, 'ground');
+    applyStylize(this.kerbMaterial, 'road');
+    applyStylize(this.pitMaterial, 'road');
+    applyStylize(this.decalMaterial, 'road');
     this.asphalt = new Strip(capacity, 2, this.asphaltMaterial);
     this.shoulders = new Strip(capacity, 4, this.shoulderMaterial);
     this.pit = new Strip(capacity, 2, this.pitMaterial);
@@ -194,6 +201,7 @@ export class Road {
       map: this.poolTexture, color: '#ffb45a', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
     }), MAX_POOLS);
+    applyGrade(this.pools.material);
     this.pools.frustumCulled = false;
     this.pools.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.pools.count = 0;

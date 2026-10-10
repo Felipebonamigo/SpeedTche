@@ -1,6 +1,6 @@
 // Renderizador 3D (Three.js). Uma cena só; a cada quadro, para cada viewport, o mundo é
 // reposicionado no referencial do carro daquele jogador (RoadFrame) e desenhado por
-// scissor. Tone mapping ACES com a exposição da paleta (cena × período). Pós-processamento
+// scissor. Tone mapping Custom (Neutral + gradação por bioma × período, stylize.ts) com a exposição da paleta. Pós-processamento
 // (bloom + saída sRGB) por viewport na qualidade alta, com MSAA no render target; o limiar do
 // bloom fica acima do branco iluminado pelo sol (de dia só o disco do sol e os emissivos
 // brilham; à noite, faróis, postes e neon); médio sem pós; baixo sem sombras e com menos pista.
@@ -26,6 +26,7 @@ import { absoluteHeading, buildRoadFrame, FRAME_AHEAD, FRAME_BEHIND, type RoadFr
 import { Scenery } from './scenery';
 import type { Layout } from './scenery/layout';
 import { Sky } from './sky';
+import { gradeUniforms, installToneMapping, setStylizePalette } from './stylize';
 import { Terrain } from './terrain';
 
 const BEHIND = FRAME_BEHIND;
@@ -43,7 +44,8 @@ interface ViewportPost { composer: EffectComposer; renderPass: RenderPass; bloom
 export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement): Renderer & { debugInfo(): DebugInfo } {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  installToneMapping(); // antes do primeiro quadro: troca a CustomToneMapping do chunk global (Neutral + gradação, stylize.ts)
+  renderer.toneMapping = THREE.CustomToneMapping;
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft foi removido no r186
@@ -98,7 +100,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     cars.setLight(p.light);
     effects.setPalette(p);
     effects.clear();
-    renderer.toneMappingExposure = p.exposure;
+    renderer.toneMappingExposure = setStylizePalette(p).exposure;
     bloom = p.bloom;
     for (const post of posts) applyBloom(post.bloom);
     for (const c of cameras) c.reset();
@@ -153,7 +155,10 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     composer.addPass(renderPass);
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(rect.w, rect.h), bloom[0], bloom[1], bloom[2]);
     composer.addPass(bloomPass);
-    composer.addPass(new OutputPass());
+    // O OutputPass faz o tone mapping na alta (o desenho vai a um alvo): os uniformes da gradação entram no material dele.
+    const output = new OutputPass();
+    Object.assign(output.uniforms, gradeUniforms);
+    composer.addPass(output);
     const post = { composer, renderPass, bloom: bloomPass, key };
     posts[i] = post;
     return post;

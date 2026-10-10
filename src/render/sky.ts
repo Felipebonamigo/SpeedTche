@@ -12,6 +12,7 @@ import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
 import type { Palette } from './palette';
+import { applyGrade } from './stylize';
 
 const SKY_RADIUS = 1400;
 /**
@@ -132,6 +133,7 @@ function buildStars(): THREE.Points {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.PointsMaterial({ vertexColors: true, size: 2.6, sizeAttenuation: false, transparent: true, opacity: 1, fog: false, depthWrite: false });
+  applyGrade(m);
   const pts = new THREE.Points(g, m);
   pts.frustumCulled = false;
   return pts;
@@ -221,6 +223,7 @@ export class Sky {
         uSunSize: { value: 0.03 }, uHalo: { value: 9 }, uGlowAmt: { value: 0.3 }, uDisc: { value: 6 }, uMoon: { value: 0 },
       },
     });
+    applyGrade(mat);
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 48, 24), mat);
     this.dome.renderOrder = -10;
     this.dome.frustumCulled = false;
@@ -234,6 +237,7 @@ export class Sky {
         uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal },
       },
     });
+    applyGrade(cloudMat);
     this.clouds = new THREE.Mesh(this.cloudGeo[1], cloudMat);
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = -9;

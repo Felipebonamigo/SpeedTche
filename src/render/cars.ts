@@ -16,6 +16,7 @@ import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
 import { createCarMaterial, setCarQuality, type CarUniforms } from './cars/material';
+import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel } from './cars/models';
 import { carPaint } from './cars/paints';
@@ -126,6 +127,7 @@ export class Cars {
       im.visible = false;
       this.group.add(im);
     }
+    applyStylize(this.ghostMaterial, 'ghost');
     this.ghost = new THREE.Mesh(this.styles[0].model.shell, this.ghostMaterial);
     this.ghost.matrixAutoUpdate = false; this.ghost.frustumCulled = false; this.ghost.visible = false; this.ghost.renderOrder = 3;
     this.group.add(this.ghost);
