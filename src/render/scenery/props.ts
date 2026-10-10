@@ -5,7 +5,8 @@
 // textures.ts.
 import * as THREE from 'three';
 import { hash3 } from '../noise';
-import { box, cone, cyl, merge, paint, shadeY, tf, type Geo, type Model } from './geom';
+import { smoothNormals } from '../normals';
+import { bakeAO, bevelBox, box, cone, cyl, merge, mergeRound, paint, roundedBar, shadeY, tf, wavyStrip, type Geo, type Model } from './geom';
 import { collisionHalfM } from './vegetation';
 
 // ───────────────────────────── Atlas de painéis ─────────────────────────────
@@ -253,4 +254,45 @@ export function trafficCone(): Model {
     paint(cyl(0.19, 0.235, 0.14, 10), '#f4f4f4', tf(0, 0.36, 0)),
   ]);
   return { parts: [{ geometry: g, mat: 'flat', shadow: true }] };
+}
+
+// ───────────────────────────── Orla de Copacabana (kit redondo, onda L4) ─────────────────────────────
+
+/** Cores do quiosque por variante: parede, palha do telhado e banquinhos. */
+const KIOSK = [
+  { wall: '#ffd23f', thatch: '#c9974f', stool: '#e8402a' },
+  { wall: '#ff8a5c', thatch: '#b9803c', stool: '#1e88e5' },
+  { wall: '#46c2c9', thatch: '#d4a65c', stool: '#ffd23f' },
+] as const;
+
+/**
+ * Quiosque da orla: palafita de madeira, corpo de caixa com bisel, balcão de borda redonda para a pista (+X), telhado de palha de
+ * revolução (10 gomos), banquinhos e a placa que acende à noite. Do kit redondo: normais próprias e oclusão assada. A palafita
+ * desce 2 m (o quiosque pousa em declive); ~410 triângulos, ~4,7 m de altura. Fica além do alcance do carro (layout.ts).
+ */
+export function kiosk(seed: number): Model {
+  const c = KIOSK[((seed % 3) + 3) % 3];
+  const round = (g: Geo): Geo => smoothNormals(g, 50);
+  const flat: Geo[] = [
+    paint(bevelBox(5.4, 2.4, 4.4, 0.25), '#b88a5a', tf(0, -0.85, 0)), // palafita (a tampa em y = 0,35)
+    paint(bevelBox(4.4, 2.5, 3.4, 0.35), c.wall, tf(-0.2, 1.6, 0)), // corpo
+    paint(round(roundedBar(0.9, 0.18, 3.6, 0.08, 1)), '#f4f1e8', tf(2.35, 1.5, 0)), // balcão
+    paint(box(0.12, 1.0, 2.6), '#2c3e55', tf(2.0, 2.0, 0)), // janela do balcão
+    paint(new THREE.LatheGeometry([[3.5, 0], [3.3, 0.25], [2.1, 0.95], [1.0, 1.5], [0.0001, 1.85]].map(([r, y]) => new THREE.Vector2(r, y)), 10), c.thatch, tf(-0.2, 2.85, 0)), // telhado
+  ];
+  for (let k = 0; k < 3; k++) flat.push(paint(cyl(0.22, 0.28, 0.55, 6), c.stool, tf(3.35, 0.62, (k - 1) * 1.1)));
+  const body = mergeRound(flat);
+  bakeAO(body, { reach: 2.2, strength: 0.55, rays: 12 });
+  shadeY(body, -2, 4.7, 0.8, 1.05);
+  const sign = merge([paint(box(0.1, 0.45, 2.0), '#ffe9a8', tf(2.3, 2.75, 0))]);
+  return { parts: [{ geometry: body, mat: 'flat', shadow: true }, { geometry: sign, mat: 'glow' }], blob: 3.2 };
+}
+
+/**
+ * Trecho de calçadão em ondas (uma tira de 4 m = um segmento): o mosaico preto e branco de Copacabana, 2 ondas por tira (emenda na
+ * seguinte), 4,4 m de largura, a tampa a 4 cm do chão — abaixo da faixa do carro (`CAR_BAND` começa em 5 cm): o carro passa por
+ * cima como por uma faixa pintada — e o meio-fio descendo 0,9 m (a areia desce para o mar ao lado). 68 triângulos.
+ */
+export function boardwalk(): Model {
+  return { parts: [{ geometry: wavyStrip({ len: 4, width: 4.4, waves: 2, amp: 0.32, bands: 4, zdiv: 8, thick: 0.04, skirt: 0.9 }), mat: 'flat' }] };
 }

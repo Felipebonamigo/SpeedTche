@@ -165,8 +165,7 @@ export class Scenery {
     // Recorte alfa (capim de cartão, L4): um lote só, sem sombra; o `stylize` compõe com o callback do material.
     const blade = bladeTexture();
     this.textures.push(blade);
-    this.cutoutMat = cutoutMaterial(blade);
-    applyStylize(this.cutoutMat, 'scenery');
+    this.cutoutMat = cutoutMaterial(blade); // o `applyStylize` já foi (cutout.ts)
     this.materials = {
       flat: this.flatMat, dress: this.flatMat, haze: this.hazeMat, office: facade('office'), apartment: facade('apartment'), classic: facade('classic'), house: facade('house'),
       glow: this.glowMat, beacon: this.beaconMat, cone, panel: this.panelMat, blob: this.blobMat, cutout: this.cutoutMat,

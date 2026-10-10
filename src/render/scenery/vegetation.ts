@@ -11,7 +11,8 @@ import type { SpriteKind } from '../../core/types';
 import { SPRITE_HALF_WIDTH } from '../../core/track/sprites';
 import { hash2, valueNoise3 } from '../noise';
 import { ROAD_HALF_WIDTH_M } from '../units';
-import { box, cone, cullInside, cyl, frond, ico, jitter, lean, lumpy, merge, mottle, paint, roundedBar, shadeY, sphere, tf, tintUpSoft, tris, tuft, type Ellipsoid, type Geo, type Model } from './geom';
+import { smoothNormals, CREASE } from '../normals';
+import { bakeAO, box, cone, cullInside, cutoutCards, cyl, frond, ico, jitter, lean, lumpy, merge, mergeRound, mottle, paint, roundedBar, shadeY, sphere, sphericalNormals, tf, tintUpSoft, tris, tuft, type Ellipsoid, type Geo, type Model } from './geom';
 
 /** Meia largura de colisão (m, escala 1) de um sprite: o modelo sólido tem de chegar até ela na altura do carro. */
 export function collisionHalfM(kind: SpriteKind): number {
@@ -344,6 +345,81 @@ export function coconutPalm(seed: number, lean: number, baseColors = ['#3f9a3c',
   return flat(finish(merge(parts), H + 1, 0.75, 1.12, 0.04, seed), 2.4);
 }
 
+/** As 4 palmeiras de cartum: altura, quanto o tronco tomba, cor do tronco (pé, topo), folhas e se há palmito verde. */
+const CARTOON_PALMS = [
+  { H: 7.4, tilt: 1.6, r0: 0.3, r1: 0.19, trunk: ['#8a6a3f', '#a67f4a'], fronds: 10, len: 3.4, droop: 2.5, shaft: false },
+  { H: 8.6, tilt: 0.5, r0: 0.3, r1: 0.2, trunk: ['#85683f', '#a07a48'], fronds: 10, len: 3.5, droop: 2.5, shaft: false },
+  { H: 10.4, tilt: 0.15, r0: 0.38, r1: 0.26, trunk: ['#b6ada0', '#d2cabc'], fronds: 10, len: 3.7, droop: 2.4, shaft: true },
+  { H: 3.6, tilt: 0.4, r0: 0.42, r1: 0.32, trunk: ['#8a6e48', '#a2825a'], fronds: 12, len: 3.0, droop: 1.2, shaft: false },
+] as const;
+
+/**
+ * Palmeira de cartum (kit redondo, onda L4): tronco de 8 lados e 7 anéis que afina e tomba (normal radial, cor em degradê), copa de
+ * folhas largas e arqueadas com a NORMAL ESFERIZADA (a copa lê como uma bola de luz só, não como pratos), palmito, cocos de bolinha e
+ * o pé de sempre (`palmBase`: a pegada de colisão). Nada da copa passa da pegada abaixo de ~2,4 m (a faixa do carro com a escala mais baixa
+ * do sorteio de altura enxerga até aí): a baixa (3) tem folha que arqueia menos. `kind` 0 e 1 coqueiros (tombado e reto), 2 palmeira-imperial, 3 baixa.
+ * Normais próprias (`keepNormals`) e oclusão assada na copa. ~590 triângulos (o coqueiro de antes tinha 428).
+ */
+export function cartoonPalm(seed: number, kind: 0 | 1 | 2 | 3): Model {
+  const c = CARTOON_PALMS[kind];
+  const H = c.H + hash2(seed, 1) * 0.6;
+  const dir = hash2(seed, 2) * Math.PI * 2;
+  const cd = Math.cos(dir); const sd = Math.sin(dir);
+  const SEG = 7; const SIDES = 8;
+  // Tronco: anéis ao longo da curva (x = tomba · t²), o raio afina e alarga no pé; normal radial, cor em degradê do pé ao topo.
+  const centre = (t: number): [number, number, number] => [c.tilt * t * t * cd, H * t, c.tilt * t * t * sd];
+  const ring = (t: number): Array<{ p: [number, number, number]; n: [number, number, number] }> => {
+    const [cx, cy, cz] = centre(t);
+    const r = c.r0 + (c.r1 - c.r0) * t + (t < 0.15 ? 0.1 * (1 - t / 0.15) : 0);
+    return Array.from({ length: SIDES }, (_, k) => {
+      const a = (k / SIDES) * Math.PI * 2;
+      return { p: [cx + Math.cos(a) * r, cy, cz + Math.sin(a) * r] as [number, number, number], n: [Math.cos(a), 0, Math.sin(a)] as [number, number, number] };
+    });
+  };
+  const tp: number[] = []; const tn: number[] = []; const tc: number[] = [];
+  const c0 = new THREE.Color(c.trunk[0]); const c1 = new THREE.Color(c.trunk[1]); const tmpC = new THREE.Color();
+  for (let j = 0; j < SEG; j++) {
+    const A = ring(j / SEG); const B = ring((j + 1) / SEG);
+    for (let k = 0; k < SIDES; k++) {
+      const k2 = (k + 1) % SIDES;
+      const quad = [[A[k], j], [B[k2], j + 1], [A[k2], j], [A[k], j], [B[k], j + 1], [B[k2], j + 1]] as const;
+      for (const [pt, row] of quad) {
+        tp.push(...pt.p); tn.push(...pt.n);
+        tmpC.copy(c0).lerp(c1, row / SEG);
+        tc.push(tmpC.r, tmpC.g, tmpC.b);
+      }
+    }
+  }
+  const trunkGeo = new THREE.BufferGeometry();
+  trunkGeo.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
+  trunkGeo.setAttribute('normal', new THREE.Float32BufferAttribute(tn, 3));
+  trunkGeo.setAttribute('color', new THREE.Float32BufferAttribute(tc, 3));
+  // Copa: folhas largas e arqueadas, a normal esferizada para fora do centro da copa.
+  const [topX, topY, topZ] = centre(1);
+  const crownC: [number, number, number] = [topX, topY + 0.3, topZ];
+  const leaves: Geo[] = [];
+  for (let k = 0; k < c.fronds; k++) {
+    const a = (k / c.fronds) * Math.PI * 2 + hash2(seed, k) * 0.4;
+    const len = c.len + hash2(seed, k + 20) * 0.7;
+    leaves.push(paint(frond(len, 1.25, a, 1.0 + hash2(seed, k + 40) * 0.5, c.droop + hash2(seed, k + 30) * 0.5, 5), k % 2 ? '#3f9a3a' : '#52b046', tf(topX, topY - 0.05, topZ)));
+  }
+  for (let k = 0; k < 4; k++) leaves.push(paint(frond(1.5, 0.6, k * 1.57 + 0.4, 1.7, 0.3, 2), '#7ccb58', tf(topX, topY, topZ)));
+  const crown = sphericalNormals(mergeRound(leaves), crownC, 0.65);
+  const crownColor = crown.getAttribute('color') as THREE.BufferAttribute; const crownPos = crown.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < crownPos.count; i++) { // ponta da folha mais clara (por ponto: sem degrau)
+    const d = Math.min(1, Math.hypot(crownPos.getX(i) - topX, crownPos.getZ(i) - topZ) / (c.len + 0.7));
+    const f = 0.88 + 0.26 * d;
+    crownColor.setXYZ(i, crownColor.getX(i) * f, crownColor.getY(i) * f, crownColor.getZ(i) * f);
+  }
+  const bits: Geo[] = [paint(sphere(0.36, 6, 4), '#3f8f38', tf(topX, topY + 0.05, topZ))]; // palmito
+  if (c.shaft) bits.push(paint(cyl(0.22, 0.27, 1.5, 8, true), '#5a9a3a', tf(topX, topY - 0.7, topZ)));
+  else for (let k = 0; k < 3; k++) bits.push(paint(sphere(0.2, 5, 3), '#6b4a22', tf(topX + Math.cos(k * 2.1) * 0.3, topY - 0.45, topZ + Math.sin(k * 2.1) * 0.3)));
+  const base = smoothNormals(merge(palmBase(seed, ['#3f9a3c', '#58ad44'])), CREASE.plant);
+  const g = mergeRound([trunkGeo, crown, ...bits, base]);
+  bakeAO(g, { reach: 1.8, strength: 0.5, rays: 10, smoothDeg: 180 }); // planta: sem quina viva, o mesmo ponto tem a mesma oclusão
+  return flat(finish(g, H + 1, 0.78, 1.12, 0.04, seed), 2.4);
+}
+
 /** Palmeira-imperial: tronco reto cinza, palmito verde, folhas em arco. */
 export function royalPalm(seed: number, baseColors = ['#3f9a3c', '#58ad44']): Model {
   const H = 9.5 + hash2(seed, 1) * 2;
@@ -618,6 +694,11 @@ export function rocks(seed: number, style: RockStyle, R = ROCK_R): Model {
 /** Tufo de capim/folhagem baixa (o carro passa por cima). */
 export function grassTuft(seed: number, color: string, h = 0.55, n = 7): Model {
   return { parts: [{ geometry: shadeY(paint(tuft(n, h, 0.35, seed), color), 0, h, 0.7, 1.15), mat: 'flat' }] };
+}
+
+/** Tufo de capim de recorte alfa (cartões cruzados + a lâmina de `cutout.ts`): 4 cartões, 8 triângulos; `foot` e `head` são as cores do pé e da ponta. */
+export function cutoutTuft(seed: number, foot: string, head: string, h = 0.62, w = 1.0): Model {
+  return { parts: [{ geometry: cutoutCards(4, w, h, seed, foot, head), mat: 'cutout' }] };
 }
 
 /** Canteiro de flores do campo: tufo com pontos coloridos. */

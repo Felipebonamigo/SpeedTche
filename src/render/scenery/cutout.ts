@@ -3,6 +3,7 @@
 // usa `alphaTest`, então não precisa ordenar nem misturar, e funciona dentro do `BatchedMesh`.
 import * as THREE from 'three';
 import { hash2 } from '../noise';
+import { applyStylize } from '../stylize';
 
 /** Lâminas por tufo na textura. */
 const BLADES = 7;
@@ -63,8 +64,8 @@ export function bladeTexture(size = 64): THREE.CanvasTexture {
 
 /**
  * Material do lote `cutout`: cor por vértice × silhueta, `alphaTest` (sem sombra, sem mistura). A normal vale para os dois lados
- * do cartão (o `faceDirection` do three viraria a normal de cima do capim para baixo no verso e o escureceria). O `stylize`
- * entra depois, composto com este callback (runtime.ts).
+ * do cartão (o `faceDirection` do three viraria a normal de cima do capim para baixo no verso e o escureceria). O `stylize` entra
+ * por último, composto com este callback e esta chave de programa (como no `hazeMat` do runtime.ts).
  */
 export function cutoutMaterial(map: THREE.Texture): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, map, alphaTest: 0.45, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
@@ -72,5 +73,6 @@ export function cutoutMaterial(map: THREE.Texture): THREE.MeshStandardMaterial {
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('gl_FrontFacing ? 1.0 : - 1.0', '1.0'));
   };
   m.customProgramCacheKey = () => 'scenery-cutout';
+  applyStylize(m, 'scenery');
   return m;
 }

@@ -459,6 +459,13 @@ export interface AoOptions {
   /** O chão (y = `groundY`) também tapa. Vértice abaixo do chão não conta (a fundação não aparece). */
   ground?: boolean;
   groundY?: number;
+  /** Outras malhas não indexadas do mesmo modelo que também tapam (o prédio é uma parte `flat` e outra de fachada). */
+  occluders?: readonly Geo[];
+  /**
+   * Vértices no mesmo ponto com normais a menos de `smoothDeg` graus (a superfície lisa: arco do bisel, copa, tronco) dividem a
+   * MÉDIA da oclusão — a cor corre contínua pela aresta lisa; a quina viva (90°) mantém um valor por face. Padrão 62°.
+   */
+  smoothDeg?: number;
 }
 
 /** Hemisfério ponderado pelo cosseno (espiral de Fibonacci): `n` direções no referencial local (z para cima). */
@@ -485,83 +492,102 @@ export function bakeAO(geo: Geo, o: AoOptions = {}): Geo {
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   const nor = geo.getAttribute('normal') as THREE.BufferAttribute;
   const col = geo.getAttribute('color') as THREE.BufferAttribute;
-  const T = Math.floor(pos.count / 3);
+  const sources = [geo, ...(o.occluders ?? [])].map((g) => g.getAttribute('position') as THREE.BufferAttribute);
+  const T = sources.reduce((sum, a) => sum + Math.floor(a.count / 3), 0);
   // Por triângulo: um vértice, a normal da face, os lados, o centro e o raio da esfera que o contém.
   const v0 = new Float64Array(T * 3); const e1 = new Float64Array(T * 3); const e2 = new Float64Array(T * 3); const fn = new Float64Array(T * 3);
   const ctr = new Float64Array(T * 3); const rad = new Float64Array(T);
-  for (let t = 0; t < T; t++) {
-    const a = t * 3;
-    const ax = pos.getX(a); const ay = pos.getY(a); const az = pos.getZ(a);
-    const bx = pos.getX(a + 1); const by = pos.getY(a + 1); const bz = pos.getZ(a + 1);
-    const cx = pos.getX(a + 2); const cy = pos.getY(a + 2); const cz = pos.getZ(a + 2);
-    v0[a] = ax; v0[a + 1] = ay; v0[a + 2] = az;
-    e1[a] = bx - ax; e1[a + 1] = by - ay; e1[a + 2] = bz - az;
-    e2[a] = cx - ax; e2[a + 1] = cy - ay; e2[a + 2] = cz - az;
-    let nx = e1[a + 1] * e2[a + 2] - e1[a + 2] * e2[a + 1]; let ny = e1[a + 2] * e2[a] - e1[a] * e2[a + 2]; let nz = e1[a] * e2[a + 1] - e1[a + 1] * e2[a];
-    const nl = Math.hypot(nx, ny, nz);
-    if (nl < 1e-12) { rad[t] = -1; continue; } // degenerado: nunca tapa
-    nx /= nl; ny /= nl; nz /= nl;
-    fn[a] = nx; fn[a + 1] = ny; fn[a + 2] = nz;
-    ctr[a] = (ax + bx + cx) / 3; ctr[a + 1] = (ay + by + cy) / 3; ctr[a + 2] = (az + bz + cz) / 3;
-    rad[t] = Math.max(Math.hypot(ax - ctr[a], ay - ctr[a + 1], az - ctr[a + 2]), Math.hypot(bx - ctr[a], by - ctr[a + 1], bz - ctr[a + 2]), Math.hypot(cx - ctr[a], cy - ctr[a + 1], cz - ctr[a + 2]));
+  let t = -1;
+  for (const src of sources) {
+    for (let k = 0; k + 2 < src.count; k += 3) {
+      t++;
+      const a = t * 3;
+      const ax = src.getX(k); const ay = src.getY(k); const az = src.getZ(k);
+      const bx = src.getX(k + 1); const by = src.getY(k + 1); const bz = src.getZ(k + 1);
+      const cx = src.getX(k + 2); const cy = src.getY(k + 2); const cz = src.getZ(k + 2);
+      v0[a] = ax; v0[a + 1] = ay; v0[a + 2] = az;
+      e1[a] = bx - ax; e1[a + 1] = by - ay; e1[a + 2] = bz - az;
+      e2[a] = cx - ax; e2[a + 1] = cy - ay; e2[a + 2] = cz - az;
+      let nx = e1[a + 1] * e2[a + 2] - e1[a + 2] * e2[a + 1]; let ny = e1[a + 2] * e2[a] - e1[a] * e2[a + 2]; let nz = e1[a] * e2[a + 1] - e1[a + 1] * e2[a];
+      const nl = Math.hypot(nx, ny, nz);
+      if (nl < 1e-12) { rad[t] = -1; continue; } // degenerado: nunca tapa
+      nx /= nl; ny /= nl; nz /= nl;
+      fn[a] = nx; fn[a + 1] = ny; fn[a + 2] = nz;
+      ctr[a] = (ax + bx + cx) / 3; ctr[a + 1] = (ay + by + cy) / 3; ctr[a + 2] = (az + bz + cz) / 3;
+      rad[t] = Math.max(Math.hypot(ax - ctr[a], ay - ctr[a + 1], az - ctr[a + 2]), Math.hypot(bx - ctr[a], by - ctr[a + 1], bz - ctr[a + 2]), Math.hypot(cx - ctr[a], cy - ctr[a + 1], cz - ctr[a + 2]));
+    }
   }
   const dirs = hemisphere(rays);
+  const cosSmooth = (o.smoothDeg ?? 62) >= 180 ? -2 : Math.cos(((o.smoothDeg ?? 62) * Math.PI) / 180); // 180° = todas (cos = −1 exato falha em float)
   const cache = new Map<string, number>();
+  type Entry = { nx: number; ny: number; nz: number; f: number };
+  const groups = new Map<string, Entry[]>();
   const near: number[] = [];
+  const keys: string[] = []; const normals: Array<[number, number, number]> = [];
   for (let i = 0; i < pos.count; i++) {
     const px = pos.getX(i); const py = pos.getY(i); const pz = pos.getZ(i);
     let nx = nor.getX(i); let ny = nor.getY(i); let nz = nor.getZ(i);
     const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
     // Vértices idênticos (posição, normal) herdam o mesmo valor: a caixa tem 3 a 6 triângulos por canto.
-    const key = `${px.toFixed(4)},${py.toFixed(4)},${pz.toFixed(4)},${nx.toFixed(3)},${ny.toFixed(3)},${nz.toFixed(3)}`;
-    let f = cache.get(key);
-    if (f === undefined) {
-      // Origem um pouco acima da superfície (a própria face não tapa); a base do hemisfério gira com a normal.
-      const ox = px + nx * 0.04; const oy = py + ny * 0.04; const oz = pz + nz * 0.04;
-      near.length = 0;
-      for (let t = 0; t < T; t++) {
-        if (rad[t] < 0) continue;
-        const a = t * 3;
-        if (Math.hypot(ctr[a] - px, ctr[a + 1] - py, ctr[a + 2] - pz) < reach + rad[t]) near.push(t);
-      }
-      const hx = Math.abs(nx) < 0.9 ? 1 : 0; const hy = hx ? 0 : 1;
-      // tangente = normalize(h × n), bitangente = n × tangente
-      let tx = hy * nz; let ty = -hx * nz; let tz = hx * ny - hy * nx;
-      const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
-      const bx = ny * tz - nz * ty; const by = nz * tx - nx * tz; const bz = nx * ty - ny * tx;
-      let occ = 0;
-      for (const [lx, ly, lz] of dirs) {
-        const dx = tx * lx + bx * ly + nx * lz; const dy = ty * lx + by * ly + ny * lz; const dz = tz * lx + bz * ly + nz * lz;
-        let best = reach;
-        for (const t of near) {
-          const a = t * 3;
-          const denom = dx * fn[a] + dy * fn[a + 1] + dz * fn[a + 2];
-          if (denom > -1e-9) continue; // por trás da face (ou paralelo): não tapa
-          const tt = ((v0[a] - ox) * fn[a] + (v0[a + 1] - oy) * fn[a + 1] + (v0[a + 2] - oz) * fn[a + 2]) / denom;
-          if (tt < -1e-4 || tt >= best) continue;
-          const hxp = ox + dx * tt - v0[a]; const hyp = oy + dy * tt - v0[a + 1]; const hzp = oz + dz * tt - v0[a + 2];
-          // Dentro do triângulo (coordenadas baricêntricas pelo produto escalar com os lados).
-          const d00 = e1[a] * e1[a] + e1[a + 1] * e1[a + 1] + e1[a + 2] * e1[a + 2];
-          const d01 = e1[a] * e2[a] + e1[a + 1] * e2[a + 1] + e1[a + 2] * e2[a + 2];
-          const d11 = e2[a] * e2[a] + e2[a + 1] * e2[a + 1] + e2[a + 2] * e2[a + 2];
-          const d20 = hxp * e1[a] + hyp * e1[a + 1] + hzp * e1[a + 2];
-          const d21 = hxp * e2[a] + hyp * e2[a + 1] + hzp * e2[a + 2];
-          const den = d00 * d11 - d01 * d01;
-          if (Math.abs(den) < 1e-14) continue;
-          const bv = (d11 * d20 - d01 * d21) / den; const bw = (d00 * d21 - d01 * d20) / den;
-          if (bv < -1e-6 || bw < -1e-6 || bv + bw > 1 + 1e-6) continue;
-          best = Math.max(0, tt);
-        }
-        let w = best < reach ? 1 - best / reach : 0;
-        if (ground && dy < 0 && oy >= groundY - 1e-4) {
-          const tg = (groundY - oy) / dy;
-          if (tg < reach) w = Math.max(w, 1 - Math.max(0, tg) / reach);
-        }
-        occ += w;
-      }
-      f = 1 - strength * (occ / rays);
-      cache.set(key, f);
+    const pk = `${px.toFixed(4)},${py.toFixed(4)},${pz.toFixed(4)}`;
+    const key = `${pk},${nx.toFixed(3)},${ny.toFixed(3)},${nz.toFixed(3)}`;
+    keys.push(pk); normals.push([nx, ny, nz]);
+    if (cache.has(key)) continue;
+    // Origem um pouco acima da superfície (a própria face não tapa); a base do hemisfério gira com a normal.
+    const ox = px + nx * 0.04; const oy = py + ny * 0.04; const oz = pz + nz * 0.04;
+    near.length = 0;
+    for (let t2 = 0; t2 < T; t2++) {
+      if (rad[t2] < 0) continue;
+      const a = t2 * 3;
+      if (Math.hypot(ctr[a] - px, ctr[a + 1] - py, ctr[a + 2] - pz) < reach + rad[t2]) near.push(t2);
     }
+    const hx = Math.abs(nx) < 0.9 ? 1 : 0; const hy = hx ? 0 : 1;
+    // tangente = normalize(h × n), bitangente = n × tangente
+    let tx = hy * nz; let ty = -hx * nz; let tz = hx * ny - hy * nx;
+    const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    const bx = ny * tz - nz * ty; const by = nz * tx - nx * tz; const bz = nx * ty - ny * tx;
+    let occ = 0;
+    for (const [lx, ly, lz] of dirs) {
+      const dx = tx * lx + bx * ly + nx * lz; const dy = ty * lx + by * ly + ny * lz; const dz = tz * lx + bz * ly + nz * lz;
+      let best = reach;
+      for (const q of near) {
+        const a = q * 3;
+        const denom = dx * fn[a] + dy * fn[a + 1] + dz * fn[a + 2];
+        if (denom > -1e-9) continue; // por trás da face (ou paralelo): não tapa
+        const tt = ((v0[a] - ox) * fn[a] + (v0[a + 1] - oy) * fn[a + 1] + (v0[a + 2] - oz) * fn[a + 2]) / denom;
+        if (tt < -1e-4 || tt >= best) continue;
+        const hxp = ox + dx * tt - v0[a]; const hyp = oy + dy * tt - v0[a + 1]; const hzp = oz + dz * tt - v0[a + 2];
+        // Dentro do triângulo (coordenadas baricêntricas pelo produto escalar com os lados).
+        const d00 = e1[a] * e1[a] + e1[a + 1] * e1[a + 1] + e1[a + 2] * e1[a + 2];
+        const d01 = e1[a] * e2[a] + e1[a + 1] * e2[a + 1] + e1[a + 2] * e2[a + 2];
+        const d11 = e2[a] * e2[a] + e2[a + 1] * e2[a + 1] + e2[a + 2] * e2[a + 2];
+        const d20 = hxp * e1[a] + hyp * e1[a + 1] + hzp * e1[a + 2];
+        const d21 = hxp * e2[a] + hyp * e2[a + 1] + hzp * e2[a + 2];
+        const den = d00 * d11 - d01 * d01;
+        if (Math.abs(den) < 1e-14) continue;
+        const bv = (d11 * d20 - d01 * d21) / den; const bw = (d00 * d21 - d01 * d20) / den;
+        if (bv < -1e-6 || bw < -1e-6 || bv + bw > 1 + 1e-6) continue;
+        best = Math.max(0, tt);
+      }
+      let w = best < reach ? 1 - best / reach : 0;
+      if (ground && dy < 0 && oy >= groundY - 1e-4) {
+        const tg = (groundY - oy) / dy;
+        if (tg < reach) w = Math.max(w, 1 - Math.max(0, tg) / reach);
+      }
+      occ += w;
+    }
+    const f = 1 - strength * (occ / rays);
+    cache.set(key, f);
+    const list = groups.get(pk) ?? [];
+    list.push({ nx, ny, nz, f });
+    groups.set(pk, list);
+  }
+  // Média dentro da superfície lisa (mesmo ponto, normais próximas): a cor não dá salto na aresta lisa.
+  for (let i = 0; i < pos.count; i++) {
+    const [nx, ny, nz] = normals[i];
+    let sum = 0; let cnt = 0;
+    for (const e of groups.get(keys[i]) ?? []) if (e.nx * nx + e.ny * ny + e.nz * nz >= cosSmooth) { sum += e.f; cnt++; }
+    const f = cnt ? sum / cnt : 1;
     col.setXYZ(i, col.getX(i) * f, col.getY(i) * f, col.getZ(i) * f);
   }
   col.needsUpdate = true;
@@ -627,8 +653,9 @@ export interface WavyStripOptions {
   /** Faixas pretas e brancas alternadas e fileiras por tira (pontos da onda). */
   bands: number;
   zdiv: number;
-  /** Altura da tampa acima do chão (m); a tira desce 0,3 m (o calçadão pousa em declive sem mostrar o fundo). */
+  /** Altura da tampa acima do chão (m); a tira desce `skirt` m (0,3 por padrão: o calçadão pousa em declive sem mostrar o fundo). */
   thick: number;
+  skirt?: number;
   /** Cores das faixas e do meio-fio. */
   dark?: THREE.ColorRepresentation;
   light?: THREE.ColorRepresentation;
@@ -642,7 +669,7 @@ export interface WavyStripOptions {
 export function wavyStrip(o: WavyStripOptions): Geo {
   const dark = new THREE.Color(o.dark ?? '#1b1b1d'); const light = new THREE.Color(o.light ?? '#f1efe8'); const curb = new THREE.Color(o.curb ?? '#8f8c86');
   const pos: number[] = []; const col: number[] = [];
-  const hw = o.width / 2; const hl = o.len / 2; const low = -0.3;
+  const hw = o.width / 2; const hl = o.len / 2; const low = -(o.skirt ?? 0.3);
   const edge = (b: number, z: number): number => -hw + (o.width * b) / o.bands + (b > 0 && b < o.bands ? o.amp * Math.sin((2 * Math.PI * o.waves * (z + hl)) / o.len) : 0);
   const quad = (a: number[], b: number[], c: number[], d: number[], color: THREE.Color): void => {
     pos.push(...a, ...b, ...c, ...a, ...c, ...d);
