@@ -38,12 +38,15 @@ function raceIgnoringPit(track: Track, style: Style): { state: RaceState; logs: 
   };
   const logs: Log[] = humans.map(() => ({ lowAt: [], emptyAt: null }));
   for (let i = 0; i < TICK_RATE * 900 && state.phase !== 'finished'; i++) {
+    // A volta de cada carro ANTES do tick: o aviso (physics.ts) decide com a volta de antes de `updateLaps`. Lida depois do tick, um aviso
+    // no mesmo tick da linha da última volta (onde o box está logo à frente) parecia "aviso na última volta" — só dependia do FUEL_LOW_LAPS cair ali.
+    const lapBefore = state.cars.map((c) => c.lap);
     run(state, track, 1, autopilot);
     for (const e of state.events) {
       if (e.type !== 'fuel_low' && e.type !== 'fuel_empty') continue;
       const car = state.cars[e.carId];
       if (car.seat < 0 || car.finished) continue;
-      if (e.type === 'fuel_low') logs[car.seat].lowAt.push({ progress: car.progress, lap: car.lap });
+      if (e.type === 'fuel_low') logs[car.seat].lowAt.push({ progress: car.progress, lap: lapBefore[car.id] });
       else logs[car.seat].emptyAt = car.progress;
     }
   }

@@ -4,9 +4,10 @@
 // resultado com atraso 3 e com 12. Os testes foram escritos ANTES do código e vistos falhar pelo motivo certo.
 import { describe, expect, it } from 'vitest';
 import {
-  COUNTDOWN_TICKS, LAUNCH_AI_FULL_SKILL, LAUNCH_AI_MAX_CHANCE, LAUNCH_AI_MIN_SKILL, LAUNCH_BOOST_TICKS, LAUNCH_WINDOW_EARLY_TICKS,
-  LAUNCH_WINDOW_LATE_TICKS, NITRO_GAIN_LAUNCH, NITRO_START_METER,
+  CAR_HALF_WIDTH, COUNTDOWN_TICKS, LAUNCH_AI_CLEAR_RANGE, LAUNCH_AI_FULL_SKILL, LAUNCH_AI_MAX_CHANCE, LAUNCH_AI_MIN_SKILL, LAUNCH_BOOST_TICKS,
+  LAUNCH_WINDOW_EARLY_TICKS, LAUNCH_WINDOW_LATE_TICKS, NITRO_GAIN_LAUNCH, NITRO_START_METER,
 } from '../src/core/constants';
+import { wrappedDelta } from '../src/core/sim/collisions';
 import { deserializeRace, hashRace, serializeRace } from '../src/core/serialize';
 import { launchChance } from '../src/core/sim/ai';
 import { createRace, stepRace } from '../src/core/sim/race';
@@ -127,6 +128,10 @@ describe('largada-foguete: a IA acerta conforme a habilidade, sorteando em state
     expect(launchChance(mid + 0.01)).toBeGreaterThan(launchChance(mid));
   });
 
+  /** A IA tem um carro na própria faixa à frente, perto o bastante para um arranque de nitro bater nele? (a regra de LAUNCH_AI_CLEAR_RANGE) */
+  const blockedAhead = (state: RaceState, car: CarState): boolean => state.cars.some((o) => o !== car
+    && wrappedDelta(o.z, car.z, state.trackLength) > 0 && wrappedDelta(o.z, car.z, state.trackLength) < LAUNCH_AI_CLEAR_RANGE && Math.abs(o.x - car.x) < CAR_HALF_WIDTH * 2);
+
   it('a IA decide no tick G, uma vez: antes ela está pendente; depois, perfeita (com o arranque e a barra) ou sem bônus', () => {
     const { state, track } = quickRace({ totalCars: 20, seed: 3 });
     const ais = state.cars.filter((c) => c.ai && c.seat < 0);
@@ -143,20 +148,40 @@ describe('largada-foguete: a IA acerta conforme a habilidade, sorteando em state
     expect(state.events.filter((e) => e.type === 'launch').length).toBe(decided.filter((d) => d === 1).length);
   });
 
-  it('em 40 grids de 20 carros alguns (mas não todos) da IA acertam, e os mais hábeis acertam mais', () => {
-    let good = 0; let total = 0; const bySkill: Array<{ skill: number; perfect: boolean }> = [];
+  it('a IA que tem um carro na frente, na própria faixa, não tenta o arranque (ia bater nele): só a de pista livre pode acertar', () => {
+    expect(LAUNCH_AI_CLEAR_RANGE).toBeGreaterThan(0);
+    let blocked = 0; let clear = 0; let clearGood = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const { state, track } = quickRace({ totalCars: 20, seed });
-      const ais = state.cars.filter((c) => c.ai);
-      for (let i = 0; i <= G; i++) stepRace(state, track, []);
-      for (const c of ais) { total++; if (c.launch === 1) good++; bySkill.push({ skill: c.ai!.skill, perfect: c.launch === 1 }); }
+      const ais = state.cars.filter((c) => c.ai && c.seat < 0);
+      for (let i = 0; i < G; i++) stepRace(state, track, []);
+      const wasBlocked = ais.map((c) => blockedAhead(state, c));
+      stepRace(state, track, []);
+      ais.forEach((c, k) => {
+        if (wasBlocked[k]) { blocked++; expect(launchOf(c), `${c.name} (semente ${seed}) tinha carro à frente`).toBe(2); } else { clear++; if (c.launch === 1) clearGood++; }
+      });
     }
-    expect(good).toBeGreaterThan(total * 0.05);
-    expect(good).toBeLessThan(total * LAUNCH_AI_MAX_CHANCE + total * 0.1);
-    bySkill.sort((a, b) => a.skill - b.skill);
-    const half = Math.floor(bySkill.length / 2);
-    const rate = (xs: typeof bySkill) => xs.filter((x) => x.perfect).length / xs.length;
-    expect(rate(bySkill.slice(half))).toBeGreaterThan(rate(bySkill.slice(0, half)));
+    expect(blocked, 'a maioria do grid tem alguém na frente').toBeGreaterThan(clear * 4);
+    expect(clear, 'a primeira fila está livre').toBeGreaterThanOrEqual(40);
+    expect(clearGood, 'alguma da pista livre acerta').toBeGreaterThan(0);
+    expect(clearGood, 'mas não todas').toBeLessThan(clear);
+  }, 60_000);
+
+  it('a IA de pista livre acerta mais quanto mais hábil: a chance cresce com a habilidade (carros sozinhos na pista, 600 sorteios)', () => {
+    const track = syntheticTrack();
+    const hit: Record<string, number> = { low: 0, high: 0 };
+    for (let seed = 1; seed <= 300; seed++) {
+      for (const [key, skill] of [['low', LAUNCH_AI_MIN_SKILL + 0.02], ['high', LAUNCH_AI_FULL_SKILL]] as const) {
+        const { state } = quickRace({ track, totalCars: 1, seed });
+        const car = humanCar(state);
+        car.ai = { skill, laneX: 0, laneUntil: 0, lookahead: 25, aggression: 0 };
+        for (let i = 0; i <= G; i++) stepRace(state, track, []);
+        if (car.launch === 1) hit[key]++;
+      }
+    }
+    expect(hit.high).toBeGreaterThan(hit.low * 2);
+    expect(hit.high / 300).toBeGreaterThan(LAUNCH_AI_MAX_CHANCE - 0.1);
+    expect(hit.high / 300).toBeLessThan(LAUNCH_AI_MAX_CHANCE + 0.1);
   }, 60_000);
 
   it('o humano que a IA assumiu antes do zero também sorteia (a IA dirige o carro)', () => {

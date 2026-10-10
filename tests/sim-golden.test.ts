@@ -22,8 +22,10 @@
 // (1) Os campos novos do CarState (nitroMeter no lugar do nitroLeft, throttleHeld, launch, draftTicks, gainLock) entram no serializeRace e no hashRace.
 // (2) O nitro larga com 1 carga em vez de 3 e enche com as fontes: o piloto de roteiro aperta o nitro a cada 700 ticks, e o 2º aperto (tick 1400) já
 // é negado — o contra-relógio (sem IA, sem sorteio, o rng nunca diverge) é igual ao de 640538f até o tick 1400 e muda dali. (3) O sorteio da
-// largada-foguete (um por IA, no tick 210 = JÁ) muda o rng e o arranque das 7 corridas com IA: todas divergem no tick 210. Conferido tick a
-// tick contra o 640538f (scratch/n1-trace.ts). PHYSICS_REVISION 2 → 3 junto com o contra-relógio.
+// largada-foguete (um por IA, no tick 210 = JÁ) anda o rng das 7 corridas com IA: o rng diverge no tick 210 em todas, e o primeiro carro com
+// estado diferente é o da primeira fila que acertou o arranque (tick 210 em coop4-tudo, revezamento e solo; 231 na tomada-pela-ia) ou a primeira
+// decisão que sorteia depois disso (248 na escolta, 432 no versus, 598 sem-personalidades). Conferido tick a tick contra o 640538f
+// (scratch/n1-trace.ts, fora do git). PHYSICS_REVISION 2 → 3 junto com o contra-relógio.
 //
 // Mudou a jogabilidade DE PROPÓSITO (constante, IA, física)? Aí o hash muda e é esperado: rode
 // `npx tsx scripts/perf-sim.ts --fingerprints`, confira que só mudaram as corridas que deviam e atualize.
@@ -40,15 +42,16 @@ import { PHYSICS_REVISION } from '../src/game/content-version';
 // Onda K (K5): Copacabana com o Cristo em traço de cartum (`bend`), e as placas de curva só em curva forte de ≥ 12
 // segmentos — Noite em Sampa (quinas de 8–9) perdeu as placas. Só as duas corridas delas mudaram.
 const EXPECTED: Record<string, { fingerprint: string; ticks: number }> = {
-  'solo-sem-assistencias': { fingerprint: '204127fe', ticks: 7711 },
-  'coop4-tudo': { fingerprint: '10b44793', ticks: 7751 },
-  'versus-cambio-manual': { fingerprint: '89243ea8', ticks: 9594 },
-  escolta: { fingerprint: '8a8a73a3', ticks: 8488 },
-  revezamento: { fingerprint: 'cb7bf447', ticks: 11571 },
-  'tomada-pela-ia': { fingerprint: 'c8367441', ticks: 8783 },
+  'solo-sem-assistencias': { fingerprint: '5c5c0457', ticks: 8085 },
+  'coop4-tudo': { fingerprint: '7082fd5b', ticks: 7815 },
+  'versus-cambio-manual': { fingerprint: '4879fcd7', ticks: 9076 },
+  escolta: { fingerprint: 'e4b941e7', ticks: 8491 },
+  revezamento: { fingerprint: 'c4458cea', ticks: 11554 },
+  'tomada-pela-ia': { fingerprint: '1c1efad5', ticks: 8952 },
   'contra-relogio': { fingerprint: 'def5c918', ticks: 7786 },
-  'sem-personalidades': { fingerprint: '6f595c5a', ticks: 9891 },
+  'sem-personalidades': { fingerprint: '2fc453a0', ticks: 9942 },
 };
+
 describe('corridas de referência (impressão digital fixa)', () => {
   it('toda corrida de referência tem valor gravado', () => {
     expect(GOLDEN_SCENARIOS.map((s) => s.name).sort()).toEqual(Object.keys(EXPECTED).sort());

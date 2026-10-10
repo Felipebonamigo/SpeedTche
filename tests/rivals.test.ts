@@ -118,16 +118,11 @@ describe('personalidades: dados', () => {
 });
 
 describe('personalidades: efeitos medidos (semente fixa)', () => {
-  // Onda N (N1): a semente era 5. O sorteio da largada-foguete (um por IA, no tick do JÁ) mudou a corrida de toda semente e, na 5, o limpo
-  // passou a bater mais que o neutro (22 × 17) e o agressivo a trocar de faixa só 1,39× o limpo — uma amostra azarada: medido em 10 sementes
-  // antes e depois, as médias seguem (trocas de faixa do agressivo ÷ limpo 1,87 → 1,88; batidas 2,75× → 2,09×; batidas do limpo × as do neutro
-  // 110 × 222 → 127 × 202). A 8 é uma em que as quatro afirmações valem com folga (2,06×, 4,43×, 7 × 16, nenhum nitro perto de curva).
-  const MEASURE_SEED = 8;
   // Passo Alpino (dificuldade 5, curvas de até 6) com 11 carros da IA, 150 s.
   const results = new Map<Personality | 'neutral', Metrics>();
   const get = (p: Personality | 'neutral'): Metrics => {
     let m = results.get(p);
-    if (!m) { m = measure(p === 'neutral' ? null : p, 'passo_alpino', 150, MEASURE_SEED); results.set(p, m); }
+    if (!m) { m = measure(p === 'neutral' ? null : p, 'passo_alpino', 150); results.set(p, m); }
     return m;
   };
 

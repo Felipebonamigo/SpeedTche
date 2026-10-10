@@ -1,16 +1,17 @@
 // Física de um carro por tick: marcha, aceleração, volante, força centrífuga, grama, box,
 // combustível e nitro. Pseudo-3D clássico: a pista é uma linha (z) e o carro se desloca em x.
 import {
-  CATCHUP_TOP_MULT, CENTRIFUGAL, COUNTDOWN_TICKS, DRAFT_ACCEL_MULT, DRAFT_TOP_MULT, DRIFT_BOOST_ACCEL_MULT, DRIFT_BOOST_SPEED_MULT,
+  CAR_HALF_WIDTH, CATCHUP_TOP_MULT, CENTRIFUGAL, COUNTDOWN_TICKS, DRAFT_ACCEL_MULT, DRAFT_TOP_MULT, DRIFT_BOOST_ACCEL_MULT, DRIFT_BOOST_SPEED_MULT,
   DRIFT_BOOST_TICKS, DRIFT_CENTRIFUGAL_MULT, DRIFT_CHARGE_MIN_CURVE, DRIFT_DRAG_PER_SECOND, DRIFT_ENTRY_STEER, DRIFT_KEEP_SPEED_FACTOR,
   DRIFT_LEVEL_TICKS, DRIFT_MIN_SPEED_FACTOR, DRIFT_PULL, DT, FUEL_EMPTY_SPEED_FACTOR, GEAR_ACCEL,
-  GEAR_COUNT, GEAR_TOP, LAUNCH_BOOST_TICKS, LAUNCH_NONE, LAUNCH_PENDING, LAUNCH_PERFECT, LAUNCH_WINDOW_EARLY_TICKS, LAUNCH_WINDOW_LATE_TICKS,
+  GEAR_COUNT, GEAR_TOP, LAUNCH_AI_CLEAR_RANGE, LAUNCH_BOOST_TICKS, LAUNCH_NONE, LAUNCH_PENDING, LAUNCH_PERFECT, LAUNCH_WINDOW_EARLY_TICKS, LAUNCH_WINDOW_LATE_TICKS,
   NITRO_ACCEL_MULT, NITRO_DURATION_TICKS, NITRO_FUEL_MULT, NITRO_GAIN_DRIFT, NITRO_GAIN_LAUNCH, NITRO_GAIN_SLING, NITRO_SLING_COOLDOWN_TICKS, NITRO_SLING_TICKS,
   NITRO_SPEED_MULT, OFFROAD_DECEL_FACTOR, OFFROAD_LIMIT_FACTOR, OFFROAD_X, PIT_REFUEL_PER_SECOND, PIT_SPEED_LIMIT_FACTOR, PIT_X, TEAM_DRAFT_TOP_MULT,
 } from '../constants';
 import { nextFloat } from '../rng';
 import { segmentAt } from '../track/builder';
 import type { CarState, CarStats, PlayerInput, RaceState, SimEvent, Track } from '../types';
+import { wrappedDelta } from './collisions';
 import { fuelLowLevel, pitStillAhead } from './fuel';
 import { carStats, grantNitro, launchChance, spendNitroCharge } from './stats';
 
@@ -120,11 +121,21 @@ function stepDrift(state: RaceState, car: CarState, def: CarStats, curve: number
   }
 }
 
+/** Há um carro na faixa de `car`, à frente, a menos de LAUNCH_AI_CLEAR_RANGE? (o arranque da IA só bateria nele) */
+function blockedAhead(state: RaceState, car: CarState): boolean {
+  for (const o of state.cars) {
+    if (o === car) continue;
+    const d = wrappedDelta(o.z, car.z, state.trackLength);
+    if (d > 0 && d < LAUNCH_AI_CLEAR_RANGE && Math.abs(o.x - car.x) < CAR_HALF_WIDTH * 2) return true;
+  }
+  return false;
+}
+
 /**
  * A largada-foguete de um tick (docs/ondas/N/N1.md, §4.4). Enquanto está pendente, conta os ticks seguidos do acelerador
  * (`throttleHeld`: também o dado do motor subindo na contagem). A partir do "JÁ" (COUNTDOWN_TICKS), o humano acerta se o ÚLTIMO aperto
  * (tick − throttleHeld + 1) caiu em [JÁ − EARLY, JÁ + LATE] e o pedal ainda está apertado; passou da janela, larga normal. A IA
- * sorteia uma vez, no tick do JÁ, em state.rng. Acertar liga o nitro por LAUNCH_BOOST_TICKS (sem gastar a barra) e enche a barra.
+ * sorteia uma vez, no tick do JÁ, em state.rng, e só tenta com a pista livre à frente. Acertar liga o nitro por LAUNCH_BOOST_TICKS (sem gastar a barra) e enche a barra.
  * Chamada antes do nitro: o arranque vale no próprio tick em que o carro fica livre.
  */
 function stepLaunch(state: RaceState, car: CarState, input: PlayerInput, events: SimEvent[]): void {
@@ -134,7 +145,9 @@ function stepLaunch(state: RaceState, car: CarState, input: PlayerInput, events:
   if (tick < COUNTDOWN_TICKS) return;
   let perfect: boolean;
   if (car.ai) {
-    perfect = nextFloat(state.rng) < launchChance(car.ai.skill);
+    // Sempre sorteia (o rng anda igual com ou sem carro à frente); só tenta com a pista livre (LAUNCH_AI_CLEAR_RANGE).
+    const roll = nextFloat(state.rng) < launchChance(car.ai.skill);
+    perfect = roll && !blockedAhead(state, car);
   } else if (input.throttle) {
     const press = tick - car.throttleHeld + 1;
     perfect = press >= COUNTDOWN_TICKS - LAUNCH_WINDOW_EARLY_TICKS && press <= COUNTDOWN_TICKS + LAUNCH_WINDOW_LATE_TICKS;

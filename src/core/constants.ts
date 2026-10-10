@@ -53,8 +53,13 @@ export const OFFROAD_DECEL_FACTOR = 0.6;  // desaceleração fora da pista, fra�
 export const OFFROAD_X = 1.05;            // |x| a partir do qual o carro está na grama
 
 export const NITRO_DURATION_TICKS = 150;  // 2,5 s
-/** Consumo de combustível com o nitro aceso, por tick (além do que a velocidade maior já gasta). */
-export const NITRO_FUEL_MULT = 1.6;
+/**
+ * Consumo de combustível com o nitro aceso, por tick (além do que a velocidade maior já gasta). Era 1,6 (um literal na física) com 3 cargas
+ * por corrida, ~3% do tempo em nitro. Na N1 o nitro fica aceso ~13% do tempo: com 1,6 o gasto extra por corrida quase quadruplicava, o aviso
+ * de combustível do jogador de pé no fundo vinha 0,05 volta antes do último box (mínimo 0,10) e uma IA ficou sem combustível numa fila do box
+ * (Bonito, tests/ai.test.ts). 1,3 segue mais sedento que andar sem nitro. PROVISÓRIO: o combustível das 109 pistas é da onda O2.
+ */
+export const NITRO_FUEL_MULT = 1.3;
 export const NITRO_SPEED_MULT = 1.28;
 export const NITRO_ACCEL_MULT = 2.2;
 
@@ -156,6 +161,12 @@ export const COUNTDOWN_TICKS = 3 * TICK_RATE + 30; // 3 s de contagem + meio seg
  * personalidades) apagavam a diferença entre elas (onda F, docs/FISICA.md; tests/rivals.test.ts).
  */
 export const GRID_ROW_GAP = 400;
+/**
+ * Largada-foguete da IA (N1): a IA só tenta o arranque com a pista livre — sem carro na própria faixa à frente até esta distância (2 filas do
+ * grid, 800 u = 16 m: o que 1,5 s de nitro percorre a mais que o carro da frente). Quem tem alguém na frente larga normal: o arranque só a
+ * faria bater nele (medido: o piloto médio, que larga na última fila, tinha 4,9 batidas nos 10 primeiros segundos com o arranque contra 0 sem).
+ */
+export const LAUNCH_AI_CLEAR_RANGE = GRID_ROW_GAP * 2;
 /** Grid: o primeiro carro larga esta distância antes da linha, e cada fila tem um carro em cada lado (x = ±GRID_LANE_X).
  *  A pintura das vagas no chão (src/render/road-textures.ts) lê estas constantes — não repita os números lá. */
 export const GRID_FRONT_GAP = 600;
@@ -167,11 +178,12 @@ export const FUEL_EMPTY_SPEED_FACTOR = 0.2;
  * voltas em aceleração total. Proporcional à volta porque um nível fixo (eram 25%) chega tarde nas
  * voltas longas; acima de 1 porque o jogador de pé no fundo gasta ~0,95–1,0 disso por volta, e a
  * sobra (0,15 volta, ~12 s) é o tempo de ver o aviso e ir para o box (sim/fuel.ts, tests/fuel.test.ts).
- * Onda N (N1): 1,15 → 1,25 (PROVISÓRIO, o combustível das 109 pistas é da O2). Com a barra de nitro o jogador que aperta o nitro
+ * Onda N (N1): 1,15 → 1,22 (PROVISÓRIO, o combustível das 109 pistas é da O2). Com a barra de nitro o jogador que aperta o nitro
  * sempre que pode passou de 3 cargas para quase todas as que enche, e o nitro gasta ×NITRO_FUEL_MULT: a pior antecedência do aviso
- * (23 pistas) caiu de 0,143 volta para 0,049; com 1,25 ela volta a 0,125 (mínimo 0,10 no tests/fuel.test.ts).
+ * (pé no fundo, 109 pistas) caiu de 0,143 volta para 0,077 mesmo com o NITRO_FUEL_MULT em 1,3; com 1,22 ela é 0,134 (mínimo 0,10 no
+ * tests/fuel.test.ts; com 1,2 um aviso caía no mesmo tick da linha da última volta, em Trollstigen).
  */
-export const FUEL_LOW_LAPS = 1.25;
+export const FUEL_LOW_LAPS = 1.22;
 /** Folga da IA sobre o consumo medido ao decidir se passa reto pelo box (sim/fuel.ts). */
 export const FUEL_PIT_MARGIN = 1.15;
 export const PIT_X = 1.55;                 // centro do box, em `x` normalizado
