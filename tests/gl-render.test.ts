@@ -81,28 +81,28 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
   });
 
   it('o resize() e a troca de lotação não recriam o composer', async () => {
-    const run = (): Promise<{ builds: number; resizes: number }[]> => page.evaluate(() => {
+    const s = await page.evaluate(() => {
       const L = window.lab; const out: Array<{ builds: number; resizes: number }> = [];
       const snap = () => { const p = L.info().post; out.push({ builds: p.builds, resizes: p.resizes }); };
       L.resize(640, 360, 1);
-      L.setup('copacabana', 1, 300); L.render('high', 2); snap();
-      L.resize(480, 270, 1); L.render('high', 1); snap(); // outro tamanho de janela
-      L.resize(640, 360, 1); L.render('high', 1); snap();
-      for (const n of [2, 4, 1, 4, 2, 1]) { L.setup('copacabana', n, 300); L.render('high', 2); snap(); } // lotação
-      L.resize(800, 450, 2); L.render('high', 1); snap(); // e a densidade de pixels
+      L.setup('copacabana', 1, 300); L.render('high', 2); snap(); // 0: o primeiro pipeline
+      L.resize(480, 270, 1); L.render('high', 1); snap(); // 1: outro tamanho de janela
+      L.resize(640, 360, 1); L.render('high', 1); snap(); // 2
+      for (const n of [2, 4, 1, 4, 2, 1]) { L.setup('copacabana', n, 300); L.render('high', 2); snap(); } // 3..8: lotação
+      L.resize(800, 450, 2); L.render('high', 1); snap(); // 9: e a densidade de pixels
       return out;
     });
-    const s = await run();
-    // Um composer por viewport que já existiu (no máximo 4, ao chegar a 4 jogadores), nunca mais um por resize/lotação.
-    expect(s[0].builds).toBeGreaterThanOrEqual(1);
-    const depoisDe4 = s[4]; // após a lotação 4
-    for (let i = 1; i < s.length; i++) expect(s[i].builds, `passo ${i}`).toBeLessThanOrEqual(Math.max(depoisDe4.builds, s[0].builds));
-    expect(s[s.length - 1].builds).toBe(depoisDe4.builds);
-    expect(depoisDe4.builds).toBeLessThanOrEqual(4);
-    // Os resizes foram feitos em lugar: o contador sobe.
+    // Um pipeline por viewport que já foi usado (no máximo 3 a mais ao chegar a 4 jogadores), nunca mais um por resize ou lotação.
+    const base = s[0].builds;
+    expect(s[1].builds).toBe(base);
+    expect(s[2].builds).toBe(base);
+    const depoisDe4 = s[4].builds;
+    expect(depoisDe4).toBeLessThanOrEqual(base + 3);
+    for (let i = 4; i < s.length; i++) expect(s[i].builds, `passo ${i}`).toBe(depoisDe4);
+    // Os redimensionamentos foram feitos em lugar: o contador sobe.
     expect(s[s.length - 1].resizes).toBeGreaterThan(s[0].resizes);
-    // O mesmo tamanho de novo não refaz alvo nenhum.
-    expect(s[2].builds).toBe(s[0].builds);
+    // O mesmo tamanho de novo (passo 2 = 0) é um redimensionamento em lugar, não um pipeline novo.
+    expect(s[2].resizes).toBeGreaterThan(s[0].resizes);
   });
 
   it('a resolução dinâmica troca de degrau dentro do alvo fixo: o alvo da cena encolhe, o composer não é recriado', async () => {
@@ -115,10 +115,15 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
       const builds = cheio.post.builds;
       L.dynamic(true, 0.72);
       const baixo = L.render('high', 2)[1];
-      const fixo = L.render('medium', 2)[1];
       L.dynamic(false, null);
       const volta = L.render('high', 2)[1];
-      return { cheio, baixo, fixo, volta, builds };
+      // A Média também tem alvo da cena (a troca de qualidade recria os pipelines: a base de `builds` é depois dela).
+      L.dynamic(true, 0.72);
+      L.render('medium', 1);
+      const mBase = L.info().post.builds;
+      const fixo = L.render('medium', 2)[1];
+      L.dynamic(false, null);
+      return { cheio, baixo, fixo, volta, builds, mBase };
     });
     expect(r.cheio.viewports[0]).toMatchObject({ targetW: 640, targetH: 360 });
     expect(r.cheio.post.scale).toBe(1);
@@ -126,7 +131,8 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', () => {
     expect(r.baixo.viewports[0].targetW).toBe(Math.round(640 * 0.72));
     expect(r.baixo.viewports[0].targetH).toBe(Math.round(360 * 0.72));
     expect(r.baixo.post.builds).toBe(r.builds);
-    expect(r.fixo.viewports[0].targetW).toBe(Math.round(640 * 0.72)); // a Média também (tem alvo da cena)
+    expect(r.fixo.viewports[0].targetW).toBe(Math.round(640 * 0.72));
+    expect(r.fixo.post.builds).toBe(r.mBase);
     expect(r.volta.viewports[0]).toMatchObject({ targetW: 640, targetH: 360 });
     expect(r.volta.post.builds).toBe(r.builds);
   });
