@@ -258,7 +258,7 @@ function grade(c: string, time: TimeOfDay): string {
 const SEA: Record<TimeOfDay, { glint: number; sky: number; spec: number }> = {
   day: { glint: 1, sky: 0.5, spec: 180 },
   dusk: { glint: 1.5, sky: 0.55, spec: 60 },
-  night: { glint: 0.9, sky: 0.4, spec: 90 },
+  night: { glint: 0.9, sky: 0.4, spec: 60 },
 };
 
 /**

@@ -40,7 +40,8 @@ describe('reflexo de lente: o layout em tela (puro)', () => {
     expect(veil && streak, 'véu e faixa existem').toBeTruthy();
     for (const e of [veil, streak]) { expect(e?.x).toBeCloseTo(sun[0], 9); expect(e?.y).toBeCloseTo(sun[1], 9); }
     expect(streak!.halfW).toBeGreaterThan(streak!.halfH * 8);
-    for (const e of q) { expect(e.halfW * 2, e.kind).toBeCloseTo(e.halfH, 9); } // largura em NDC = altura / proporção: o disco sai redondo (aspecto 2)
+    // largura em NDC = altura / proporção: o disco sai redondo (aspecto 2); só a faixa é esticada de propósito
+    for (const e of q.filter((x) => x.kind !== 'streak')) expect(e.halfW * 2, e.kind).toBeCloseTo(e.halfH, 9);
   });
 
   it('some quando o sol sai da tela ou fica atrás da câmera, e cresce rumo ao centro', () => {
@@ -161,5 +162,27 @@ describe('folha de contato', () => {
       expect(TIMES_OF_DAY).toContain(s.tod);
       expect(SCENERIES).toContain(s.scenery);
     }
+  });
+});
+
+describe('o mar lê a paleta', () => {
+  it('o expoente, a força do brilho e o céu refletido do shader do mar são os da paleta do período (e mudam de um período para o outro)', async () => {
+    const { fakeCanvasDocument } = await import('./canvas-fake');
+    const restore = fakeCanvasDocument();
+    try {
+      const { Terrain } = await import('../src/render/terrain');
+      const terrain = new Terrain(64);
+      const track = getTrack('copacabana');
+      const u = (terrain as unknown as { sea: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> }).sea.material.uniforms;
+      const seen: string[] = [];
+      for (const t of TIMES_OF_DAY) {
+        const p = palette('coast', t);
+        terrain.setTrack(track, p, `mar:${t}`);
+        expect(u.uSpec.value, t).toBe(p.seaSpec); expect(u.uGlint.value, t).toBe(p.seaGlint); expect(u.uSkyMix.value, t).toBe(p.seaSky);
+        seen.push(`${u.uSpec.value}/${u.uGlint.value}/${u.uSkyMix.value}`);
+      }
+      expect(new Set(seen).size, 'um mar para cada período').toBe(3);
+      terrain.dispose();
+    } finally { restore(); }
   });
 });

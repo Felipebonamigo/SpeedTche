@@ -11,8 +11,11 @@ import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
+import { buildLensFlare } from './lensflare';
 import { palette, type Palette } from './palette';
 import { applyGrade } from './stylize';
+
+export { FLARE_ELEMENTS, flareFade, lensFlareLayout } from './lensflare';
 
 const SKY_RADIUS = 1400;
 /**
@@ -214,6 +217,11 @@ export class Sky {
   private readonly clouds: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
   /** Nuvens por qualidade: redondas na alta, facetadas (¼ dos triângulos) na média e na baixa. */
   private readonly cloudGeo: [THREE.BufferGeometry, THREE.BufferGeometry] = [buildClouds(0), buildClouds(1)];
+  /** Reflexo de lente do entardecer (lensflare.ts): uma malha, visível só quando a paleta, a qualidade e o jogador deixam. */
+  readonly flare: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> = buildLensFlare();
+  private flareStrength = 0;
+  private flareQualityOk = true;
+  private flareAllowed = true;
   private readonly pmrem: THREE.PMREMGenerator;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private paletteKey = '';
@@ -251,6 +259,7 @@ export class Sky {
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = -9;
     this.group.add(this.clouds);
+    this.group.add(this.flare); // a posição dele é em tela (a câmera de cada viewport): o giro do grupo não conta
     scene.add(this.group);
 
     this.sun = new THREE.DirectionalLight('#ffffff', 3);
@@ -282,6 +291,18 @@ export class Sky {
     }
     this.fogBase = FOG_DENSITY[q];
     this.fog.density = this.fogBase * this.fogMul;
+    this.flareQualityOk = atLeast(q, 'medium'); // a Baixa não paga os pixels aditivos do reflexo
+    this.syncFlare();
+  }
+
+  /** O jogador liga e desliga o reflexo de lente (Reduzir efeitos): vale para as próximas pistas também. */
+  setFlare(on: boolean): void {
+    this.flareAllowed = on;
+    this.syncFlare();
+  }
+
+  private syncFlare(): void {
+    this.flare.visible = this.flareAllowed && this.flareQualityOk && this.flareStrength > 0;
   }
 
   setPalette(p: Palette, time: TimeOfDay, key: string): void {
@@ -316,6 +337,11 @@ export class Sky {
     this.fog.color.set(p.fog);
     this.fogMul = p.fogDensity;
     this.fog.density = this.fogBase * this.fogMul;
+    this.flareStrength = p.flare;
+    const fu = this.flare.material.uniforms;
+    fu.uStrength.value = p.flare;
+    (fu.uColor.value as THREE.Color).set(p.flareColor);
+    this.syncFlare();
     this.scene.environmentIntensity = p.envIntensity;
     this.rebuildEnvironment();
   }
@@ -337,6 +363,7 @@ export class Sky {
     const c = Math.cos(absHeading); const s = Math.sin(absHeading);
     this.sunDirLocal.set(d.x * c + d.z * s, d.y, -d.x * s + d.z * c);
     this.sun.position.copy(this.sunDirLocal).multiplyScalar(260).add(this.target.position);
+    (this.flare.material.uniforms.uSunDir.value as THREE.Vector3).copy(this.sunDirLocal);
   }
 
   get isNight(): boolean { return this.night; }
@@ -346,6 +373,7 @@ export class Sky {
     this.stars.geometry.dispose(); (this.stars.material as THREE.Material).dispose();
     for (const g of this.cloudGeo) g.dispose();
     this.clouds.material.dispose();
+    this.flare.geometry.dispose(); this.flare.material.dispose();
     if (this.envTarget) this.envTarget.dispose();
     this.pmrem.dispose();
     if (this.sun.shadow.map) this.sun.shadow.map.dispose();

@@ -217,7 +217,7 @@ void main() {
 // ângulo raso e o caminho de brilho do sol/lua. As ondas somem com a distância (sem cintilar).
 const SEA_FRAG = /* glsl */ `
 uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSky; uniform vec3 uSunDir; uniform vec3 uSunColor;
-uniform float uTime; uniform float uSpec;
+uniform float uTime; uniform float uSpec; uniform float uGlint; uniform float uSkyMix;
 varying vec3 vWorld;
 #include <fog_pars_fragment>
 void main() {
@@ -235,10 +235,10 @@ void main() {
   vec3 col = mix(uShallow, uDeep, smoothstep(25.0, 320.0, dist));
   float band = sin(dot(p, vec2(0.045, 0.1)) + t * 0.7 + sin(p.x * 0.025 + t * 0.2) * 2.2);
   col *= 1.0 + 0.07 * smoothstep(0.55, 0.95, band) * near;
-  col = mix(col, uSky, clamp(fres * 0.5, 0.0, 0.5));
+  col = mix(col, uSky, clamp(fres * uSkyMix, 0.0, uSkyMix));
   vec3 r = reflect(-v, n);
   float s = max(dot(r, uSunDir), 0.0);
-  col += uSunColor * (pow(s, uSpec) * 2.2 + pow(s, uSpec * 0.08) * 0.12);
+  col += uSunColor * (pow(s, uSpec) * 2.2 + pow(s, uSpec * 0.08) * 0.12) * uGlint;
   gl_FragColor = vec4(col, 1.0);
   #if defined(USE_FOG) && defined(FOG_EXP2)
     // Névoa mais leve no mar: o azul chega saturado até o horizonte.
@@ -438,7 +438,7 @@ export class Terrain {
       vertexShader: SEA_VERT, fragmentShader: SEA_FRAG, fog: true,
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
         uDeep: { value: new THREE.Color('#0b4f8a') }, uShallow: { value: new THREE.Color('#2aa8c8') }, uSky: { value: new THREE.Color('#cfefff') },
-        uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color('#fff3a0') }, uTime: { value: 0 }, uSpec: { value: 180 },
+        uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color('#fff3a0') }, uTime: { value: 0 }, uSpec: { value: 180 }, uGlint: { value: 1 }, uSkyMix: { value: 0.5 },
       }]),
     });
     applyGrade(seaMat);
@@ -523,7 +523,8 @@ export class Terrain {
     (su.uShallow.value as THREE.Color).set(p.waterShallow);
     (su.uSky.value as THREE.Color).set(p.sky[2]).lerp(this.tmp.set(p.sky[1]), 0.5);
     (su.uSunColor.value as THREE.Color).set(p.sun ?? p.moon ?? '#ffffff');
-    su.uSpec.value = p.moon ? 60 : p.light < 0.8 ? 90 : 180;
+    // O caminho de brilho do sol/lua na água vem da paleta (M2): comprido e forte no pôr do sol, firme de dia, largo no luar.
+    su.uSpec.value = p.seaSpec; su.uGlint.value = p.seaGlint; su.uSkyMix.value = p.seaSky;
     const fu = this.foam.material.uniforms;
     (fu.uFoam.value as THREE.Color).set(p.foam);
     (fu.uShallow.value as THREE.Color).set(p.waterShallow);
