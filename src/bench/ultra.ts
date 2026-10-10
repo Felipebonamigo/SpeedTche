@@ -24,7 +24,7 @@ export interface UltraEffect {
 }
 
 export const ULTRA_EFFECTS: readonly UltraEffect[] = [
-  { id: 'gtao', label: 'Oclusão de ambiente (GTAO)', params: { samples: 16, radius: 1.2, resolutionScale: 0.5, denoise: true }, implemented: false },
+  { id: 'gtao', label: 'Oclusão de ambiente (GTAO)', params: { samples: 16, radius: 1.2, resolutionScale: 1, denoise: true }, implemented: false },
   { id: 'ssr', label: 'Reflexo em tela (água e asfalto molhado)', params: { maxSteps: 64, maxDistance: 80, resolutionScale: 0.5, surfaces: 'water,wet-asphalt' }, implemented: false },
   { id: 'volumetric-rays', label: 'Raios de sol volumétricos', params: { samples: 48, density: 0.35, resolutionScale: 0.5 }, implemented: false },
   { id: 'dof', label: 'Profundidade de campo (menus e pódio)', params: { where: 'menus+podium', bokehScale: 3, maxBlurPx: 12 }, implemented: false },
