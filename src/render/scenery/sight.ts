@@ -10,7 +10,7 @@
 // Puro: só contas sobre a linha central desenrolada.
 import { REFERENCE_SPEED, SEGMENT_LENGTH } from '../../core/constants';
 import type { Track } from '../../core/types';
-import { CHASE_CAMERA } from '../camera';
+import { CHASE_CAMERA } from '../camera-base';
 import { palette } from '../palette';
 import { FRAME_AHEAD } from '../roadframe';
 import { FOG_DENSITY } from '../sky';
@@ -126,8 +126,9 @@ const SAMPLE_X = new Float64Array(SAMPLES); const SAMPLE_Y = new Float64Array(SA
  * Segundos em que o marco posto no segmento `k` (desenrolado: a volta do meio), na fração `f`, a `x` m do centro
  * (+ = direita), com a base a `y` m do início do segmento e girado `yaw` (Placement do layout) fica à vista da câmera de
  * perseguição na aproximação: da entrada dele na janela do runtime até o carro passar. `haze`: a névoa do horizonte.
+ * `lower`: quanto a câmera está abaixo da base (m; 0 = a base, `CAMERA_DYNAMICS.lower.max` = a mais baixa em velocidade).
  */
-export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y: number, yaw: number, b: SightBounds, haze: boolean, from = -Infinity): number {
+export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y: number, yaw: number, b: SightBounds, haze: boolean, from = -Infinity, lower = 0): number {
   const { px, pz, hd, hs, hc, py } = road;
   // Centro e giro como em runtime.place: lateral somada nas duas pontas do segmento e interpolada.
   const ax = px[k] + x * hc[k]; const az = pz[k] + x * hs[k];
@@ -165,7 +166,7 @@ export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y
     const h = hd[j] + (hd[j + 1] - hd[j]) * u;
     const sh = Math.sin(h); const ch = Math.cos(h);
     const ry = roadY(py, s);
-    const camY = roadY(py, s - backS) + CHASE_CAMERA.height;
+    const camY = roadY(py, s - backS) + CHASE_CAMERA.height - lower;
     const lookY = ry + CHASE_CAMERA.lookY + Math.max(-4, Math.min(4, (roadY(py, s + lookS) - ry) * 0.6));
     // Câmera atrás do carro no rumo dele; olha o ponto à frente. Base: D (eixo), R (direita), U = R × D.
     const camX = cx - CHASE_CAMERA.back * sh; const camZ = cz + CHASE_CAMERA.back * ch;
@@ -223,4 +224,212 @@ export function blocked(road: SightRoad, cx: number, cy: number, cz: number, tx:
     if (top > 0 && cy + dy * t - py[q] < top) return true;
   }
   return false;
+}
+
+
+// ───────────────────────────── Câmera dinâmica (M5) ─────────────────────────────
+// Os deslocamentos que a câmera de perseguição faz ALÉM da base (`CHASE_CAMERA`, que não muda) e o limite de cada um. Moram aqui, ao lado da
+// conta de enquadramento, porque o que se prova é o mesmo: o que a câmera vê e onde ela está. `camera.ts` só aplica o modelo; os testes
+// (tests/camera-dinamica.test.ts) varrem os limites. Tudo puro (sem three, sem DOM) e determinístico.
+// Garantias, e como valem:
+//   - cenário: a lateral que a órbita acrescenta fica em `max(orbit.lateralFree, a da câmera-base)`; nas 109 pistas nenhuma célula do que
+//     tapa a vista (prédio, arquibancada, box, outdoor) nem sólido do núcleo está a menos de 6 m do eixo (medido: 6 em Copacabana, 8 nas
+//     outras). Árvore e poste (a 9 m+) não entram na grade e ficam além do corredor com folga;
+//   - chão: a câmera nunca desce abaixo de `CHASE_CAMERA.height − lower.max` (1,73 m) sobre a pista sob ela;
+//   - carros: a órbita recua até a câmera sair da caixa de qualquer vizinho (e da do próprio carro); só ela se aproxima de um carro, a base
+//     fica 7,8 m atrás do dono dela, e a base não é desta frente;
+//   - FOV: o sobrepasso da mola é cortado em `fov.springMax` e a soma de tudo cabe em `fov.hardMax`.
+// A mola de FOV só ABRE o quadro e a câmera baixa por até 0,32 m: a conta de enquadramento dos marcos (`sightSeconds(..., lower)`)
+// continua valendo com a base, e um teste mede que baixar não custa visada além do muro que já a escondia.
+
+export const CAMERA_DYNAMICS = {
+  /** Câmera mais baixa em velocidade: até `max` m abaixo da base, entre `from` e `to` (frações da velocidade máxima). */
+  lower: { max: 0.32, from: 0.55, to: 1 },
+  /** Mola do FOV de nitro: sobrepasso máximo (°), teto absoluto do FOV (°), tranco no engate (°/s), frequência (rad/s) e amortecimento. */
+  fov: { springMax: 5, hardMax: 92, kick: 55, omega: 14, zeta: 0.45 },
+  /** Tremor fino: a partir de `from` da máxima, até `offset` m e `roll` rad. */
+  tremor: { from: 0.9, offset: 0.02, roll: 0.003 },
+  /**
+   * Cresta de morro: o quanto a câmera flutua (m), a queda de inclinação que conta como cresta (e a mínima de reserva), a distância mínima entre duas
+   * (segmentos), o máximo por volta, e as janelas (m) de subida antes e de descida depois dela.
+   */
+  crest: { lift: 0.5, minDrop: 0.04, fallbackDrop: 0.02, spacing: 40, max: 4, rise: 10, fall: 25 },
+  /** Órbita da vitória: guinada máxima (rad), duração (s), raio final (m), elevação (m), lateral livre (m) e a caixa do carro (m) com a folga da câmera. */
+  orbit: { yawMax: 1.26, seconds: 2.4, radiusMin: 5.4, lift: 0.5, lateralFree: 5.5, halfLength: 2, halfWidth: 0.91, marginLength: 1, marginWidth: 0.8 },
+} as const;
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+const smooth = (v: number): number => { const t = clamp01(v); return t * t * (3 - 2 * t); };
+
+/** Quanto a câmera desce (m) na fração `speedFrac` da velocidade máxima: 0 até `from`, `max` a partir de `to`, suave no meio. */
+export function cameraLowering(speedFrac: number): number {
+  const { max, from, to } = CAMERA_DYNAMICS.lower;
+  return max * smooth((speedFrac - from) / (to - from));
+}
+
+/** Intensidade do tremor fino, 0..1: nada até 90% da máxima, cheio na máxima. */
+export function tremorAmount(speedFrac: number): number {
+  const { from } = CAMERA_DYNAMICS.tremor;
+  return clamp01((speedFrac - from) / (1 - from));
+}
+
+export interface Tremor { x: number; y: number; roll: number }
+
+/**
+ * O tremor no instante `time` (s) com a intensidade `amount` (0..1): duas senoides rápidas (15 a 28 Hz) por eixo, sem ruído sorteado. Os pesos somam 1:
+ * o deslocamento nunca passa de `amount · offset` (nem o giro de `amount · roll`).
+ */
+export function tremorOffset(time: number, amount: number, out: Tremor = { x: 0, y: 0, roll: 0 }): Tremor {
+  const { offset, roll } = CAMERA_DYNAMICS.tremor;
+  const a = clamp01(amount);
+  out.x = a * offset * (0.62 * Math.sin(time * 97.3) + 0.38 * Math.sin(time * 151.7 + 1.3));
+  out.y = a * offset * (0.6 * Math.sin(time * 113.1 + 0.7) + 0.4 * Math.sin(time * 173.9 + 2.1));
+  out.roll = a * roll * (0.7 * Math.sin(time * 79.3 + 0.4) + 0.3 * Math.sin(time * 131.9));
+  return out;
+}
+
+/** A parcela de FOV do nitro (°): posição `x` e velocidade `v` da mola. */
+export interface NitroFov { x: number; v: number }
+
+/**
+ * Anda a mola do FOV do nitro `dt` segundos. Engatado, o alvo é `CHASE_CAMERA.nitroFov` e o engate (`justEngaged`) dá um tranco de velocidade:
+ * a mola subamortecida passa do alvo e assenta. Sem nitro o alvo é 0. `reduce` (reduzir efeitos): amortecimento crítico e sem tranco, ou seja,
+ * chega ao alvo sem sobrepasso. A parcela fica em [0, nitroFov + springMax]. Passos de no máximo 1/120 s (estável com quadro lento).
+ */
+export function stepNitroFov(s: NitroFov, engaged: boolean, justEngaged: boolean, dt: number, reduce: boolean): NitroFov {
+  const { springMax, kick, omega, zeta } = CAMERA_DYNAMICS.fov;
+  const target = engaged ? CHASE_CAMERA.nitroFov : 0;
+  const w = reduce ? 10 : omega; const z = reduce ? 1 : zeta;
+  const hi = CHASE_CAMERA.nitroFov + springMax;
+  if (justEngaged && !reduce) s.v += kick;
+  const steps = Math.max(1, Math.ceil(dt * 120));
+  const h = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    s.v += (w * w * (target - s.x) - 2 * z * w * s.v) * h;
+    s.x += s.v * h;
+    if (s.x < 0) { s.x = 0; if (s.v < 0) s.v = 0; } else if (s.x > hi) { s.x = hi; if (s.v > 0) s.v = 0; }
+  }
+  return s;
+}
+
+/** A órbita da vitória, 0..1, `seconds` depois de cruzar a linha em 1º: sobe suave (sem arrancada) em `orbit.seconds`. */
+export function orbitAmount(seconds: number): number {
+  return smooth(seconds / CAMERA_DYNAMICS.orbit.seconds);
+}
+
+/** Outro carro, em metros relativos ao carro dono da câmera: `dx` + à direita, `dz` + à frente. */
+export interface Neighbor { dx: number; dz: number }
+
+/** A câmera de órbita no referencial da pista: lateral absoluta (m do eixo), distância atrás do carro (m), elevação (m), fração efetiva e guinada (rad, + = para a direita). */
+export interface OrbitOut { lat: number; back: number; lift: number; alpha: number; yaw: number }
+
+/**
+ * A câmera (lateral `relLat` m do carro dono, `back` m atrás dele) está dentro da caixa do vizinho `n`, alargada pela folga da câmera? Serve também
+ * para o próprio carro (`n = {dx: 0, dz: 0}`).
+ */
+export function insideCarBox(relLat: number, back: number, n: Neighbor): boolean {
+  const o = CAMERA_DYNAMICS.orbit;
+  return Math.abs(relLat - n.dx) < o.halfWidth + o.marginWidth && Math.abs(-back - n.dz) < o.halfLength + o.marginLength;
+}
+
+/**
+ * A câmera da órbita com a fração `alpha` (0..1): gira em volta do carro (lateral `carLat` m do eixo; a câmera-base está em `camLat`) para o lado do
+ * centro da pista, chega mais perto e mais alto. A lateral fica em `max(lateralFree, |camLat|)`. Se a pose cair na caixa de um dos `count` primeiros
+ * vizinhos, ou do próprio carro, recua a fração em 16 passos até sair (0 = a base, sempre aceita). `out.alpha` é a fração que valeu.
+ */
+export function orbitCamera(alpha: number, carLat: number, camLat: number, neighbors: readonly Neighbor[], count: number, out: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 }): OrbitOut {
+  const o = CAMERA_DYNAMICS.orbit;
+  const side = carLat >= 0 ? -1 : 1;
+  const base = CHASE_CAMERA.back;
+  const limit = Math.max(o.lateralFree, Math.abs(camLat));
+  const target = clamp01(alpha);
+  const rel0 = camLat - carLat;
+  for (let k = 16; k >= 0; k--) {
+    const a = (target * k) / 16;
+    const yaw = side * o.yawMax * a;
+    const radius = base - (base - o.radiusMin) * a;
+    const rel = radius * Math.sin(yaw) + rel0 * (1 - a);
+    const back = radius * Math.cos(yaw);
+    const lat = Math.max(-limit, Math.min(limit, carLat + rel));
+    let clear = k === 0 || !insideCarBox(lat - carLat, back, { dx: 0, dz: 0 });
+    for (let i = 0; clear && i < count; i++) if (insideCarBox(lat - carLat, back, neighbors[i])) clear = false;
+    if (clear) { out.lat = lat; out.back = back; out.lift = o.lift * a; out.alpha = a; out.yaw = yaw; return out; }
+  }
+  return out; // inalcançável (k = 0 sempre vale)
+}
+
+/** Cresta de morro: o segmento, o z (unidades de pista) e a queda de inclinação (m/m) que a define. */
+export interface Crest { seg: number; z: number; drop: number }
+
+/** Janela (segmentos) em que se mede a inclinação antes e depois do ponto, e a vizinhança em que só o maior fica. */
+const CREST_WINDOW = 6;
+const CREST_NEIGHBOURHOOD = 20;
+
+const crestCache = new WeakMap<Track, Crest[]>();
+
+/**
+ * As cristas da pista: onde a inclinação média dos 6 segmentos antes cai mais que `minDrop` (4% = 4 m a cada 100 m) em relação à dos 6 depois — a
+ * estrada "some" na ponta. Fica o maior de cada vizinhança de 20 segmentos, depois os maiores com `spacing` segmentos de distância, no máximo
+ * `max` (4) por volta, em ordem de pista. Pista sem nenhuma queda de 4% usa a reserva de 2%; pista plana não tem cresta. Só visual.
+ */
+export function findCrests(track: Track): Crest[] {
+  const cached = crestCache.get(track);
+  if (cached) return cached;
+  const { minDrop, fallbackDrop, spacing, max } = CAMERA_DYNAMICS.crest;
+  const segs = track.segments; const n = segs.length;
+  const slope = new Float64Array(n);
+  for (let i = 0; i < n; i++) slope[i] = ((segs[i].y1 - segs[i].y0) * Y_SCALE) / SEGMENT_M;
+  const drop = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    let before = 0; let after = 0;
+    for (let k = 1; k <= CREST_WINDOW; k++) { before += slope[(i - k + n) % n]; after += slope[(i + k - 1) % n]; }
+    drop[i] = (before - after) / CREST_WINDOW;
+  }
+  const pick = (threshold: number): Crest[] => {
+    const cand: Crest[] = [];
+    for (let i = 0; i < n; i++) {
+      if (drop[i] < threshold) continue;
+      let top = true;
+      for (let k = -CREST_NEIGHBOURHOOD; top && k <= CREST_NEIGHBOURHOOD; k++) {
+        const d = drop[(i + k + n) % n];
+        if (d > drop[i] || (d === drop[i] && k < 0)) top = false; // empate: fica o primeiro
+      }
+      if (top) cand.push({ seg: i, z: i * SEGMENT_LENGTH, drop: drop[i] });
+    }
+    cand.sort((a, b) => b.drop - a.drop);
+    const kept: Crest[] = [];
+    for (const c of cand) {
+      if (kept.length >= max) break;
+      if (kept.every((q) => { const d = Math.abs(q.seg - c.seg); return Math.min(d, n - d) >= spacing; })) kept.push(c);
+    }
+    return kept.sort((a, b) => a.seg - b.seg);
+  };
+  let out = pick(minDrop);
+  if (out.length === 0) out = pick(fallbackDrop);
+  crestCache.set(track, out);
+  return out;
+}
+
+const Z_TO_M = SEGMENT_M / SEGMENT_LENGTH;
+
+/**
+ * Quanto a câmera flutua (m) em `z` perto de uma cresta: sobe suave nos `rise` m antes dela e desce nos `fall` m depois, até `crest.lift` na
+ * velocidade máxima (de 50% a 100% da máxima, suave; devagar não flutua) e menos nas cristas mais mansas. Zero longe de qualquer uma.
+ */
+export function crestLift(crests: readonly Crest[], z: number, trackLength: number, speedFrac: number): number {
+  if (crests.length === 0) return 0;
+  const { lift, rise, fall } = CAMERA_DYNAMICS.crest;
+  const fast = smooth((speedFrac - 0.5) / 0.5);
+  if (fast === 0) return 0;
+  let best = 0;
+  for (const c of crests) {
+    let d = z - c.z;
+    d -= Math.round(d / trackLength) * trackLength; // a volta da pista
+    const m = d * Z_TO_M; // + = depois da cresta
+    const pulse = m < 0 ? smooth(1 + m / rise) : smooth(1 - m / fall);
+    if (pulse <= 0) continue;
+    const gentle = Math.max(0.5, Math.min(1, 0.5 + c.drop * 5));
+    best = Math.max(best, pulse * gentle);
+  }
+  return lift * fast * best;
 }

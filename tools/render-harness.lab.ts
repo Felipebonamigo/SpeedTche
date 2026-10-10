@@ -152,8 +152,45 @@ function blob(): { found: boolean; count: number } {
   return { found, count };
 }
 
+/**
+ * M5: a cena dos efeitos acesos (tests/efeitos-gl.test.ts). `ticks` = 207: a largada cai no quadro 3 (anel da largada); do quadro 4 em diante os dois humanos
+ * derrapam com carga roxa, a velocidade máxima, o nitro engata (halo), a batida acontece no quadro 5 (POW, faíscas) e o impulso da derrapagem solta a rajada;
+ * um carro rápido à frente do 1º humano acende o túnel do vácuo. `forced = false` é a mesma cena sem forçar nada (a base da comparação de chamadas).
+ * Devolve o `renderer.info` do último quadro e as malhas `fx-*` que têm o que desenhar nele.
+ */
+function fxScene(quality: Quality, forced: boolean): { debug: DebugInfo; meshes: Array<{ name: string; visible: boolean; drawn: number }> } {
+  setup('copacabana', 2, 207);
+  if (!current) throw new Error('lab.setup primeiro');
+  const { state, track } = current;
+  const humans = state.cars.filter((c) => c.seat >= 0);
+  const lead = state.cars.find((c) => c.seat < 0);
+  let debug = renderer.debugInfo();
+  for (let i = 0; i < 16; i++) {
+    stepRace(state, track, []);
+    tick++;
+    if (forced && i >= 3) {
+      for (const c of humans) {
+        c.speed = c.stats.topSpeed; c.driftDir = 1; c.driftTicks = 30; c.driftCharge = 160; c.nitroTicks = Math.max(c.nitroTicks, 100);
+        if (i === 5) { c.collisionCooldown = 20; c.speed = c.stats.topSpeed * 0.5; }
+        if (i === 6) c.driftBoostTicks = 88;
+      }
+      if (lead && humans[0]) { lead.z = (humans[0].z + 700) % track.length; lead.x = humans[0].x; lead.speed = lead.stats.topSpeed; }
+    }
+    renderer.render(frameFor(quality));
+    debug = renderer.debugInfo();
+  }
+  const meshes: Array<{ name: string; visible: boolean; drawn: number }> = [];
+  scene.traverse((o) => {
+    if (!o.name.startsWith('fx-')) return;
+    const m = o as import('three').Mesh;
+    const inst = o as import('three').InstancedMesh;
+    meshes.push({ name: o.name, visible: o.visible, drawn: inst.isInstancedMesh ? inst.count : m.geometry.drawRange.count });
+  });
+  return { debug, meshes };
+}
+
 const lab = {
-  renderer, setup, render, idle, programs, collect, blob,
+  renderer, setup, render, idle, programs, collect, blob, fxScene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),
   dynamic: (on: boolean, pin: number | null) => { renderer.setDynamicResolution(on); renderer.pinDynamicScale(pin); },
