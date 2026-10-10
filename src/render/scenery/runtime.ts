@@ -14,9 +14,10 @@ import { getModel, landmarkOf } from './catalog';
 import type { MatKey, Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
+import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
 
-type BatchKey = 'flat' | 'dress' | 'haze' | 'office' | 'apartment' | 'classic' | 'house' | 'glow' | 'beacon' | 'cone' | 'panel' | 'blob';
+type BatchKey = 'flat' | 'dress' | 'haze' | 'office' | 'apartment' | 'classic' | 'house' | 'glow' | 'beacon' | 'cone' | 'panel' | 'blob' | 'cutout';
 
 /** Janela máxima do RoadFrame em segmentos (BEHIND + AHEAD alto + 1 = 291) com folga. */
 const WINDOW = 300;
@@ -30,7 +31,7 @@ const BLOB_AHEAD = 60;
 const ATTRS: Record<BatchKey, string[]> = {
   flat: ['position', 'normal', 'color'], dress: ['position', 'normal', 'color'], haze: ['position', 'normal', 'color'], glow: ['position', 'normal', 'color'], beacon: ['position', 'normal', 'color'],
   office: ['position', 'normal', 'color', 'uv'], apartment: ['position', 'normal', 'color', 'uv'], classic: ['position', 'normal', 'color', 'uv'], house: ['position', 'normal', 'color', 'uv'],
-  panel: ['position', 'normal', 'uv'], cone: ['position', 'normal'], blob: ['position', 'normal', 'uv'],
+  panel: ['position', 'normal', 'uv'], cone: ['position', 'normal'], blob: ['position', 'normal', 'uv'], cutout: ['position', 'normal', 'color', 'uv'],
 };
 
 /** Geometria só com os atributos do lote (o BatchedMesh exige o mesmo conjunto em todas). */
@@ -106,6 +107,7 @@ export class Scenery {
   private readonly glowMat: THREE.MeshBasicMaterial;
   private readonly beaconMat: THREE.MeshBasicMaterial;
   private readonly panelMat: THREE.MeshStandardMaterial;
+  private readonly cutoutMat: THREE.MeshStandardMaterial;
   private readonly blobMat: THREE.MeshBasicMaterial;
   private readonly textures: THREE.Texture[] = [];
   private trackKey = '';
@@ -160,9 +162,14 @@ export class Scenery {
     applyGrade(this.blobMat);
     const cone = new THREE.MeshBasicMaterial({ color: '#ffd98a', transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     applyGrade(cone);
+    // Recorte alfa (capim de cartão, L4): um lote só, sem sombra; o `stylize` compõe com o callback do material.
+    const blade = bladeTexture();
+    this.textures.push(blade);
+    this.cutoutMat = cutoutMaterial(blade);
+    applyStylize(this.cutoutMat, 'scenery');
     this.materials = {
       flat: this.flatMat, dress: this.flatMat, haze: this.hazeMat, office: facade('office'), apartment: facade('apartment'), classic: facade('classic'), house: facade('house'),
-      glow: this.glowMat, beacon: this.beaconMat, cone, panel: this.panelMat, blob: this.blobMat,
+      glow: this.glowMat, beacon: this.beaconMat, cone, panel: this.panelMat, blob: this.blobMat, cutout: this.cutoutMat,
     };
     this.applyNight();
   }
@@ -198,6 +205,7 @@ export class Scenery {
     this.flatMat.color.set(time === 'day' ? '#ffffff' : time === 'dusk' ? mix('#ffffff', '#5a2e4a', 0.22) : mix('#ffffff', '#0a1030', 0.42));
     for (const m of this.facadeMats) m.color.copy(this.flatMat.color);
     this.hazeMat.color.copy(this.flatMat.color);
+    this.cutoutMat.color.copy(this.flatMat.color);
     this.blobMat.color.set(time === 'day' ? '#1c2a5a' : time === 'dusk' ? '#2c1a48' : '#050818');
     this.blobMat.opacity = time === 'night' ? 0.4 : 0.32;
 
