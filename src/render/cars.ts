@@ -23,7 +23,7 @@ import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, type WheelDesign, type WheelModel } from './cars/wheels';
 import { FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameColorFor } from './cars/flame';
-import { newMotion, stepMotion, type Motion } from './cars/motion';
+import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
 
@@ -77,6 +77,8 @@ export class Cars {
   /** Estrelinhas da batida (3 por carro). */
   private readonly stars: THREE.InstancedMesh;
   private readonly starPose: StarPose = { x: 0, y: 0, z: 0, scale: 0, roll: 0 };
+  /** Entrada reaproveitada do `stepMotion` (nada de objeto novo por carro por quadro). */
+  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, topSpeed: 1, reduce: false };
   /** Aparência por carro (estilo, cores, pintura), recalculada só quando o carro ou a pintura escolhida mudam. */
   private readonly looks: Array<CarLook | null> = [];
   private readonly lookIds: string[] = [];
@@ -265,10 +267,10 @@ export class Cars {
       a.bob = c.skidTicks > 0 && c.speed > 200 ? 1 : 0;
       a.nitro = c.nitroTicks > 0 ? c.nitroTicks / NITRO_DURATION_TICKS : 0;
       // M4: guinada da derrapagem, batida e esticão, só visuais, por borda do estado (cars/motion.ts).
-      stepMotion(a.motion, {
-        driftDir: c.driftDir, driftTicks: c.driftTicks, driftBoostTicks: c.driftBoostTicks, nitroTicks: c.nitroTicks,
-        collisionCooldown: c.collisionCooldown, speed: c.speed, topSpeed: c.stats.topSpeed, reduce: frame.options.reduceEffects,
-      }, dt);
+      const mi = this.motionIn;
+      mi.driftDir = c.driftDir; mi.driftTicks = c.driftTicks; mi.driftBoostTicks = c.driftBoostTicks; mi.nitroTicks = c.nitroTicks;
+      mi.collisionCooldown = c.collisionCooldown; mi.speed = c.speed; mi.topSpeed = c.stats.topSpeed; mi.reduce = frame.options.reduceEffects;
+      stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;
   }

@@ -22,6 +22,10 @@ const preTicks = Number(q.get('ticks') ?? 1500);
 const quality = q.get('q') ?? 'high';
 const forceNitro = q.get('nitro') === '1';
 const forceSkid = q.get('skid') === '1';
+// drift=1|-1: o carro do jogador derrapa para a direita (1) ou a esquerda (-1) (guinada visual, M4); hit=<quadro>: no quadro dado o carro do
+// jogador "bate" (queda de 40% da velocidade e collisionCooldown = 20), para ver o rodopio, o quique e as estrelinhas; frames=<n> escolhe o instante.
+const forceDrift = Number(q.get('drift') ?? 0);
+const hitFrame = q.get('hit') === null ? -1 : Number(q.get('hit'));
 // carview=side|rear34|front34|rear: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
 // showroom=1: os 13 estilos em grade na pista (carview escolhe o lado, padrão front34);
 // sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros;
@@ -206,6 +210,8 @@ function loop(now) {
     for (const c of state.cars) if (c.seat >= 0) { if (forceNitro) c.nitroTicks = 100; if (forceSkid) { c.x = 1.35; c.skidTicks = 6; } }
     // brake=1: o carro do jogador "freia" a cada quadro (só a velocidade cai; parado no lugar) — lanternas de freio.
     if (q.get('brake') === '1') { me.speed = Math.max(400, 5000 - frames * 250); me.collisionCooldown = 0; }
+    if (forceDrift) { me.driftDir = forceDrift; me.driftTicks = 30; }
+    if (hitFrame >= 0) { const top = me.stats.topSpeed; if (frames < hitFrame) { me.speed = top * 0.8; me.collisionCooldown = 0; } else if (frames === hitFrame) { me.speed = top * 0.4; me.collisionCooldown = 20; } else me.collisionCooldown = Math.max(0, 20 - (frames - hitFrame)); }
     ageMessages(dt);
     renderer.render(raceFrame());
     if (extraCam) renderExtra(showroom ? (carview ?? 'front34') : (carview || 'rear34'), showroom ? SHOWROOM_VIEWS : VIEWS);

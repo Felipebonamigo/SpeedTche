@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CAR_BODIES } from '../src/core/data/cars';
 import type { CarBody } from '../src/core/types';
-import { checkCarModel } from '../src/render/cars/check';
+import { CAR_LIMITS, checkCarModel } from '../src/render/cars/check';
 import { carModelFromGltf, parseCarGlb } from '../src/render/cars/gltf';
 import type { CarModel } from '../src/render/cars/model';
 import { MODEL_BUILDERS } from '../src/render/cars/models';
@@ -48,8 +48,8 @@ describe('carro em glTF: o validador da convenção', () => {
     for (let i = 0; i < mat.count; i++) mat.setW(i, 0);
     expect(checkCarModel(dark).join(' | ')).toMatch(/lanterna/);
 
-    const heavy = { ...MODEL_BUILDERS.micro(), triangles: 3600 };
-    expect(checkCarModel(heavy).join(' | ')).toMatch(/3\.600 triângulos/);
+    const heavy = { ...MODEL_BUILDERS.micro(), triangles: CAR_LIMITS.maxShellTriangles + 100 }; // o teto subiu para 4.500 na M4
+    expect(checkCarModel(heavy).join(' | ')).toMatch(/4\.600 triângulos/);
   });
 });
 

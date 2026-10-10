@@ -26,7 +26,7 @@ function fakeCanvasDocument(): void {
   vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, style: {}, getContext: () => ctx }) });
 }
 
-interface Inner { flames: THREE.InstancedMesh; stars: THREE.InstancedMesh; styles: Array<{ model: { body: string }; mesh: THREE.InstancedMesh; count: number }> }
+interface Inner { flames: THREE.InstancedMesh; stars: THREE.InstancedMesh; styles: Array<{ model: { body: string }; mesh: THREE.InstancedMesh; count: number; lod1: { mesh: THREE.InstancedMesh; count: number } | null }> }
 const inner = (c: Cars) => c as unknown as Inner;
 
 /** Corrida de 4 carros (o jogador de Falcão, que fica em `own`) e uma passada de `update` + `pose`. */
@@ -169,6 +169,23 @@ describe('Cars: guinada da derrapagem e estrelinhas', () => {
     s.draw(0.032);
     s.draw(0.3);
     expect(inner(s.cars).stars.count).toBe(0);
+    s.cars.dispose();
+  });
+});
+
+describe('Cars: o casco simples (lod1) do procedural', () => {
+  it('carro a mais de 30 m à frente usa o lote do lod1; o de perto e o jogador, o do casco completo', () => {
+    const s = scene((st, own) => {
+      // Um Trovão (muscle) a 8 m e outro a 60 m (50 unidades de pista por metro), os demais longe, atrás.
+      const others = st.cars.filter((_, i) => i !== own);
+      others[0].carId = 'trovao'; others[0].z = st.cars[own].z + 8 * 50;
+      others[1].carId = 'trovao'; others[1].z = st.cars[own].z + 60 * 50;
+    });
+    s.draw();
+    const muscle = inner(s.cars).styles.find((x) => x.model.body === 'muscle');
+    expect(muscle?.lod1, 'o procedural tem lote de lod1').toBeTruthy();
+    expect(muscle?.count).toBe(1); // o de 8 m
+    expect(muscle?.lod1?.count).toBe(1); // o de 60 m
     s.cars.dispose();
   });
 });
