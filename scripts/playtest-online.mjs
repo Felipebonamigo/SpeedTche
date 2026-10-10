@@ -131,7 +131,20 @@ check(guestPaint !== 'original', `convidado pinta o carro (${guestPaint})`);
 await guest.evaluate(() => { const o = window.nc.session.online; for (const [f, n] of [['finish', 3], ['stripe', 2], ['wheel', 1], ['flame', 2]]) for (let i = 0; i < n; i++) o.stepLookField(0, f, 1); });
 const guestLook = await guest.evaluate(() => JSON.stringify(window.nc.session.online.lookOf(0)));
 check(/"finish":"fosco"/.test(guestLook) && /"stripe":"a"/.test(guestLook) && /"wheel"/.test(guestLook) && /"flame"/.test(guestLook), `convidado personaliza o visual (${guestLook})`);
-await press(guest, 'ArrowDown', 3);
+// O editor do visual na sala (N3): "Visual" abre os 8 campos logo abaixo do botão, tudo dentro da janela e sem rolar a página; Voltar fecha.
+await press(guest, 'ArrowDown', 2); // direção, Visual
+await press(guest, 'Enter');
+const editorBox = await guest.evaluate(() => {
+  const rows = [...document.querySelectorAll('.online-look-editor .sel-look')];
+  const inside = rows.every((r) => { const b = r.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.height > 0; });
+  return { n: rows.length, inside, pageScroll: document.documentElement.scrollHeight > innerHeight + 1 };
+});
+check(editorBox.n === 8 && editorBox.inside && !editorBox.pageScroll, `o editor do visual abre na sala com os 8 campos, dentro da janela, sem rolar a página (${JSON.stringify(editorBox)})`);
+await shot(guest, '02a-lobby-editor');
+await press(guest, 'ArrowDown', 9); // 8 campos e o Voltar
+await press(guest, 'Enter');
+check(await guest.evaluate(() => document.querySelectorAll('.online-look-editor').length === 0), 'Voltar fecha o editor do visual');
+await press(guest, 'ArrowDown');
 await press(guest, 'Enter');
 const guestReady = await waitFor(guest, () => window.nc.session.online.ready);
 check(guestReady, 'convidado pronto');

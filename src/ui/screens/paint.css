@@ -29,16 +29,24 @@
 .look-editor { display: flex; flex-direction: column; gap: calc(4 * var(--u)); min-height: 0; }
 .look-preview { display: flex; justify-content: center; }
 .look-preview .car-svg { max-height: calc(54 * var(--u)); width: auto; }
-.look-rows { display: grid; grid-template-columns: 1fr 1fr; gap: calc(3 * var(--u)) calc(6 * var(--u)); }
-.sel-look { padding: calc(1 * var(--u)) calc(4 * var(--u)) calc(1 * var(--u)) calc(8 * var(--u)); flex: none; min-width: 0; }
+.look-rows { display: grid; grid-template-columns: 1fr; gap: calc(2 * var(--u)); }
+.sel-look { padding: calc(2 * var(--u)) calc(6 * var(--u)) calc(2 * var(--u)) calc(12 * var(--u)); flex: none; min-width: 0; }
 .sel-look .sel-label, .sel-look .sel-value { font-size: var(--fs-sm); white-space: nowrap; }
 .sel-look .sel-box { min-width: 0; }
-.sel-look .sel-arrow { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
-.sel-look .look-value { display: inline-flex; align-items: center; justify-content: center; gap: calc(4 * var(--u)); min-width: calc(70 * var(--u)); overflow: hidden; }
+.sel-look .sel-arrow { width: calc(24 * var(--u)); height: calc(24 * var(--u)); flex: none; }
+.sel-look .look-value { display: inline-flex; align-items: center; justify-content: center; gap: calc(6 * var(--u)); min-width: calc(150 * var(--u)); overflow: hidden; }
 .sel-look .look-name { overflow: hidden; text-overflow: ellipsis; }
 .look-dot { width: calc(11 * var(--u)); height: calc(11 * var(--u)); box-shadow: 0 0 0 calc(1 * var(--u)) rgba(255, 255, 255, 0.55); }
-.btn-look { padding: calc(3 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* "Visual": no lobby, um botão só com o ícone no rodapé do cartão (ao lado do PRONTO); na sala online é uma linha do cartão. */
+.btn-look { padding: calc(3 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); white-space: nowrap; flex: none; }
+.btn-look-icon { padding: calc(4 * var(--u)) calc(8 * var(--u)); margin-left: auto; margin-right: calc(6 * var(--u)); line-height: 0; }
+.btn-look-icon .ico { width: calc(18 * var(--u)); height: calc(18 * var(--u)); }
+/* O painel do editor por cima do lobby (lobby.ts): um assento por vez, o lobby inteiro de espaço. */
+.scr-lobby .lobby-body { position: relative; }
+.look-overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.74); padding: calc(8 * var(--u)); }
+.look-panel { width: min(calc(480 * var(--u)), 100%); max-height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: calc(6 * var(--u)); padding: calc(10 * var(--u)) calc(14 * var(--u)); border: calc(2 * var(--u)) solid var(--seat, var(--accent)); border-radius: calc(14 * var(--u)); }
+.look-panel-head { display: flex; align-items: center; gap: calc(8 * var(--u)); font-weight: 800; }
+.look-panel-title { font-size: var(--fs); }
 .btn-look.locked { opacity: 0.55; }
 .btn-look-back { padding: calc(3 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); align-self: center; }
-.slot.editing { justify-content: flex-start; }
 .online-look-editor { margin-top: calc(2 * var(--u)); }

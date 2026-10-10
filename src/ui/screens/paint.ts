@@ -110,6 +110,22 @@ export function lookSummary(look: CarLook | null | undefined): string {
   return parts.length === 1 ? parts[0] : t('look.summary.more', { first: parts[0], n: parts.length - 1 });
 }
 
+/** Ícone do botão "Visual" (uma paleta de tinta): SVG próprio, na marcação constante abaixo (nunca dado do usuário), como os de icons.ts. */
+export function lookIcon(): SVGSVGElement {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = '<svg class="ico look-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2.2-.9 2.2-1.9 0-1.3-1.1-1.7-1.1-2.9 0-1 .8-1.7 1.9-1.7H17a4 4 0 0 0 4-4c0-4.2-4-8.5-9-8.5z"/><circle cx="7.6" cy="11.2" r="1.1"/><circle cx="10.2" cy="7.2" r="1.1"/><circle cx="14.8" cy="7.2" r="1.1"/></svg>';
+  return tpl.content.firstElementChild as SVGSVGElement;
+}
+
+/**
+ * O botão "Visual" do cartão do lobby: só o ícone (o cartão 2×2 não tem largura nem altura para texto), com o nome na `aria-label` e o resumo
+ * do que mudou na dica do mouse e em `data-summary`. Abre o editor (`onActivate`); `cls` = 'locked' com o PRONTO dado.
+ */
+export function lookButton(summary: string, onActivate: () => void, cls = ''): FocusItem {
+  const el = h('button', { class: `btn btn-look btn-look-icon ${cls}`.trim(), attrs: { type: 'button', 'aria-label': t('look.row'), title: `${t('look.row')}: ${summary}`, 'data-summary': summary } }, lookIcon());
+  return { el, activate: onActivate };
+}
+
 export interface LookEditorOptions {
   /** O carro que o visual veste (as cores de fábrica e a lista de rodas dele). */
   car(): CarDef;

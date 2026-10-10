@@ -98,12 +98,9 @@ const SCREENS = [
   ['main', () => window.nc.session.menus.show('main')],
   ['lobby-1', () => { const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1'); s.menus.show('lobby'); }],
   ['lobby-4', () => { const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('lobby'); }],
-  // O editor do visual do carro (N3) aberto em todos os assentos: o pior caso da altura do cartão (o clique no botão "Visual" o abre, como o confirmar).
+  // O editor do visual do carro (N3): o painel por cima do lobby, de um assento por vez (o clique no botão "Visual" o abre, como o confirmar).
   ['lobby-1-editor', () => { const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1'); s.menus.show('lobby'); document.querySelector('.slot.occupied .btn-look')?.click(); }],
-  ['lobby-4-editor', () => {
-    const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('lobby');
-    for (let k = 0; k < 4; k++) [...document.querySelectorAll('.slot.occupied:not(.editing) .btn-look')][0]?.click();
-  }],
+  ['lobby-4-editor', () => { const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('lobby'); document.querySelector('.slot.occupied .btn-look')?.click(); }],
   // Copas em duas etapas (onda G): abre na aba da fronteira (Nordeste, 9 estados: a lista mais longa).
   ['cups', () => window.nc.session.menus.show('cups')],
   // Mundial fechado: o aviso do porquê em cima da lista e a copa de 4 pistas (o detalhe mais alto), na última copa.
