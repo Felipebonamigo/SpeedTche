@@ -1,4 +1,4 @@
-/* Nitro Crew — interface dos menus. Visual atual: painéis de vidro sobre o jogo 3D, uma cor de
+/* Speed Tchê — interface dos menus. Visual atual: painéis de vidro sobre o jogo 3D, uma cor de
    destaque (#ff5a36) com branco e cinzas, tipografia grande e limpa, foco com barra lateral.
    Sem fontes externas. Funciona de 1024×640 a 4K: os tamanhos escalam com --u (unidade).
    O #hud do renderizador fica entre o canvas e o #ui e não é estilizado aqui. */

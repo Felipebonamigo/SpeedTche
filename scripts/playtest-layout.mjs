@@ -44,11 +44,11 @@ const humans = (n) => Array.from({ length: n }, (_, i) => ({ seat: i, name: `P${
 // nome mais largo nos assentos que a corrida de preparação não troca (P3 "POROROCA V10", P4 "IARA TURBO").
 // Só num save vazio (a primeira carga): não apaga o save de ninguém.
 await page.addInitScript(() => {
-  if (localStorage.getItem('nitro-crew.save')) return;
+  if (localStorage.getItem('speed-tche.save')) return;
   // Expedição Brasil no meio (onda G): Sudeste, Sul e Centro-Oeste carimbados e a Bahia; o Mundial ainda fechado
   // (a aba dele mostra o aviso do porquê, a linha a mais que aperta a tela).
   const done = ['br_rj', 'br_sp', 'br_mg', 'br_es', 'br_pr', 'br_sc', 'br_rs', 'br_df', 'br_go', 'br_ms', 'br_mt', 'br_ba'];
-  localStorage.setItem('nitro-crew.save', JSON.stringify({
+  localStorage.setItem('speed-tche.save', JSON.stringify({
     carsUnlocked: ['curupira', 'sucuri', 'carcara', 'pororoca', 'iara', 'boitata', 'beijaflor'],
     seatCars: ['falcao', 'trovao', 'pororoca', 'iara'],
     cupsCompleted: done,

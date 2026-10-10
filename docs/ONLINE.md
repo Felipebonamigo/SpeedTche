@@ -140,7 +140,7 @@ anfitrião. O relay, por sua vez, confere a forma e os tamanhos antes de repassa
 ## Rodar localmente
 
 ```bash
-cd nitro-crew/server && npm ci && cd ..
+cd server && npm ci && cd ..
 npm run relay                       # terminal 1: ws://localhost:8787
 npm run dev                         # terminal 2: abra duas janelas (uma anônima) em localhost:5174
 ```
@@ -240,16 +240,16 @@ e do relay, que falhavam antes da correção (4 de 4; o do relay largava com 17 
 O relay é um processo Node sem estado em disco (salas só na memória). Um VPS de 1 vCPU/1 GB aguenta
 centenas de salas: cada corrida manda ~62 mensagens pequenas por segundo por computador.
 
-1. **Node 22** e o código: `git clone …` e `cd nitro-crew/server && npm ci --omit=dev`.
+1. **Node 22** e o código: `git clone …` e `cd server && npm ci --omit=dev`.
 2. **Serviço** (`/etc/systemd/system/nitro-relay.service`):
 
    ```ini
    [Unit]
-   Description=Nitro Crew relay
+   Description=Speed Tchê relay
    After=network.target
 
    [Service]
-   WorkingDirectory=/opt/nitro-crew
+   WorkingDirectory=/opt/speed-tche
    ExecStart=/usr/bin/node server/relay.mjs
    Environment=PORT=8787 HOST=127.0.0.1
    Restart=always

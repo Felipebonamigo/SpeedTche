@@ -1,4 +1,4 @@
-# Política de privacidade — Nitro Crew (rascunho)
+# Política de privacidade — Speed Tchê (rascunho)
 
 > **Rascunho técnico, não revisado por advogado.** Escrito a partir do que o código faz em 25/09/2026, para o
 > advogado revisar (passo 5.7 do roteiro). Os pontos que precisam de revisão jurídica estão marcados com
@@ -35,14 +35,14 @@ O jogo grava estes dados **localmente**. Nós não temos acesso a eles.
 
 | O quê | Exemplos | Onde |
 |---|---|---|
-| **Opções** | idioma, volumes, qualidade de imagem, dificuldade, se a telemetria está ligada (e em qual versão destes termos você a ligou) | `nitro-crew.settings` |
-| **Progresso** | copas concluídas, recordes de volta e de corrida por pista, conquistas, número de corridas e vitórias | `nitro-crew.save` |
-| **Diário de jogo** | a data e a hora (UTC) de cada sessão, o tempo e as entradas do título até a 1ª corrida e, por corrida, o modo, a pista, a copa, a posição, a duração, se abandonou ou foi eliminado, a assistência usada, batidas e box, o termômetro de emoção (ultrapassagens, disputa, nitro, raspões) e as respostas do questionário. **Nunca guarda nome de jogador.** Nada é enviado | `nitro-crew.playlog` |
+| **Opções** | idioma, volumes, qualidade de imagem, dificuldade, se a telemetria está ligada (e em qual versão destes termos você a ligou) | `speed-tche.settings` |
+| **Progresso** | copas concluídas, recordes de volta e de corrida por pista, conquistas, número de corridas e vitórias | `speed-tche.save` |
+| **Diário de jogo** | a data e a hora (UTC) de cada sessão, o tempo e as entradas do título até a 1ª corrida e, por corrida, o modo, a pista, a copa, a posição, a duração, se abandonou ou foi eliminado, a assistência usada, batidas e box, o termômetro de emoção (ultrapassagens, disputa, nitro, raspões) e as respostas do questionário. **Nunca guarda nome de jogador.** Nada é enviado | `speed-tche.playlog` |
 | **Nomes dos jogadores** | os nomes que você digita para cada assento (P1–P4) e o carro de cada um, e o nome gravado junto de cada recorde | dentro do progresso |
-| **Registro de erros** | até 50 erros: versão do jogo, data e hora (da primeira e da última vez), quantas vezes aconteceu, tipo do erro, mensagem técnica, trecho do código onde aconteceu, modo de jogo, pista e tela abertas na última vez | `nitro-crew.errors` e, na versão para computador, o arquivo `logs/errors.log` |
+| **Registro de erros** | até 50 erros: versão do jogo, data e hora (da primeira e da última vez), quantas vezes aconteceu, tipo do erro, mensagem técnica, trecho do código onde aconteceu, modo de jogo, pista e tela abertas na última vez | `speed-tche.errors` e, na versão para computador, o arquivo `logs/errors.log` |
 
-**Onde exatamente:** na versão para computador, na pasta de dados do jogo — `%APPDATA%\Nitro Crew` (Windows),
-`~/.config/Nitro Crew` (Linux e Steam Deck), `~/Library/Application Support/Nitro Crew` (macOS). No navegador,
+**Onde exatamente:** na versão para computador, na pasta de dados do jogo — `%APPDATA%\SpeedTche` (Windows),
+`~/.config/SpeedTche` (Linux e Steam Deck), `~/Library/Application Support/SpeedTche` (macOS). No navegador,
 no armazenamento local do site.
 
 **Os nomes dos jogadores** são o que você quiser digitar ("P1", um apelido). Recomendamos não usar o nome

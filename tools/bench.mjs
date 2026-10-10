@@ -1,6 +1,6 @@
 // Banco de prova no Chromium headless (swiftshader): abre /?bench=1&<query> no vite, espera window.ncBench.done, grava o
 // JSON e imprime uma linha por corrida, a meta de cada uma e cada problema/aviso. Só prova o formato; FPS de verdade é o do
-// dono (docs/DESEMPENHO.md §3–4: no PC com `"Nitro Crew.exe" --bench`, no Deck com `./nitro-crew --bench`).
+// dono (docs/DESEMPENHO.md §3–4: no PC com `"SpeedTche.exe" --bench`, no Deck com `./speedtche --bench`).
 // Uso: node tools/bench.mjs <porta> [query] [saida.json]     ex.: node tools/bench.mjs 5641 "cenas=copa-1p&q=low&frames=2&warm=1"
 // Níveis (q=): low, medium, high e ultra (2560x1440 na Alta; `res=LxA` força outro tamanho). Sem q=, mede os quatro.
 // Sai com 1 se houver problema de formato ou erro na página; aviso e meta não batida NÃO dão exit 1.

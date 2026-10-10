@@ -14,7 +14,7 @@ import {
 import { isRecord, readJson, writeJson } from './settings';
 import { PLAYLOG_KEY } from './playlog';
 
-export const GHOST_STORE_KEY = 'nitro-crew.ghosts';
+export const GHOST_STORE_KEY = 'speed-tche.ghosts';
 /** Teto do JSON inteiro (~30 voltas típicas de ~5 KB; o arquivo espelhado do Electron aceita até 1 MB). */
 export const GHOST_STORE_MAX_CHARS = 160_000;
 
@@ -126,7 +126,7 @@ export function ghostFileName(rec: GhostRecord): string {
   return `fantasma-${rec.trackId}`;
 }
 
-/** Exporta o fantasma como arquivo `.nitro.json`; false se cancelado ou se não deu. */
+/** Exporta o fantasma como arquivo `.tche.json`; false se cancelado ou se não deu. */
 export async function exportGhostFile(rec: GhostRecord): Promise<boolean> {
   const text = ghostFileText(rec);
   const desktop = getDesktop();
@@ -136,7 +136,7 @@ export async function exportGhostFile(rec: GhostRecord): Promise<boolean> {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${ghostFileName(rec)}.nitro.json`;
+    a.download = `${ghostFileName(rec)}.tche.json`;
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();

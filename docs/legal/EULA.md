@@ -1,4 +1,4 @@
-# Contrato de licença de uso (EULA) — Nitro Crew (rascunho)
+# Contrato de licença de uso (EULA) — Speed Tchê (rascunho)
 
 > **Rascunho, não revisado por advogado** (passo 5.7 do roteiro). Linguagem simples de propósito; os pontos que
 > precisam de revisão jurídica estão marcados com **⚖️ ADVOGADO**. A Steam já tem um contrato padrão
@@ -8,7 +8,7 @@
 
 **Versão:** [1.0] · **Data:** [data da publicação]
 
-Este contrato é entre você e **[nome da empresa], CNPJ [número]** ("nós"), sobre o jogo **Nitro Crew** (o
+Este contrato é entre você e **[nome da empresa], CNPJ [número]** ("nós"), sobre o jogo **Speed Tchê** (o
 "Jogo"). Ao instalar ou jogar, você concorda com ele. Se não concordar, não instale nem jogue — e, se comprou,
 peça o reembolso pela loja onde comprou.
 
@@ -22,7 +22,7 @@ Você também pode, sem pedir permissão:
 
 - fazer vídeos, transmissões ao vivo e capturas de tela do Jogo, inclusive com monetização (canais, doações,
   anúncios da plataforma), desde que não diga que o conteúdo é oficial nosso;
-- compartilhar os arquivos que o Jogo exporta (`.nitro.json`).
+- compartilhar os arquivos que o Jogo exporta (`.tche.json`).
 
 ## 2. O que você não pode fazer
 
@@ -122,7 +122,7 @@ diferente, ou uma única versão com a do Brasil.
 2. **Classificação indicativa (ClassInd):** jogo vendido no Brasil precisa de classificação; a Steam usa a
    classificação IARC, que o Brasil aceita para distribuição digital. Proposta de enquadramento: **Livre** (sem
    violência, sem texto impróprio; o único risco é o nome livre no online).
-3. **Marca:** "Nitro Crew" é nome provisório. Busca no INPI e na Steam antes da página "Em breve" (Fase 2.1).
+3. **Marca:** "Speed Tchê" é nome provisório. Busca no INPI e na Steam antes da página "Em breve" (Fase 2.1).
 4. **Distância dos jogos originais** (passo 5.7): nenhuma menção a "Top Gear" no jogo, na loja ou no material de
    imprensa; traçados de pista próprios (o DSL do jogo não copia nenhum traçado); músicas originais.
 5. Versão em inglês: traduzir **depois** da revisão.

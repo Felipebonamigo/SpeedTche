@@ -156,14 +156,14 @@ describe('diário de jogo', () => {
     expect(PLAYLOG_MAX_CHARS).toBeLessThan(desktopStorage.MAX_SAVE_BYTES);
   }, 30_000);
 
-  it('grava na chave nitro-crew.playlog, que o espelho do Electron leva para saves/', () => {
+  it('grava na chave speed-tche.playlog, que o espelho do Electron leva para saves/', () => {
     const { deps, writes } = fakeDeps();
     const log = createPlaylog(deps);
     log.sessionStart();
     log.raceEnded(fakeRace());
     const last = writes[writes.length - 1];
     expect(last[0]).toBe(PLAYLOG_KEY);
-    expect(PLAYLOG_KEY).toBe('nitro-crew.playlog');
+    expect(PLAYLOG_KEY).toBe('speed-tche.playlog');
     expect(last[1]).toEqual(log.data());
     expect(isCloudKey(PLAYLOG_KEY)).toBe(true);
     expect(desktopStorage.isSaveKey(PLAYLOG_KEY)).toBe(true);
@@ -261,7 +261,7 @@ describe('diário de jogo', () => {
       surveysAnswered: 2, surveysSkipped: 0, againMean: 4.5, firstRaceFinished: true,
     });
     const text = log.reportText();
-    expect(text.startsWith('Nitro Crew — play log\n')).toBe(true);
+    expect(text.startsWith('Speed Tchê — play log\n')).toBe(true);
     expect(JSON.parse(text.split('--- json ---\n')[1])).toEqual(log.data());
     expect(text).toBe(formatPlaylogReport(log.data(), { version: '0.1.0', generated: new Date(clock.now).toISOString() }));
 

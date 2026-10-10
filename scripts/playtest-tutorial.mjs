@@ -182,7 +182,7 @@ for (let i = 0; i < 1400; i++) {
 }
 for (const code of held2) await page.keyboard.up(code);
 held2.clear();
-st = await page.evaluate(() => ({ menu: window.nc.session.menus.current(), race: !!window.nc.session.race, save: JSON.parse(localStorage.getItem('nitro-crew.save') ?? 'null') }));
+st = await page.evaluate(() => ({ menu: window.nc.session.menus.current(), race: !!window.nc.session.race, save: JSON.parse(localStorage.getItem('speed-tche.save') ?? 'null') }));
 check(st.menu === 'tutorialDone' && !st.race, `tutorial concluído → tela final (${st.menu}); passos vistos: ${shots.join(', ')}`);
 check(['throttle', 'curve', 'brake', 'nitro', 'pit', 'tow'].every((s) => shots.includes(s)), 'os 6 passos apareceram no painel');
 check(st.save?.tutorialDone === true, `flag tutorialDone gravada no save (${st.save?.tutorialDone})`);

@@ -1,20 +1,24 @@
-# Nitro Crew — guia para agentes
+# Speed Tchê — guia para agentes
 
 Corrida arcade (estilo Top Gear) em 3D e co-op local de até 4 em tela dividida, em
 TypeScript + Three.js (WebGL), empacotável com Electron para a Steam. **Alvo visual (dono, 06/10/2026): parecer um jogo de
 última geração, cartunesco** (Mario Kart 8, Crash Team Racing Nitro-Fueled; `docs/DIRECAO-DE-ARTE.md`) — o low-poly
 estilizado de hoje e a antiga referência Horizon Chase Turbo ficam abaixo desse alvo. O pseudo-3D de 16 bits existe só como **modo Retrô opcional** (Opções › Visual,
 `src/render-pseudo3d/`, `docs/RETRO.md`); o 3D é o padrão e o foco do trabalho visual. Interface e comentários em português (Brasil); código em inglês.
-Repositório próprio: `Felipebonamigo/nitro-crew` (privado). Nasceu em 08/10/2026 da pasta `nitro-crew/` do repositório do
-site Padelizou, com o histórico inteiro (202 commits); **o jogo não tem relação nenhuma com o site**. Os hashes de commit
-citados nos docs são do repositório antigo (branch `claude/top-gear-coop-game-ns9u5l` do padelizou); aqui eles são outros.
+Repositório próprio: `Felipebonamigo/SpeedTche` (github.com/Felipebonamigo/SpeedTche). **O jogo se chama Speed Tchê** desde 10/10/2026
+(antes: "Nitro Crew", nome provisório); identificadores técnicos em ASCII: `speed-tche` (pacote, chaves de save `speed-tche.*`),
+`SpeedTche` (pasta de dados, executável, appId `br.com.bonamigo.speedtche`). O progresso de quem jogou a 0.1.0 migra sozinho
+(`src/game/legacy-name.ts`, `desktop/storage.cjs`). Nasceu em 10/10/2026 da pasta `nitro-crew/` do repositório do site Padelizou, com o
+histórico inteiro (227 commits); **o jogo não tem relação nenhuma com o site**. Os hashes de commit citados nos docs são do repositório
+antigo (branch `claude/top-gear-coop-game-ns9u5l` do padelizou); aqui eles são outros. Nos cartões da onda K (`docs/ondas/K*`), a pasta
+`speed-tche/` e os caminhos `/home/user/padelizou/...` descrevem o fluxo do monorepo antigo (a pasta era `nitro-crew/`): a onda K está concluída.
 
 ## Antes de qualquer trabalho (qualquer modelo)
 1. **`docs/PLAYBOOK.md`** — o manual de execução: comandos, ferramentas de ver/medir, como rodar uma onda com agentes,
    o modelo de instrução para cada agente, o checklist de mescla e as armadilhas que já custaram retrabalho. Feito para
    que um modo mais econômico faça igual (pedido do dono, 06/10/2026).
 2. **`docs/CRONOGRAMA.md`** — as ondas a fazer, em ordem; o cartão de cada onda em `docs/ondas/`.
-**Onde paramos (10/10/2026):** a **onda K está concluída** (commit `01d01ea`): K1 fluxo sem atrito, K2 diário/termômetro/questionário, K3 ritmo da IA (rampa B provisória), K4 banco de prova com nível Ultra, K5 Cristo e `bend`, K6 ajustes do dono, K0 contratos, 10 desenhos de pista, bíblia de estilo e contrato do asset; versão **0.1.1** com pacotes Windows e Linux gerados (`desktop/release/`, **ainda não publicados**: o repositório `padelizou` é público e a decisão nº 2 do cronograma manda tornar privado antes). 2057 testes. **A onda L não abre** sem: o `.json` do `--bench` do dono (PC e Deck), a decisão do duelo de motores (nº 27, sessão local no PC da 4070 Ti) e a escolha do orçamento de arte (hoje: sem artista, Meshy pela lista). O repositório próprio `Felipebonamigo/nitro-crew` (privado) ainda não existe (o dono cria; a extração do histórico está no topo de `docs/ondas/K.md`). Decisões abertas: onde fica o botão "Abrir pasta" nas Opções, se o questionário vira só "ao sair", horas semanais, Steamworks, rampa da IA (A/B; a K3 usou B).
+**Onde paramos (10/10/2026):** a **onda K está concluída**: K1 fluxo sem atrito, K2 diário/termômetro/questionário, K3 ritmo da IA (rampa B provisória), K4 banco de prova com nível Ultra, K5 Cristo e `bend`, K6 ajustes do dono, K0 contratos, 10 desenhos de pista (aprovados), bíblia de estilo e contrato do asset; versão **0.1.1** com pacotes gerados (`desktop/release/`, ainda não publicados) e **o jogo foi renomeado para Speed Tchê** e movido para este repositório próprio. **A onda L não abre** sem: o `.json` do `--bench` do dono (PC e Deck), a decisão do duelo de motores (nº 27, sessão local no PC da 4070 Ti) e o orçamento de arte (hoje: sem artista, Meshy pela lista). Decisões abertas: onde fica o botão "Abrir pasta" nas Opções, se o questionário vira só "ao sair", horas semanais, Steamworks, rampa da IA (A/B; a K3 usou B), nome definitivo/INPI (decisão nº 14: "Speed Tchê" agora é o nome oficial; falta a busca no INPI).
 Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revisão visual": nível Ultra, luz assada, duelo de motores antes da L (nº 27), Meshy com teto (nº 28).
 
 3. **`docs/DIRECAO-DE-ARTE.md`** — **diretriz do dono: parecer um jogo de ÚLTIMA GERAÇÃO, CARTUNESCO** (referências
@@ -42,7 +46,7 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
   `… --part <peça> --height <m> [--paint 'y>0.62:#1b1b1b'] [--palette … --by-light] --install` → `src/assets/landmarks/parts/<peça>.glb`;
   sem o arquivo, a cena usa o bicho procedural (`landmarks/parts.ts`; os comandos por peça em `docs/ARTE.md`, "Peças baixadas").
 - `NC_FEEL_OUT=<arquivo> npm run balance -- corrida profissional <semente>` grava a linha de base do termômetro de emoção (só com `corrida` e sem pista avulsa). `?nosurvey=1` na URL desliga o questionário (playtests que encadeiam corridas).
-- Banco de prova: `?bench=1` no navegador ou `--bench` no Electron grava `nitro-crew-bench/1` (baixa, média, alta e Ultra, 6 cenas); `node tools/bench.mjs <porta> [query] [saida.json]` (swiftshader: só prova o formato, FPS é do dono) · `node tools/referencias.mjs` (5 câmeras de pista × 3 períodos, garagem, escolha, 3 folhas de carros; saturação e contraste só como alerta).
+- Banco de prova: `?bench=1` no navegador ou `--bench` no Electron grava `speed-tche-bench/1` (baixa, média, alta e Ultra, 6 cenas); `node tools/bench.mjs <porta> [query] [saida.json]` (swiftshader: só prova o formato, FPS é do dono) · `node tools/referencias.mjs` (5 câmeras de pista × 3 períodos, garagem, escolha, 3 folhas de carros; saturação e contraste só como alerta).
 - `npx tsx scripts/career-balance.ts` — calibragem da carreira (dinheiro × nível dos rivais) com corridas inteiras.
 - Ver e medir (com o vite no ar): `PORT=<porta> node tools/capture.mjs "nome::track=<pista>&seg=<n>&hud=0"` (captura na corrida) · `node tools/landmark-sheet.mjs <porta> x.png "ids=a,b"` (folha de marcos) · `npx tsx tools/landmark-sight.ts <pista>` (onde fica cada marco e quantos segundos aparece) · `npx tsx tools/front-view-measure.ts <marco>` · `node tools/tile.mjs` · `node tools/svg2png.mjs` (detalhes no `docs/PLAYBOOK.md`).
 - ⚠️ Para matar um relay órfão, filtre pelo processo `node` (`ps -eo pid,comm,args`); `pkill -f relay.mjs` casa com o próprio shell.
@@ -113,7 +117,7 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
   sozinho (o Chromium headless daqui renderiza WebGL com swiftshader); núcleo determinístico separado da
   renderização para lockstep/replays; visual procedural em código como base (hoje low-poly; o alvo agora é cartunesco de última
   geração), arte final em glTF;
-  "Nitro Crew" é nome provisório (Fase 2.1 decide). Gerar 3D por IA (Meshy): era proibido (dono, 04/10/2026); em 09/10/2026 o dono pôs o Meshy na lista de
+  "Speed Tchê" é nome provisório (Fase 2.1 decide). Gerar 3D por IA (Meshy): era proibido (dono, 04/10/2026); em 09/10/2026 o dono pôs o Meshy na lista de
   ferramentas, **sem artista**: procurar SEMPRE modelo pronto antes (galeria CC0 do Meshy, Kenney, Quaternius, Poly Pizza), convertido por
   `tools/convert-landmark.mjs` (`docs/ARTE.md`); o que não existir pronto vai para `docs/MESHY-LISTA.md` e **nada é gerado pela API sem o
   dono ver a lista e dar um teto de créditos** (decisão nº 28 do cronograma). Nunca em tempo de jogo.

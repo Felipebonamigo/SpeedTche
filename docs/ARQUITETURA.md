@@ -1,6 +1,6 @@
-# Nitro Crew — arquitetura técnica (resumo para quem vai escrever um renderizador)
+# Speed Tchê — arquitetura técnica (resumo para quem vai escrever um renderizador)
 
-Jogo em **TypeScript + Three.js (WebGL)**, empacotado com Electron. Código em `nitro-crew/src/`. Três camadas:
+Jogo em **TypeScript + Three.js (WebGL)**, empacotado com Electron. Código em `src/`. Três camadas:
 
 ```
 src/core   → simulação pura e determinística (estado JSON, sem DOM, sem Three)

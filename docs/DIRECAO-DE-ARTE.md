@@ -1,13 +1,13 @@
 # Direção de arte — "jogo de última geração, cartunesco"
 
-Esta é a **bíblia de estilo** do Nitro Crew. Ela diz o que o jogador tem de ver, com critérios que se verificam numa
+Esta é a **bíblia de estilo** do Speed Tchê. Ela diz o que o jogador tem de ver, com critérios que se verificam numa
 captura, e não depende do motor: vale igual para o Three.js (WebGL) de hoje e para um eventual Unity 6 URP, porque descreve
 o resultado (forma, luz, números, câmeras) e não a API que o produz. O motor é decidido por um duelo antes da onda L
 (decisão nº 27 de `docs/CRONOGRAMA.md`); o formato do asset está em `docs/CONTRATO-DO-ASSET.md`.
 
 ## 0. Diretriz do dono
 
-**Diretriz do dono (06/10/2026), vale sobre todas as anteriores:** o Nitro Crew tem de **parecer um jogo de última
+**Diretriz do dono (06/10/2026), vale sobre todas as anteriores:** o Speed Tchê tem de **parecer um jogo de última
 geração, cartunesco** — estilizado de alto acabamento, não o low-poly de faces chapadas. Ele aceita refazer o jogo
 inteiro (direção de arte e pipeline gráfico) para chegar lá. Pedidos que levaram a isso: "deixar o jogo visualmente
 mais bonito, menos quadrado, que dê para reconhecer bem as artes e os locais do jogo"; os desenhos do minimapa "podem
@@ -135,7 +135,7 @@ O `tools/referencias.mjs` (K4) captura estas mesmas câmeras, nos 3 períodos, e
 (WebGL, ou o motor que o duelo da nº 27 escolher) é o que está nas seções 2 a 5; a base só decide como se chega lá.
 
 **Banco de prova.** O `?bench=1` no navegador (ou `--bench` no Electron) mede 6 cenas × 4 níveis (baixa, média, alta e
-Ultra) e grava `nitro-crew-bench/1` com `warnings[]`, `verdicts[]` (meta × medido) e `runs[]`; o roteiro e a leitura do
+Ultra) e grava `speed-tche-bench/1` com `warnings[]`, `verdicts[]` (meta × medido) e `runs[]`; o roteiro e a leitura do
 JSON estão em `docs/DESEMPENHO.md` §4 (código em `src/bench/`). No swiftshader da nuvem ele só prova o formato: **os números
 de FPS reais só vêm do dono**, e por isso todo número de desempenho desta bíblia é **provisório** até o JSON dele chegar.
 

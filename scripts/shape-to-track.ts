@@ -627,7 +627,7 @@ function sheet(file: string): void {
   const W = cols * cell + 10; const H = rows * cell + 46;
   writeFileSync(file, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="sans-serif">`
     + `<rect width="${W}" height="${H}" fill="#0b1724"/><text x="${W / 2}" y="${H - 16}" font-size="14" fill="#cfe3f5" text-anchor="middle">`
-    + `Nitro Crew · Expedição Brasil: o minimapa de uma pista por estado (ponto vermelho = largada)</text>${body}</svg>\n`);
+    + `Speed Tchê · Expedição Brasil: o minimapa de uma pista por estado (ponto vermelho = largada)</text>${body}</svg>\n`);
   console.log(`folha em ${file} (${ids.length} pistas)`);
 }
 

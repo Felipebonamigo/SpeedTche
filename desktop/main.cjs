@@ -6,12 +6,14 @@ const fs = require('node:fs/promises');
 const storage = require('./storage.cjs');
 
 // ───────────────────────────── Pasta de dados (Steam Cloud) ─────────────────────────────
-// Fixa o userData em "<appData>/Nitro Crew" — %APPDATA%\Nitro Crew no Windows, ~/.config/Nitro Crew no Linux,
-// ~/Library/Application Support/Nitro Crew no macOS —, em desenvolvimento (`npm start`) e no pacote. Sem isto
-// o nome vinha do package.json ("nitro-crew-desktop"). O Steam Auto-Cloud aponta para `saves/` desta pasta
+// Fixa o userData em "<appData>/SpeedTche" — %APPDATA%\SpeedTche no Windows, ~/.config/SpeedTche no Linux,
+// ~/Library/Application Support/SpeedTche no macOS —, em desenvolvimento (`npm start`) e no pacote. Sem isto
+// o nome vinha do package.json ("speed-tche-desktop"). O Steam Auto-Cloud aponta para `saves/` desta pasta
 // (desktop/README.md): mudar o nome aqui perde o save de quem já joga. Tem que vir antes da trava de
 // instância única, que também mora no userData.
-const USER_DATA_DIR_NAME = 'Nitro Crew';
+const USER_DATA_DIR_NAME = 'SpeedTche';
+// Quem jogou a 0.1.0 (Nitro Crew) tem a pasta antiga: move para a nova antes de qualquer coisa ler o userData.
+storage.migrateLegacyUserData(app.getPath('appData'), 'Nitro Crew', USER_DATA_DIR_NAME);
 app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_DIR_NAME));
 const savesDir = () => path.join(app.getPath('userData'), 'saves');
 const logsDir = () => path.join(app.getPath('userData'), 'logs');
@@ -75,7 +77,7 @@ function setRichPresence(text) {
 function createWindow() {
   const win = new BrowserWindow({
     width: 1600, height: 900, minWidth: 1024, minHeight: 640,
-    title: 'Nitro Crew', backgroundColor: '#000', autoHideMenuBar: true, show: false,
+    title: 'Speed Tchê', backgroundColor: '#000', autoHideMenuBar: true, show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !bench },
   });
   win.once('ready-to-show', () => { win.show(); if (bench) win.setFullScreen(true); });   // tela cheia é decidida pelo jogo (opções salvas); no bench, sempre
@@ -122,14 +124,14 @@ ipcMain.handle('steam:achievement', (_e, id) => {
 });
 ipcMain.handle('steam:richPresence', (_e, text) => { setRichPresence(text); });
 
-// Arquivos: o jogo grava/lê progresso ou replays em `.nitro.json` na pasta Documentos (diálogo do sistema).
+// Arquivos: o jogo grava/lê progresso ou replays em `.tche.json` na pasta Documentos (diálogo do sistema).
 ipcMain.handle('file:save', async (e, name, content) => {
   const w = BrowserWindow.fromWebContents(e.sender);
-  const base = path.basename(typeof name === 'string' && name ? name : 'nitro-crew');
-  const file = base.endsWith('.nitro.json') ? base : `${base}.nitro.json`;
+  const base = path.basename(typeof name === 'string' && name ? name : 'speed-tche');
+  const file = base.endsWith('.tche.json') ? base : `${base}.tche.json`;
   const r = await dialog.showSaveDialog(w, {
     defaultPath: path.join(app.getPath('documents'), file),
-    filters: [{ name: 'Nitro Crew', extensions: ['nitro.json', 'json'] }],
+    filters: [{ name: 'Speed Tchê', extensions: ['tche.json', 'nitro.json', 'json'] }],
   });
   if (r.canceled || !r.filePath) return false;
   await fs.writeFile(r.filePath, String(content ?? ''), 'utf8');
@@ -137,7 +139,7 @@ ipcMain.handle('file:save', async (e, name, content) => {
 });
 ipcMain.handle('file:open', async (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
-  const r = await dialog.showOpenDialog(w, { properties: ['openFile'], filters: [{ name: 'Nitro Crew', extensions: ['nitro.json', 'json'] }] });
+  const r = await dialog.showOpenDialog(w, { properties: ['openFile'], filters: [{ name: 'Speed Tchê', extensions: ['tche.json', 'nitro.json', 'json'] }] });
   if (r.canceled || r.filePaths.length === 0) return null;
   return fs.readFile(r.filePaths[0], 'utf8');
 });

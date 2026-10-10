@@ -1,5 +1,6 @@
 import { hydrateFromDisk, installSaveMirror } from './game/cloudsave';
 import { getDesktop } from './game/desktop';
+import { migrateLegacyKeys } from './game/legacy-name';
 import { createErrorReporter, dropStoredErrors, GAME_VERSION, installGlobalHandlers, setActiveReporter, telemetryConsented } from './game/errors';
 import { dropOldestGhost } from './game/ghost-store';
 import { createSaveNotice } from './game/save-notice';
@@ -44,6 +45,8 @@ window.addEventListener('pagehide', () => reporter.flush());
 setSpaceFreers([(key) => dropStoredErrors(storage, key), dropOldestGhost]);
 
 async function boot(): Promise<void> {
+  // 0) Quem jogou a 0.1.0 (Nitro Crew) tem as chaves `nitro-crew.*`: copia para `speed-tche.*` antes de qualquer leitura.
+  if (storage) migrateLegacyKeys(storage);
   // 2) No Electron, o save em arquivo (Steam Cloud) vale mais que o localStorage — antes de a sessão ler as opções.
   if (desktop && storage) {
     await hydrateFromDisk(desktop, storage);

@@ -1,4 +1,4 @@
-# Relay do Nitro Crew
+# Relay do Speed Tchê
 
 Servidor de retransmissão (WebSocket) do online em lockstep. **Não simula a corrida e não entende
 o jogo**: guarda salas por código, sabe quem é o anfitrião, repassa as mensagens entre os

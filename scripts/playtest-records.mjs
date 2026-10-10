@@ -53,7 +53,7 @@ await page.evaluate((ids) => {
   });
   const felipe = { ...zero, name: 'Felipe', races: 64, wins: 20, podiums: 40, laps: 190, meters: 1_234_000, raceTicks: 60 * 12000, bestPositions };
   const ana = { ...zero, name: 'Ana', races: 2, meters: 9000, bestPositions: { [ids[0]]: 2, [ids[19]]: 5 } };
-  localStorage.setItem('nitro-crew.save', JSON.stringify({
+  localStorage.setItem('speed-tche.save', JSON.stringify({
     cupsCompleted: ['br_rj'], racesRun: 65, racesWon: 20, achievements: ['PRIMEIRA_VITORIA', 'GIRO_COMPLETO'],
     bestLaps, bestRaces, seatNames: ['Felipe', 'Ana', 'P3', 'P4'],
     // Ana primeiro (mais recente): o Felipe, com as 32 pistas, é o último da lista, logo antes da grade.

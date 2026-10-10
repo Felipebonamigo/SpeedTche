@@ -39,56 +39,56 @@ describe('saves em arquivo (desktop/storage.cjs)', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
   it('grava e lê de volta, um arquivo .json por chave, sem sobrar temporário', () => {
-    expect(storage.writeSave(dir, 'nitro-crew.save', '{"racesRun":3}')).toBe(true);
-    expect(storage.writeSave(dir, 'nitro-crew.settings', '{"language":"en"}')).toBe(true);
-    expect(storage.writeSave(dir, 'nitro-crew.save', '{"racesRun":4}')).toBe(true);
-    expect(readdirSync(dir).sort()).toEqual(['nitro-crew.save.json', 'nitro-crew.settings.json']);
-    expect(storage.readAllSaves(dir)).toEqual({ 'nitro-crew.save': '{"racesRun":4}', 'nitro-crew.settings': '{"language":"en"}' });
+    expect(storage.writeSave(dir, 'speed-tche.save', '{"racesRun":3}')).toBe(true);
+    expect(storage.writeSave(dir, 'speed-tche.settings', '{"language":"en"}')).toBe(true);
+    expect(storage.writeSave(dir, 'speed-tche.save', '{"racesRun":4}')).toBe(true);
+    expect(readdirSync(dir).sort()).toEqual(['speed-tche.save.json', 'speed-tche.settings.json']);
+    expect(storage.readAllSaves(dir)).toEqual({ 'speed-tche.save': '{"racesRun":4}', 'speed-tche.settings': '{"language":"en"}' });
   });
 
   it('pasta que não existe: leitura vazia, e a gravação cria a pasta', () => {
     const sub = join(dir, 'a', 'saves');
     expect(storage.readAllSaves(sub)).toEqual({});
-    expect(storage.writeSave(sub, 'nitro-crew.save', '{}')).toBe(true);
-    expect(storage.readAllSaves(sub)).toEqual({ 'nitro-crew.save': '{}' });
+    expect(storage.writeSave(sub, 'speed-tche.save', '{}')).toBe(true);
+    expect(storage.readAllSaves(sub)).toEqual({ 'speed-tche.save': '{}' });
   });
 
   it('recusa chave que escapa da pasta ou não é do jogo, e texto que não é JSON', () => {
-    for (const key of ['../x', 'nitro-crew./x', 'nitro-crew.a/b', 'nitro-crew.', 'outra.chave', 'nitro-crew..a', '', 42, null, `nitro-crew.${'a'.repeat(80)}`]) {
+    for (const key of ['../x', 'speed-tche./x', 'speed-tche.a/b', 'speed-tche.', 'outra.chave', 'speed-tche..a', '', 42, null, `speed-tche.${'a'.repeat(80)}`]) {
       expect(storage.isSaveKey(key), String(key)).toBe(false);
       expect(storage.writeSave(dir, key, '{}'), String(key)).toBe(false);
     }
-    expect(storage.writeSave(dir, 'nitro-crew.save', '{quebrado')).toBe(false);
-    expect(storage.writeSave(dir, 'nitro-crew.save', 7)).toBe(false);
-    expect(storage.writeSave(dir, 'nitro-crew.save', `"${'x'.repeat(storage.MAX_SAVE_BYTES)}"`)).toBe(false);
+    expect(storage.writeSave(dir, 'speed-tche.save', '{quebrado')).toBe(false);
+    expect(storage.writeSave(dir, 'speed-tche.save', 7)).toBe(false);
+    expect(storage.writeSave(dir, 'speed-tche.save', `"${'x'.repeat(storage.MAX_SAVE_BYTES)}"`)).toBe(false);
     expect(readdirSync(dir)).toEqual([]);
-    expect(storage.isSaveKey('nitro-crew.career.slot-1')).toBe(true);
+    expect(storage.isSaveKey('speed-tche.career.slot-1')).toBe(true);
   });
 
   it('leitura ignora arquivo de fora do padrão, temporário e grande demais', () => {
-    writeFileSync(join(dir, 'nitro-crew.save.json'), '{"ok":1}');
-    writeFileSync(join(dir, 'nitro-crew.save.json.tmp'), '{"meio":1');
+    writeFileSync(join(dir, 'speed-tche.save.json'), '{"ok":1}');
+    writeFileSync(join(dir, 'speed-tche.save.json.tmp'), '{"meio":1');
     writeFileSync(join(dir, 'leia-me.json'), '{}');
-    writeFileSync(join(dir, 'nitro-crew.big.json'), 'x'.repeat(storage.MAX_SAVE_BYTES + 1));
-    expect(storage.readAllSaves(dir)).toEqual({ 'nitro-crew.save': '{"ok":1}' });
+    writeFileSync(join(dir, 'speed-tche.big.json'), 'x'.repeat(storage.MAX_SAVE_BYTES + 1));
+    expect(storage.readAllSaves(dir)).toEqual({ 'speed-tche.save': '{"ok":1}' });
   });
 
   // Revisão: arquivo que existe e não deu para ler ficava de fora, igual a "não há arquivo" — e a inicialização
   // gravava o localStorage por cima dele. Agora vem como null ("existe, não sei o que tem"); sumiço entre a
   // listagem e a leitura (ENOENT) continua sendo "não há arquivo".
   it('arquivo que existe mas não dá para ler vem como null; arquivo que sumiu fica de fora', () => {
-    writeFileSync(join(dir, 'nitro-crew.save.json'), '{"racesRun":42}');
-    writeFileSync(join(dir, 'nitro-crew.settings.json'), '{"language":"pt"}');
-    mkdirSync(join(dir, 'nitro-crew.pasta.json'));
-    symlinkSync(join(dir, 'nao-existe'), join(dir, 'nitro-crew.sumiu.json'));
+    writeFileSync(join(dir, 'speed-tche.save.json'), '{"racesRun":42}');
+    writeFileSync(join(dir, 'speed-tche.settings.json'), '{"language":"pt"}');
+    mkdirSync(join(dir, 'speed-tche.pasta.json'));
+    symlinkSync(join(dir, 'nao-existe'), join(dir, 'speed-tche.sumiu.json'));
     const fs = require('node:fs') as { readFileSync: (...args: unknown[]) => unknown };
     const original = fs.readFileSync;
     const spy = vi.spyOn(fs, 'readFileSync').mockImplementation((...args: unknown[]) => {
-      if (String(args[0]).endsWith('nitro-crew.save.json')) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      if (String(args[0]).endsWith('speed-tche.save.json')) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
       return original.apply(fs, args);
     });
     try {
-      expect(storage.readAllSaves(dir)).toEqual({ 'nitro-crew.save': null, 'nitro-crew.settings': '{"language":"pt"}', 'nitro-crew.pasta': null });
+      expect(storage.readAllSaves(dir)).toEqual({ 'speed-tche.save': null, 'speed-tche.settings': '{"language":"pt"}', 'speed-tche.pasta': null });
     } finally {
       spy.mockRestore();
     }
@@ -141,27 +141,27 @@ describe('banco de prova e pastas (desktop/storage.cjs, main.cjs)', () => {
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
   it('benchQuery: só --bench liga, e só as chaves conhecidas passam', () => {
-    expect(storage.benchQuery(['/x/nitro-crew'])).toBeNull();
-    expect(storage.benchQuery(['/x/nitro-crew', '--benchmark'])).toBeNull();
-    expect(storage.benchQuery(['/x/nitro-crew', '--bench'])).toEqual({ bench: '1', uncapped: '1' });
-    expect(storage.benchQuery(['/x/nitro-crew', '--no-sandbox', '--bench=frames=4&warm=2&cenas=copa-1p&q=low&sair=1&evil=../x']))
+    expect(storage.benchQuery(['/x/speed-tche'])).toBeNull();
+    expect(storage.benchQuery(['/x/speed-tche', '--benchmark'])).toBeNull();
+    expect(storage.benchQuery(['/x/speed-tche', '--bench'])).toEqual({ bench: '1', uncapped: '1' });
+    expect(storage.benchQuery(['/x/speed-tche', '--no-sandbox', '--bench=frames=4&warm=2&cenas=copa-1p&q=low&sair=1&evil=../x']))
       .toEqual({ bench: '1', uncapped: '1', frames: '4', warm: '2', cenas: 'copa-1p', q: 'low', sair: '1' });
     expect(storage.benchQuery('nada')).toBeNull();
   });
 
   // Acréscimo do dono (09/10/2026): o Ultra mede em 1440p, e o tamanho de desenho vai pela linha de comando.
   it('benchQuery: res (tamanho de desenho do Ultra) passa, e continua só o que é conhecido', () => {
-    expect(storage.benchQuery(['/x/nitro-crew', '--bench=q=ultra&res=2560x1440&uncapped=0&bench=0']))
+    expect(storage.benchQuery(['/x/speed-tche', '--bench=q=ultra&res=2560x1440&uncapped=0&bench=0']))
       .toEqual({ bench: '1', uncapped: '1', q: 'ultra', res: '2560x1440' });
   });
 
   it('writeBench: grava bench-AAAAMMDD-HHMMSS.json sem sobrescrever, e recusa lixo', () => {
     const d = new Date(2026, 9, 12, 14, 5, 9);
     const b = join(dir, 'bench');
-    const first = storage.writeBench(b, '{"schema":"nitro-crew-bench/1"}', d);
+    const first = storage.writeBench(b, '{"schema":"speed-tche-bench/1"}', d);
     expect(first).toBe(join(b, 'bench-20261012-140509.json'));
-    expect(readFileSync(first ?? '', 'utf8')).toBe('{"schema":"nitro-crew-bench/1"}');
-    expect(storage.writeBench(b, '{"schema":"nitro-crew-bench/1"}', d)).toBe(join(b, 'bench-20261012-140509-2.json'));
+    expect(readFileSync(first ?? '', 'utf8')).toBe('{"schema":"speed-tche-bench/1"}');
+    expect(storage.writeBench(b, '{"schema":"speed-tche-bench/1"}', d)).toBe(join(b, 'bench-20261012-140509-2.json'));
     expect(storage.writeBench(b, '{quebrado', d)).toBeNull();
     expect(storage.writeBench(b, 7, d)).toBeNull();
     expect(storage.writeBench(b, `"${'x'.repeat(storage.MAX_SAVE_BYTES)}"`, d)).toBeNull();
@@ -205,17 +205,17 @@ describe('empacotamento (desktop/package.json)', () => {
     expect(game).toEqual({ from: '../dist', to: 'app', filter: ['**/*', '!**/*.map'] });
   });
 
-  // Defeito de 25/09: sem productName no topo, o Electron usava o `name` ("nitro-crew-desktop") como pasta
-  // de dados — %APPDATA%\nitro-crew-desktop —, e não a "Nitro Crew" que o Steam Cloud documentado espera.
-  it('a pasta de dados (userData) é "Nitro Crew", a mesma documentada para o Steam Cloud', () => {
+  // Defeito de 25/09: sem productName no topo, o Electron usava o `name` ("speed-tche-desktop") como pasta
+  // de dados — %APPDATA%\speed-tche-desktop —, e não a "SpeedTche" que o Steam Cloud documentado espera.
+  it('a pasta de dados (userData) é "SpeedTche", a mesma documentada para o Steam Cloud', () => {
     const electronAppName = pkg.productName ?? pkg.name; // regra do Electron para app.getName()
-    expect(electronAppName).toBe('Nitro Crew');
-    expect(read('main.cjs')).toMatch(/USER_DATA_DIR_NAME = 'Nitro Crew'[\s\S]*app\.setPath\('userData'[\s\S]*requestSingleInstanceLock/);
+    expect(electronAppName).toBe('SpeedTche');
+    expect(read('main.cjs')).toMatch(/USER_DATA_DIR_NAME = 'SpeedTche'[\s\S]*app\.setPath\('userData'[\s\S]*requestSingleInstanceLock/);
   });
 
-  // Defeito de 25/09: o README manda executar release/linux-unpacked/nitro-crew, mas o binário saía "nitro-crew-desktop".
+  // Defeito de 25/09: o README manda executar release/linux-unpacked/speedtche, mas o binário saía "speed-tche-desktop".
   it('o executável Linux tem o nome que o README e o depósito da Steam usam', () => {
-    expect(pkg.build.linux?.executableName).toBe('nitro-crew');
-    expect(read('README.md')).toContain('release/linux-unpacked/nitro-crew');
+    expect(pkg.build.linux?.executableName).toBe('speedtche');
+    expect(read('README.md')).toContain('release/linux-unpacked/speedtche');
   });
 });

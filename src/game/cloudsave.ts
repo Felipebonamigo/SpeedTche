@@ -19,9 +19,9 @@ import type { DesktopApi } from './desktop';
 import { ERRORS_KEY } from './errors';
 import { keepInMemory, setStorageMirror } from './storage';
 
-export const KEY_PREFIX = 'nitro-crew.';
+export const KEY_PREFIX = 'speed-tche.';
 /** Chaves cuja última gravação local ainda não foi confirmada no disco (JSON: string[]). */
-export const PENDING_KEY = 'nitro-crew.__pending';
+export const PENDING_KEY = 'speed-tche.__pending';
 /** Ficam só neste computador: a marcação de pendência e o log de erros. */
 export const LOCAL_ONLY_KEYS: ReadonlySet<string> = new Set([PENDING_KEY, ERRORS_KEY]);
 const IPC_TIMEOUT_MS = 3000;

@@ -1,5 +1,5 @@
 // Banco de prova (?bench=1 no navegador; --bench no Electron chega como ?bench=1&uncapped=1…): uma corrida nova por
-// cena × nível, 1 tick por quadro, quadros medidos pelos carimbos do rAF. JSON nitro-crew-bench/1 (metrics.ts).
+// cena × nível, 1 tick por quadro, quadros medidos pelos carimbos do rAF. JSON speed-tche-bench/1 (metrics.ts).
 // O nível Ultra (src/bench/ultra.ts) é desenhado em 2560×1440 (ou no `res=` pedido) com a qualidade Alta: enquanto os
 // efeitos da L2 não existem, o número dele é a folga da Alta em 1440p, e o relatório diz isso (benchWarnings).
 import '../i18n/core';

@@ -16,7 +16,7 @@ nem colide: é lido do estado depois de cada tick e desenhado por cima. Nada mud
 |---|---|---|
 | Gravação, codificação, reprodução | `src/game/ghost.ts` (puro) | `recordTick`, `encodeTrace`/`decodeTrace`, `ghostPoseAt`, `liveDelta`, `createGhostRun`, `checkGhost` |
 | Versão do conteúdo | `src/game/content-version.ts` (puro) | `lapFingerprint(pista, carro)`, `PHYSICS_REVISION`; também a `onlineFingerprint()` do online |
-| Armazenamento e arquivo | `src/game/ghost-store.ts` | chave `nitro-crew.ghosts`, teto e descarte, `ghostFor` (só o que vale), exportar/importar (`judgeGhostFile`) |
+| Armazenamento e arquivo | `src/game/ghost-store.ts` | chave `speed-tche.ghosts`, teto e descarte, `ghostFor` (só o que vale), exportar/importar (`judgeGhostFile`) |
 | Ligação com a sessão | `src/game/ghost-session.ts` | `startGhost` → `afterTick` / `frame`; mensagens do HUD |
 | Sessão | `src/game/session.ts` | três ganchos: `beginRace`, `stepOnce`, `buildFrame` |
 | Render | `src/render/cars.ts` (`poseGhost`), `renderer.ts` | carroceria + cabine com material transparente claro, sem sombra nem rodas |
@@ -54,19 +54,19 @@ batendo de um lado para o outro, indo para a grama, voltas de 2–3 min — até
 32 pistas.
 
 ### Armazenamento
-Chave própria `nitro-crew.ghosts` (fora do save): `{ ghosts: { [trackId]: GhostRecord & { savedAt } } }`, um
+Chave própria `speed-tche.ghosts` (fora do save): `{ ghosts: { [trackId]: GhostRecord & { savedAt } } }`, um
 fantasma por pista. Teto total `GHOST_STORE_MAX_CHARS = 160 000` caracteres (~30 voltas típicas): passou,
 saem os **gravados há mais tempo** (`savedAt`, que é a hora em que entrou neste computador — um fantasma
 importado antigo não sai primeiro por ter data velha). Se a gravação não ficar em lugar nenhum (`localStorage`
 cheio no navegador), descarta o mais antigo e tenta de novo até a loja vazia; nunca lança. Grava pela mesma
-`writeJson` do jogo, então no Electron também vai para `<userData>/saves/nitro-crew.ghosts.json` (Steam Cloud) —
+`writeJson` do jogo, então no Electron também vai para `<userData>/saves/speed-tche.ghosts.json` (Steam Cloud) —
 inteira, mesmo com o `localStorage` cheio. No navegador cheio, os fantasmas mais antigos também abrem espaço
 para o save e as opções (`dropOldestGhost`; `docs/SAVE.md`). Leitura saneia tudo:
 entrada com dados corrompidos, pista errada ou tempo que não bate com a volta é descartada em silêncio.
 
 ### Arquivo (desafiar um amigo)
-JSON `{ format: 'nitro-crew-ghost', v: 2, trackId, ticks, name, carId, date, data, fp }`, nome
-`fantasma-<pista>.nitro.json`. `fp` é a impressão da volta (ver "Versão do conteúdo"); o arquivo `v: 1`
+JSON `{ format: 'speed-tche-ghost', v: 2, trackId, ticks, name, carId, date, data, fp }`, nome
+`fantasma-<pista>.tche.json`. `fp` é a impressão da volta (ver "Versão do conteúdo"); o arquivo `v: 1`
 (de antes dela, sem `fp`) ainda é lido, e cai como versão desconhecida. `GHOST_VERSION` (1) é a versão da
 codificação da string `data` e não mudou; `GHOST_FILE_VERSION` (2) é a do arquivo. Electron: diálogo do sistema pelo `file:save` / `file:open` do preload.
 Navegador: download e `<input type=file>` (no navegador o seletor de arquivo exige gesto do usuário:

@@ -95,7 +95,7 @@ Marque na ordem; cada item tem dono (V = Felipe, A = agente, T = terceiros).
 ### 3.2 Steamworks
 
 - [ ] (V) Depósitos Windows/Linux(/mac) enviados pela SteamPipe; branch de teste instalado **pela biblioteca**, não pelo `npm start`.
-- [ ] (V) Opções de inicialização: executável certo por sistema (`Nitro Crew.exe` / `nitro-crew` / `Nitro Crew.app`).
+- [ ] (V) Opções de inicialização: executável certo por sistema (`SpeedTche.exe` / `speed-tche` / `SpeedTche.app`).
 - [ ] (V) Steam Cloud: Auto-Cloud com a raiz e as substituições (Root Overrides) de `desktop/README.md`; teste de
   dois computadores **com sistemas diferentes** (Windows → Steam Deck) feito.
 - [ ] (V) Conquistas cadastradas com os IDs exatos de `desktop/README.md`; desbloqueio conferido com a Steam aberta.
@@ -173,8 +173,8 @@ Anote **tudo o que estranhar**, mesmo sem certeza de que é defeito. Tempo entre
 20. Mude volume, qualidade e minimapa; saia e volte. ✅ tudo ficou salvo.
 21. Feche o jogo e abra de novo. ✅ as opções continuam (e o idioma também).
 22. Opções → "Copiar relatório" → cole num bloco de notas. ✅ texto começa com
-    "Nitro Crew — error report", tem a versão, e **não** tem o seu nome de usuário nem pastas do computador.
-22b. No relatório colado, depois do bloco `Nitro Crew — error report`, há um `Nitro Crew — play log` com `sessions:`, `races:` e o JSON. ✅ nenhum nome de jogador aparece.
+    "Speed Tchê — error report", tem a versão, e **não** tem o seu nome de usuário nem pastas do computador.
+22b. No relatório colado, depois do bloco `Speed Tchê — error report`, há um `Speed Tchê — play log` com `sessions:`, `races:` e o JSON. ✅ nenhum nome de jogador aparece.
 23. Confira "Telemetria anônima": ✅ veio **Desligado**.
 
 ### F. Fechamento (2 min)

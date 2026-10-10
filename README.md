@@ -1,4 +1,4 @@
-# Nitro Crew *(nome provisório)*
+# Speed Tchê *(nome provisório)*
 
 Corrida arcade no espírito do Top Gear (SNES) com visual **3D cartunesco de última geração** (referência:
 Mario Kart 8 Deluxe), e **cooperativo local para até 4 jogadores em tela dividida**: a equipe divide um cofre

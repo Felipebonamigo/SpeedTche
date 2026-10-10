@@ -7,8 +7,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-/** `nitro-crew.<nome>` (ex.: nitro-crew.save, nitro-crew.settings): só letras, números, `_`, `-` e pontos entre eles. */
-const KEY_RE = /^nitro-crew\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/;
+/** `speed-tche.<nome>` (ex.: speed-tche.save, speed-tche.settings): só letras, números, `_`, `-` e pontos entre eles. */
+const KEY_RE = /^speed-tche\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/;
 const MAX_KEY_LENGTH = 80;
 /** Um save maior que isto é lixo ou ataque; o progresso real tem poucos KB. */
 const MAX_SAVE_BYTES = 1024 * 1024;
@@ -31,6 +31,7 @@ function readAllSaves(dir) {
   const out = {};
   let names;
   try { names = fs.readdirSync(dir); } catch { return out; }
+  names = migrateLegacySaveFiles(dir, names);
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     const key = name.slice(0, -'.json'.length);
@@ -46,6 +47,39 @@ function readAllSaves(dir) {
     }
   }
   return out;
+}
+
+/**
+ * O jogo se chamava Nitro Crew (10/10/2026: Speed Tchê). Os saves eram `nitro-crew.<nome>.json`; renomeia cada um para
+ * `speed-tche.<nome>.json`, a não ser que o novo já exista (esse ganha, e o antigo é apagado). Devolve a listagem atual.
+ */
+function migrateLegacySaveFiles(dir, names) {
+  const LEGACY = 'nitro-crew.';
+  let changed = false;
+  for (const name of names) {
+    if (!name.startsWith(LEGACY) || !name.endsWith('.json')) continue;
+    const fresh = `speed-tche.${name.slice(LEGACY.length)}`;
+    try {
+      if (fs.existsSync(path.join(dir, fresh))) fs.rmSync(path.join(dir, name), { force: true });
+      else fs.renameSync(path.join(dir, name), path.join(dir, fresh));
+      changed = true;
+    } catch { /* fica como está; a próxima abertura tenta de novo */ }
+  }
+  if (!changed) return names;
+  try { return fs.readdirSync(dir); } catch { return names; }
+}
+
+/**
+ * Move `<appData>/<legacyName>` para `<appData>/<newName>` (o userData do Electron: saves, logs e o localStorage do
+ * Chromium) na primeira abertura depois da troca de nome. 'moved' = moveu; 'kept' = as duas existem, não mexe em nada;
+ * 'none' = não havia pasta antiga.
+ */
+function migrateLegacyUserData(appData, legacyName, newName) {
+  const from = path.join(appData, legacyName);
+  const to = path.join(appData, newName);
+  if (!fs.existsSync(from)) return 'none';
+  if (fs.existsSync(to)) return 'kept';
+  try { fs.renameSync(from, to); return 'moved'; } catch { return 'kept'; }
 }
 
 /**
@@ -122,4 +156,4 @@ function folderFor(userData, kind) {
   return path.join(userData, kind);
 }
 
-module.exports = { isSaveKey, readAllSaves, writeSave, appendLog, benchQuery, writeBench, folderFor, LOG_MAX_BYTES, MAX_SAVE_BYTES, LOG_ENTRY_MAX_CHARS };
+module.exports = { isSaveKey, readAllSaves, migrateLegacyUserData, writeSave, appendLog, benchQuery, writeBench, folderFor, LOG_MAX_BYTES, MAX_SAVE_BYTES, LOG_ENTRY_MAX_CHARS };

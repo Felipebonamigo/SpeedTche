@@ -1,7 +1,7 @@
 {
-  "name": "nitro-crew-relay",
+  "name": "speed-tche-relay",
   "version": "0.1.0",
-  "description": "Servidor de retransmissão (relay WebSocket) do online em lockstep do Nitro Crew.",
+  "description": "Servidor de retransmissão (relay WebSocket) do online em lockstep do Speed Tchê.",
   "type": "module",
   "private": true,
   "license": "MIT",

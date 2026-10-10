@@ -194,8 +194,8 @@ export function panelAtlas(): THREE.CanvasTexture {
       ctx.fillRect(x + k * 32, y + r * 32, 32, 32); ctx.fillRect(x + w - 128 + k * 32, y + r * 32, 32, 32);
     }
     ctx.fillStyle = '#ffd23f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    fitText(ctx, 'NITRO CREW', w - 300, 96);
-    ctx.fillText('NITRO CREW', x + w / 2, y + h / 2 + 4);
+    fitText(ctx, 'SPEED TCHÊ', w - 300, 96);
+    ctx.fillText('SPEED TCHÊ', x + w / 2, y + h / 2 + 4);
     ctx.fillStyle = '#ff3b3b'; ctx.fillRect(x + 128, y, w - 256, 8); ctx.fillRect(x + 128, y + h - 8, w - 256, 8);
   }
   {

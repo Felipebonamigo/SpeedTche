@@ -40,8 +40,9 @@ describe('pacote desktop: metadados', () => {
     expect(pkg.version).toBe(rootPkg.version);
   });
 
-  it('nome "Nitro Crew" e copyright com o ano e o autor', () => {
-    expect(pkg.productName).toBe('Nitro Crew');
+  // O nome de exibição ("Speed Tchê") vai na janela e na interface; o do pacote é ASCII, para pasta, exe e Steam sem acento.
+  it('nome do pacote "SpeedTche" e copyright com o ano e o autor', () => {
+    expect(pkg.productName).toBe('SpeedTche');
     expect(pkg.build.copyright).toMatch(/^Copyright © 20\d\d /);
     expect(pkg.build.copyright).toContain(pkg.author ?? '?');
   });

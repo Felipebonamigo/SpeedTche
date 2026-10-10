@@ -11,7 +11,7 @@ está marcado como plano.
 
 ## Nome
 
-- **Provisório:** Nitro Crew (Fase 2.1 decide o definitivo).
+- **Provisório:** Speed Tchê (Fase 2.1 decide o definitivo).
 - O nome aparece igual em PT e EN. Se o definitivo tiver palavra em português, manter também no EN (identidade),
   como "Horizon Chase" mantém o nome em todo lugar.
 
@@ -29,7 +29,7 @@ está marcado como plano.
 
 ### PT
 
-**Corrida arcade feita para o sofá.** Nitro Crew traz de volta a corrida arcade dos anos 90 — reta, curva,
+**Corrida arcade feita para o sofá.** Speed Tchê traz de volta a corrida arcade dos anos 90 — reta, curva,
 nitro, box — com visual 3D colorido e um detalhe que muda tudo: até **4 pessoas no mesmo sofá correm como uma
 equipe**, em tela dividida, contra um grid de pilotos controlados pelo computador.
 
@@ -50,7 +50,7 @@ jogadores no teclado. Interface em português e inglês.
 
 ### EN
 
-**Arcade racing made for the couch.** Nitro Crew brings back 90s arcade racing — straights, corners, nitro, pit
+**Arcade racing made for the couch.** Speed Tchê brings back 90s arcade racing — straights, corners, nitro, pit
 stops — with colorful 3D visuals and one twist that changes everything: up to **4 people on the same couch race
 as a team**, in split screen, against a grid of computer-controlled drivers.
 
@@ -147,7 +147,7 @@ aqui é o logotipo e o briefing da arte. Conferir tamanhos no painel na hora (a 
 
 | Cápsula | Tamanho | Texto | Briefing da arte |
 |---|---|---|---|
-| Header (cabeçalho) | 920×430 | Logotipo "Nitro Crew" | 4 carros lado a lado saindo de uma curva, chamas de nitro, pôr do sol; logotipo grande à esquerda. |
+| Header (cabeçalho) | 920×430 | Logotipo "Speed Tchê" | 4 carros lado a lado saindo de uma curva, chamas de nitro, pôr do sol; logotipo grande à esquerda. |
 | Pequena | 462×174 | Só o logotipo | O logotipo tem que ser legível em 120 px de largura: nada de subtítulo. Um carro cortado ao fundo. |
 | Principal | 1232×706 | Logotipo | Tela dividida em 4 estilizada (4 cenários: Copacabana, Las Vegas, Monte Fuji, Mônaco) com o logotipo no centro. |
 | Vertical | 748×896 | Logotipo | Os 4 carros empilhados em perspectiva vindo na direção de quem olha; logotipo em cima. |

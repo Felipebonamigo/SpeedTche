@@ -62,7 +62,7 @@ const desc = await page.evaluate(() => document.querySelector('.access-desc')?.t
 check(desc.startsWith('Volante assistido'), `explicação do nível em foco (${desc.slice(0, 40)}…)`);
 let s = await settings();
 check(s.colorPalette === 'deutan' && s.hudScale === 1.5 && s.reduceEffects && s.seatAssists[0] === 'steer', `opções gravadas: ${JSON.stringify(s)}`);
-const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.settings') ?? '{}'));
+const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.settings') ?? '{}'));
 check(stored.colorPalette === 'deutan' && stored.seatAssists?.[0] === 'steer', 'e salvas no localStorage');
 check(await page.evaluate(() => document.getElementById('hud').style.getPropertyValue('--hud-scale')) === '1.5', '--hud-scale 1.5 no #hud');
 await page.screenshot({ path: `${out}-02-options-set.png` });

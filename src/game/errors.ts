@@ -1,7 +1,7 @@
 // Relatório de erros: guarda os últimos 50 erros — com versão do jogo, data, modo e pista do momento — para o
 // jogador copiar em Opções › "Copiar relatório" (junto do diário de jogo, src/game/playlog.ts) e mandar ao desenvolvedor.
 // Fontes: window 'error', promessas rejeitadas sem tratamento e o catch do laço da sessão (`reportError(err, 'loop')`).
-// Onde fica: localStorage (`nitro-crew.errors`, só neste computador — fora do Steam Cloud) e, no Electron, também
+// Onde fica: localStorage (`speed-tche.errors`, só neste computador — fora do Steam Cloud) e, no Electron, também
 // `<userData>/logs/errors.log` pelo IPC `logAppend` (limite de tamanho e rotação em desktop/storage.cjs).
 // Nunca lança e nunca trava o jogo:
 //   • um erro que se repete (mesma pilha; números da mensagem não contam) vira UMA entrada com contador, que
@@ -22,7 +22,7 @@ import { getDesktop, isDesktop } from './desktop';
 import { PLAYLOG_KEY } from './playlog';
 
 export const GAME_VERSION: string = packageVersion;
-export const ERRORS_KEY = 'nitro-crew.errors';
+export const ERRORS_KEY = 'speed-tche.errors';
 export const RING_SIZE = 50;
 const MESSAGE_MAX = 500;
 const STACK_MAX = 4000;
@@ -185,7 +185,7 @@ export interface ReportMeta {
  */
 export function formatReport(entries: readonly ErrorEntry[], meta: ReportMeta): string {
   const lines = [
-    'Nitro Crew — error report',
+    'Speed Tchê — error report',
     `version: ${meta.version}`,
     `generated: ${meta.generated}`,
     `platform: ${scrubPaths(meta.userAgent)}`,

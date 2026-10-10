@@ -1,4 +1,4 @@
-# Playbook — como executar o Nitro Crew com qualquer modelo
+# Playbook — como executar o Speed Tchê com qualquer modelo
 
 Este é o manual para uma sessão (de qualquer modelo, inclusive os mais baratos) fazer o trabalho do jeito que vinha
 sendo feito: mesmo processo, mesmas verificações, mesmos cuidados. Ele existe porque o dono pediu para seguir num modo
@@ -14,7 +14,7 @@ O que ler, nesta ordem, no começo de toda sessão:
 
 ## 1. Ambiente e comandos (copiar e colar)
 
-Tudo roda da raiz do repositório (`Felipebonamigo/nitro-crew`, privado; o jogo é independente de qualquer outro projeto).
+Tudo roda da raiz do repositório (`Felipebonamigo/speed-tche`, privado; o jogo é independente de qualquer outro projeto).
 
 | Para quê | Comando |
 |---|---|
@@ -100,7 +100,7 @@ com o modo de usar no cabeçalho do arquivo.
 Copie e preencha os `<…>`. Tudo o que está aqui veio de problema real.
 
 ```
-Você trabalha no jogo Nitro Crew (este repositório; TypeScript + Three.js; leia
+Você trabalha no jogo Speed Tchê (este repositório; TypeScript + Three.js; leia
 `CLAUDE.md`, `docs/PLAYBOOK.md` e <docs da área> antes de tudo). Responda e comente em português;
 código em inglês.
 

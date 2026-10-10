@@ -16,7 +16,7 @@ vira executável com o Electron (pasta `desktop/`, ver o README de lá para os c
 
 ## 3. Depósitos e upload (SteamPipe)
 - Steamworks SDK → `tools/ContentBuilder`; script `app_build_<appid>.vdf` com `ContentRoot` em
-  `desktop/release/win-unpacked` e executável de lançamento `Nitro Crew.exe`.
+  `desktop/release/win-unpacked` e executável de lançamento `SpeedTche.exe`.
 - `steamcmd +login <usuário> +run_app_build caminho/app_build.vdf +quit`; publicar a build num branch (default/beta).
 
 ## 4. Recursos da Steam que o jogo já prevê
@@ -28,7 +28,7 @@ vira executável com o Electron (pasta `desktop/`, ver o README de lá para os c
 - **Conquistas**: `window.desktop.achievement('ID')` via `steamworks.js`; a lista com PT/EN está em
   `src/game/desktop.ts` (`ACHIEVEMENTS`) e a sessão desbloqueia sozinha (`src/game/achievements.ts`).
 - **Rich Presence**: "Correndo em <pista> · 3P" enquanto há corrida.
-- **Cloud**: opções e progresso são espelhados em `<userData>/saves/*.json` (`%APPDATA%/Nitro Crew/saves` no
+- **Cloud**: opções e progresso são espelhados em `<userData>/saves/*.json` (`%APPDATA%/SpeedTche/saves` no
   Windows); o Auto-Cloud aponta para essa subpasta, nunca para o `localStorage` do Chromium. Caminhos por sistema
   e regras em `desktop/README.md` → "Steam Cloud".
 - **Multiplayer próprio (Fase 4.2+)**: núcleo determinístico com `hashRace`; o transporte pode ser Steam

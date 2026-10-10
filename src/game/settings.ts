@@ -12,7 +12,7 @@ import { readJson, writeJson } from './storage';
 // Onde gravar (localStorage, arquivo do Electron, memória da sessão) é com storage.ts; save e fantasmas importam daqui.
 export { readJson, writeJson };
 
-export const SETTINGS_KEY = 'nitro-crew.settings';
+export const SETTINGS_KEY = 'speed-tche.settings';
 export const TOTAL_CARS_MIN = 8;
 export const TOTAL_CARS_MAX = 20;
 export const QUICK_LAPS_MIN = 2;

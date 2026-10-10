@@ -1,8 +1,8 @@
-// E2E do pacote Electron de verdade (release/linux-unpacked/nitro-crew) com o Playwright da raiz do jogo.
+// E2E do pacote Electron de verdade (release/linux-unpacked/speedtche) com o Playwright da raiz do jogo.
 // Uso, dentro de desktop/ e depois de `npm run dist:linux`:
 //   xvfb-run -a node e2e.mjs [prefixo-das-capturas]      (sem Xvfb, numa máquina com tela: node e2e.mjs)
 // userData isolado numa pasta temporária (XDG_CONFIG_HOME) — nunca toca o ~/.config de verdade.
-// Confere: app/index.html de dentro do asar, preload, pasta "Nitro Crew", erro → aviso + log em arquivo,
+// Confere: app/index.html de dentro do asar, preload, pasta "Speed Tchê", erro → aviso + log em arquivo,
 // "Copiar relatório" → área de transferência, telemetria → saves/*.json, arquivo trocado "pela nuvem"
 // vencendo um localStorage DIFERENTE na volta (conflito de verdade), o mesmo erro na 2ª abertura voltando ao log,
 // e a tela de erro fatal quando o WebGL não existe — com a opção num <code> e operada por um controle simulado.
@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shots = process.argv[2] ?? join(here, 'release', 'e2e');
-const exe = join(here, 'release', 'linux-unpacked', 'nitro-crew');
+const exe = join(here, 'release', 'linux-unpacked', 'speed-tche');
 const xdg = mkdtempSync(join(tmpdir(), 'nc-xdg-'));
-const userData = join(xdg, 'Nitro Crew');
+const userData = join(xdg, 'Speed Tchê');
 const fails = [];
 const check = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails.push(msg); };
 const shot = (name) => page.screenshot({ path: `${shots}-${name}.png`, timeout: 120000 });
@@ -36,7 +36,7 @@ async function launch(extraArgs = []) {
 // ───────────── 1ª execução ─────────────
 let { app, page, pageErrors } = await launch();
 const ud = await app.evaluate(({ app: a }) => a.getPath('userData'));
-check(ud === userData, `userData = <XDG>/Nitro Crew (${ud})`);
+check(ud === userData, `userData = <XDG>/SpeedTche (${ud})`);
 check(await page.evaluate(() => typeof window.desktop?.storeReadAll === 'function'), 'preload expõe storeReadAll');
 const info = await page.evaluate(() => ({ href: location.href, menu: window.nc.session.menus.current() }));
 check(/app\.asar\/app\/index\.html$/.test(info.href), `carregou app/index.html de dentro do asar (${info.href.split('/').slice(-3).join('/')})`);
@@ -74,7 +74,7 @@ await page.keyboard.press('Enter'); await page.waitForTimeout(600);
 const valueText = await page.evaluate(() => document.querySelector('[data-item="error-report"] .sel-value')?.textContent);
 check(valueText === 'Copiado ✓', `retorno visual da cópia (${valueText})`);
 const clip = await app.evaluate(({ clipboard }) => clipboard.readText());
-check(clip.includes('Nitro Crew — error report') && clip.includes('erro E2E de propósito') && clip.includes('desktop: yes'), 'área de transferência tem o relatório com o erro');
+check(clip.includes('Speed Tchê — error report') && clip.includes('erro E2E de propósito') && clip.includes('desktop: yes'), 'área de transferência tem o relatório com o erro');
 check(!/\/tmp\/|nc-xdg|\/home\/[a-z]/.test(clip), 'relatório sem caminho do computador');
 await shot('03-copied');
 
@@ -82,15 +82,15 @@ await shot('03-copied');
 for (let i = 0; i < 3 && (await focusedItem()) !== 'telemetry'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100); }
 check((await focusedItem()) === 'telemetry', 'foco na telemetria');
 await page.keyboard.press('Enter'); await page.waitForTimeout(600);
-const settingsFile = join(userData, 'saves', 'nitro-crew.settings.json');
+const settingsFile = join(userData, 'saves', 'speed-tche.settings.json');
 const consent = existsSync(settingsFile) ? JSON.parse(readFileSync(settingsFile, 'utf8')).telemetryConsent : undefined;
-check(consent === 1, `telemetria ligada gravada em saves/nitro-crew.settings.json com a versão dos termos (${consent})`);
+check(consent === 1, `telemetria ligada gravada em saves/speed-tche.settings.json com a versão dos termos (${consent})`);
 await shot('04-telemetry');
 // As opções passaram pelo espelho: localStorage e arquivo iguais. O save de progresso fica só no localStorage,
 // diferente do que a "nuvem" vai pôr no disco.
-const localSettingsRun1 = await page.evaluate(() => localStorage.getItem('nitro-crew.settings'));
+const localSettingsRun1 = await page.evaluate(() => localStorage.getItem('speed-tche.settings'));
 check(localSettingsRun1 === readFileSync(settingsFile, 'utf8'), 'opções: localStorage e arquivo iguais depois da gravação');
-await page.evaluate(() => { localStorage.setItem('nitro-crew.save', JSON.stringify({ racesRun: 1 })); });
+await page.evaluate(() => { localStorage.setItem('speed-tche.save', JSON.stringify({ racesRun: 1 })); });
 
 const logFile = join(userData, 'logs', 'errors.log');
 check(existsSync(logFile) && readFileSync(logFile, 'utf8').includes('erro E2E de propósito'), 'erro gravado em logs/errors.log');
@@ -100,21 +100,21 @@ await app.close();
 
 // ───────────── "Outro computador": a nuvem troca os arquivos em disco antes da 2ª execução ─────────────
 // Conflito de verdade: o localStorage TEM as duas chaves, com valores diferentes dos que a nuvem trouxe.
-writeFileSync(join(userData, 'saves', 'nitro-crew.save.json'), JSON.stringify({ racesRun: 42, racesWon: 7, cupsCompleted: ['brasil'] }));
+writeFileSync(join(userData, 'saves', 'speed-tche.save.json'), JSON.stringify({ racesRun: 42, racesWon: 7, cupsCompleted: ['brasil'] }));
 const cloudSettings = { ...JSON.parse(readFileSync(settingsFile, 'utf8')), language: 'en', quickLaps: 5 };
 writeFileSync(settingsFile, JSON.stringify(cloudSettings));
 ({ app, page, pageErrors } = await launch());
-const local = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.save') ?? '{}'));
+const local = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.save') ?? '{}'));
 check(local.racesRun === 42 && local.cupsCompleted?.[0] === 'brasil', `save do disco venceu o localStorage diferente (racesRun 1 → ${local.racesRun})`);
 const s2 = await page.evaluate(() => ({ language: window.nc.session.settings.language, quickLaps: window.nc.session.settings.quickLaps, consent: window.nc.session.settings.telemetryConsent }));
 check(s2.language === 'en' && s2.quickLaps === 5, `opções do disco venceram as do localStorage (idioma ${s2.language}, voltas ${s2.quickLaps})`);
 check(s2.consent === 1, 'consentimento da telemetria sobreviveu ao reinício');
-const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.errors') ?? '[]').length);
+const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.errors') ?? '[]').length);
 check(kept === 1, `anel de erros sobreviveu ao reinício (${kept})`);
 // O mesmo erro de novo: continua uma entrada (x2), e volta ao log nesta abertura.
 await throwOnPurpose();
 await page.waitForTimeout(700);
-const ring2 = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.errors') ?? '[]'));
+const ring2 = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.errors') ?? '[]'));
 check(ring2.length === 1 && ring2[0].count === 2, `erro repetido em outra abertura: uma entrada, contador 2 no localStorage (${ring2.map((e) => `x${e.count}`).join(',')})`);
 const purposeLines = readFileSync(logFile, 'utf8').split('\n').filter((l) => l.includes('erro E2E de propósito'));
 check(purposeLines.length === 2, `log recebeu o erro nas duas aberturas (${purposeLines.length} linhas)`);

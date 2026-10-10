@@ -74,8 +74,8 @@ async function boot(storage: QuotaStorage) {
 }
 type Game = Awaited<ReturnType<typeof boot>>;
 
-const SAVE_KEY = 'nitro-crew.save';
-const SETTINGS_KEY = 'nitro-crew.settings';
+const SAVE_KEY = 'speed-tche.save';
+const SETTINGS_KEY = 'speed-tche.settings';
 
 /** Última corrida da Copa Brasil, fechada como a sessão fecha (settleRace no race_over, gravando pelo saveSave). */
 function winLastCupRace(g: Game, save: SaveData): void {
@@ -156,12 +156,12 @@ describe('localStorage cheio no Electron', () => {
   it('a sessão relê o que acabou de gravar, com ou sem o espelho', async () => {
     for (const mirror of [true, false]) {
       const storage = new QuotaStorage(5_000);
-      storage.setItem('nitro-crew.ghosts', '{"ghosts":{}}');
+      storage.setItem('speed-tche.ghosts', '{"ghosts":{}}');
       storage.fill();
       const g = await boot(storage);
       if (mirror) g.cloud.installSaveMirror(fakeDisk(), storage);
-      g.settings.writeJson('nitro-crew.ghosts', { ghosts: { copacabana: { ticks: 100 } } });
-      expect(g.settings.readJson('nitro-crew.ghosts'), mirror ? 'com espelho' : 'sem espelho').toEqual({ ghosts: { copacabana: { ticks: 100 } } });
+      g.settings.writeJson('speed-tche.ghosts', { ghosts: { copacabana: { ticks: 100 } } });
+      expect(g.settings.readJson('speed-tche.ghosts'), mirror ? 'com espelho' : 'sem espelho').toEqual({ ghosts: { copacabana: { ticks: 100 } } });
     }
   });
 
@@ -308,11 +308,11 @@ describe('localStorage cheio no navegador (sem arquivo)', () => {
     storage.fill();
     g.storage.setSpaceFreers([(k) => g.errors.dropStoredErrors(storage, k), g.ghosts.dropOldestGhost]);
 
-    const ok = g.settings.writeJson('nitro-crew.playlog', { format: 1, races: ['x'.repeat(500)] });
+    const ok = g.settings.writeJson('speed-tche.playlog', { format: 1, races: ['x'.repeat(500)] });
     expect(Object.keys(g.ghosts.loadGhostStore().ghosts).sort()).toEqual(['a1', 'b2', 'c3']);
     expect(storage.getItem(g.errors.ERRORS_KEY)).toBe(errors);
     expect(ok).toBe(false);
-    expect(g.storage.saveHealth().lost).toEqual(['nitro-crew.playlog']);
+    expect(g.storage.saveHealth().lost).toEqual(['speed-tche.playlog']);
   });
 });
 

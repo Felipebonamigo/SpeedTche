@@ -103,7 +103,7 @@ await downTo('Visual');
 await press('ArrowRight');
 st = await info();
 check(st.style === 'modern' && st.mode === '3d' && st.canvas && st.marker, `volta ao Moderno, HUD de fora intacto (${JSON.stringify({ style: st.style, mode: st.mode, marker: st.marker })})`);
-const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.settings') ?? '{}').renderStyle);
+const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.settings') ?? '{}').renderStyle);
 check(persisted === 'modern', `a escolha fica salva (${persisted})`);
 
 check(errors.length === 0, `sem erros na página (${errors.slice(0, 3).join(' | ')})`);

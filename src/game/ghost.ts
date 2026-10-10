@@ -40,7 +40,9 @@ export const MAX_GHOST_TICKS = 10 * 60 * TICK_RATE;
 export const MAX_GHOST_CHARS = 19_000;
 /** Teto do arquivo importado (antes de qualquer parse). */
 export const MAX_GHOST_FILE_CHARS = 64 * 1024;
-export const GHOST_FILE_FORMAT = 'nitro-crew-ghost';
+export const GHOST_FILE_FORMAT = 'speed-tche-ghost';
+/** O formato que a 0.1.0 (Nitro Crew) exportava: continua valendo na importação. */
+const LEGACY_GHOST_FILE_FORMAT = 'nitro-crew-ghost';
 
 export interface GhostSample {
   z: number;
@@ -380,7 +382,7 @@ export function parseGhostFile(text: unknown): GhostRecord | null {
   try { raw = JSON.parse(text); } catch { return null; }
   if (typeof raw !== 'object' || raw === null) return null;
   const o = raw as Record<string, unknown>;
-  if (o.format !== GHOST_FILE_FORMAT) return null;
+  if (o.format !== GHOST_FILE_FORMAT && o.format !== LEGACY_GHOST_FILE_FORMAT) return null;
   if (o.v === 1) return sanitizeGhostRecord({ ...o, fp: undefined });
   if (o.v !== GHOST_FILE_VERSION || !isFingerprint(o.fp)) return null;
   return sanitizeGhostRecord(o);

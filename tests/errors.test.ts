@@ -100,9 +100,9 @@ describe('describeError e scrubPaths', () => {
     // Caminho padrão da Steam no Windows: parênteses dentro da URL.
     expect(scrubPaths('at g (file:///C:/Program%20Files%20(x86)/Steam/steamapps/common/Nitro%20Crew/resources/app.asar/app/assets/i.js:9:1)')).toBe('at g (app/assets/i.js:9:1)');
     // Navegador: dist servido por arquivo.
-    expect(scrubPaths('file:///home/ana/nitro-crew/dist/assets/i.js:1:1')).toBe('assets/i.js:1:1');
-    expect(scrubPaths('ENOENT: /home/ana/.config/Nitro Crew/saves')).toBe('ENOENT: /home/~/.config/Nitro Crew/saves');
-    expect(scrubPaths('open C:\\Users\\Ana\\AppData\\Roaming\\Nitro Crew')).toBe('open C:\\Users\\~\\AppData\\Roaming\\Nitro Crew');
+    expect(scrubPaths('file:///home/ana/speed-tche/dist/assets/i.js:1:1')).toBe('assets/i.js:1:1');
+    expect(scrubPaths('ENOENT: /home/ana/.config/SpeedTche/saves')).toBe('ENOENT: /home/~/.config/SpeedTche/saves');
+    expect(scrubPaths('open C:\\Users\\Ana\\AppData\\Roaming\\SpeedTche')).toBe('open C:\\Users\\~\\AppData\\Roaming\\SpeedTche');
     expect(scrubPaths('/Users/bia/Library/Application Support')).toBe('/Users/~/Library/Application Support');
     expect(scrubPaths('http://localhost:4186/assets/index.js:1:1')).toBe('http://localhost:4186/assets/index.js:1:1');
   });
@@ -110,9 +110,9 @@ describe('describeError e scrubPaths', () => {
   // Revisão: conta local do Windows pode ter espaço no nome ("Ana Maria"), e o corte no primeiro espaço deixava
   // o sobrenome no relatório — a política de privacidade promete que o nome de usuário sai.
   it('nome de usuário do Windows com espaço sai inteiro', () => {
-    expect(scrubPaths('open C:\\Users\\Ana Maria\\AppData\\Roaming\\Nitro Crew\\saves')).toBe('open C:\\Users\\~\\AppData\\Roaming\\Nitro Crew\\saves');
+    expect(scrubPaths('open C:\\Users\\Ana Maria\\AppData\\Roaming\\SpeedTche\\saves')).toBe('open C:\\Users\\~\\AppData\\Roaming\\SpeedTche\\saves');
     expect(scrubPaths("EPERM: operation not permitted, open 'C:\\Users\\Ana Maria de Souza'")).toBe("EPERM: operation not permitted, open 'C:\\Users\\~'");
-    expect(scrubPaths('C:/Users/Ana Maria/Documents/x.nitro.json')).toBe('C:/Users/~/Documents/x.nitro.json');
+    expect(scrubPaths('C:/Users/Ana Maria/Documents/x.tche.json')).toBe('C:/Users/~/Documents/x.tche.json');
   });
 });
 
@@ -579,8 +579,8 @@ describe('Opções: itens do relatório de erros', () => {
     const footer = optionsFooter(fakeScreenApi(structuredClone(DEFAULT_SETTINGS) as Settings), () => undefined, back);
     footer.items[0].activate?.();
     await vi.waitFor(() => expect(copied).not.toBe(''));
-    expect(copied).toContain('Nitro Crew — error report');
-    expect(copied).toContain('Nitro Crew — play log');
+    expect(copied).toContain('Speed Tchê — error report');
+    expect(copied).toContain('Speed Tchê — play log');
     footer.destroy();
     setActivePlaylog(null);
   });

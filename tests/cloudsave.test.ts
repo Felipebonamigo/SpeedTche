@@ -54,8 +54,8 @@ describe('quem vale para cada chave', () => {
   });
 
   it('só chaves do jogo vão para a nuvem; log de erros e marcação ficam no computador', () => {
-    expect(isCloudKey('nitro-crew.save')).toBe(true);
-    expect(isCloudKey('nitro-crew.settings')).toBe(true);
+    expect(isCloudKey('speed-tche.save')).toBe(true);
+    expect(isCloudKey('speed-tche.settings')).toBe(true);
     expect(isCloudKey(ERRORS_KEY)).toBe(false);
     expect(isCloudKey(PENDING_KEY)).toBe(false);
     expect(isCloudKey('outra-coisa')).toBe(false);
@@ -65,50 +65,50 @@ describe('quem vale para cada chave', () => {
 describe('hydrateFromDisk (inicialização no Electron)', () => {
   it('save da nuvem substitui o local; save só local vai para o disco; lixo fica de fora', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":1}');
-    storage.setItem('nitro-crew.settings', '{"language":"en"}');
+    storage.setItem('speed-tche.save', '{"racesRun":1}');
+    storage.setItem('speed-tche.settings', '{"language":"en"}');
     storage.setItem(ERRORS_KEY, '[]');
     storage.setItem('outro-app', 'x');
-    const disk = fakeDisk({ 'nitro-crew.save': '{"racesRun":9}', 'nitro-crew.errors': '[1]', 'lixo': '{}' });
+    const disk = fakeDisk({ 'speed-tche.save': '{"racesRun":9}', 'speed-tche.errors': '[1]', 'lixo': '{}' });
     const report = await hydrateFromDisk(disk, storage);
-    expect(report).toEqual({ fromDisk: ['nitro-crew.save'], toDisk: ['nitro-crew.settings'], failed: [], unknown: [] });
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":9}');
-    expect(disk.files['nitro-crew.settings']).toBe('{"language":"en"}');
+    expect(report).toEqual({ fromDisk: ['speed-tche.save'], toDisk: ['speed-tche.settings'], failed: [], unknown: [] });
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":9}');
+    expect(disk.files['speed-tche.settings']).toBe('{"language":"en"}');
     expect(storage.getItem(ERRORS_KEY)).toBe('[]');
-    expect(disk.writes).toEqual(['nitro-crew.settings']);
+    expect(disk.writes).toEqual(['speed-tche.settings']);
     expect(pending(storage)).toEqual([]);
   });
 
   it('gravação pendente vence o arquivo e é regravada', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":5}');
-    storage.setItem(PENDING_KEY, '["nitro-crew.save"]');
-    const disk = fakeDisk({ 'nitro-crew.save': '{"racesRun":4}' });
+    storage.setItem('speed-tche.save', '{"racesRun":5}');
+    storage.setItem(PENDING_KEY, '["speed-tche.save"]');
+    const disk = fakeDisk({ 'speed-tche.save': '{"racesRun":4}' });
     const report = await hydrateFromDisk(disk, storage);
-    expect(report.toDisk).toEqual(['nitro-crew.save']);
-    expect(disk.files['nitro-crew.save']).toBe('{"racesRun":5}');
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":5}');
+    expect(report.toDisk).toEqual(['speed-tche.save']);
+    expect(disk.files['speed-tche.save']).toBe('{"racesRun":5}');
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":5}');
     expect(pending(storage)).toEqual([]);
   });
 
   it('disco recusando a gravação: a chave continua pendente (tenta de novo na próxima vez)', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":2}');
+    storage.setItem('speed-tche.save', '{"racesRun":2}');
     const report = await hydrateFromDisk(fakeDisk({}, { failWrites: true }), storage);
-    expect(report.failed).toEqual(['nitro-crew.save']);
-    expect(pending(storage)).toEqual(['nitro-crew.save']);
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":2}');
+    expect(report.failed).toEqual(['speed-tche.save']);
+    expect(pending(storage)).toEqual(['speed-tche.save']);
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":2}');
   });
 
   it('IPC que falha ou não responde: segue com o localStorage intacto', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":2}');
+    storage.setItem('speed-tche.save', '{"racesRun":2}');
     await hydrateFromDisk(fakeDisk({}, { readRejects: true, failWrites: true }), storage);
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":2}');
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":2}');
     const silent = { storeReadAll: () => new Promise<Record<string, string>>(() => undefined), storeWrite: () => new Promise<boolean>(() => undefined) };
     const report = await hydrateFromDisk(silent, storage, 20);
-    expect(report).toEqual({ fromDisk: [], toDisk: [], failed: [], unknown: ['nitro-crew.save'] });
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":2}');
+    expect(report).toEqual({ fromDisk: [], toDisk: [], failed: [], unknown: ['speed-tche.save'] });
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":2}');
   });
 
   // Revisão: a leitura do disco falhava (ou passava do limite) e o disco virava "vazio" — o localStorage velho
@@ -118,17 +118,17 @@ describe('hydrateFromDisk (inicialização no Electron)', () => {
     const cloud = '{"racesRun":42,"cupsCompleted":["br_rj"]}';
     const reads = [
       () => Promise.reject(new Error('IPC morto')),
-      () => new Promise<Record<string, string>>((resolve) => { setTimeout(() => resolve({ 'nitro-crew.save': cloud }), 60); }),
+      () => new Promise<Record<string, string>>((resolve) => { setTimeout(() => resolve({ 'speed-tche.save': cloud }), 60); }),
     ];
     for (const storeReadAll of reads) {
       const storage = new MemoryStorage();
-      storage.setItem('nitro-crew.save', '{"racesRun":1}');
-      const disk = fakeDisk({ 'nitro-crew.save': cloud });
+      storage.setItem('speed-tche.save', '{"racesRun":1}');
+      const disk = fakeDisk({ 'speed-tche.save': cloud });
       const report = await hydrateFromDisk({ storeReadAll, storeWrite: disk.storeWrite }, storage, 20);
       expect(disk.writes).toEqual([]);
-      expect(disk.files['nitro-crew.save']).toBe(cloud);
-      expect(report).toEqual({ fromDisk: [], toDisk: [], failed: [], unknown: ['nitro-crew.save'] });
-      expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":1}');
+      expect(disk.files['speed-tche.save']).toBe(cloud);
+      expect(report).toEqual({ fromDisk: [], toDisk: [], failed: [], unknown: ['speed-tche.save'] });
+      expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":1}');
       // E não vira pendente: nada diz que o local é mais novo que o arquivo.
       expect(pending(storage)).toEqual([]);
     }
@@ -136,31 +136,31 @@ describe('hydrateFromDisk (inicialização no Electron)', () => {
 
   it('leitura que falha com gravação local pendente: o local (sabidamente mais novo) ainda vai para o disco', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":5}');
-    storage.setItem(PENDING_KEY, '["nitro-crew.save"]');
+    storage.setItem('speed-tche.save', '{"racesRun":5}');
+    storage.setItem(PENDING_KEY, '["speed-tche.save"]');
     const disk = fakeDisk({}, { readRejects: true });
     const report = await hydrateFromDisk(disk, storage);
-    expect(report).toEqual({ fromDisk: [], toDisk: ['nitro-crew.save'], failed: [], unknown: [] });
-    expect(disk.files['nitro-crew.save']).toBe('{"racesRun":5}');
+    expect(report).toEqual({ fromDisk: [], toDisk: ['speed-tche.save'], failed: [], unknown: [] });
+    expect(disk.files['speed-tche.save']).toBe('{"racesRun":5}');
     expect(pending(storage)).toEqual([]);
   });
 
   it('arquivo que existe mas não deu para ler (null) não é sobrescrito; os outros seguem a regra de sempre', async () => {
     const storage = new MemoryStorage();
-    storage.setItem('nitro-crew.save', '{"racesRun":1}');
-    storage.setItem('nitro-crew.settings', '{"language":"en"}');
-    const disk = fakeDisk({ 'nitro-crew.settings': '{"language":"pt"}' });
-    const api = { storeReadAll: () => Promise.resolve({ ...disk.files, 'nitro-crew.save': null }), storeWrite: disk.storeWrite };
+    storage.setItem('speed-tche.save', '{"racesRun":1}');
+    storage.setItem('speed-tche.settings', '{"language":"en"}');
+    const disk = fakeDisk({ 'speed-tche.settings': '{"language":"pt"}' });
+    const api = { storeReadAll: () => Promise.resolve({ ...disk.files, 'speed-tche.save': null }), storeWrite: disk.storeWrite };
     const report = await hydrateFromDisk(api, storage);
     expect(disk.writes).toEqual([]);
-    expect(report).toEqual({ fromDisk: ['nitro-crew.settings'], toDisk: [], failed: [], unknown: ['nitro-crew.save'] });
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":1}');
-    expect(storage.getItem('nitro-crew.settings')).toBe('{"language":"pt"}');
+    expect(report).toEqual({ fromDisk: ['speed-tche.settings'], toDisk: [], failed: [], unknown: ['speed-tche.save'] });
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":1}');
+    expect(storage.getItem('speed-tche.settings')).toBe('{"language":"pt"}');
   });
 
   it('resposta de preload desatualizado (não é objeto de textos) é ignorada', async () => {
     const storage = new MemoryStorage();
-    const odd = { storeReadAll: () => Promise.resolve({ 'nitro-crew.save': 42 } as unknown as Record<string, string>), storeWrite: () => Promise.resolve(true) };
+    const odd = { storeReadAll: () => Promise.resolve({ 'speed-tche.save': 42 } as unknown as Record<string, string>), storeWrite: () => Promise.resolve(true) };
     expect(await hydrateFromDisk(odd, storage)).toEqual({ fromDisk: [], toDisk: [], failed: [], unknown: [] });
   });
 
@@ -189,7 +189,7 @@ describe('espelho das gravações', () => {
     expect(JSON.parse(disk.files[SAVE_KEY]).racesRun).toBe(3);
     expect(pending(storage)).toEqual([]);
     off();
-    writeJson('nitro-crew.save', { racesRun: 99 });
+    writeJson('speed-tche.save', { racesRun: 99 });
     expect(JSON.parse(disk.files[SAVE_KEY]).racesRun).toBe(3); // desligado: só o localStorage
   });
 
@@ -198,11 +198,11 @@ describe('espelho das gravações', () => {
     vi.stubGlobal('localStorage', storage);
     const resolvers: Array<(ok: boolean) => void> = [];
     const off = installSaveMirror({ storeWrite: () => new Promise<boolean>((r) => { resolvers.push(r); }) }, storage);
-    writeJson('nitro-crew.save', { racesRun: 1 });
-    writeJson('nitro-crew.save', { racesRun: 2 });
+    writeJson('speed-tche.save', { racesRun: 1 });
+    writeJson('speed-tche.save', { racesRun: 2 });
     resolvers[0](true); // a antiga confirmou, a nova ainda não
     await Promise.resolve();
-    expect(pending(storage)).toEqual(['nitro-crew.save']);
+    expect(pending(storage)).toEqual(['speed-tche.save']);
     resolvers[1](true);
     await Promise.resolve();
     expect(pending(storage)).toEqual([]);
@@ -213,13 +213,13 @@ describe('espelho das gravações', () => {
     const storage = new MemoryStorage();
     vi.stubGlobal('localStorage', storage);
     const off = installSaveMirror({ storeWrite: () => Promise.reject(new Error('disco cheio')) }, storage);
-    expect(writeJson('nitro-crew.save', { racesRun: 4 })).toBe(true);
+    expect(writeJson('speed-tche.save', { racesRun: 4 })).toBe(true);
     await Promise.resolve();
-    expect(storage.getItem('nitro-crew.save')).toBe('{"racesRun":4}');
-    expect(pending(storage)).toEqual(['nitro-crew.save']);
+    expect(storage.getItem('speed-tche.save')).toBe('{"racesRun":4}');
+    expect(pending(storage)).toEqual(['speed-tche.save']);
     off();
     const off2 = installSaveMirror({ storeWrite: () => { throw new Error('preload quebrado'); } }, storage);
-    expect(writeJson('nitro-crew.settings', { language: 'pt' })).toBe(true);
+    expect(writeJson('speed-tche.settings', { language: 'pt' })).toBe(true);
     off2();
   });
 

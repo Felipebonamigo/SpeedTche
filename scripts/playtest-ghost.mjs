@@ -47,7 +47,7 @@ const ghostFrame = () => page.evaluate(() => {
   const g = r.ghost?.frame(r.state);
   return g ? { pose: g.pose ? { z: Math.round(g.pose.z), x: +g.pose.x.toFixed(2) } : null, delta: g.delta, carId: g.carId } : null;
 });
-const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.ghosts') ?? 'null'));
+const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.ghosts') ?? 'null'));
 
 /** Pilota pelo teclado: acelerador sempre; volante para voltar ao meio da pista. Passos de `chunk` ticks. */
 async function drive(untilFn, chunk = 5, maxTicks = 30000) {
@@ -166,14 +166,14 @@ check(await focusBy(/Fantasma/), `foco na pista com fantasma`);
 const [download] = await Promise.all([page.waitForEvent('download'), press('Enter')]);
 const file = await download.path().then((p) => import('node:fs').then((fs) => fs.readFileSync(p, 'utf8')));
 const parsed = JSON.parse(file);
-check(download.suggestedFilename() === `fantasma-${trackId}.nitro.json` && parsed.format === 'nitro-crew-ghost' && parsed.trackId === trackId, `exportou ${download.suggestedFilename()} (${file.length} bytes)`);
+check(download.suggestedFilename() === `fantasma-${trackId}.tche.json` && parsed.format === 'speed-tche-ghost' && parsed.trackId === trackId, `exportou ${download.suggestedFilename()} (${file.length} bytes)`);
 await page.waitForTimeout(200);
 check(/exportado/.test(await page.evaluate(() => document.querySelector('#ui .ghost-status')?.textContent ?? '')), 'status: exportado');
 // Importar: o arquivo do "amigo" (mesmo fantasma, outro nome) substitui o da pista.
 const friend = JSON.stringify({ ...parsed, name: 'Amigo', date: '2026-09-20T10:00:00.000Z' });
 check(await focusBy(/importar fantasma/i), `foco em importar (${await focusText()})`);
 const [chooser] = await Promise.all([page.waitForEvent('filechooser'), press('Enter')]);
-await chooser.setFiles({ name: 'amigo.nitro.json', mimeType: 'application/json', buffer: Buffer.from(friend) });
+await chooser.setFiles({ name: 'amigo.tche.json', mimeType: 'application/json', buffer: Buffer.from(friend) });
 for (let i = 0; i < 20 && (await store())?.ghosts?.[trackId]?.name !== 'Amigo'; i++) await page.waitForTimeout(100);
 check((await store())?.ghosts?.[trackId]?.name === 'Amigo', 'importado: o fantasma da pista é o do amigo');
 await page.waitForTimeout(200);
@@ -182,7 +182,7 @@ check(/importado/.test(after.status) && /Amigo/.test(after.row), `status e linha
 await page.screenshot({ path: `${out}-05-importado.png` });
 // Arquivo inválido: aviso, nada muda.
 const [chooser2] = await Promise.all([page.waitForEvent('filechooser'), (async () => { await focusBy(/importar fantasma/i); await press('Enter'); })()]);
-await chooser2.setFiles({ name: 'lixo.nitro.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"nitro-crew-ghost","v":1,"data":"@@"}') });
+await chooser2.setFiles({ name: 'lixo.tche.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"speed-tche-ghost","v":1,"data":"@@"}') });
 await page.waitForTimeout(400);
 check(/não é um fantasma/.test(await page.evaluate(() => document.querySelector('#ui .ghost-status')?.textContent ?? '')) && (await store())?.ghosts?.[trackId]?.name === 'Amigo', 'arquivo inválido: aviso e fantasma intacto');
 await page.screenshot({ path: `${out}-06-invalido.png` });
@@ -197,7 +197,7 @@ await press('Enter');
 check(await menu() === 'options', 'Opções');
 check(await focusBy(/fantasma/i, 'ArrowDown', 30), `item do fantasma (${await focusText()})`);
 await press('ArrowRight');
-check(await page.evaluate(() => window.nc.session.settings.ghost === false && JSON.parse(localStorage.getItem('nitro-crew.settings')).ghost === false), 'desligado e gravado');
+check(await page.evaluate(() => window.nc.session.settings.ghost === false && JSON.parse(localStorage.getItem('speed-tche.settings')).ghost === false), 'desligado e gravado');
 await page.screenshot({ path: `${out}-07-opcoes.png` });
 await page.evaluate(() => { const s = window.nc.session; s.debugBind(0, 'kb1'); s.startQuick(s.menus ? 'copacabana' : 'copacabana', 2, [{ seat: 0, name: 'P1', carId: 'falcao', teamId: 0, color: '#ffd23f' }], true); });
 await drive((k) => k.lap >= 1 && k.z > 8000);

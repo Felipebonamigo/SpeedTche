@@ -11,7 +11,7 @@ import { DEFAULT_SAVE, type BestLap, type RaceMode, type SaveData } from './cont
 import { isRecord, pickNumber, pickString, readJson, writeJson } from './settings';
 import { sanitizeStats } from './stats';
 
-export const SAVE_KEY = 'nitro-crew.save';
+export const SAVE_KEY = 'speed-tche.save';
 export const SEATS = 4;
 export const NAME_MAX_LENGTH = 12;
 

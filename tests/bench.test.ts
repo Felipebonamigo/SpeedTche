@@ -1,4 +1,4 @@
-// Banco de prova (src/bench/): métricas puras, plano de cenas e validação do relatório `nitro-crew-bench/1`.
+// Banco de prova (src/bench/): métricas puras, plano de cenas e validação do relatório `speed-tche-bench/1`.
 // O que o navegador faz (run.ts) e o que o Electron faz (storage.cjs) são conferidos em outro lugar
 // (tools/bench.mjs e tests/desktop-storage.test.ts); aqui só a parte pura.
 // Os testes 1–16 são os do cartão K4; os "Ultra" são o acréscimo do dono de 09/10/2026 (docs/CRONOGRAMA.md, "Revisão visual", R1).
@@ -153,7 +153,7 @@ describe('validateBenchReport', () => {
     const a = report();
     a.runs = [a.runs[0]];
     expect(validateBenchReport(a)).toEqual(['falta copa-4p/low']);
-    expect(validateBenchReport({ ...report(), schema: 'x' as typeof BENCH_SCHEMA })).toEqual(['schema: esperado nitro-crew-bench/1, veio x']);
+    expect(validateBenchReport({ ...report(), schema: 'x' as typeof BENCH_SCHEMA })).toEqual(['schema: esperado speed-tche-bench/1, veio x']);
   });
 
   it('run sem viewports vira problema, sem lançar', () => {

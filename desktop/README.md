@@ -1,4 +1,4 @@
-# Nitro Crew — build desktop (Electron) para Steam
+# Speed Tchê — build desktop (Electron) para Steam
 
 O jogo é uma aplicação web (TypeScript + Three.js/WebGL, Vite) empacotada com Electron — o mesmo caminho de
 Vampire Survivors (versões iniciais) e CrossCode na Steam. Esta pasta só embrulha o `../dist`; nada do jogo
@@ -25,9 +25,9 @@ npm install && npm run build
 cd desktop
 npm ci
 npm start            # abre a janela do jogo apontando para ../dist (F11 = tela cheia)
-npm run dist:win     # release/win-unpacked/Nitro Crew.exe
-npm run dist:linux   # release/linux-unpacked/nitro-crew
-npm run dist:mac     # release/mac-universal/Nitro Crew.app — só num Mac (ver "macOS" abaixo)
+npm run dist:win     # release/win-unpacked/SpeedTche.exe
+npm run dist:linux   # release/linux-unpacked/speedtche
+npm run dist:mac     # release/mac-universal/SpeedTche.app — só num Mac (ver "macOS" abaixo)
 npm run check        # confere o conteúdo de todo pacote em release/ (check-package.mjs)
 ```
 
@@ -46,14 +46,14 @@ Nenhum pacote é versionado: `release/` e os ícones gerados estão no `.gitigno
 
 | Pacote | Comando | Gera em Linux | Gera em Windows | Gera em Mac | Tamanho | Aberto de verdade |
 |---|---|---|---|---|---|---|
-| Linux x64 (`release/linux-unpacked/nitro-crew`) | `dist:linux` | ✅ | não testado | não testado | 292 MB | ✅ aqui, `e2e.mjs` sob Xvfb (userData, saves, log, tela fatal) |
-| Windows x64 (`release/win-unpacked/Nitro Crew.exe`) | `dist:win` | ✅ sem wine | não testado (caminho padrão) | não testado | 377 MB | ❌ só conteúdo conferido (`check`): não há Windows aqui |
-| macOS universal (`release/mac-universal/Nitro Crew.app`) | `dist:mac` | ❌ `@electron/universal` só roda em macOS | ❌ | esperado ✅ (não testado) | — | ❌ |
-| macOS x64 sem assinatura (`release/mac/Nitro Crew.app`) | `build-all.sh --mac-x64` | ✅ (conferência) | — | — | 299 MB | ❌ (e não é para publicar) |
+| Linux x64 (`release/linux-unpacked/speedtche`) | `dist:linux` | ✅ | não testado | não testado | 292 MB | ✅ aqui, `e2e.mjs` sob Xvfb (userData, saves, log, tela fatal) |
+| Windows x64 (`release/win-unpacked/SpeedTche.exe`) | `dist:win` | ✅ sem wine | não testado (caminho padrão) | não testado | 377 MB | ❌ só conteúdo conferido (`check`): não há Windows aqui |
+| macOS universal (`release/mac-universal/SpeedTche.app`) | `dist:mac` | ❌ `@electron/universal` só roda em macOS | ❌ | esperado ✅ (não testado) | — | ❌ |
+| macOS x64 sem assinatura (`release/mac/SpeedTche.app`) | `build-all.sh --mac-x64` | ✅ (conferência) | — | — | 299 MB | ❌ (e não é para publicar) |
 
 **Windows gerado no Linux, sem wine:** o electron-builder 26 grava ícone, versão e copyright do `.exe` com o
 `resedit` (JavaScript), não com o `rcedit.exe` — por isso não precisa de wine, e nada foi pulado. Conferido no
-`.exe` gerado aqui: Propriedades → Detalhes com "Nitro Crew", versão 0.1.0 e o copyright; os 7 tamanhos do
+`.exe` gerado aqui: Propriedades → Detalhes com "Speed Tchê", versão 0.1.0 e o copyright; os 7 tamanhos do
 `build/icon.ico` embutidos byte a byte; recurso de integridade do asar presente. **Sem assinatura digital**
 (não há certificado): baixado por navegador, o SmartScreen avisa "editor desconhecido"; instalado pela Steam,
 não (a Steam não marca o arquivo como vindo da internet). Assinar é opcional para a Steam; se um dia quiser,
@@ -67,10 +67,10 @@ manual abaixo.
 
 | Campo | Valor | De onde |
 |---|---|---|
-| Nome | Nitro Crew (provisório, Fase 2.1 — `docs/LOJA.md`) | `productName` |
+| Nome | Speed Tchê (provisório, Fase 2.1 — `docs/LOJA.md`) | `productName` |
 | Versão | `0.1.0` — tem que ser igual à do `package.json` da raiz (o relatório de erros usa a de lá); `tests/desktop-package.test.ts` confere | `version` |
 | Copyright | `Copyright © 2026 Felipe Bonamigo` — trocar pelo nome da empresa quando existir (o EULA e o kit de imprensa ainda têm `[nome da empresa]`) | `build.copyright` |
-| Identificador | `br.com.bonamigo.nitrocrew` (Info.plist do macOS; não aparece na Steam) | `build.appId` |
+| Identificador | `br.com.bonamigo.speedtche` (Info.plist do macOS; não aparece na Steam) | `build.appId` |
 | macOS mínimo | 13 (vem do Electron 44) | — |
 
 ### Ícone (PROVISÓRIO até a arte da Fase 2)
@@ -103,11 +103,11 @@ Gerar o `.app` é possível no Linux (`--mac-x64` acima), mas **publicar** não:
 Comando pronto, num Mac com o certificado instalado:
 
 ```bash
-cd nitro-crew && npm ci && npm run build
+cd speed-tche && npm ci && npm run build
 cd desktop && npm ci
 export APPLE_API_KEY=~/chaves/AuthKey_XXXXXXXXXX.p8 APPLE_API_KEY_ID=XXXXXXXXXX APPLE_API_ISSUER=<uuid-do-emissor>
-npm run dist:mac && npm run check     # release/mac-universal/Nitro Crew.app, assinado e notarizado
-spctl -a -vv "release/mac-universal/Nitro Crew.app"   # tem que dizer "accepted" e "Notarized Developer ID"
+npm run dist:mac && npm run check     # release/mac-universal/SpeedTche.app, assinado e notarizado
+spctl -a -vv "release/mac-universal/SpeedTche.app"   # tem que dizer "accepted" e "Notarized Developer ID"
 ```
 
 Sem certificado (só para abrir no próprio Mac): `npx electron-builder --mac --universal -c.mac.identity=-`
@@ -122,7 +122,7 @@ xvfb-run -a npm run e2e          # numa máquina com tela: npm run e2e
 ```
 
 Abre o **executável empacotado** pelo Playwright da raiz do jogo, com o userData numa pasta temporária, e
-confere: `app/index.html` carregado de dentro do asar, preload, pasta "Nitro Crew", erro → aviso no canto e
+confere: `app/index.html` carregado de dentro do asar, preload, pasta "Speed Tchê", erro → aviso no canto e
 `logs/errors.log`, "Copiar relatório" → área de transferência, telemetria → `saves/*.json`, save
 trocado em disco (como a nuvem faria) vencendo um `localStorage` **diferente** na volta (conflito de verdade),
 o mesmo erro repetido na 2ª abertura voltando ao log, e a tela de erro fatal sem WebGL — com a opção
@@ -163,7 +163,7 @@ Electron `getDesktop()` devolve `null` e `setFullscreen()` cai na Fullscreen API
 | `steamName()` | Nome do jogador na Steam, ou `null` fora dela. |
 | `achievement(id)` | Desbloqueia a conquista; `true` se a Steam aceitou. |
 | `richPresence(texto)` | Texto na lista de amigos ("Correndo em Copacabana"); texto vazio limpa. |
-| `saveFile(nome, conteudo)` / `openFile()` | Diálogos do sistema em Documentos; extensão `.nitro.json`. |
+| `saveFile(nome, conteudo)` / `openFile()` | Diálogos do sistema em Documentos; extensão `.tche.json`. |
 | `storeReadAll()` / `storeWrite(chave, json)` | Saves em `<userData>/saves/<chave>.json` (ver "Steam Cloud" abaixo). |
 | `logAppend(texto)` | Acrescenta ao log de erros `<userData>/logs/errors.log`. |
 | `copyText(texto)` | Área de transferência do sistema (o preload em sandbox não tem `clipboard`). |
@@ -192,17 +192,17 @@ Uma segunda instância só traz a primeira para a frente.
 
 ### Steam Cloud (saves)
 
-**Onde fica tudo** — o `main.cjs` fixa o userData em `<appData>/Nitro Crew`, no pacote e no `npm start`:
+**Onde fica tudo** — o `main.cjs` fixa o userData em `<appData>/SpeedTche`, no pacote e no `npm start`:
 
 | Sistema | Pasta de dados |
 |---|---|
-| Windows | `%APPDATA%\Nitro Crew` (`C:\Users\<você>\AppData\Roaming\Nitro Crew`) |
-| Linux / Steam Deck | `~/.config/Nitro Crew` (ou `$XDG_CONFIG_HOME/Nitro Crew`) |
-| macOS | `~/Library/Application Support/Nitro Crew` |
+| Windows | `%APPDATA%\SpeedTche` (`C:\Users\<você>\AppData\Roaming\SpeedTche`) |
+| Linux / Steam Deck | `~/.config/SpeedTche` (ou `$XDG_CONFIG_HOME/SpeedTche`) |
+| macOS | `~/Library/Application Support/SpeedTche` |
 
 Dentro dela:
 
-- `saves/nitro-crew.settings.json`, `saves/nitro-crew.save.json` (e toda chave `nitro-crew.*` que o jogo gravar
+- `saves/speed-tche.settings.json`, `saves/speed-tche.save.json` (e toda chave `speed-tche.*` que o jogo gravar
   por `writeJson`) — **é isto que vai para a nuvem**. Gravação atômica (temporário + rename), só JSON válido,
   no máximo 1 MB por arquivo.
 - `logs/errors.log` (+ `errors.1.log`, rotação em 512 KB) — relatório de erros; **fica fora da nuvem**.
@@ -235,18 +235,18 @@ Com o `localStorage` cheio (cota), toda gravação vai para o arquivo mesmo assi
 
    | Raiz | Subpasta | Padrão | SO | Recursivo |
    |---|---|---|---|---|
-   | `WinAppDataRoaming` | `Nitro Crew/saves` | `*.json` | **[All OSes]** | não |
+   | `WinAppDataRoaming` | `Speed Tchê/saves` | `*.json` | **[All OSes]** | não |
 
    Substituições (Root Overrides):
 
    | Raiz original | SO | Nova raiz | Acrescentar/substituir caminho | Substituir caminho |
    |---|---|---|---|---|
-   | `WinAppDataRoaming` | Linux | `LinuxHome` | `.config/Nitro Crew/saves` | marcado |
-   | `WinAppDataRoaming` | macOS | `MacAppSupport` | `Nitro Crew/saves` | marcado |
+   | `WinAppDataRoaming` | Linux | `LinuxHome` | `.config/SpeedTche/saves` | marcado |
+   | `WinAppDataRoaming` | macOS | `MacAppSupport` | `Speed Tchê/saves` | marcado |
 
    🔧 **CONFERIR no painel** (a documentação da Steamworks não abre desta rede; o texto acima veio de citações
    dela): os nomes exatos das raízes na lista, e se "Substituir caminho" troca a subpasta inteira
-   (`Nitro Crew/saves` → `.config/Nitro Crew/saves`) — a do Linux é diferente das outras por causa do
+   (`Speed Tchê/saves` → `.config/SpeedTche/saves`) — a do Linux é diferente das outras por causa do
    `.config`. Se houver uma raiz própria para o `XDG_CONFIG_HOME`, prefira-a no Linux: quem mudou essa variável
    tem os saves fora de `~/.config` (raro; o Steam Deck usa o padrão).
 
@@ -256,11 +256,11 @@ Com o `localStorage` cheio (cota), toda gravação vai para o arquivo mesmo assi
    com sistemas diferentes** (Windows → Steam Deck/Linux): é o que prova as substituições de raiz. O `e2e.mjs`
    simula a troca do arquivo em disco entre duas execuções, mas não a Steam.
 
-**Regra para quem mexe no jogo**: chave nova de save tem que ter o prefixo `nitro-crew.` e passar por
+**Regra para quem mexe no jogo**: chave nova de save tem que ter o prefixo `speed-tche.` e passar por
 `writeJson` (`src/game/storage.ts`) — gravação direta no `localStorage` não vai para a nuvem. O relatório de
-erros (`nitro-crew.errors`) e a marcação interna `nitro-crew.__pending` ficam de fora de propósito.
+erros (`speed-tche.errors`) e a marcação interna `speed-tche.__pending` ficam de fora de propósito.
 
-**Mudar o nome da pasta** ("Nitro Crew" em `main.cjs`, `USER_DATA_DIR_NAME`) perde o save de quem já joga e
+**Mudar o nome da pasta** ("Speed Tchê" em `main.cjs`, `USER_DATA_DIR_NAME`) perde o save de quem já joga e
 exige trocar os caminhos acima — o nome definitivo do jogo (Fase 2.1) **não** precisa mudar a pasta.
 
 ### Relatório de erros
@@ -373,7 +373,7 @@ Na página do app em Steamworks:
 2. Um depósito por plataforma: `release/win-unpacked` (Windows), `release/linux-unpacked` (Linux),
    `release/mac-universal` (macOS, assinado e notarizado num Mac). O `.vdf` do depósito aponta para a pasta
    inteira, com o executável na raiz.
-3. No `app_build.vdf`, o executável de lançamento é `Nitro Crew.exe` / `nitro-crew` / `Nitro Crew.app`.
+3. No `app_build.vdf`, o executável de lançamento é `SpeedTche.exe` / `speed-tche` / `SpeedTche.app`.
    O `steam_appid.txt` que o pacote leva ao lado do executável é para **abrir fora da Steam** (teste do
    overlay e das conquistas com o `.exe` direto); a Valve orienta não publicá-lo — no `.vdf` do depósito,
    `"FileExclusion" "steam_appid.txt"`. Aberto pela Steam, o App ID vem dela.
@@ -395,21 +395,21 @@ e o resultado de cada item na tabela de `docs/QA.md`.
 ### Windows (máquina sem Node nem ferramentas de desenvolvedor — itens M-1 a M-3 da matriz)
 
 Levar o pacote: gerar lá mesmo (`npm ci && npm run build`, `cd desktop && npm ci && npm run dist:win`) ou
-compactar a pasta gerada no Linux (`cd release && zip -qr nitro-crew-win.zip win-unpacked`) e copiar.
+compactar a pasta gerada no Linux (`cd release && zip -qr speed-tche-win.zip win-unpacked`) e copiar.
 
-- [ ] `Nitro Crew.exe` abre com dois cliques. O SmartScreen avisa "editor desconhecido" (sem assinatura):
+- [ ] `SpeedTche.exe` abre com dois cliques. O SmartScreen avisa "editor desconhecido" (sem assinatura):
       "Mais informações → Executar assim mesmo". Anotar se o antivírus reclamou.
 - [ ] Ícone da estrada (provisório) no Explorer e na barra de tarefas; botão direito → Propriedades →
-      Detalhes: "Nitro Crew", versão 0.1.0, `Copyright © 2026 Felipe Bonamigo`.
+      Detalhes: "Speed Tchê", versão 0.1.0, `Copyright © 2026 Felipe Bonamigo`.
 - [ ] Janela 1600×900 sem menu; F11 entra e sai da tela cheia; a opção de tela cheia sobrevive a fechar e abrir.
 - [ ] Menu inteiro no teclado **e** num controle Xbox/PlayStation; dois controles + teclado entrando na corrida.
 - [ ] Corrida rápida com 1 jogador até a bandeirada; depois 2 e 4 jogadores em tela dividida. Anotar a
       qualidade usada e se fica a 60 fps (Opções › Qualidade).
-- [ ] `%APPDATA%\Nitro Crew\saves` tem `nitro-crew.settings.json` e, depois da corrida, `nitro-crew.save.json`.
+- [ ] `%APPDATA%\SpeedTche\saves` tem `speed-tche.settings.json` e, depois da corrida, `speed-tche.save.json`.
       Fechar e abrir: progresso e opções mantidos.
 - [ ] Opções › "Copiar relatório" e colar no Bloco de Notas: `desktop: yes`, versão 0.1.0, nenhum
       `C:\Users\<seu nome>`.
-- [ ] "Sair" no menu fecha tudo (Gerenciador de Tarefas sem "Nitro Crew"); um segundo clique no atalho com o
+- [ ] "Sair" no menu fecha tudo (Gerenciador de Tarefas sem "Speed Tchê"); um segundo clique no atalho com o
       jogo aberto só traz a janela para a frente.
 - [ ] Com o cliente Steam aberto (e o 480 em `steam_appid.txt`): Shift+Tab abre o overlay; a Steam mostra
       "jogando Spacewar". Sem a Steam aberta, o jogo abre normalmente.
@@ -420,7 +420,7 @@ compactar a pasta gerada no Linux (`cd release && zip -qr nitro-crew-win.zip win
 
 O teste que vale é pela Steam (depósito Linux num branch beta, depois da conta Steamworks). Antes disso: no
 Modo Desktop, copiar `release/linux-unpacked` para o Deck (pendrive ou `scp`), "Adicionar jogo não Steam"
-apontando para `nitro-crew` e voltar ao Modo Jogo.
+apontando para `speed-tche` e voltar ao Modo Jogo.
 
 - [ ] Abre em tela cheia 1280×800. ⚠️ **Risco a conferir primeiro:** a pasta Linux traz o `chrome-sandbox`
       sem SUID (a Steam não preserva essa permissão). Se o jogo não abrir, ou o log falar em "SUID sandbox",
@@ -433,6 +433,6 @@ apontando para `nitro-crew` e voltar ao Modo Jogo.
 - [ ] 60 fps com 2 telas (sobreposição de desempenho do Deck, nível 1), anotando a qualidade; bateria por hora.
 - [ ] No dock, na TV em 1080p: 4 controles, 4 telas; anotar fps.
 - [ ] Botão de energia no meio da corrida (suspender) e voltar: o jogo continua sem travar nem perder o áudio.
-- [ ] Save em `~/.config/Nitro Crew/saves` (Modo Desktop, Dolphin com arquivos ocultos visíveis).
+- [ ] Save em `~/.config/SpeedTche/saves` (Modo Desktop, Dolphin com arquivos ocultos visíveis).
 - [ ] "Sair" no menu volta para a biblioteca.
 - [ ] Comparação: a build Windows sob Proton (forçar compatibilidade) — se rodar melhor que a nativa, anotar.

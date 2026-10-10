@@ -1,4 +1,4 @@
-// Servidor de retransmissão (relay) do Nitro Crew para o online em lockstep.
+// Servidor de retransmissão (relay) do Speed Tchê para o online em lockstep.
 // Não simula nada e não entende o jogo: guarda salas por código, sabe quem é o anfitrião, repassa
 // as mensagens dos clientes e segura o lugar de quem caiu por um tempo (reconexão). Tudo o que
 // chega é tratado como hostil: tamanho máximo por mensagem, limite de taxa por conexão, forma
@@ -338,7 +338,7 @@ if (invokedDirectly) {
   });
   relay.wss.on('listening', () => {
     // O teste de integração lê a porta desta linha (com PORT=0 ela é sorteada pelo sistema).
-    console.log(`Nitro Crew relay ouvindo em ws://${env.HOST || DEFAULTS.host}:${relay.port()} (protocolo v${PROTOCOL_VERSION})`);
+    console.log(`Speed Tchê relay ouvindo em ws://${env.HOST || DEFAULTS.host}:${relay.port()} (protocolo v${PROTOCOL_VERSION})`);
   });
   const stop = () => { relay.close().then(() => process.exit(0)); };
   process.on('SIGINT', stop);

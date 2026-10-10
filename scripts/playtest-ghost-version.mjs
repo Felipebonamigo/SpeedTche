@@ -52,11 +52,11 @@ const translucent = () => page.evaluate(() => {
   let n = 0; window.nc.session.renderer.__scene.traverse((o) => { if (o.isMesh && !o.isInstancedMesh && o.material?.opacity < 0.5 && o.material?.transparent && o.visible) n++; });
   return n;
 });
-const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.ghosts') ?? 'null'));
+const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.ghosts') ?? 'null'));
 const setGhostFp = (fp) => page.evaluate(([id, v]) => {
-  const s = JSON.parse(localStorage.getItem('nitro-crew.ghosts'));
+  const s = JSON.parse(localStorage.getItem('speed-tche.ghosts'));
   s.ghosts[id].fp = v;
-  localStorage.setItem('nitro-crew.ghosts', JSON.stringify(s));
+  localStorage.setItem('speed-tche.ghosts', JSON.stringify(s));
 }, [TRACK, fp]);
 const hudMessages = () => page.evaluate(() => [...(window.nc.session.race?.messages.get(0) ?? [])].map((m) => m.text));
 
@@ -145,9 +145,9 @@ await toResults();
 const valid = (await store()).ghosts[TRACK];
 await setGhostFp('deadbeef');
 await page.evaluate((id) => {
-  const s = JSON.parse(localStorage.getItem('nitro-crew.save'));
+  const s = JSON.parse(localStorage.getItem('speed-tche.save'));
   s.bestLaps[id].fp = 'deadbeef';
-  localStorage.setItem('nitro-crew.save', JSON.stringify(s));
+  localStorage.setItem('speed-tche.save', JSON.stringify(s));
 }, TRACK);
 await page.reload({ waitUntil: 'networkidle' });
 await page.evaluate(() => { const s = window.nc.session; s.settings.quality = 'low'; s.stop(); });
@@ -180,16 +180,16 @@ async function importFile(name, text) {
   await page.waitForTimeout(500);
   return status();
 }
-const file = (o) => JSON.stringify({ format: 'nitro-crew-ghost', ...o });
+const file = (o) => JSON.stringify({ format: 'speed-tche-ghost', ...o });
 const { savedAt: _s, fp: _fp, ...plain } = valid;
-let msg = await importFile('outra-versao.nitro.json', file({ v: 2, ...plain, fp: 'deadbeef' }));
+let msg = await importFile('outra-versao.tche.json', file({ v: 2, ...plain, fp: 'deadbeef' }));
 check(/outra versão do jogo/.test(msg) && JSON.stringify(await store()) === before, `outra versão: aviso e loja igual (${msg})`);
-msg = await importFile('antigo-v1.nitro.json', file({ v: 1, ...plain }));
+msg = await importFile('antigo-v1.tche.json', file({ v: 1, ...plain }));
 check(/outra versão do jogo/.test(msg) && JSON.stringify(await store()) === before, `arquivo v1 (sem impressão): aviso e loja igual (${msg})`);
 await page.screenshot({ path: `${out}-04-importar-outra-versao.png` });
-msg = await importFile('outra-pista.nitro.json', file({ v: 2, ...plain, trackId: 'monaco_noite', fp: valid.fp }));
+msg = await importFile('outra-pista.tche.json', file({ v: 2, ...plain, trackId: 'monaco_noite', fp: valid.fp }));
 check(/não cabe nesta pista/.test(msg) && JSON.stringify(await store()) === before, `volta de ${TRACK} com o id de monaco_noite: aviso e loja igual (${msg})`);
-msg = await importFile('valido.nitro.json', file({ v: 2, ...plain, name: 'Amigo', fp: valid.fp }));
+msg = await importFile('valido.tche.json', file({ v: 2, ...plain, name: 'Amigo', fp: valid.fp }));
 for (let i = 0; i < 20 && (await store())?.ghosts?.[TRACK]?.name !== 'Amigo'; i++) await page.waitForTimeout(100);
 await page.waitForTimeout(300);
 const r5 = await row();

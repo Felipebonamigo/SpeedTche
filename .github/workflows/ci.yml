@@ -1,5 +1,5 @@
-# CI do Nitro Crew: typecheck, testes (com o relay do online de verdade) e build, a cada push e pull request no main.
-name: Nitro Crew
+# CI do Speed Tchê: typecheck, testes (com o relay do online de verdade) e build, a cada push e pull request no main.
+name: Speed Tchê
 
 on:
   push:

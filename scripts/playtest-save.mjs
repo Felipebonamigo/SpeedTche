@@ -64,7 +64,7 @@ async function race(page) {
   let t = await waitToast(page);
   check((await menu(page)) === 'results' && t.shown, `fim de corrida sem onde gravar: aviso no resultado ("${t.text}")`);
   check(t.text?.includes('O progresso não foi salvo'), 'texto em PT');
-  check(await page.evaluate(() => localStorage.getItem('nitro-crew.save') === null), 'o localStorage não tem o save (cota)');
+  check(await page.evaluate(() => localStorage.getItem('speed-tche.save') === null), 'o localStorage não tem o save (cota)');
   await page.screenshot({ path: `${out}-A1-resultado.png` });
   await page.waitForTimeout(10000);
   check(!(await toast(page)).shown, 'o aviso some sozinho e não volta a cada quadro no resultado');
@@ -79,7 +79,7 @@ async function race(page) {
   await page.evaluate(() => localStorage.removeItem('outro-site'));
   await page.waitForTimeout(9500);
   await race(page);
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.save') ?? 'null'));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.save') ?? 'null'));
   check(saved?.racesRun === 2 && saved?.stats?.totals?.races === 2, `espaço liberado: o save grava as duas corridas (racesRun ${saved?.racesRun})`);
   check(!(await toast(page)).shown, 'e sem aviso');
   check(errors.length === 0, `sem erro de página (${errors.join(' | ')})`);
@@ -110,15 +110,15 @@ async function race(page) {
   await page.keyboard.press('Enter'); await page.waitForTimeout(800);
   await race(page);
   check(!(await toast(page)).shown, '[Electron] fim de corrida com o arquivo recebendo: sem aviso');
-  check(await page.evaluate(() => localStorage.getItem('nitro-crew.save') === null), '[Electron] o localStorage recusou o save');
-  const run1 = JSON.parse(files['nitro-crew.save'] ?? 'null')?.racesRun;
+  check(await page.evaluate(() => localStorage.getItem('speed-tche.save') === null), '[Electron] o localStorage recusou o save');
+  const run1 = JSON.parse(files['speed-tche.save'] ?? 'null')?.racesRun;
   check(run1 === 1, `[Electron] o arquivo tem a corrida (racesRun ${run1})`);
   await page.screenshot({ path: `${out}-B1-resultado-electron.png` });
   // Reabertura com o localStorage ainda cheio: a sessão parte do arquivo (a corrida seguinte soma em cima dele).
   await open(page);
   await page.keyboard.press('Enter'); await page.waitForTimeout(800);
   await race(page);
-  const run2 = JSON.parse(files['nitro-crew.save'] ?? 'null')?.racesRun;
+  const run2 = JSON.parse(files['speed-tche.save'] ?? 'null')?.racesRun;
   check(run2 === 2, `[Electron] reabertura leu o arquivo: a 2ª corrida soma em cima (racesRun ${run2})`);
   check(!(await toast(page)).shown, '[Electron] e sem aviso');
   check(errors.length === 0, `[Electron] sem erro de página (${errors.join(' | ')})`);

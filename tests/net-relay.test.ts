@@ -17,7 +17,7 @@ import { OnlineController, type OnlineHost } from '../src/game/online-session';
 import type { RoomSettings } from '../src/net/protocol';
 
 const HAS_WS = fs.existsSync('server/node_modules/ws/package.json');
-if (!HAS_WS && process.env.NC_REQUIRE_RELAY === '1') throw new Error('server/node_modules/ws não instalado: rode `npm ci` em nitro-crew/server');
+if (!HAS_WS && process.env.NC_REQUIRE_RELAY === '1') throw new Error('server/node_modules/ws não instalado: rode `npm ci` em server');
 const RECONNECT_MS = 1500;
 
 let relay: ChildProcess | null = null;

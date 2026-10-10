@@ -1,4 +1,4 @@
-# Nitro Crew — Design e arquitetura
+# Speed Tchê — Design e arquitetura
 
 ## O jogo em uma frase
 Corrida arcade no espírito dos clássicos de 16 bits (Top Gear), com visual 3D cartunesco de última geração, na linha de Mario Kart 8 Deluxe
@@ -95,4 +95,4 @@ classificação + minimapa). HUD em DOM por cima do canvas.
   renderizador, fora do estado.
 - **Humanos largam por último** (como no Top Gear) e a IA corre em duplas com nome de equipe, para a classificação
   por equipes fazer sentido.
-- **Nome provisório** "Nitro Crew"; a decisão de nome/marca é da Fase 2.1 do roteiro.
+- **Nome provisório** "Speed Tchê"; a decisão de nome/marca é da Fase 2.1 do roteiro.

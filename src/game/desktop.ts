@@ -13,7 +13,7 @@ export interface DesktopApi {
   achievement(id: string): Promise<boolean>;
   /** Texto na lista de amigos da Steam ("Correndo em Copacabana"); vazio limpa. */
   richPresence(text: string): Promise<void>;
-  /** Diálogo de salvar em Documentos, extensão `.nitro.json`; false se cancelado. */
+  /** Diálogo de salvar em Documentos, extensão `.tche.json`; false se cancelado. */
   saveFile(name: string, content: string): Promise<boolean>;
   /** Diálogo de abrir; null se cancelado. */
   openFile(): Promise<string | null>;

@@ -1,8 +1,8 @@
 {
-  "name": "nitro-crew-desktop",
-  "productName": "Nitro Crew",
+  "name": "speed-tche-desktop",
+  "productName": "SpeedTche",
   "version": "0.1.1",
-  "description": "Empacotamento desktop (Electron) do Nitro Crew para Steam/Windows/Linux/macOS.",
+  "description": "Empacotamento desktop (Electron) do Speed Tchê para Steam/Windows/Linux/macOS.",
   "author": "Felipe Bonamigo",
   "main": "main.cjs",
   "private": true,
@@ -27,8 +27,8 @@
     "steamworks.js": "^0.4.0"
   },
   "build": {
-    "appId": "br.com.bonamigo.nitrocrew",
-    "productName": "Nitro Crew",
+    "appId": "br.com.bonamigo.speedtche",
+    "productName": "SpeedTche",
     "copyright": "Copyright © 2026 Felipe Bonamigo",
     "files": [
       "main.cjs",
@@ -61,7 +61,7 @@
         "dir"
       ],
       "category": "Game",
-      "executableName": "nitro-crew"
+      "executableName": "speedtche"
     },
     "mac": {
       "target": [

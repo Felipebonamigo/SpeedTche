@@ -25,7 +25,7 @@ const mainIndex = (pattern) => page.evaluate((src) => {
 }, pattern);
 /** Pintura à mostra em cada cartão do lobby (data-paint do seletor) e o nome dela. */
 const slotPaints = () => page.evaluate(() => [...document.querySelectorAll('.slot.occupied .sel-paint')].map((e) => `${e.dataset.paint}:${e.querySelector('.paint-name')?.textContent}`));
-const savedPaints = () => page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.save') ?? '{}').seatPaints ?? null);
+const savedPaints = () => page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.save') ?? '{}').seatPaints ?? null);
 const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 async function openGame() {
   await page.goto(url, { waitUntil: 'networkidle' });

@@ -1,13 +1,13 @@
-NITRO CREW — versão de teste para amigos (0.1.1, build de 10/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.1, build de 10/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
 
 COMO ABRIR
-- Windows: descompacte o .zip numa pasta e abra "Nitro Crew.exe".
+- Windows: descompacte o .zip numa pasta e abra "SpeedTche.exe".
   O Windows vai avisar "O Windows protegeu o computador / editor desconhecido": o jogo ainda não tem
   assinatura digital. Clique em "Mais informações" e depois em "Executar assim mesmo".
-- Linux: descompacte o .tar.gz e rode ./nitro-crew dentro da pasta.
+- Linux: descompacte o .tar.gz e rode ./speedtche dentro da pasta.
 - Mac: ainda não tem versão (precisa de um Mac e da conta paga da Apple para gerar).
 
 CONTROLES (dá para trocar em Opções › Controles)

@@ -1,10 +1,10 @@
-// Banco de prova: o formato do relatório `nitro-crew-bench/1` e as contas puras sobre ele (sem DOM, sem three).
+// Banco de prova: o formato do relatório `speed-tche-bench/1` e as contas puras sobre ele (sem DOM, sem three).
 // Quem mede é src/bench/run.ts; quem lê no PC do dono é o JSON (docs/DESEMPENHO.md §4). Os NOMES dos campos são contrato
-// para a L2 e para o dono: não mude, só acrescente (campos novos são opcionais, e o `nitro-crew-bench/1` continua o mesmo).
+// para a L2 e para o dono: não mude, só acrescente (campos novos são opcionais, e o `speed-tche-bench/1` continua o mesmo).
 import type { Quality } from '../game/contracts';
 import { FLOOR_TARGET_FPS, ULTRA_EFFECTS, ULTRA_TARGET, type BenchLevel } from './ultra';
 
-export const BENCH_SCHEMA = 'nitro-crew-bench/1';
+export const BENCH_SCHEMA = 'speed-tche-bench/1';
 
 export interface BenchViewport { calls: number; triangles: number; targetW: number; targetH: number; targetPx: number; samples: number; passes: number; postPx: number }
 

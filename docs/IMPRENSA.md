@@ -1,4 +1,4 @@
-# Kit de imprensa — Nitro Crew
+# Kit de imprensa — Speed Tchê
 
 Base do press kit (página de imprensa e e-mail para jornalistas e criadores de conteúdo). Os campos entre
 colchetes dependem de decisões ainda abertas (nome definitivo, empresa, data, preço — passos 2.1, 5.1 e 6.3 do
@@ -10,7 +10,7 @@ roteiro). Números conferidos com o jogo em 25/09/2026; atualizar junto com `doc
 
 | | |
 |---|---|
-| **Jogo** | Nitro Crew *(nome provisório)* |
+| **Jogo** | Speed Tchê *(nome provisório)* |
 | **Desenvolvedor** | [nome do estúdio / empresa] — desenvolvedor independente, [cidade], Brasil |
 | **Publicação** | Autopublicado |
 | **Lançamento** | [data] — [Acesso Antecipado / versão 1.0] |
@@ -27,11 +27,11 @@ roteiro). Números conferidos com o jogo em 25/09/2026; atualizar junto com `doc
 
 ## Descrição curta (para colar)
 
-**PT:** Nitro Crew é uma corrida arcade no espírito dos clássicos dos anos 90 em que até 4 pessoas no mesmo sofá
+**PT:** Speed Tchê é uma corrida arcade no espírito dos clássicos dos anos 90 em que até 4 pessoas no mesmo sofá
 correm como uma equipe, em tela dividida. Nitro compartilhado, empurrão no companheiro que rodou, vácuo de
 equipe, box e combustível — com visual 3D colorido e 20 carros na pista.
 
-**EN:** Nitro Crew is an arcade racer in the spirit of 90s classics where up to 4 people on the same couch race
+**EN:** Speed Tchê is an arcade racer in the spirit of 90s classics where up to 4 people on the same couch race
 as a team, in split screen. Shared nitro, a push for the teammate who spun out, team draft, pit stops and fuel —
 with colorful 3D visuals and 20 cars on track.
 
@@ -39,10 +39,10 @@ with colorful 3D visuals and 20 cars on track.
 
 ### PT
 
-Lembra de dividir a tela da TV com o irmão numa corrida de 16 bits? Nitro Crew nasceu dessa lembrança, com uma
+Lembra de dividir a tela da TV com o irmão numa corrida de 16 bits? Speed Tchê nasceu dessa lembrança, com uma
 pergunta: e se, em vez de correr um contra o outro, a turma do sofá corresse **junta**?
 
-No Nitro Crew, até quatro jogadores formam uma equipe contra um grid de pilotos controlados pelo computador. O
+No Speed Tchê, até quatro jogadores formam uma equipe contra um grid de pilotos controlados pelo computador. O
 nitro fica num cofre comum. Quem roda na curva pode ser salvo por um empurrão do companheiro. Andar colado no
 amigo rende vácuo de equipe. E, no campeonato, a equipe pontua com os dois melhores resultados — o jogador mais
 experiente e o que acabou de pegar o controle jogam a mesma corrida, e os dois importam.
@@ -54,10 +54,10 @@ Osaka, de dia, ao entardecer e à noite.
 
 ### EN
 
-Remember splitting the TV screen with your sibling in a 16-bit racer? Nitro Crew was born from that memory, with
+Remember splitting the TV screen with your sibling in a 16-bit racer? Speed Tchê was born from that memory, with
 one question: what if, instead of racing each other, the whole couch raced **together**?
 
-In Nitro Crew, up to four players form a crew against a grid of computer-controlled drivers. Nitro goes into a
+In Speed Tchê, up to four players form a crew against a grid of computer-controlled drivers. Nitro goes into a
 shared stash. Whoever spins out in a corner can be rescued by a teammate's push. Tucking in behind a friend gives
 you team draft. And in the championship the crew scores with its two best finishes — the seasoned player and the
 one who just picked up a controller race the same race, and both matter.

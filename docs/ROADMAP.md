@@ -1,4 +1,4 @@
-# Nitro Crew — Roteiro e cronograma até a Steam
+# Speed Tchê — Roteiro e cronograma até a Steam
 
 > **Documento vivo.** Ao concluir um passo, marque ✅ aqui. Revisar a cada duas semanas (ver "Rotina" no fim).
 > Última revisão: 09/10/2026 — ondas A–J concluídas (resumo em "Estado atual" do `CLAUDE.md`); as próximas, K–W, estão em
@@ -55,7 +55,7 @@ Objetivo: do "bonito procedural" para o "bonito de loja". O visual é 3D cartune
 
 | # | Passo | Resp. | Semanas |
 |---|---|---|---|
-| 2.1 | Direção de arte fechada em documento de 1 página (paleta por bioma, proporção dos carros, bíblia de estilo em `docs/DIRECAO-DE-ARTE.md` (referência Mario Kart 8 Deluxe; onda K)); **nome definitivo** (verificar marca no INPI e nomes na Steam — "Nitro Crew" é provisório) e logo | V + T | 3–4 |
+| 2.1 | Direção de arte fechada em documento de 1 página (paleta por bioma, proporção dos carros, bíblia de estilo em `docs/DIRECAO-DE-ARTE.md` (referência Mario Kart 8 Deluxe; onda K)); **nome definitivo** (verificar marca no INPI e nomes na Steam — "Speed Tchê" é provisório) e logo | V + T | 3–4 |
 | 2.2 | Produzir a arte pelo contrato do asset (`docs/CONTRATO-DO-ASSET.md`): sem artista (dono, 09/10), com modelos CC0, Meshy só para o que não existir pronto (`docs/MESHY-LISTA.md`, decisão nº 28) e limpeza no Blender; se o dono contratar um artista, o mesmo contrato vale. Com o briefing gerado da lista de `SpriteKind`, carros e biomas já no código; formato glTF, orçamento de triângulos por modelo | V + T | 4–5 |
 | 2.3 | Assets: 14 carros (com variações de cor por material), ~60 modelos de cenário (6 biomas), skyboxes/céus e anéis de horizonte por bioma × período, arco de largada, box, arquibancadas; retratos de 20 pilotos; capsule art da Steam | T | 5–13 |
 | 2.3b | ✅ Visual procedural da onda F (30/09): 13 modelos de carro por estilo, pista/céu/luz por bioma × período, cenário por bioma e país (`docs/CARROS.md`, `docs/VISUAL.md`); modo Retrô pseudo-3D opcional (`docs/RETRO.md`). Serve de base e de briefing para a arte final | A | — |

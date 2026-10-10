@@ -172,7 +172,7 @@ const end = await page.evaluate(() => {
     humans: r.humans.map((h) => h.name.trim()),
     unlocked: r.outcome ? r.outcome.achievements.map((u) => u.id) : null,
     chips: document.querySelectorAll('.scr-results .ach-chip').length,
-    save: JSON.parse(localStorage.getItem('nitro-crew.save') ?? 'null'),
+    save: JSON.parse(localStorage.getItem('speed-tche.save') ?? 'null'),
   };
 });
 check(end.save?.racesRun === 1 && end.save?.stats?.totals?.races === end.humans.length,

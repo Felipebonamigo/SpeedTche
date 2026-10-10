@@ -78,7 +78,7 @@ check((await statusText()).includes('Nitro'), `aviso pede a tecla (${await statu
 await key('KeyR');
 let c = await controls();
 check(JSON.stringify(c.kb1.nitro) === '["KeyR"]' && (await capturing()) === null, `R vira o nitro do teclado 1 (${JSON.stringify(c.kb1.nitro)})`);
-const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('nitro-crew.settings') ?? '{}').controls?.kb1?.nitro);
+const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.settings') ?? '{}').controls?.kb1?.nitro);
 check(JSON.stringify(stored) === '["KeyR"]', `gravado no localStorage (${JSON.stringify(stored)})`);
 check((await menu()) === 'controls', 'a tecla capturada não fez mais nada');
 

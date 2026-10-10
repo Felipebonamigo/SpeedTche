@@ -47,7 +47,7 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 
 ## Regras do mapeamento
 
-- **Gravado em `Settings.controls`** (localStorage `nitro-crew.settings`), lido ao vivo pela
+- **Gravado em `Settings.controls`** (localStorage `speed-tche.settings`), lido ao vivo pela
   entrada a cada quadro: trocar na tela vale no quadro seguinte, sem reiniciar nada.
 - **Saneamento** (`sanitizeBindings`, nunca lança): lixo ou dispositivo ausente → padrão; código
   inválido para a ação → padrão da ação; no máximo 3 códigos por ação, sem repetição.

@@ -1,11 +1,11 @@
-**Nitro Crew 0.1.1 — versão de teste para amigos** (build de 10/10/2026)
+**Speed Tchê 0.1.1 — versão de teste para amigos** (build de 10/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `NitroCrew-0.1.1-teste-windows-x64.zip` (Windows) ou `NitroCrew-0.1.1-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.1-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.1-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
-- **Windows:** descompacte e abra `Nitro Crew.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
-- **Linux:** descompacte e rode `./nitro-crew`.
+- **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
+- **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
 

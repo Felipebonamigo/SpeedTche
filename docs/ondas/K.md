@@ -4,7 +4,7 @@
 >
 > **Precedência.** Quando esta abertura e um cartão disserem coisas diferentes, **vale a abertura**. Ela foi escrita depois dos seis cartões e confere um contra o outro; as divergências estão no §3.3. Onde a abertura não fala do assunto, vale o cartão.
 >
-> Todo comando roda de `/home/user/padelizou/nitro-crew`, salvo quando o passo indica outra pasta.
+> Todo comando roda de `/home/user/speedtche`, salvo quando o passo indica outra pasta.
 
 > **K6 (acrescentada em 09/10/2026, depois desta abertura).** Os ajustes anotados pelo dono viraram a frente K6 em
 > `docs/CRONOGRAMA.md` (onda K e a tabela "Ajustes anotados pelo dono"). Ainda **não tem cartão**: o K0 escreve
@@ -12,10 +12,10 @@
 > tabela de donos desta abertura — `src/ui/input.ts` e o laço do quadro de `src/game/session.ts` cruzam com a K1;
 > a K6 entra depois da mescla da K1, ou a K1 cede essas linhas.
 
-> **Repositório próprio (decisão do dono, 08/10/2026).** O jogo vai para `Felipebonamigo/nitro-crew`, privado — isso
+> **Repositório próprio (decisão do dono, 08/10/2026).** O jogo vai para `Felipebonamigo/speed-tche`, privado — isso
 > responde a decisão nº 2 (repositório público). O repositório ainda não existe (o dono cria; a sessão não tem permissão).
-> Quando existir: o histórico vai com `git subtree split --prefix=nitro-crew`, e nos cartões troque
-> `/home/user/padelizou/nitro-crew` pela raiz do repositório novo e `origin/claude/top-gear-coop-game-ns9u5l` por
+> Quando existir: o histórico vai com `git subtree split --prefix=speed-tche`, e nos cartões troque
+> `/home/user/speedtche` pela raiz do repositório novo e `origin/claude/top-gear-coop-game-ns9u5l` por
 > `origin/main` (substituição mecânica; o resto não muda). Enquanto não existir, a onda K **não abre**: tudo o que for
 > commitado no `padelizou` sai público.
 
@@ -25,7 +25,7 @@
 
 ### 1.1 Estado em 09/10/2026 (conferido nesta data)
 
-- Ponta: `532d957` ("Nitro Crew: onde paramos…"). Este arquivo e `docs/ondas/K/` foram commitados junto com a abertura (o passo A10 do K0 só confere que estão no remoto).
+- Ponta: `532d957` ("Speed Tchê: onde paramos…"). Este arquivo e `docs/ondas/K/` foram commitados junto com a abertura (o passo A10 do K0 só confere que estão no remoto).
 - Suíte: 1776 testes em 76 arquivos (`CLAUDE.md:96`), cerca de 6 min com a máquina livre.
 - `docs/CRONOGRAMA.md:3` ainda diz "**Versão 2 (06/10/2026), aguardando aprovação do dono.**"
 - `docs/QA.md` §5 (l. 184–190) tem a tabela vazia: o retorno dos amigos sobre a 0.1.0 não foi registrado.
@@ -312,7 +312,7 @@ Em todos os itens, vale o que está escrito nesta abertura.
 
 12. **Linha de base do termômetro depois da K5.**
     - O M9 da K2 espera mudança em 5 pistas. A K5 muda traçado ou placas de 24; pode mudar qualquer uma delas e nenhuma outra (comando no §4).
-    - Dentro de `nitro-crew/`, `git show HEAD:<caminho>` precisa de `./` (`HEAD:./scripts/…`).
+    - Dentro de `speed-tche/`, `git show HEAD:<caminho>` precisa de `./` (`HEAD:./scripts/…`).
 
 13. **Pedido do bench ao dono.** O M4 do K0 pede o bench na mescla da K4. Mas o jogo do dono só ganha `--bench` no pacote 0.1.1. O pedido vai com a 0.1.1 (C10).
 
@@ -332,7 +332,7 @@ Em todos os itens, vale o que está escrito nesta abertura.
 
 ### 4.1 Regras
 
-1. **Uma mescla por vez.** Siga o M0 do K0: `git status` limpo em `nitro-crew/`, `git merge --no-ff`, `npx tsc --noEmit -p .` sem saída e os testes da área.
+1. **Uma mescla por vez.** Siga o M0 do K0: `git status` limpo em `speed-tche/`, `git merge --no-ff`, `npx tsc --noEmit -p .` sem saída e os testes da área.
 2. **A ordem é a de chegada**, com estas restrições:
    - **K2 só depois de K1 e K4.** As ligações dela usam o `keyNav` da K1 e a ponte da K4. Se a K2 chegar antes, espere.
    - **`nc/k-k0` só com `npx vitest run tests/track-art.test.ts` → `61 passed (61)` no worktree.**
@@ -353,7 +353,7 @@ Ordem ideal: **K5 → K3 → K1 → K4 → K2 (com as ligações) → `nc/k-k0` 
 - Impressões digitais contra o `532d957`:
   ```bash
   npx tsx scripts/perf-sim.ts --fingerprints | grep -o "fingerprint: '[0-9a-f]*'" > scratch/k0-fp.txt
-  git show 532d957:nitro-crew/tests/sim-golden.test.ts | grep -o "fingerprint: '[0-9a-f]*'" | diff - scratch/k0-fp.txt
+  git show 532d957:tests/sim-golden.test.ts | grep -o "fingerprint: '[0-9a-f]*'" | diff - scratch/k0-fp.txt
   ```
   A saída tem de ser exatamente os blocos `1c1` (`5553cf13` → `368c98f8`) e `3c3` (`1fbd037d` → `56beefb8`).
 - `grep -rln "Object.keys(ART)" tests` → só `tests/track-art.test.ts`.
@@ -472,7 +472,7 @@ Faça na ordem, com a máquina livre, e marque cada item.
 
   Abra a folha com o Read: nenhuma captura pode sair em branco ou preta.
 - [ ] **10. Commit, push e release (C8).**
-  - `gh api repos/Felipebonamigo/padelizou/releases/tags/nitro-crew-teste-0.1.1 --jq '.assets[] | "\(.name) \(.size)"'` → 4 anexos com tamanho > 0: os dois pacotes, o LEIA-ME e o `referencias-0.1.1.zip`.
+  - `gh api repos/Felipebonamigo/padelizou/releases/tags/speed-tche-teste-0.1.1 --jq '.assets[] | "\(.name) \(.size)"'` → 4 anexos com tamanho > 0: os dois pacotes, o LEIA-ME e o `referencias-0.1.1.zip`.
   - Upload recusado depois do `/root/.ccr/README.md` → **BLOCKED**, com o texto exato do erro.
 - [ ] **11. Registros (C9), num commit só de docs, com push.** Na mensagem do commit, diga que a suíte do C5 continua valendo.
   - `CLAUDE.md`:

@@ -1,7 +1,7 @@
 // Diário de jogo: o que o jogador fez, medido SEM sair do computador. Guarda o funil (do título à 1ª largada), as
 // corridas (modo, pista, posição, duração, abandono, termômetro de emoção por assento) e as sessões datadas, num anel
-// com teto, e as respostas do questionário de 3 perguntas. Nada é enviado: a chave `nitro-crew.playlog` é uma chave
-// de save comum (writeJson), então no Electron o espelho a leva para <userData>/saves/nitro-crew.playlog.json — esse
+// com teto, e as respostas do questionário de 3 perguntas. Nada é enviado: a chave `speed-tche.playlog` é uma chave
+// de save comum (writeJson), então no Electron o espelho a leva para <userData>/saves/speed-tche.playlog.json — esse
 // é o "relatório exportado em arquivo" — e "Copiar relatório" (src/errors/options.ts) junta o texto dele ao dos erros.
 // Privacidade (docs/legal/PRIVACIDADE.md): nunca guarda nome de jogador, só números, ids de pista/copa/carro e datas.
 // Puro: relógio, leitura e gravação entram por `PlaylogDeps`; os imports de valor são só do núcleo, do termômetro
@@ -13,7 +13,7 @@ import type { MenuEvent, RaceMode } from './contracts';
 import { feelOf, meanFeel, type FeelTracker, type RaceFeel } from './race-feel';
 import { TUTORIAL_TRACK_ID } from './tutorial-track';
 
-export const PLAYLOG_KEY = 'nitro-crew.playlog';
+export const PLAYLOG_KEY = 'speed-tche.playlog';
 export const PLAYLOG_FORMAT = 1;
 export const MAX_RACES = 150;
 export const MAX_SESSIONS = 100;
@@ -360,7 +360,7 @@ export function formatPlaylogReport(d: PlaylogData, meta: { version: string; gen
     ? `overtakes/min ${f.overtakesPerMin.toFixed(2)} · battle ${pct(f.battleSeconds, f.seconds)}% · alone ${pct(f.aloneSeconds, f.seconds)}% · flat out ${Math.round(f.flatOutPct)}% · nitro ${f.nitroPct.toFixed(1)}% · scrapes ${f.scrapes.toFixed(1)} · rear hits ${f.rearHits.toFixed(1)}`
     : 'n/a';
   const lines = [
-    'Nitro Crew — play log',
+    'Speed Tchê — play log',
     `version: ${meta.version}`,
     `generated: ${meta.generated}`,
     `sessions: ${s.sessions} (days: ${s.days})`,

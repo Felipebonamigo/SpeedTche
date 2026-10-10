@@ -55,7 +55,7 @@ async function open(w, hgt, tag, save = SAVE) {
   const page = await browser.newPage({ viewport: { width: w, height: hgt } });
   page.on('pageerror', (e) => errors.push(`${tag} pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${tag} console: ${m.text()}`); });
-  await page.addInitScript((sv) => { try { localStorage.setItem('nitro-crew.save', JSON.stringify(sv)); } catch { /* sem storage */ } }, save);
+  await page.addInitScript((sv) => { try { localStorage.setItem('speed-tche.save', JSON.stringify(sv)); } catch { /* sem storage */ } }, save);
   page.setDefaultTimeout(180_000);
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.evaluate(() => { window.nc.session.settings.quality = 'low'; window.nc.session.stop(); });
