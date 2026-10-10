@@ -20,7 +20,7 @@ import { Cars } from './cars';
 import { Effects, type Shake } from './effects';
 import { Hud } from './hud';
 import { viewportRects, type Rect } from './layout';
-import { palette } from './palette';
+import { palette, type Palette } from './palette';
 import { DynamicResolution, dynamicResolutionDefault } from './postfx/dynres';
 import { ViewportPipeline } from './postfx/pipeline';
 import { planFor, radialBlurStrength, shadowPlan, type PostPlan } from './postfx/plan';
@@ -32,6 +32,7 @@ import type { Layout } from './scenery/layout';
 import { Sky } from './sky';
 import { installToneMapping, setStylizePalette } from './stylize';
 import { Terrain } from './terrain';
+import { buildHorizon } from './horizon';
 
 const BEHIND = FRAME_BEHIND;
 const AHEAD = FRAME_AHEAD;
@@ -132,6 +133,11 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   let vpCount = 0;
   let disposed = false;
 
+  let horizonFor: { id: string; p: Palette } | null = null;
+  function rebuildHorizon(): void {
+    if (horizonFor) terrain.setHorizon(buildHorizon(horizonFor.id, horizonFor.p, quality ?? 'high'));
+  }
+
   function ensureTrack(track: Track): void {
     const key = `${track.def.id}:${track.def.scenery}:${track.def.timeOfDay}`;
     if (key === trackKey) return;
@@ -141,6 +147,8 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     sky.setPalette(p, track.def.timeOfDay, key);
     road.setPalette(p, track.def.timeOfDay === 'night', key);
     terrain.setTrack(track, p, key);
+    horizonFor = { id: track.def.id, p };
+    rebuildHorizon();
     scenery.setNight(night);
     cars.setLight(p.light);
     effects.setPalette(p);
@@ -158,6 +166,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     renderer.shadowMap.enabled = q !== 'low';
     sky.setQuality(q);
     cars.setQuality(q);
+    rebuildHorizon();
     // Materiais com sombra precisam recompilar quando o shadow map liga/desliga.
     scene.traverse((o) => { if (o instanceof THREE.Mesh) { const m = o.material as THREE.Material; m.needsUpdate = true; } });
     disposePosts(); // os passes de cada degrau são outros

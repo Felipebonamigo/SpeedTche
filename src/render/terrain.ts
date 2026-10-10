@@ -7,6 +7,7 @@
 // Mais: mar estilizado com espuma na linha d'água, quadras + prédios de fundo na cidade, disco
 // de chão e o horizonte em três planos de montanha, cada um mais dentro da névoa, que gira
 // pelo rumo absoluto.
+import type { Horizon } from './horizon';
 import * as THREE from 'three';
 import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
@@ -761,7 +762,17 @@ export class Terrain {
     }
   }
 
+  private horizon: Horizon | null = null;
+
+  /** Paisagem própria da pista (L4: o Rio na baía). Troca a anterior sem deixar nada para trás; `null` só retira. */
+  setHorizon(h: Horizon | null): void {
+    if (this.horizon) { this.farGroup.remove(this.horizon); this.horizon.dispose(); }
+    this.horizon = h;
+    if (h) this.farGroup.add(h);
+  }
+
   dispose(): void {
+    this.setHorizon(null);
     this.left.dispose(); this.right.dispose(); this.material.dispose();
     this.ground.geometry.dispose(); this.ground.material.dispose();
     this.sea.geometry.dispose(); this.sea.material.dispose();
