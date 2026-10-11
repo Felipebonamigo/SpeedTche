@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
 import { smoothNormals } from './normals';
-import { type Palette } from './palette';
+import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
 import type { RoadFrame } from './roadframe';
 import { inClearing } from './scenery/clearings';
@@ -183,9 +183,11 @@ export function horizonElevation(biome: SceneryId, turns: number): number {
 }
 
 const RING_VERT = /* glsl */ `
+// colorB / uBlend (M6): a cor do período seguinte por vértice e quanto dela vale (0 = a da pista); sem período seguinte colorB é a própria cor.
+attribute vec3 colorB; uniform float uBlend;
 varying vec3 vColor; varying vec3 vW; varying vec3 vN;
 void main() {
-  vColor = color;
+  vColor = mix(color, colorB, uBlend);
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vW = wp.xyz;
   vN = normalize(mat3(modelMatrix) * normal);
@@ -393,6 +395,14 @@ interface GroundColors {
   block: [THREE.Color, THREE.Color, THREE.Color];
 }
 
+function groundColorsOf(p: Palette): GroundColors {
+  return {
+    low: new THREE.Color(p.groundLow), high: new THREE.Color(p.groundHigh), rock: new THREE.Color(p.rock), snow: new THREE.Color(p.snow),
+    sand: new THREE.Color(p.sand), verge: new THREE.Color(p.verge), wetSand: new THREE.Color(p.sand).multiplyScalar(0.72),
+    block: [new THREE.Color(p.asphalt).multiplyScalar(0.9), new THREE.Color(p.verge).multiplyScalar(0.75), new THREE.Color(p.groundHigh)],
+  };
+}
+
 export class Terrain {
   readonly group = new THREE.Group();
   /** Planos do horizonte e skyline: giram pelo rumo absoluto. */
@@ -417,6 +427,10 @@ export class Terrain {
   /** Por segmento × lado × coluna: relevo (m), cor (linear) e inclinação (para fora, ao longo). Montado em setTrack. */
   private reliefTable = new Float32Array(0);
   private colorTable = new Float32Array(0);
+  /** M6 (b): a tabela de cor do período seguinte (a cor do chão é combinação convexa da paleta, então a mistura das duas tabelas é a tabela da paleta interpolada) e o quanto dela vale. */
+  private colorTableB: Float32Array | null = null;
+  private blend = 0;
+  private baseFacet = 0.3;
   private gradTable = new Float32Array(0);
   /** columnDrop por lado (−1, +1) e coluna. */
   private readonly dropW = new Float32Array(2 * NC);
@@ -498,13 +512,14 @@ export class Terrain {
     this.farGroup.add(this.neon);
     this.ringMaterial = new THREE.ShaderMaterial({
       vertexShader: RING_VERT, fragmentShader: RING_FRAG, vertexColors: true, fog: false,
-      uniforms: { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uFacet: { value: 0.3 } },
+      uniforms: { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uFacet: { value: 0.3 }, uBlend: { value: 0 } },
     });
     applyGrade(this.ringMaterial);
     this.group.add(this.farGroup);
   }
 
-  setTrack(track: Track, p: Palette, key: string): void {
+  /** `pTo`: a paleta do período seguinte, se a corrida o alcança (M6, `racePeriodPlan`); `setLive` mistura as duas. */
+  setTrack(track: Track, p: Palette, key: string, pTo?: Palette): void {
     if (key === this.trackKey) return;
     this.trackKey = key;
     this.biome = track.def.scenery;
@@ -512,12 +527,13 @@ export class Terrain {
     for (const s of track.segments) minY = Math.min(minY, s.y0, s.y1);
     this.minRoadY = minY * Y_SCALE;
     for (let si = 0; si < 2; si++) for (let c = 0; c < NC; c++) this.dropW[si * NC + c] = columnDrop(this.biome, si === 0 ? -1 : 1, c);
-    const colors: GroundColors = {
-      low: new THREE.Color(p.groundLow), high: new THREE.Color(p.groundHigh), rock: new THREE.Color(p.rock), snow: new THREE.Color(p.snow),
-      sand: new THREE.Color(p.sand), verge: new THREE.Color(p.verge), wetSand: new THREE.Color(p.sand).multiplyScalar(0.72),
-      block: [new THREE.Color(p.asphalt).multiplyScalar(0.9), new THREE.Color(p.verge).multiplyScalar(0.75), new THREE.Color(p.groundHigh)],
-    };
-    this.buildTables(track, colors);
+    this.buildTables(track, groundColorsOf(p));
+    this.colorTableB = null; this.blend = 0;
+    if (pTo) {
+      const a = this.colorTable.slice();
+      this.buildTables(track, groundColorsOf(pTo));
+      this.colorTableB = this.colorTable; this.colorTable = a;
+    }
     this.ground.material.color.set(p.groundHigh).lerp(this.tmp.set(p.fog), 0.25);
     this.ground.visible = this.biome !== 'coast';
     this.sea.visible = this.biome === 'coast';
@@ -536,9 +552,8 @@ export class Terrain {
     for (const im of this.cityBlocks) im.visible = city;
     this.skyline.visible = city;
     this.neon.visible = city;
-    this.cityMaterial.color.set(p.light < 0.5 ? '#4a5470' : '#6a7488');
-    this.cityMaterial.emissiveIntensity = p.light < 0.8 ? 1.3 : 0;
-    this.buildFar(p);
+    this.buildFar(p, pTo);
+    this.liveCity(p.light); // a cor dos prédios e as janelas: 4a5470 e 1,3 à noite, 6a7488 e 1,3 no entardecer, apagadas de dia (a mesma conta do setLive)
   }
 
   /** Relevo e cor de cada (segmento, lado, coluna): só dependem da pista e da paleta. */
@@ -621,19 +636,31 @@ export class Terrain {
     return ground;
   }
 
-  private buildFar(p: Palette): void {
+  private buildFar(p: Palette, pTo?: Palette): void {
     for (const m of this.ringMeshes) { this.farGroup.remove(m); m.geometry.dispose(); }
     this.ringMeshes = [];
     const fog = new THREE.Color(p.fog);
     const b = this.biome;
     const rel = RELIEF[b];
     const snow = Number.isFinite(rel.snowLine) ? new THREE.Color(p.snow) : null;
+    this.baseFacet = rel.facet;
     this.ringMaterial.uniforms.uFacet.value = rel.facet * (p.moon ? 0.4 : 1);
+    this.ringMaterial.uniforms.uBlend.value = 0;
+    const fogB = pTo ? new THREE.Color(pTo.fog) : null;
+    const snowB = pTo && Number.isFinite(rel.snowLine) ? new THREE.Color(pTo.snow) : null;
     for (let l = 2; l >= 0; l--) {
       const top = new THREE.Color(p.layers[l]);
       // Na cidade o plano mais perto é a skyline (instanciada); os anéis ficam só como morros ao fundo.
       if (b === 'city_night' && l === 0) continue;
-      const mesh = new THREE.Mesh(buildRing(b, l, LAYER_RADII[l], rel.layers[l], top, fog, p.layerHaze[l], l > 0 || b === 'alpine' ? snow : null), this.ringMaterial);
+      const useSnow = l > 0 || b === 'alpine';
+      const geo = buildRing(b, l, LAYER_RADII[l], rel.layers[l], top, fog, p.layerHaze[l], useSnow ? snow : null);
+      // A segunda cor por vértice (M6): o mesmo anel pintado com a paleta do período seguinte; sem ela, `colorB` é a própria cor (um programa só).
+      if (pTo && fogB) {
+        const geoB = buildRing(b, l, LAYER_RADII[l], rel.layers[l], new THREE.Color(pTo.layers[l]), fogB, pTo.layerHaze[l], useSnow ? snowB : null);
+        geo.setAttribute('colorB', new THREE.BufferAttribute((geoB.getAttribute('color').array as Float32Array).slice(), 3));
+        geoB.dispose();
+      } else geo.setAttribute('colorB', geo.getAttribute('color'));
+      const mesh = new THREE.Mesh(geo, this.ringMaterial);
       mesh.frustumCulled = false;
       mesh.renderOrder = -5 + (2 - l); // de longe para perto (sem névoa, a ordem não importa para a cor)
       this.farGroup.add(mesh);
@@ -681,6 +708,8 @@ export class Terrain {
     const rt = this.reliefTable; const ct = this.colorTable; const gt = this.gradTable;
     const ys = this.ys;
     const turn = turnPerCurve(track);
+    // M6 (b): a cor do chão é a mistura das duas tabelas (sem período seguinte, a própria tabela e peso 0).
+    const cb = this.colorTableB ?? ct; const bl = this.colorTableB ? this.blend : 0;
     let foamPoints = 0;
     for (let j = 0; j < n; j++) {
       const si = frame.segIndex[j];
@@ -710,7 +739,7 @@ export class Terrain {
           let nx = -gA * side * cx - gL * sz; let nz = -gA * side * sz + gL * cx;
           const inv = 1 / Math.sqrt(nx * nx + 1 + nz * nz);
           nx *= inv; nz *= inv;
-          strip.set(j, lane, px + side * dist * cx, y, pz + side * dist * sz, ct[k], ct[k + 1], ct[k + 2], nx, inv, nz);
+          strip.set(j, lane, px + side * dist * cx, y, pz + side * dist * sz, ct[k] + (cb[k] - ct[k]) * bl, ct[k + 1] + (cb[k + 1] - ct[k + 1]) * bl, ct[k + 2] + (cb[k + 2] - ct[k + 2]) * bl, nx, inv, nz);
         }
         if (seaSide) {
           // Linha d'água: onde o chão cruza o nível do mar (entre a coluna 3 e a 4).
@@ -746,6 +775,38 @@ export class Terrain {
     this.ground.position.y = coast ? seaY - 20 : floorY - 2;
     this.farGroup.rotation.y = absHeading;
     if (this.biome === 'city_night') this.updateCityBlocks(frame, track);
+  }
+
+  /** As janelas e a cor dos prédios de fundo da cidade pela luz do período (a luz 0,7 do entardecer em diante já acende; de dia, apagadas). */
+  private liveCity(light: number): void {
+    const night = Math.max(0, Math.min(1, (0.7 - light) / 0.38));
+    const sm = night * night * (3 - 2 * night);
+    this.cityMaterial.color.set(mixHex('#6a7488', '#4a5470', sm));
+    this.cityMaterial.emissiveIntensity = 1.3 * Math.min(1, lightsAmount(light) / 0.6);
+  }
+
+  /**
+   * M6 (b): o chão no instante da corrida, SÓ uniformes e a mistura das duas tabelas de cor (nenhum material novo, nenhum programa recompilado): o mar e a espuma, o chão
+   * plano, a mistura dos anéis, as janelas da cidade e o horizonte do Rio. `t = 0` repõe a cena exatamente como `setTrack` a deixou.
+   */
+  setLive(live: LivePalette): void {
+    const { p, t } = live;
+    this.blend = this.colorTableB ? t : 0;
+    this.ringMaterial.uniforms.uBlend.value = this.blend;
+    const night = Math.max(0, Math.min(1, (lightsAmount(p.light) - 0.6) / 0.4));
+    this.ringMaterial.uniforms.uFacet.value = this.baseFacet * (1 - 0.6 * night);
+    this.horizon?.setBlend(this.blend);
+    this.ground.material.color.set(p.groundHigh).lerp(this.tmp.set(p.fog), 0.25);
+    const su = this.sea.material.uniforms;
+    (su.uDeep.value as THREE.Color).set(p.waterDeep);
+    (su.uShallow.value as THREE.Color).set(p.waterShallow);
+    (su.uSky.value as THREE.Color).set(p.sky[2]).lerp(this.tmp.set(p.sky[1]), 0.5);
+    (su.uSunColor.value as THREE.Color).set(live.body);
+    su.uSpec.value = p.seaSpec; su.uGlint.value = p.seaGlint; su.uSkyMix.value = p.seaSky;
+    const fu = this.foam.material.uniforms;
+    (fu.uFoam.value as THREE.Color).set(p.foam);
+    (fu.uShallow.value as THREE.Color).set(p.waterShallow);
+    this.liveCity(p.light);
   }
 
   /** Prédios de fundo da cidade: um a cada 2 segmentos por lado, entre 45 e 300 m da pista. */

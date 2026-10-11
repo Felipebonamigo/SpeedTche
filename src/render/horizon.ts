@@ -126,10 +126,29 @@ function graniteAt(layer: number, az: number, only?: 'ultra'): number {
 const GREEN = new THREE.Color('#4f8f5a');
 const GRANITE = new THREE.Color('#a9a59b');
 
-/** O horizonte do Rio: um grupo de malhas e a limpeza (`dispose`: geometrias e o material compartilhado). */
+/**
+ * O horizonte do Rio: um grupo de malhas e a limpeza (`dispose`: geometrias e o material compartilhado). Cada malha leva a cor do período da pista (`color`) e a do período
+ * seguinte (`colorB`; sem ele, a mesma): `setBlend(t)` mistura as duas por um uniforme (M6, a corrida que muda), sem material novo nem programa recompilado.
+ */
 export class Horizon extends THREE.Group {
   private readonly material: THREE.MeshBasicMaterial;
-  constructor(material: THREE.MeshBasicMaterial) { super(); this.name = 'horizon:rio'; this.material = material; }
+  readonly blend = { value: 0 };
+  constructor(material: THREE.MeshBasicMaterial) {
+    super(); this.name = 'horizon:rio'; this.material = material;
+    // Compõe com o que o material já tem (a gradação do `applyGrade`): o callback e a chave de programa antigos continuam.
+    const prev = material.onBeforeCompile; const prevKey = material.customProgramCacheKey;
+    material.onBeforeCompile = (shader, renderer) => {
+      prev.call(material, shader, renderer);
+      const chunk = THREE.ShaderChunk.color_vertex;
+      if (!chunk.includes('vColor *= color;')) throw new Error('horizon: o three mudou o color_vertex (vColor *= color não achado)');
+      shader.uniforms.uHorizonBlend = this.blend;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', () => '#include <common>\nattribute vec3 colorB;\nuniform float uHorizonBlend;')
+        .replace('#include <color_vertex>', () => chunk.replace('vColor *= color;', 'vColor *= mix( color, colorB, uHorizonBlend );'));
+    };
+    material.customProgramCacheKey = () => `${prevKey.call(material)}|horizon-blend-v1`;
+  }
+  setBlend(t: number): void { this.blend.value = Math.max(0, Math.min(1, t)); }
   override dispose(): void {
     this.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); });
     this.material.dispose();
@@ -254,12 +273,22 @@ const HORIZONS: Readonly<Record<string, (p: Palette, q: Quality, material: THREE
  * O horizonte da pista (ou `null` sem paisagem própria). `palette` dá as cores dos planos e a névoa (a noite escurece sozinha) e `quality` o
  * degrau (`horizonDetail`). Quem recebe é dono: `dispose()` ao trocar de pista ou de qualidade.
  */
-export function buildHorizon(trackId: string, palette: Palette, quality: Quality): Horizon | null {
+export function buildHorizon(trackId: string, palette: Palette, quality: Quality, paletteTo?: Palette): Horizon | null {
   const make = HORIZONS[trackId];
   if (!make) return null;
   const material = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide });
   applyGrade(material);
   const h = new Horizon(material);
-  for (const o of make(palette, quality, material)) h.add(o);
+  const meshes = make(palette, quality, material);
+  // A segunda cor por vértice (M6): o mesmo horizonte pintado com a paleta do período seguinte (a geometria só depende da qualidade). Sem ela, `colorB` é a própria cor.
+  const other = paletteTo ? make(paletteTo, quality, new THREE.MeshBasicMaterial()) : null;
+  meshes.forEach((o, i) => {
+    const m = o as THREE.Mesh;
+    const color = m.geometry.getAttribute('color');
+    const b = other?.[i] as THREE.Mesh | undefined;
+    m.geometry.setAttribute('colorB', b ? new THREE.BufferAttribute((b.geometry.getAttribute('color').array as Float32Array).slice(), 3) : color);
+    h.add(o);
+  });
+  if (other) for (const o of other) { const m = o as THREE.Mesh; m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
   return h;
 }
