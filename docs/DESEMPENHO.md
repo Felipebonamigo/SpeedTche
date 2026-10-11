@@ -547,3 +547,7 @@ Com 3–4 janelas na Alta não há AO (23 chamadas, 3 passes). Pódio de 3 carro
 ## Cenário redondo (M3, contagens em swiftshader, sem FPS)
 
 Chamadas iguais nas 16 amostras do gate. Triângulos: `copa-1p/high` 263.788 → 307.220; `sampa-4p/medium` 209.902 → 299.982; `sampa-4p/high` e `ultra` 224.341 → 334.097 (limite subido de 323 mil para 350 mil, provisório). Custo de quadro do cenário (janela [s-30, s+260], com LOD, sem marcos): pior pista 510 → 775 △/segmento, média 245 → 423 (teto 900). Montagem dos marcos ~2× mais cara (a araucária chega a ~1 s sob carga). O vento só foi medido em contagem; o custo do `texelFetch` extra e o FPS são do `--bench` do dono. Se o Deck não aguentar Sampa 4p: cortar malha de `bld:apt`, `bld:glass`, `bld:brick` e postes.
+
+## Efeitos e câmera (M5, contagens em swiftshader, sem FPS)
+
+Todos os efeitos acesos: no máximo 5 chamadas extras por viewport (4 na Baixa, sem anel); cada efeito é uma malha ou instância. Teto de pontos das marcas de pneu 192 / 640 / 1.280 / 2.048 por degrau; linhas de velocidade 14 / 24 / 36 / 48 (metade com 3 ou 4 jogadores). Na largada, a malha de traços custa +1 chamada acima de 85% da máxima (`copa-2p/medium` 77 → 78, `copa-4p/medium` 79 → 80, limite subido; provisório até o bench). Medir com `tools/render-harness.lab.ts` (`fxScene`) e `tests/efeitos-gl.test.ts`. Parâmetros do harness: `driftlevel=1|2|3`, `top=<fração>`, `draft=1`, `reduce=1`, `win=<s>`, `nitroat=<quadro>`, `ticks=205`.

@@ -142,7 +142,7 @@ describe('sessão online: remetente conferido', () => {
     if (myId === 0) ctl.create('kb1'); else ctl.join('KQXTR', 'kb1');
     sock.open();
     // A impressão do conteúdo vai junto: o relay não põe na mesma sala builds diferentes.
-    expect(sock.sent[0]).toMatchObject({ t: myId === 0 ? 'create' : 'join', v: 3, b: onlineFingerprint() });
+    expect(sock.sent[0]).toMatchObject({ t: myId === 0 ? 'create' : 'join', v: 4, b: onlineFingerprint() });
     sock.push({ t: 'welcome', room: 'KQXTR', id: myId, token: TOKEN, rejoined: false });
     sock.push(roomMsg(0));
     expect(ctl.phase).toBe('lobby');

@@ -60,6 +60,22 @@ export function defaultAccent(color: string): string {
 /** Bits de pintura da instância (combinam com `layer` dos pincéis): 2 = camada A, 4 = camada B. */
 export const LIVERY_A = 2;
 export const LIVERY_B = 4;
+/**
+ * No LOTE DE RODA o bit da camada B (as faces `layer: 2` da roda: o aro) é o do ARO, não o da faixa B do corpo (N3): o corpo e as rodas
+ * são lotes diferentes, cada um com o seu `instExtra`. Mesmo valor, outro bit: tirar a faixa B do corpo não tira o aro.
+ */
+export const WHEEL_RIM = LIVERY_B;
+
+/** Bits da faixa que o look pede (`nenhuma`, `a`, `b`, `ab`); sem escolha (ou id que não existe) vale a faixa do modelo (`stock`). */
+export function stripeBits(stripe: string | undefined, stock: number): number {
+  switch (stripe) {
+    case 'nenhuma': return 0;
+    case 'a': return LIVERY_A;
+    case 'b': return LIVERY_B;
+    case 'ab': return LIVERY_A | LIVERY_B;
+    default: return stock;
+  }
+}
 
 /**
  * Pintura de cada carro: o n-ésimo carro de um estilo (na ordem de `cars`) usa a n-ésima pintura da

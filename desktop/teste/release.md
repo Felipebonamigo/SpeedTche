@@ -1,15 +1,23 @@
-**Speed Tchê 0.1.1 — versão de teste para amigos** (build de 10/10/2026)
+**Speed Tchê 0.1.2 — versão de teste para amigos** (build de 11/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.1-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.1-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.2-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.2-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
 
-Novidades da 0.1.1: menos apertos entre uma corrida e a próxima (**Mais uma?**, **Recomeçar a copa**), nitro que dispara de primeira, nome de pista com a cidade, e um questionário curto depois da 3ª corrida (pode pular).
+Novidades da 0.1.2 (a maior mudança até agora, **ainda não vista por ninguém além de testes automáticos**, então bugs visuais são esperados):
+
+- **Nitro em barra** e **largada-foguete** (aperte o acelerador na hora do "JÁ!").
+- **Voz do carro**: motor e buzina de cada carro, e balões de provocação (segure a buzina).
+- **Visual novo**: luz, céu e cor por tipo de pista, Copacabana com o Rio ao fundo, cenário e marcos redondos, chama de nitro, faíscas, fumaça, marcas de pneu e câmera dinâmica.
+- **Garagem 3D e Concessionária** (a compra de carro agora é lá) e **visual do carro** (acabamentos, rodas, faixa, cor da chama).
+- **Qualidade gráfica** Baixa, Média, Alta e Ultra em Opções › Visual. Se ficar pesado, baixe um degrau e conte o que aconteceu.
+
+O save da 0.1.1 abre normalmente, mas não volte para a 0.1.1 depois de abrir na 0.1.2.
 
 Achou um bug? Opções › **Copiar relatório** e mande para o Felipe com o que estava fazendo (o relatório leva também o diário de jogo, sem nomes).
 

@@ -37,6 +37,16 @@ const scenes = [
   ['cores_split2', 'track=copacabana&humans=2&paints=rubi,cobalto&ticks=1500&frames=24'],
   ['cores_rubi', 'track=copacabana&carview=rear34&car=falcao&paints=rubi&ticks=60&frames=6'],
   ['cores_cobalto', 'track=copacabana&carview=rear34&car=falcao&paints=cobalto&ticks=60&frames=6'],
+  // Visual do carro (N3): um campo do look por folha, na Alta e na Média (o verniz só existe na Alta; a Média usa o brilho de Fresnel).
+  ...['high', 'medium'].flatMap((qq) => [
+    [`look_acabamentos_${qq}`, `track=copacabana&looksheet=finish&car=falcao&lookbase=${encodeURIComponent('{"paint":"rubi"}')}&carview=rear34&q=${qq}&frames=3`, BIG],
+    [`look_acabamentos_azul_${qq}`, `track=copacabana&looksheet=finish&car=trovao&lookbase=${encodeURIComponent('{"paint":"cobalto"}')}&carview=front34&q=${qq}&frames=3`, BIG],
+    [`look_rodas_${qq}`, `track=copacabana&looksheet=wheel&car=falcao&lookbase=${encodeURIComponent('{"paint":"grafite"}')}&carview=side&q=${qq}&frames=3`, BIG],
+    [`look_rodas9_${qq}`, `track=copacabana&looksheet=wheelall&car=falcao&lookbase=${encodeURIComponent('{"paint":"rubi"}')}&carview=side&q=${qq}&frames=3`, BIG],
+    [`look_faixas_${qq}`, `track=copacabana&looksheet=stripe&car=falcao&lookbase=${encodeURIComponent('{"paint":"cobalto"}')}&carview=rear34&q=${qq}&frames=3`, BIG],
+    [`look_aros_${qq}`, `track=copacabana&looksheet=rim&car=falcao&lookbase=${encodeURIComponent('{"paint":"rubi"}')}&carview=side&q=${qq}&frames=3`, BIG],
+    [`look_chamas_${qq}`, `track=copacabana&looksheet=flame&nitro=1&car=falcao&carview=rear&q=${qq}&frames=3`, BIG],
+  ]),
 ];
 const BODIES = ['gt', 'muscle', 'hatch', 'sedan', 'electric', 'rally', 'hyper', 'classic', 'wedge', 'pickup', 'prototype', 'micro', 'roadster'];
 const carScenes = BODIES.flatMap((b) => ['front34', 'rear34', 'side', 'rear'].map((v) => [`carro_${b}_${v}`, `track=copacabana&carview=${v}&body=${b}&frames=6`]));

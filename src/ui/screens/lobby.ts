@@ -9,10 +9,12 @@ import '../../access/strings';
 import { assistedHumans } from '../../access/humans';
 import { seatColor } from '../../core/data/drivers';
 import { ASSIST_LEVELS } from '../../core/sim/assist';
-import type { CarDef, HumanEntry } from '../../core/types';
+import type { CarDef, CarLook, HumanEntry } from '../../core/types';
 import type { DeviceId, MenuContext, MenuNav, SaveData } from '../../game/contracts';
 import { carAvailable } from '../../game/career-save';
-import { ORIGINAL_PAINT, seatPaint, stepSeatPaint, withPaint } from '../../game/paints';
+import '../../cosmetics/strings';
+import { stepLook, type LookField } from '../../game/cosmetics';
+import { ORIGINAL_PAINT, seatLook, seatPaint, setSeatLook, stepSeatPaint, withLook } from '../../game/paints';
 import { NAME_MAX_LENGTH, saveSave } from '../../game/save';
 import { t } from '../../i18n';
 import { isPartyMode, lobbyHidesCar, lobbyHidesDriver, lobbyTeamLabel, partySeatsProblem, versusAllowed } from '../../party/rules';
@@ -20,7 +22,7 @@ import { isKeyboard } from '../input';
 import { arrowButton, button, carCard, createFocusList, h, listNav, screenFrame, selector, type FocusItem, type FocusList, type LobbySeat, type LobbyState, type ScreenApi, type ScreenInstance, type Selector } from './common';
 import { icon } from './icons';
 import { commitSettings, raceOptionSelectors } from './options';
-import { paintSelector } from './paint';
+import { lookButton, lookEditor, lookSummary, paintSelector } from './paint';
 
 export const LOBBY_SEATS = 4;
 
@@ -30,10 +32,10 @@ export function availableCars(ctx: Pick<MenuContext, 'cars' | 'save'>): CarDef[]
 }
 
 /** Pilotos do jogo salvo que o lobby de "Continuar" religa (nome, carro e pintura, na ordem dos assentos). */
-export function resumeRoster(lobby: LobbyState, save: SaveData): Array<{ name: string; carId: string | null; paint?: string }> {
+export function resumeRoster(lobby: LobbyState, save: SaveData): Array<{ name: string; carId: string | null; look?: CarLook }> {
   if (!lobby.resume) return [];
   if (lobby.mode === 'career') return save.career?.drivers.map((d) => ({ name: d.name, carId: null })) ?? [];
-  return save.cupInProgress?.humans.map((h) => ({ name: h.name, carId: h.carId, paint: h.paint })) ?? [];
+  return save.cupInProgress?.humans.map((h) => ({ name: h.name, carId: h.carId, look: h.look })) ?? [];
 }
 
 export function maxSeats(lobby: LobbyState, save?: SaveData): number {
@@ -70,13 +72,13 @@ export function lobbyHumans(api: ScreenApi): HumanEntry[] {
   const versus = api.lobby.versus && versusAllowed(api.lobby.mode, seats.length);
   return assistedHumans(seats.map((s) => {
     const carId = (cars[s.carIndex] ?? cars[0]).id;
-    return withPaint({
+    return withLook({
       seat: s.seat,
       name: s.name.trim() || `P${s.seat + 1}`,
       carId,
       teamId: versus ? s.seat : 0,
       color: seatColor(s.seat, settings.colorPalette),
-    }, seatPaint(save, s.seat, carId));
+    }, seatLook(save, s.seat, carId));
   }), settings.seatAssists);
 }
 
@@ -149,6 +151,14 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     body,
   );
   let lists: Array<FocusList | null> = [null, null, null, null];
+  /**
+   * O editor do visual (N3) aberto: um painel por cima do lobby, para UM assento por vez, só com o dispositivo dele (docs/ondas/N/N3.md, §4.7).
+   * Em cartão 2×2 não cabem oito linhas sem cortar o rótulo (o playtest-layout mediu): o painel tem o lobby inteiro. Enquanto ele está aberto
+   * os outros assentos esperam (o que valem são o editor e o Voltar do dono), e nenhum outro abre o dele.
+   */
+  let editingSeat: number | null = null;
+  /** O cursor do assento antes de abrir o editor (a lista dele troca para a do editor e volta ao mesmo item). */
+  let cursorBefore = 0;
   /** O P1 acabou de ficar PRONTO: o próximo render põe o cursor dele em INICIAR (o render reconstrói as listas). */
   let focusStartNext = false;
 
@@ -159,6 +169,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   const deviceLabel = (device: DeviceId) => input.devices().find((d) => d.id === device)?.label ?? device;
 
   const join = (seat: number, device: DeviceId) => {
+    if (editingSeat === seat) editingSeat = null;
     input.bindSeat(seat, device);
     lobby.seats[seat] = newSeat(api, seat, device);
     api.sfx('confirm');
@@ -166,13 +177,43 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   };
 
   const leave = (seat: number) => {
+    if (editingSeat === seat) editingSeat = null;
     input.unbindSeat(seat);
     lobby.seats[seat] = null;
     api.sfx('back');
     render();
   };
 
+  /** ←/→ num campo do visual: grava no save do assento para o carro dele (a pintura da paleta é a de sempre, as demais mexem no look). */
+  const stepField = (s: LobbySeat, field: LookField, dir: -1 | 1) => {
+    if (s.ready) return;
+    const carId = (cars[s.carIndex] ?? cars[0]).id;
+    if (field === 'paint') stepSeatPaint(save, s.seat, carId, dir);
+    else setSeatLook(save, s.seat, carId, stepLook(seatLook(save, s.seat, carId), field, dir, carId));
+    saveSave(save);
+  };
+
+  /** Abre/fecha o editor do visual do assento: a lista de foco dele troca para a do editor e volta ao mesmo item. */
+  const openEditor = (s: LobbySeat) => {
+    if (editingSeat !== null) return;
+    cursorBefore = lists[s.seat]?.index ?? s.cursor;
+    lists[s.seat] = null; // o render não regrava o cursor desta lista (o do editor começa em cima)
+    s.cursor = 0;
+    editingSeat = s.seat;
+    api.sfx('confirm');
+    render();
+  };
+  const closeEditor = (s: LobbySeat) => {
+    if (editingSeat !== s.seat) return;
+    lists[s.seat] = null;
+    s.cursor = cursorBefore;
+    editingSeat = null;
+    api.sfx('back');
+    render();
+  };
+
   const toggleReady = (s: LobbySeat) => {
+    if (editingSeat === s.seat) editingSeat = null;
     s.ready = !s.ready;
     api.sfx(s.ready ? 'confirm' : 'back');
     if (s.ready && s.seat === 0) focusStartNext = true;
@@ -182,6 +223,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   /** Confirmar no carro, na pintura ou na direção: só dá PRONTO, nunca tira (tirar é o botão PRONTO). */
   const markReady = (s: LobbySeat) => {
     if (s.ready) return;
+    if (editingSeat === s.seat) editingSeat = null;
     s.ready = true;
     api.sfx('confirm');
     if (s.seat === 0) focusStartNext = true;
@@ -214,11 +256,13 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       activate: () => { nameInput.focus(); nameInput.select(); },
     };
     const nameEl = hidesDriver ? null : nameRow ? nameRow.el : h('strong', { class: 'slot-name static', text: s.name, title: t('ui.lobby.name') });
-    // Pintura: a que este assento guardou para o carro à mostra (save.seatPaints); no "Continuar", a da copa salva.
+    // Pintura: a que este assento guardou para o carro à mostra (save.seatLooks); no "Continuar", a da copa salva.
     const carNow = () => cars[s.carIndex] ?? cars[0];
-    const paintNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.paint ?? ORIGINAL_PAINT : seatPaint(save, s.seat, carNow().id));
-    const heroBody = h('div', { class: 'car-hero-body' }, carCard(carNow(), cars, paintNow()));
-    const showCar = () => heroBody.replaceChildren(carCard(carNow(), cars, paintNow()));
+    const paintNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.look?.paint ?? ORIGINAL_PAINT : seatPaint(save, s.seat, carNow().id));
+    // O visual inteiro (N3): o desenho do carro mostra a cor e o detalhe dele; no "Continuar", o da copa salva.
+    const lookNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.look ?? null : seatLook(save, s.seat, carNow().id));
+    const heroBody = h('div', { class: 'car-hero-body' }, carCard(carNow(), cars, lookNow()));
+    const showCar = () => heroBody.replaceChildren(carCard(carNow(), cars, lookNow()));
     let paintItem: Selector | null = null;
     const changeCar = (dir: -1 | 1) => {
       if (s.ready) return;
@@ -250,6 +294,9 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       onActivate: () => markReady(s),
       cls: s.ready ? 'locked' : '',
     }) : null;
+    // O visual inteiro: um botão (só o ícone: a altura e a largura do cartão 2×2 não comportam texto) que abre o editor por cima do lobby. Só onde o carro
+    // se escolhe aqui, como a pintura; mora no rodapé, ao lado do PRONTO. O resumo do que mudou fica na dica do mouse e em `data-summary`.
+    const lookItem: FocusItem | null = carItem ? lookButton(lookSummary(lookNow()), () => { if (!s.ready) openEditor(s); }, s.ready ? 'locked' : '') : null;
     const carEl = carItem ? carItem.el
       : career ? h('div', { class: 'car-hero locked lobby-note' }, icon('flag'), h('span', { text: t('career.lobby.carNote') }))
       : hidesDriver ? h('div', { class: 'car-hero locked lobby-note' }, icon('users'), h('span', { text: t('party.lobby.tournamentNote') }))
@@ -280,10 +327,11 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       assistItem.el,
       h('div', { class: 'slot-foot' },
         h('span', { class: 'slot-team' }, icon('users'), h('span', { text: team })),
+        lookItem?.el,
         ready.el,
       ),
     );
-    return { el: slot, items: [nameRow, carItem, paintItem, assistItem, ready].filter((x): x is FocusItem => x !== null) };
+    return { el: slot, items: [nameRow, carItem, paintItem, assistItem, lookItem, ready].filter((x): x is FocusItem => x !== null) };
   }
 
   function emptySlot(seat: number): HTMLElement {
@@ -362,12 +410,30 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       );
       createFocusList([backBtn], { sfx: api.sfx });
     }
+    // O editor do visual aberto: o painel por cima do lobby e a lista de foco do dono dele trocada pela do editor.
+    let overlay: HTMLElement | null = null;
+    const editor = editingSeat !== null && lobby.seats[editingSeat] ? buildEditor(lobby.seats[editingSeat] as LobbySeat) : null;
+    if (editor && editingSeat !== null) {
+      const owner = lobby.seats[editingSeat] as LobbySeat;
+      overlay = h('div', { class: 'look-overlay', style: `--seat:${seatColor(owner.seat, ctx.settings.colorPalette)}` },
+        h('div', { class: 'look-panel glass' },
+          h('div', { class: 'look-panel-head' }, h('span', { class: 'seat-badge', text: `P${owner.seat + 1}` }), h('span', { class: 'look-panel-title', text: `${t('look.title')} · ${carOfSeat(owner).name}` })),
+          editor.el,
+        ));
+      slotItems[editingSeat] = editor.items;
+    }
     for (let seat = 0; seat < limit; seat++) {
       const s = lobby.seats[seat];
       const items = slotItems[seat];
       if (s && items) lists[seat] = createFocusList(items, { start: Math.min(s.cursor, items.length - 1), sfx: api.sfx });
     }
-    body.replaceChildren(slotsEl, panelEl);
+    body.replaceChildren(slotsEl, panelEl, ...(overlay ? [overlay] : []));
+  }
+
+  const carOfSeat = (s: LobbySeat): CarDef => cars[s.carIndex] ?? cars[0];
+  const lookOfSeat = (s: LobbySeat): CarLook | null => (resume ? resumeRoster(lobby, save)[s.seat]?.look ?? null : seatLook(save, s.seat, carOfSeat(s).id));
+  function buildEditor(s: LobbySeat) {
+    return lookEditor({ car: () => carOfSeat(s), look: () => lookOfSeat(s), onStep: (field, dir) => stepField(s, field, dir), onClose: () => closeEditor(s), sfx: api.sfx });
   }
 
   render();
@@ -387,12 +453,14 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
         return;
       }
       // Start (controle) ou confirmar segurado (teclado, keyNav): quem não está pronto fica, e larga se todos estiverem.
-      if (nav.start) {
+      if (nav.start && editingSeat === null) {
         const me = lobby.seats[seat];
         if (me && !me.ready) markReady(me);
         start();
         return;
       }
+      // Com o editor do visual de um assento aberto, só o dono dele navega (e o Start do controle não larga a corrida por baixo do painel).
+      if (editingSeat !== null && seat !== editingSeat) return;
       const list = lists[seat];
       const s = lobby.seats[seat];
       if (!list || !s) return;
@@ -411,7 +479,10 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       const leaving = input.leavePressed();
       if (leaving) {
         const seat = seatOfDevice(lobby, leaving);
-        if (seat >= 0) leave(seat);
+        // Voltar com o editor do visual aberto o fecha; só depois dele sair do assento.
+        const me = seat >= 0 ? lobby.seats[seat] : null;
+        if (me && editingSeat === seat) closeEditor(me);
+        else if (seat >= 0 && editingSeat === null) leave(seat);
       }
     },
   };

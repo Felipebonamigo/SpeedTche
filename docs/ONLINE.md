@@ -329,3 +329,7 @@ existe. Entra na política de privacidade do passo 5.7 do roteiro.
 ## Contagem adiantada pelo atraso de entrada (N1)
 
 a contagem (luzes, bipes e "JÁ!") é desenhada e tocada no tick do núcleo + o atraso de entrada (`RenderFrame.inputLead`, `countdownDisplayTick`/`countdownCue` em `src/render/hud-model.ts`); com isso o aperto no instante em que se vê o zero cai no tick do JÁ e a largada-foguete dá o mesmo resultado com atraso 3 ou 12 (`tests/largada.test.ts`). Sofá e tutorial: atraso 0.
+
+## Visual do carro na rede (N3)
+
+O visual vai no `info` (`LobbyPlayer.look`) e na largada (`SeatAssignment.look`), em forma canônica; ausente = de fábrica. `PROTOCOL_VERSION` **4**, o relay aceita 1..4. Validação estrita (`parseLook`): chave desconhecida, id fora do catálogo, roda fora da lista do estilo, cor mal formada ou `null` explícito **recusam** (cor com saturação baixa não recusa: é puxada, igual em toda máquina). Um `info` recusado aparece sem jogadores e a sala continua; um `start` inválido é descartado por todos. O catálogo entra na impressão do online (não na `lapFingerprint`). `raceConfigFrom` usa `withoutLook`: o estado e o hash não carregam cosmético (teste de guarda com 25 looks sorteados).

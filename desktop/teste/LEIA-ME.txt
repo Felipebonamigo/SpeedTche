@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.1, build de 10/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.2, build de 11/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -17,9 +17,22 @@ CONTROLES (dá para trocar em Opções › Controles)
   Virar       ← →                   A D                   D-pad / analógico
   Nitro       Espaço                F                     RB
   Marchas     M (sobe) N (desce)    E / Q                 Y / LB
+  Derrapar    Shift direito         Shift esquerdo        RB
+  Olhar trás  B                     R                     R3
+  Buzina      H                     G                     L3
   Menus: setas + Enter, Esc volta.
+  Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.2 (o que mais queremos que vocês olhem):
+  * Nitro virou uma BARRA: larga com 1 carga e enche com derrapagem, vácuo, raspão, ultrapassagem e largada perfeita.
+    Largada-foguete: aperte o acelerador na hora do "JÁ!" (não antes) para arrancar com nitro.
+  * Cada carro com seu barulho de motor e sua buzina; provocação por balão (sem palavrão).
+  * Visual novo: luz, céu e cor por tipo de pista, Copacabana com o Rio ao fundo, cenário e marcos mais redondos,
+    carros com roda grande, chama de nitro, faíscas, fumaça, marcas de pneu, câmera que acompanha a velocidade.
+  * Garagem em 3D e CONCESSIONÁRIA (menu principal): a compra de carro agora é lá. A Garagem mostra só os seus carros.
+  * Visual do carro: acabamentos (metálico, perolado, fosco, cromado, camaleão), rodas, aro, faixa e cor da chama (botão Visual no lobby).
+  * Qualidade gráfica: Opções › Visual (Baixa, Média, Alta, Ultra). Se ficar pesado, baixe um degrau e conte o que acontece.
 - Modo Carreira: a Expedição Brasil (27 estados, 3 pistas cada) e depois o Mundial.
 - Corrida rápida e tela dividida com 2 a 4 jogadores (teclado + controles).
 - O passaporte (carimbos e cartão-postal de cada estado).
@@ -29,6 +42,8 @@ O QUE TESTAR
 - Depois da 3ª corrida o jogo faz 3 perguntas rápidas (pode pular). As respostas ficam só no seu computador.
 - O nome da pista agora começa pela cidade ("Rio de Janeiro · Orla de Copacabana") e o minimapa mostra o nome.
 - O online ainda NÃO funciona nesta versão (falta o servidor no ar). Joguem juntos na mesma máquina.
+- Seu save da 0.1.1 abre normalmente (as pinturas antigas são migradas), mas não volte para a 0.1.1 depois de abrir na 0.1.2.
+- Se a corrida ficar lenta (principalmente com 3–4 jogadores na tela dividida), diga a placa/computador e a qualidade usada.
 
 ACHOU UM PROBLEMA?
 - Mande para o Felipe: o que estava fazendo, o que esperava e o que aconteceu (print ajuda muito).

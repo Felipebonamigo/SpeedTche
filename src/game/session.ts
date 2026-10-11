@@ -11,7 +11,7 @@ import { finishMessage } from './finish-message';
 import { lapMessage } from './lap-message';
 import { getTrack, TRACKS, trackDef } from '../core/track';
 import { hashString } from '../core/rng';
-import type { ChampionshipState, HumanEntry, PlayerInput, RaceConfig, RaceState, SimEvent, Track } from '../core/types';
+import type { CarLook, ChampionshipState, HumanEntry, PlayerInput, RaceConfig, RaceState, SimEvent, Track } from '../core/types';
 import { NEUTRAL_INPUT } from '../core/types';
 import { setLanguage, t } from '../i18n';
 import '../i18n/core';
@@ -41,7 +41,7 @@ import { cupDuels, gridRival, rivalLine } from './rivals';
 import { createRivalTalk, observeRivalTalk, rivalByName, rivalReply, rivalTalkText, type RivalTalk } from './rival-talk';
 import { createOnlineController, type OnlineController } from './online-session';
 import { createPartySession, isPartyRaceMode } from './party-session';
-import { racePaints, withoutPaint } from './paints';
+import { raceVisuals, withoutLook } from './paints';
 import { carIndexOfSeat } from '../core/modes';
 import { createFeelTracker, createScrapeMemory, observeFeel, observeScrapes, type FeelTracker, type ScrapeCue, type ScrapeMemory } from './race-feel';
 import { countdownCue } from '../render/hud-model';
@@ -83,7 +83,8 @@ interface ActiveRace {
   localSeats: number[];
   /** Fantasma do contra-relógio local (ghost-session.ts); null nas outras corridas. */
   ghost: GhostHooks | null;
-  /** Pintura de cada carro (índice = state.cars), montada na largada a partir de `humans` (paints.ts: racePaints). */
+  /** Visual de cada carro (índice = state.cars), montado na largada a partir de `humans` (paints.ts: raceLooks), e as cores dele (`paints`, para o Retrô). */
+  looks: Array<CarLook | null>;
   paints: Array<CarColors | null>;
   /** Bordas (nitro, marchas) lidas num quadro de tela em que não coube nenhum passo da física; valem no próximo passo. */
   /** Cópia só de exibição que segue andando depois da bandeirada (o estado real fica parado); some com a corrida. */
@@ -255,8 +256,8 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
 
   function baseConfig(trackId: string, laps: number, humans: HumanEntry[], seed: number): RaceConfig {
     return {
-      // A pintura fica com os humanos da sessão (r.humans → RenderFrame.paints): a config e o estado não a carregam.
-      trackId, laps, humans: assistedHumans(withoutPaint(humans), settings.seatAssists), totalCars: Math.max(humans.length, settings.totalCars),
+      // O visual fica com os humanos da sessão (r.humans → RenderFrame.looks): a config e o estado não o carregam.
+      trackId, laps, humans: assistedHumans(withoutLook(humans), settings.seatAssists), totalCars: Math.max(humans.length, settings.totalCars),
       difficulty: settings.difficulty, manualGear: settings.manualGear, assists: { ...settings.assists }, seed,
     };
   }
@@ -273,7 +274,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     const ghost = startGhost(mode, net !== undefined, config.trackId, humans, { settings, hud: (seat, m) => pushMessage(seat, m.text, m.kind, m.ttl) });
     session.race = {
       state, track, mode, humans, messages, telemetry: newTelemetry(), overFor: 0, seed: config.seed, outcome: null, driver: net?.driver ?? null, localSeats, ghost,
-      paints: racePaints(state.cars, humans),
+      ...raceVisuals(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
       scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null, voice: createVoiceRace(),
       inputLead: net && net.driver === online ? Math.max(0, online.status().delayTicks) : 0,
@@ -562,6 +563,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       showHud: menus.current() === null || menus.current() === 'pause' || (r.driver !== null && online.quitOpen),
       ghost: r.ghost?.frame(r.state),
       paints: r.paints,
+      looks: r.looks,
       ...(r.inputLead > 0 ? { inputLead: r.inputLead } : {}),
     };
   }
