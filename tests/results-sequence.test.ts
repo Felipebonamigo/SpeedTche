@@ -58,7 +58,7 @@ interface RigOpts {
 function rig(o: RigOpts = {}): Rig {
   const mode = o.mode ?? 'quick';
   const n = o.humans ?? 1;
-  const humans = Array.from({ length: n }, (_, i) => ({ ...human(i, o.coop ? 0 : i, ['falcao', 'trovao', 'tornado', 'camelo'][i]), ...(o.paint && i === 0 ? { paint: o.paint } : {}) }));
+  const humans = Array.from({ length: n }, (_, i) => ({ ...human(i, o.coop ? 0 : i, ['falcao', 'trovao', 'tornado', 'camelo'][i]), ...(o.paint && i === 0 ? { look: { paint: o.paint } } : {}) }));
   const positions = o.positions ?? Object.fromEntries(humans.map((h, i) => [h.seat, 14 + i]));
   const results = fakeResults(positions, humans);
   const save = sanitizeSave({});

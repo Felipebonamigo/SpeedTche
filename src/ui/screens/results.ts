@@ -83,7 +83,7 @@ export function podiumEntries(d: ResultsScreenData): PodiumEntry[] {
     .sort((a, b) => a.position - b.position)
     .map((r) => ({
       place: r.position as 1 | 2 | 3, carId: r.carDefId,
-      paint: r.seat >= 0 ? paintColors(d.humans.find((x) => x.seat === r.seat)?.paint) : null,
+      paint: r.seat >= 0 ? paintColors(d.humans.find((x) => x.seat === r.seat)?.look?.paint) : null,
     }));
 }
 
