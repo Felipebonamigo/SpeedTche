@@ -29,6 +29,7 @@ export const GATE_SCENES: ReadonlyArray<{ id: string; track: string; humans: num
 // 10/10/2026: chamadas da copa subiram +1 a +5 com o lote `cutout` da L4 e os lotes de LOD1 da M4 (deliberado; triângulos dentro). Provisório até o bench do dono.
 // 10/10/2026 (M3): Sampa 4p Alta/Ultra 323 mil → 350 mil triângulos (medido 334 mil, +49% com o kit redondo: prédios, postes, arquibancadas). Provisório; o `--bench` do dono diz se cabe no Deck.
 // 10/10/2026 (M5): +1 chamada em Média com 2 e 4 jogadores (copa-2p 77 → 78, copa-4p 79 → 80): a malha de traços das linhas de velocidade 3D (fx/streaks.ts) acende acima de 85% da máxima, e o piso medido já estava no limite. Deliberado e medido (tools/render-harness.lab.ts, com e sem o grupo de efeitos); os outros degraus ficam dentro.
+// 10/10/2026 (N3): copa-4p/medium 80 → 82: uma roda escolhida que ninguém mais usa na cena abre um lote (+1 chamada, teto de 9 lotes).
 export const GATE_LIMITS: GateLimits = {
   'copa-1p': {
     low: { calls: 38, triangles: 173000, passes: 0, postPxRatio: 0 },
@@ -44,7 +45,7 @@ export const GATE_LIMITS: GateLimits = {
   },
   'copa-4p': {
     low: { calls: 42, triangles: 174000, passes: 0, postPxRatio: 0 },
-    medium: { calls: 80, triangles: 316000, passes: 5, postPxRatio: 5.8 },
+    medium: { calls: 82, triangles: 316000, passes: 5, postPxRatio: 5.8 },
     high: { calls: 81, triangles: 340000, passes: 4, postPxRatio: 5.4 },
     ultra: { calls: 85, triangles: 340000, passes: 5, postPxRatio: 8.7 },
   },

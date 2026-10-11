@@ -112,7 +112,7 @@ function press(screen: ScreenInstance, device: DeviceId, key: 'up' | 'down' | 'l
 const actions = (screen: ScreenInstance) => one(screen.el, hasClass('actions')).children.map(text);
 const firstAction = (screen: ScreenInstance) => one(screen.el, hasClass('actions')).children[0] as FakeEl;
 
-const humans: HumanEntry[] = [{ seat: 0, name: 'Ana', carId: 'trovao', teamId: 0, color: '#fff', paint: 'rubi' }];
+const humans: HumanEntry[] = [{ seat: 0, name: 'Ana', carId: 'trovao', teamId: 0, color: '#fff', look: { paint: 'rubi' } }];
 /** 20 carros, o humano do assento 0 na posição `pos`. */
 function rows(pos: number): RaceResultRow[] {
   return Array.from({ length: 20 }, (_, i) => {

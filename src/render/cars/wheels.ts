@@ -5,13 +5,15 @@
 // limitado a uma fração dele por quadro, para os raios não "andarem para trás" (efeito estroboscópico) a
 // 300 km/h.
 import type * as THREE from 'three';
+import { WHEEL_IDS, type WheelId } from '../../game/cosmetics';
 import { AXIS_X, beam, box, cylinder, lathe, MeshBuilder, type Brush, type P2, type P3 } from './kit';
 import { ACCENT, ALU, CHROME, GUNMETAL, TIRE, TIRE_SIDE, TRIM, UNDER, WHITE, WHITEWALL } from './paints';
 import { withBrush } from './kit';
 import { CREASE } from '../normals';
 
-export type WheelDesign = 'sport5' | 'mag' | 'multi' | 'hubcap' | 'aero' | 'dish' | 'center' | 'wire' | 'steel';
-export const WHEEL_DESIGNS: readonly WheelDesign[] = ['sport5', 'mag', 'multi', 'hubcap', 'aero', 'dish', 'center', 'wire', 'steel'];
+/** Os 9 desenhos: a lista e o tipo moram no catálogo de cosméticos (src/game/cosmetics.ts), que também diz quais cada estilo oferece (N3). */
+export type WheelDesign = WheelId;
+export const WHEEL_DESIGNS: readonly WheelDesign[] = WHEEL_IDS;
 
 export interface WheelModel { design: WheelDesign; geometry: THREE.BufferGeometry; symmetry: number; triangles: number }
 
@@ -56,7 +58,7 @@ function hub(b: MeshBuilder, r: number, t0: number, t1: number, br: Brush, segs 
   cylinder(b, X(0), r, t0, t1, segs, br);
 }
 
-/** Aro prata que, na pintura B do carro, fica na cor de acento. */
+/** Aro prata que, quando o aro do carro está ligado (o bit B do lote da roda, N3), fica na cor do aro (a de acento, ou a escolhida). */
 const RIM_B = withBrush(ALU, { layer: 2 });
 
 function build(design: WheelDesign): { b: MeshBuilder; n: number } {
@@ -154,7 +156,7 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
 const TRIM_CAP = withBrush(TRIM, { rough: 0.4 });
 const WHITE_DISC = withBrush(WHITE, { rough: 0.3, metal: 0.2 });
 const CARBON_RIM = withBrush(GUNMETAL, { rgb: [0.03, 0.032, 0.036] });
-/** Aro de aço da picape: preto, ou na cor de acento na pintura B. */
+/** Aro de aço da picape: preto, ou na cor do aro quando ele está ligado. */
 const PAINT_RIM = withBrush(TRIM, { rough: 0.45, metal: 0.4, layer: 2 });
 
 export function buildWheel(design: WheelDesign): WheelModel {

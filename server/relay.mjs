@@ -14,12 +14,13 @@ import { WebSocketServer } from 'ws';
 
 /**
  * Versões do protocolo que o relay aceita: a FAIXA MIN_PROTOCOL_VERSION … PROTOCOL_VERSION (um relay novo atende clientes
- * velhos sem redeploy casado). A v2 (onda M, M1) só acrescentou o bit de derrapar na entrada, e a v3 (onda N, N6) a buzina e a frase
- * de provocação (os bits 64 e 8–11): o relay nem lê os bits. Quem separa
+ * velhos sem redeploy casado). A v2 (onda M, M1) só acrescentou o bit de derrapar na entrada, a v3 (onda N, N6) a buzina e a frase
+ * de provocação (os bits 64 e 8–11) e a v4 (onda N, N3) o visual do carro (`look`) no `info` da sala e na largada: o relay nem lê os bits
+ * nem o look (só o tamanho do bloco, `maxBlob`); quem valida o conteúdo é o cliente. Quem separa
  * jogos de conteúdo diferente na mesma sala é `b` (a impressão do conteúdo, que já leva a versão do protocolo).
  */
 export const MIN_PROTOCOL_VERSION = 1;
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 /** Impressão do conteúdo do jogo (`b` no create/join): texto curto e opaco para o relay. */
 const BUILD_MAX = 64;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

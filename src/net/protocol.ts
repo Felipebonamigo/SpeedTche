@@ -3,16 +3,17 @@
 // `null` (a mensagem é descartada e contada). O servidor (server/relay.mjs) espelha as mesmas
 // regras de forma e de tamanho, mas não entende o jogo; quem valida o conteúdo é o cliente.
 import { ASSIST_LEVELS } from '../core/sim/assist';
-import type { AssistLevel, CoopAssists, Difficulty, PlayerInput } from '../core/types';
-import { withPaint } from '../game/paints';
+import type { AssistLevel, CarLook, CoopAssists, Difficulty, PlayerInput } from '../core/types';
+import { parseLook } from '../game/cosmetics';
 
 /**
  * Versão do protocolo. 2 (onda M, M1): a entrada ganhou o bit de derrapar (32). 3 (onda N, N6): a buzina (bit 64) e a frase de
- * provocação (bits 8–11). O relay aceita a FAIXA de versões (server/relay.mjs: MIN_PROTOCOL_VERSION … PROTOCOL_VERSION) e quem
- * separa jogos de conteúdo diferente é a impressão do conteúdo (`b`, content-version.ts), que já carrega esta versão: um
- * cliente v2 e um v3 nunca dividem sala.
+ * provocação (bits 8–11). 4 (onda N, N3): o visual do carro (`look`) no `info` da sala e na largada, no lugar de `paint`; os bits da
+ * entrada não mudam. O relay aceita a FAIXA de versões (server/relay.mjs: MIN_PROTOCOL_VERSION … PROTOCOL_VERSION) e quem
+ * separa jogos de conteúdo diferente é a impressão do conteúdo (`b`, content-version.ts), que já carrega esta versão (e o catálogo de
+ * cosméticos): um cliente v3 e um v4 nunca dividem sala — o v3 ignoraria o `look` calado e o outro lado veria o carro de fábrica.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 export const DEFAULT_SERVER_URL = 'ws://localhost:8787';
 export const SERVER_URL_MAX_LENGTH = 200;
 
@@ -140,8 +141,8 @@ export interface LobbyPlayer {
   car: string;
   /** Direção assistida escolhida por este jogador; ausente = nenhuma (sim/assist.ts). */
   assist?: AssistLevel;
-  /** Pintura do carro (id da paleta, src/game/paints.ts); ausente = a de fábrica. Só aparência: fica fora da RaceConfig. */
-  paint?: string;
+  /** Visual do carro (src/game/cosmetics.ts, forma canônica); ausente = o de fábrica. Só aparência: fica fora da RaceConfig. */
+  look?: CarLook;
 }
 
 /** O que cada cliente publica sobre si no lobby. */
@@ -187,8 +188,8 @@ export interface SeatAssignment {
   car: string;
   /** Direção assistida do jogador do assento (vai para HumanEntry.assist); ausente = nenhuma. */
   assist?: AssistLevel;
-  /** Pintura do carro do assento (vai para os humanos da sessão, nunca para a RaceConfig); ausente = a de fábrica. */
-  paint?: string;
+  /** Visual do carro do assento (vai para os humanos da sessão, nunca para a RaceConfig); ausente = o de fábrica. */
+  look?: CarLook;
 }
 
 /** Tudo que um cliente precisa para montar a mesma corrida que os outros. */
@@ -308,6 +309,11 @@ export function withAssist<T extends object>(base: T, assist: AssistLevel | unde
   return assist && assist !== 'none' ? { ...base, assist } : base;
 }
 
+/** O campo `look` só aparece quando há visual (a mensagem de quem não personaliza fica como antes). O `look` já vem canônico de `parseLook`. */
+export function withLookField<T extends object>(base: T, look: CarLook | null | undefined): T & { look?: CarLook } {
+  return look ? { ...base, look } : base;
+}
+
 export function parseClientInfo(v: unknown, rules: ContentRules): ClientInfo | null {
   if (!isRecord(v) || !Array.isArray(v.players) || typeof v.ready !== 'boolean') return null;
   if (v.players.length < 1 || v.players.length > MAX_LOCAL_PLAYERS) return null;
@@ -317,8 +323,11 @@ export function parseClientInfo(v: unknown, rules: ContentRules): ClientInfo | n
     const name = cleanName(p.name);
     const assist = parseAssistLevel(p.assist);
     if (!name || typeof p.car !== 'string' || !rules.cars.includes(p.car) || !assist) return null;
-    // Pintura desconhecida (ou de outro tipo) vira a de fábrica: cosmético não recusa a mensagem.
-    players.push(withPaint(withAssist({ name, car: p.car }, assist), p.paint));
+    // Visual (ESTRITO, cosmetics.ts): id fora do catálogo, roda de outro estilo, chave desconhecida ou cor mal formada RECUSAM o jogador (e o
+    // `info` dele aparece sem jogadores: a sala segue). Quem fala a mesma versão só manda ids que existem.
+    const look = parseLook(p.look, p.car);
+    if (!look) return null;
+    players.push(withLookField(withAssist({ name, car: p.car }, assist), look.look));
   }
   return { players, ready: v.ready };
 }
@@ -355,8 +364,10 @@ export function parseStartConfig(v: unknown, rules: ContentRules): StartConfig |
     const name = cleanName(s.name);
     const assist = parseAssistLevel(s.assist);
     if (!name || typeof s.car !== 'string' || !rules.cars.includes(s.car) || used.has(s.seat) || !assist) return null;
+    const look = parseLook(s.look, s.car);
+    if (!look) return null;
     used.add(s.seat);
-    seats.push(withPaint(withAssist({ seat: s.seat, client: s.client, name, car: s.car }, assist), s.paint));
+    seats.push(withLookField(withAssist({ seat: s.seat, client: s.client, name, car: s.car }, assist), look.look));
   }
   // Nenhum cliente com mais assentos que o limite local.
   const perClient = new Map<number, number>();
