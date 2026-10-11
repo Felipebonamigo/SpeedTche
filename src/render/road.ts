@@ -5,7 +5,7 @@
 // luz dos postes no asfalto. Os buffers são alocados uma vez e atualizados no lugar.
 import * as THREE from 'three';
 import type { Segment, Track } from '../core/types';
-import type { Palette } from './palette';
+import { lightsAmount, mix, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
 import {
   ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintShoulder, paintStartDecal, PIT_REPEAT_M,
@@ -145,6 +145,34 @@ class KerbList {
   dispose(): void { this.geometry.dispose(); }
 }
 
+const MAP_SAMPLE = 'texture2D( map, vMapUv )';
+const EMISSIVE_SAMPLE = 'texture2D( emissiveMap, vEmissiveMapUv )';
+
+/**
+ * Compõe, com o `onBeforeCompile` e a chave de programa que o material já tem (o estilizador), a mistura da textura da pista com a do período seguinte: o `map` e o
+ * `emissiveMap` viram `mix(textura, texturaB, uRoadBlend)`. Só entra no programa de quem tem `userData.roadLive` (pista com período seguinte); a chave de programa distingue os dois.
+ * Falha alto se o three mudar as linhas (senão a mistura viraria no-op calado, como no stylize.ts).
+ */
+function installLiveBlend(m: THREE.Material): void {
+  const prev = m.onBeforeCompile;
+  const prevKey = m.customProgramCacheKey;
+  m.onBeforeCompile = (shader, renderer) => {
+    prev.call(m, shader, renderer);
+    const live = m.userData.roadLive as { mapB: { value: THREE.Texture }; emissiveB: { value: THREE.Texture } } | undefined;
+    if (!live) return;
+    const mapChunk = THREE.ShaderChunk.map_fragment; const emChunk = THREE.ShaderChunk.emissivemap_fragment;
+    if (!mapChunk.includes(MAP_SAMPLE) || !emChunk.includes(EMISSIVE_SAMPLE)) throw new Error('road: o three mudou o map_fragment/emissivemap_fragment (amostra da textura não achada)');
+    shader.uniforms.uRoadBlend = m.userData.roadBlend as { value: number };
+    shader.uniforms.uMapB = live.mapB;
+    shader.uniforms.uEmissiveMapB = live.emissiveB;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', () => '#include <common>\nuniform float uRoadBlend;\nuniform sampler2D uMapB;\nuniform sampler2D uEmissiveMapB;')
+      .replace('#include <map_fragment>', () => mapChunk.replace(MAP_SAMPLE, () => `mix( ${MAP_SAMPLE}, texture2D( uMapB, vMapUv ), uRoadBlend )`))
+      .replace('#include <emissivemap_fragment>', () => emChunk.replace(EMISSIVE_SAMPLE, () => `mix( ${EMISSIVE_SAMPLE}, texture2D( uEmissiveMapB, vEmissiveMapUv ), uRoadBlend )`));
+  };
+  m.customProgramCacheKey = () => `${prevKey.call(m)}|road-live:${m.userData.roadLive ? 1 : 0}`;
+}
+
 export class Road {
   readonly group = new THREE.Group();
   private readonly asphalt: Strip;
@@ -162,12 +190,17 @@ export class Road {
   private textures: THREE.Texture[] = [];
   private paletteKey = '';
   private night = false;
+  /** M6 (b): o uniforme de mistura (0 = textura da pista, 1 = a do período seguinte), compartilhado pelos materiais; só vale com `live`. */
+  private readonly blend = { value: 0 };
+  private live = false;
+  private lampPool: string | null = null;
   private readonly cBand = [new THREE.Color(), new THREE.Color()];
   private readonly dummy = new THREE.Object3D();
 
   constructor(capacity: number, private readonly anisotropy: number) {
-    this.asphaltMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, emissive: '#ffffff', emissiveIntensity: 0 });
-    this.shoulderMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+    // polygonOffset: com a pista fechada (M6) um trecho cruza outro e as faixas de chão do primeiro passam por baixo do asfalto do segundo, no mesmo plano: a pista vence.
+    this.asphaltMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, emissive: '#ffffff', emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    this.shoulderMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     this.kerbMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6, flatShading: true, emissive: '#ffffff', emissiveIntensity: 0 });
     this.pitMaterial = new THREE.MeshStandardMaterial({ roughness: 0.85, flatShading: true });
     this.decalMaterial = new THREE.MeshStandardMaterial({
@@ -180,6 +213,8 @@ export class Road {
     applyStylize(this.kerbMaterial, 'road');
     applyStylize(this.pitMaterial, 'road');
     applyStylize(this.decalMaterial, 'road');
+    // A mistura ao vivo entra DEPOIS do estilizador (compõe com ele): só há código novo no programa das pistas que têm período seguinte.
+    for (const m of [this.asphaltMaterial, this.shoulderMaterial, this.kerbMaterial, this.pitMaterial, this.decalMaterial]) installLiveBlend(m);
     this.asphalt = new Strip(capacity, 2, this.asphaltMaterial);
     this.shoulders = new Strip(capacity, 4, this.shoulderMaterial);
     this.pit = new Strip(capacity, 2, this.pitMaterial);
@@ -214,10 +249,17 @@ export class Road {
     this.decal.mesh.renderOrder = 1;
   }
 
-  setPalette(p: Palette, night: boolean, key: string): void {
+  /**
+   * `pTo`: a paleta do período seguinte, se a corrida o alcança (M6, `racePeriodPlan`): as texturas assadas são pintadas para as duas pontas e `setLive` as mistura por um
+   * uniforme. Sem `pTo` (pista de noite) o material fica exatamente como era.
+   */
+  setPalette(p: Palette, night: boolean, key: string, pTo?: Palette): void {
     if (key === this.paletteKey) return;
     this.paletteKey = key;
     this.night = night;
+    this.live = pTo !== undefined;
+    this.blend.value = 0;
+    this.lampPool = pTo?.lampPool ?? p.lampPool;
     for (const t of this.textures) t.dispose();
     const asphalt = paintAsphalt(p, this.anisotropy);
     const kerb = paintKerb(p, this.anisotropy);
@@ -246,9 +288,46 @@ export class Road {
     this.decalMaterial.emissiveMap = decal;
     this.decalMaterial.emissiveIntensity = p.markingGlow * 0.6;
     this.decalMaterial.needsUpdate = true;
+    if (pTo) {
+      // O mesmo desenho, as cores do período seguinte: a segunda ponta da mistura.
+      const asphaltB = paintAsphalt(pTo, this.anisotropy);
+      const kerbB = paintKerb(pTo, this.anisotropy);
+      const shoulderB = paintShoulder(pTo, this.anisotropy);
+      const pitB = paintPit(pTo, this.anisotropy);
+      const decalB = paintStartDecal(pTo, SEGMENT_M, this.anisotropy);
+      this.textures.push(asphaltB.map, asphaltB.glow, kerbB, shoulderB, pitB, decalB);
+      const link = (m: THREE.Material, mapB: THREE.Texture, emissiveB: THREE.Texture): void => {
+        m.userData.roadBlend = this.blend;
+        m.userData.roadLive = { mapB: { value: mapB }, emissiveB: { value: emissiveB } };
+      };
+      link(a, asphaltB.map, asphaltB.glow); link(this.kerbMaterial, kerbB, kerbB); link(this.shoulderMaterial, shoulderB, shoulderB);
+      link(this.pitMaterial, pitB, pitB); link(this.decalMaterial, decalB, decalB);
+    } else {
+      for (const m of [a, this.kerbMaterial, this.shoulderMaterial, this.pitMaterial, this.decalMaterial]) { delete m.userData.roadLive; delete m.userData.roadBlend; }
+    }
     // Faixas de 3 segmentos um pouco mais claras/escuras: o ritmo que dá sensação de velocidade.
     this.cBand[0].setRGB(1, 1, 1); this.cBand[1].setRGB(0.93, 0.93, 0.94);
     this.pools.material.color.set(p.lampPool ?? '#000000');
+  }
+
+  /**
+   * M6 (b): a pista no instante da corrida. SÓ uniformes e cores de material (a `version` não anda: nenhum programa recompila): a mistura das duas texturas, o brilho das
+   * marcações, a faixa, a aspereza do asfalto, o reflexo do céu nele e as poças de luz dos postes (que aparecem quando as luzes acendem).
+   */
+  setLive(live: LivePalette): void {
+    const { p, t } = live;
+    this.blend.value = this.live ? t : 0;
+    // O que é "noite" na pista é o quanto as luzes já estão acesas (0,6 no entardecer, 1 à noite): 0 de dia e no entardecer, 1 à noite.
+    const night = Math.max(0, Math.min(1, (lightsAmount(p.light) - 0.6) / 0.4));
+    this.night = night > 0.02;
+    const a = this.asphaltMaterial;
+    a.emissive.set(p.lane);
+    a.emissiveIntensity = p.markingGlow;
+    a.roughness = 0.9 - 0.3 * night;
+    a.envMapIntensity = 0.15 + 0.75 * night;
+    this.kerbMaterial.emissiveIntensity = p.markingGlow * 0.5;
+    this.decalMaterial.emissiveIntensity = p.markingGlow * 0.6;
+    this.pools.material.color.set(mix('#000000', this.lampPool ?? '#000000', night));
   }
 
   update(frame: RoadFrame, track: Track): void {
