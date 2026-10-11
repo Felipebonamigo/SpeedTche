@@ -207,6 +207,8 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
     show(f, now, quiet);
     const done = post.ready;
     el.setAttribute('data-post-ready', done ? '1' : '0');
+    el.setAttribute('data-post-elapsed', post.elapsed.toFixed(2));
+    el.setAttribute('data-post-skipped', post.skipped ? '1' : '0');
     hint.classList.toggle('done', done);
     for (const i of items) i.el.classList.toggle('pending', !done);
   }

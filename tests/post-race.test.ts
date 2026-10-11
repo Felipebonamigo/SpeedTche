@@ -80,8 +80,8 @@ describe('createPostRace (R3, R4)', () => {
     expect(t).toBeGreaterThan(11.9);
     expect(t).toBeLessThanOrEqual(POST_RACE_BUDGET - POST_FLAG_SECONDS + 0.05);
   });
-  it('um quadro enorme (aba parada, engasgo) não pula passos: o dt é preso a 0,1 s', () => {
-    expect(POST_FRAME_MAX).toBeCloseTo(0.1, 6);
+  it('um quadro enorme (aba que volta do segundo plano) não pula passos: o dt é preso a 0,25 s', () => {
+    expect(POST_FRAME_MAX).toBeCloseTo(0.25, 6);
     const post = createPostRace(['arrival', 'podium']);
     post.advance(30);
     expect(post.ready).toBe(false);
@@ -118,8 +118,8 @@ describe('createPostRace (R3, R4)', () => {
     const post = createPostRace(['arrival', 'podium']);
     expect(post.stepIndex).toBe(0);
     post.advance(POST_FRAME_MAX);
-    for (let i = 0; i < 30; i++) post.advance(POST_FRAME_MAX);
-    expect(post.stepIndex).toBe(1); // 3,1 s: passou dos 2 s da chegada
+    for (let i = 0; i < 12; i++) post.advance(POST_FRAME_MAX);
+    expect(post.stepIndex).toBe(1); // 3,25 s: passou dos 2 s da chegada
   });
 });
 

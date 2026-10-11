@@ -237,6 +237,9 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
     const step = post.step;
     el.setAttribute('data-post-ready', post.ready ? '1' : '0');
     el.setAttribute('data-post-step', step ?? 'ready');
+    // Para o playtest (orçamento de tempo): quantos segundos de sequência já correram e se foi pulada.
+    el.setAttribute('data-post-elapsed', post.elapsed.toFixed(2));
+    el.setAttribute('data-post-skipped', post.skipped ? '1' : '0');
     // O pódio aparece quando a chegada acaba; pulado ou pronto, já está à mostra.
     const podiumAt = post.plan.indexOf('podium');
     curtain?.classList.toggle('up', !post.ready && podiumAt >= 0 && post.stepIndex < podiumAt);

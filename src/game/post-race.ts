@@ -21,8 +21,11 @@ export const POST_FLAG_SECONDS = 3;
 /** Da bandeirada à decisão de "próxima": o teto de quem espera sem apertar nada (a bandeirada mais o pior plano, 12 s, dá 15 s). */
 export const POST_RACE_BUDGET = 15;
 
-/** Um quadro não conta mais que isto (aba em segundo plano, engasgo do 3D por software): a sequência não pula passos. */
-export const POST_FRAME_MAX = 0.1;
+/**
+ * Um quadro não conta mais que isto: a aba que volta do segundo plano (o `requestAnimationFrame` parou) manda um `dt` de dezenas de
+ * segundos, e a sequência não pode pular passos por causa disso. Acima de 4 quadros/s a sequência anda em tempo real.
+ */
+export const POST_FRAME_MAX = 0.25;
 
 /** Segurar o botão por este tempo, seguido, pula a sequência inteira. */
 export const HOLD_SKIP_SECONDS = 0.45;
