@@ -488,3 +488,31 @@ export function lightsAmount(light: number): number {
 
 /** A opacidade das estrelas de `light`: nenhuma até o entardecer, todas à noite. */
 export function starAlpha(light: number): number { return smooth((0.62 - light) / 0.3); }
+
+/** O que o cenário de beira de pista mostra de cada hora (runtime.ts, `setTrack` e `applyNight`): filtro de cor, janelas e letreiros acesos, brilho, cones do poste, mancha de sombra. */
+export interface SceneryLook {
+  /** Cor que multiplica o cenário (o mesmo filtro de hora da paleta). */
+  tint: string;
+  /** Fração das janelas acesas (0 · 0,6 · 1), brilho dos letreiros e dos faróis/luminárias (cor escalar do material `glow`). */
+  lit: number; panel: number; glow: number;
+  /** Facho dos postes (0..1: só na noite fechada) e a mancha de sombra no chão (cor e opacidade). */
+  cones: number; blob: string; blobOpacity: number;
+}
+
+/**
+ * `SceneryLook` pela luz do período (1 dia · 0,7 entardecer · 0,32 noite): nas três luzes são exatamente os valores fixos do cenário (a M6 só os interpola, em passos contínuos).
+ * As janelas seguem `lightsAmount`; o resto anda linear entre as duas estações vizinhas.
+ */
+export function sceneryLook(light: number): SceneryLook {
+  const day = light >= 0.7;
+  const w = day ? clamp01((light - 0.7) / 0.3) : clamp01((0.7 - light) / 0.38); // quanto falta para a estação de cima (dia) ou quanto já é a de baixo (noite)
+  const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
+  // `k`: 0 na estação do entardecer, 1 na outra ponta (dia acima de 0,7, noite abaixo).
+  const pick = (dayV: number, duskV: number, nightV: number): number => (day ? lerp(duskV, dayV, w) : lerp(duskV, nightV, w));
+  const tint = day ? mix(mix('#ffffff', '#5a2e4a', 0.22), '#ffffff', w) : mix(mix('#ffffff', '#5a2e4a', 0.22), mix('#ffffff', '#0a1030', 0.42), w);
+  const blob = day ? mix('#2c1a48', '#1c2a5a', w) : mix('#2c1a48', '#050818', w);
+  return {
+    tint, lit: lightsAmount(light), panel: pick(0.3, 0.6, 0.6), glow: pick(0.95, 1.4, 2.0),
+    cones: day ? 0 : w, blob, blobOpacity: pick(0.32, 0.32, 0.4),
+  };
+}

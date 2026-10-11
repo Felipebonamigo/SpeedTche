@@ -7,7 +7,7 @@
 // decoração distante usa mancha no chão (barata e funciona também na qualidade baixa).
 import * as THREE from 'three';
 import type { Track } from '../../core/types';
-import { mix } from '../palette';
+import { mix, sceneryLook, type Palette } from '../palette';
 import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
 import { getModel, landmarkOf } from './catalog';
@@ -126,6 +126,8 @@ export class Scenery {
   private windOn = true;
   /** Entardecer: luzes acesas, mas mais fracas que à noite (o céu ainda clareia). */
   private dusk = false;
+  /** Facho dos postes (0..1; só na noite fechada) e o quanto de cada material é visto: o período fixo (`applyNight`) ou o ao vivo (`setLive`). */
+  private cones = 0;
   private readonly m = new THREE.Matrix4();
   private readonly c4 = new THREE.Vector4();
   private cosH = new Float32Array(WINDOW + 8);
@@ -189,13 +191,36 @@ export class Scenery {
     this.applyNight();
   }
 
+  /**
+   * M6 (b): o cenário no instante da corrida, pela paleta ao vivo (`sceneryLook(p.light)`): só cor e intensidade de material, nenhum programa recompilado (a `version` não anda).
+   * Nos três períodos dá exatamente os valores de `setTrack`/`applyNight`.
+   */
+  setLive(p: Palette): void {
+    const look = sceneryLook(p.light);
+    this.night = look.lit > 0.3;
+    this.cones = look.cones;
+    this.flatMat.color.set(look.tint);
+    for (const m of this.facadeMats) { m.color.copy(this.flatMat.color); m.emissiveIntensity = FACADE_LIT_EMISSIVE * look.lit; }
+    this.hazeMat.color.copy(this.flatMat.color);
+    this.cutoutMat.color.copy(this.flatMat.color);
+    this.blobMat.color.set(look.blob);
+    this.blobMat.opacity = look.blobOpacity;
+    this.panelMat.emissiveIntensity = look.panel;
+    this.glowMat.color.setScalar(look.glow);
+    const cone = this.materials.cone as THREE.MeshBasicMaterial;
+    cone.opacity = 0.035 * look.cones;
+    for (const b of this.batches) if (b.key === 'cone') b.mesh.visible = this.cones > 0.001;
+  }
+
   private applyNight(): void {
     const lit = this.night ? (this.dusk ? 0.6 : 1) : 0;
     for (const m of this.facadeMats) m.emissiveIntensity = FACADE_LIT_EMISSIVE * lit;
     // De dia um pouco de brilho próprio: o outdoor lê a 300 km/h mesmo contra o sol.
     this.panelMat.emissiveIntensity = this.night ? 0.6 : 0.3;
     this.glowMat.color.setScalar(this.night ? (this.dusk ? 1.4 : GLOW_NIGHT) : 0.95);
-    for (const b of this.batches) if (b.key === 'cone') b.mesh.visible = this.night && !this.dusk;
+    this.cones = this.night && !this.dusk ? 1 : 0;
+    (this.materials.cone as THREE.MeshBasicMaterial).opacity = 0.035;
+    for (const b of this.batches) if (b.key === 'cone') b.mesh.visible = this.cones > 0.001;
   }
 
   // ───────────────────────────── Montagem por pista ─────────────────────────────
@@ -371,7 +396,7 @@ export class Scenery {
         for (let k = lo; k < hi; k++) b.mesh.setVisibleAt(s.start + k, vis);
       }
       // Facho de luz dos postes só na noite fechada (no entardecer o céu ainda clareia e o cone vira um véu bege).
-      b.mesh.visible = any && (b.key !== 'cone' || (this.night && !this.dusk));
+      b.mesh.visible = any && (b.key !== 'cone' || this.cones > 0.001);
     }
     // Baliza piscando (torres, antenas).
     const blink = Math.sin(time * 5) > 0.2 ? (this.night ? 3.2 : 1.6) : 0.35;
