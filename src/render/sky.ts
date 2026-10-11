@@ -12,7 +12,7 @@ import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { smoothNormals } from './normals';
 import { buildLensFlare } from './lensflare';
-import { palette, type Palette } from './palette';
+import { bodyColor, lightsAmount, mix, palette, starAlpha, type LivePalette, type Palette } from './palette';
 import { applyGrade } from './stylize';
 
 export { FLARE_ELEMENTS, flareFade, lensFlareLayout } from './lensflare';
@@ -59,12 +59,13 @@ void main() {
   // Disco com borda nítida; a lua ganha crateras (ruído barato no plano do disco).
   float disc = (1.0 - smoothstep(uSunSize * 0.9, uSunSize, ang)) * step(0.0, h);
   vec3 discCol = uSunColor * uDisc;
-  if (uMoon > 0.5) {
+  // uMoon vai de 0 (sol) a 1 (lua): na corrida que muda (M6) o sol vira lua aos poucos e as crateras entram com ele.
+  if (uMoon > 0.001) {
     vec3 t1 = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0)));
     vec3 t2 = cross(t1, uSunDir);
     vec2 p = vec2(dot(d, t1), dot(d, t2)) / uSunSize;
     float cr = sin(p.x * 7.0 + 1.3) * sin(p.y * 6.0 - 0.7) + 0.6 * sin(p.x * 13.0 - p.y * 11.0);
-    discCol *= 0.86 + 0.1 * smoothstep(0.2, 0.9, cr) - 0.12 * smoothstep(0.5, 1.0, length(p));
+    discCol *= mix(1.0, 0.86 + 0.1 * smoothstep(0.2, 0.9, cr) - 0.12 * smoothstep(0.5, 1.0, length(p)), uMoon);
   }
   col = mix(col, discCol, disc);
   gl_FragColor = vec4(col, 1.0);
@@ -203,6 +204,24 @@ export function buildClouds(detail: number): THREE.BufferGeometry {
   return merged;
 }
 
+/** Refeitas do env map por transição (M6): o PMREM é caro, a mudança entre dois passos de 1/8 é só reflexo. */
+const ENV_STEPS = 8;
+const ENV_STEPS_LOW = 3;
+
+type SunLook = Omit<SunSetup, 'dir' | 'moon'> & { moon: number };
+
+/** `sunLook` com a lua como 0..1 e interpolado entre dois períodos (o sol grande e baixo do entardecer encolhe e vira a lua grande da noite). */
+function lerpLook(a: Omit<SunSetup, 'dir'>, b: Omit<SunSetup, 'dir'>, t: number): SunLook {
+  const l = (x: number, y: number): number => x + (y - x) * t;
+  return { size: l(a.size, b.size), halo: l(a.halo, b.halo), glow: l(a.glow, b.glow), disc: l(a.disc, b.disc), moon: l(a.moon ? 1 : 0, b.moon ? 1 : 0) };
+}
+
+/** Quanto do entardecer há na luz `light` (1 em 0,7; 0 de dia e à noite): a borda acesa das nuvens e o laranja do horizonte. */
+export function duskAmount(light: number): number { return Math.max(0, Math.min(1, 1 - Math.abs(light - 0.7) / 0.3)); }
+
+/** Quanto da noite há na luz (0 de dia e no entardecer, 1 à noite): usa as luzes acesas, de 0,6 em diante. */
+function lightsAmountNight(light: number): number { return Math.max(0, (lightsAmount(light) - 0.6) / 0.4); }
+
 export class Sky {
   /** Domo, estrelas e nuvens: gira pelo rumo absoluto. */
   readonly group = new THREE.Group();
@@ -225,6 +244,10 @@ export class Sky {
   private readonly pmrem: THREE.PMREMGenerator;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private paletteKey = '';
+  /** A última paleta ao vivo entregue (para não repetir o mesmo passo), o `t` do último env map e quantas vezes ele foi refeito por `setLive`. */
+  private livePair: { a: Palette; b: Palette; t: number } | null = null;
+  private envT = 0;
+  private envRebuilds = 0;
   private fogBase = FOG_DENSITY.high;
   private fogMul = 1;
   private night = false;
@@ -308,29 +331,62 @@ export class Sky {
   setPalette(p: Palette, time: TimeOfDay, key: string): void {
     if (key === this.paletteKey) return;
     this.paletteKey = key;
-    const s = sunOf(p, time);
-    this.night = time === 'night';
-    this.sunDirAbs.copy(s.dir);
+    this.livePair = null;
+    this.apply({ a: p, b: p, t: 0, p, body: bodyColor(p) }, time, time);
+    this.envT = 0;
+    this.rebuildEnvironment();
+  }
+
+  /**
+   * M6 (b), a corrida que muda: a paleta entre os dois períodos (`livePalette`), só em uniformes e luzes — nenhum material novo, nenhum shader recompilado. O env map
+   * (PMREM do próprio domo) é refeito no máximo `steps` vezes por transição (3 na Baixa, 8 nas outras), nunca por quadro, e uma vez ao voltar ao período da pista.
+   * `timeA`/`timeB` = os períodos das duas pontas (o disco do sol/lua e o brilho das nuvens vêm deles).
+   */
+  setLive(live: LivePalette, timeA: TimeOfDay, timeB: TimeOfDay, quality: Quality): void {
+    const prev = this.livePair;
+    if (prev && prev.t === live.t && prev.a === live.a && prev.b === live.b) return;
+    this.livePair = { a: live.a, b: live.b, t: live.t };
+    this.apply(live, timeA, timeB);
+    const steps = atLeast(quality, 'medium') ? ENV_STEPS : ENV_STEPS_LOW;
+    const ends = (live.t === 0 || live.t === 1) && this.envT !== live.t;
+    if (ends || Math.abs(live.t - this.envT) >= 1 / steps) { this.envT = live.t; this.rebuildEnvironment(); this.envRebuilds++; }
+  }
+
+  /** Quantas vezes o env map foi refeito por `setLive` (os testes conferem o teto: nunca por quadro). */
+  get liveEnvRebuilds(): number { return this.envRebuilds; }
+
+  private apply(live: LivePalette, timeA: TimeOfDay, timeB: TimeOfDay): void {
+    const { p, a, b, t } = live;
+    const lookA = sunLook(timeA); const lookB = sunLook(timeB);
+    const look = t <= 0 ? lookA : t >= 1 ? lookB : lerpLook(lookA, lookB, t);
+    this.night = p.light < 0.5;
+    this.sunDirAbs.copy(fromAngles(p.sunEl, p.sunAz));
     const u = this.dome.material.uniforms;
     (u.uTop.value as THREE.Color).set(p.sky[0]);
     (u.uMid.value as THREE.Color).set(p.sky[1]);
     (u.uHorizon.value as THREE.Color).set(p.sky[2]);
     (u.uGlow.value as THREE.Color).set(p.skyGlow);
     (u.uBelow.value as THREE.Color).set(p.fog);
-    (u.uSunDir.value as THREE.Vector3).copy(s.dir);
-    (u.uSunColor.value as THREE.Color).set(p.sun ?? p.moon ?? '#ffffff');
-    u.uSunSize.value = s.size; u.uHalo.value = s.halo; u.uGlowAmt.value = s.glow; u.uDisc.value = s.disc; u.uMoon.value = s.moon ? 1 : 0;
-    this.stars.visible = p.stars;
+    (u.uSunDir.value as THREE.Vector3).copy(this.sunDirAbs);
+    (u.uSunColor.value as THREE.Color).set(live.body);
+    u.uSunSize.value = look.size; u.uHalo.value = look.halo; u.uGlowAmt.value = look.glow; u.uDisc.value = look.disc; u.uMoon.value = look.moon;
+    // Estrelas: a opacidade segue a luz do período (todas à noite, nenhuma no entardecer); sem interpolar um booleano.
+    const stars = t <= 0 ? (a.stars ? 1 : 0) : t >= 1 ? (b.stars ? 1 : 0) : starAlpha(p.light);
+    const sm = this.stars.material as THREE.PointsMaterial;
+    sm.opacity = stars; this.stars.visible = stars > 0.001;
     const cu = this.clouds.material.uniforms;
+    // Nuvem: de noite não há lado iluminado, o lado da sombra vale para os dois — ao entrar na noite o iluminado vai para a cor da sombra e a nuvem se dissolve no céu.
+    const litA = a.cloudLit ?? a.cloudShade; const litB = b.cloudLit ?? b.cloudShade;
     this.clouds.visible = p.cloudLit !== null;
-    (cu.uLit.value as THREE.Color).set(p.cloudLit ?? '#ffffff');
+    (cu.uLit.value as THREE.Color).set(t <= 0 ? litA : t >= 1 ? litB : mix(litA, litB, t));
     (cu.uShade.value as THREE.Color).set(p.cloudShade);
-    (cu.uRim.value as THREE.Color).set(time === 'dusk' ? p.skyGlow : '#000000');
+    const rim = duskAmount(p.light);
+    (cu.uRim.value as THREE.Color).set(mix('#000000', p.skyGlow, rim));
     (cu.uHorizon.value as THREE.Color).set(p.sky[2]);
     this.sun.color.set(p.sunLight);
     this.sun.intensity = p.sunIntensity;
-    // Sombra um pouco aberta: a hemisférica (céu) pinta o que o sol não alcança.
-    this.sun.shadow.intensity = time === 'night' ? 0.7 : 0.9;
+    // Sombra um pouco aberta: a hemisférica (céu) pinta o que o sol não alcança (mais aberta à noite).
+    this.sun.shadow.intensity = 0.9 - 0.2 * lightsAmountNight(p.light);
     this.hemi.color.set(p.hemiSky);
     this.hemi.groundColor.set(p.hemiGround);
     this.hemi.intensity = p.hemiIntensity;
@@ -343,7 +399,6 @@ export class Sky {
     (fu.uColor.value as THREE.Color).set(p.flareColor);
     this.syncFlare();
     this.scene.environmentIntensity = p.envIntensity;
-    this.rebuildEnvironment();
   }
 
   private rebuildEnvironment(): void {
