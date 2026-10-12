@@ -729,7 +729,8 @@ export class Terrain {
         for (let c = 0; c < NC; c++) {
           const dist = inside ? Math.min(COLS[c], clampD) : COLS[c];
           const w = this.dropW[sIdx * NC + c];
-          const y = py + (floorY - py) * w + rt[base + c];
+          // Coluna presa (do lado de dentro de uma curva fechada, M6): na mesma distância da última coluna livre, tem a altura dela — com a do relevo de longe virava um paredão.
+          const y = c > 0 && inside && COLS[c] > clampD ? ys[c - 1] : py + (floorY - py) * w + rt[base + c];
           ys[c] = y;
           // Esquerda: pistas de fora para dentro (x crescente), como a pista.
           const lane = side < 0 ? NC - 1 - c : c;

@@ -40,6 +40,9 @@ export function columnDistance(seg: Segment, side: number, c: number, turn: numb
 
 /** Altura do terreno na coluna `c` do ponto do segmento, relativa à pista nesse ponto. */
 export function columnHeight(track: Track, seg: Segment, side: number, c: number): number {
+  // Coluna presa (lado de dentro de uma curva fechada): a altura da última coluna livre, como o terreno a desenha (terrain.ts `update`).
+  const turn = turnPerCurve(track);
+  while (c > 0 && columnDistance(seg, side, c, turn) < TERRAIN_COLS[c]) c--;
   return columnHeightAboveRoad(track.def.scenery, seg.index, seg.y0 * Y_SCALE - minRoadY(track), side, c);
 }
 
