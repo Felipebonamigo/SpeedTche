@@ -6,7 +6,7 @@ import './tutorial.css';
 import '../../tutorial/strings';
 import { seatColor } from '../../core/data/drivers';
 import type { HumanEntry } from '../../core/types';
-import type { DeviceId, MenuContext, MenuNav, SaveData, TutorialDoneData } from '../../game/contracts';
+import type { AssistOfferData, DeviceId, MenuContext, MenuNav, SaveData, TutorialDoneData } from '../../game/contracts';
 import { seatLook, withLook } from '../../game/paints';
 import type { PanelSeat, TutorialPanel } from '../../game/tutorial-session';
 import { t } from '../../i18n';
@@ -168,6 +168,37 @@ export function tutorialDoneScreen(api: ScreenApi, data?: ScreenData): ScreenIns
     ),
   );
   return { el, nav: (nav) => listNav(list, nav, api.sfx, toMain) };
+}
+
+// ───────────────────────────── Oferta de assistência (O3) ─────────────────────────────
+
+function isOfferData(data: ScreenData): data is AssistOfferData {
+  return typeof data === 'object' && data !== null && 'brake' in data && 'amateur' in data;
+}
+
+/**
+ * Depois de 2 eliminações seguidas: Freio automático ou Amador, ou seguir como está. Voltar (Esc/B) é recusar; quem responde
+ * larga a corrida que a pergunta segurou (a sessão cuida, src/game/session.ts). Cada opção só aparece se ainda ajuda.
+ */
+export function assistOfferScreen(api: ScreenApi, data?: ScreenData): ScreenInstance {
+  const offer: AssistOfferData = isOfferData(data) ? data : { brake: true, amateur: true };
+  const answer = (choice: 'brake' | 'amateur' | 'no') => () => { api.sfx(choice === 'no' ? 'back' : 'confirm'); api.emit({ type: 'assistOfferAnswer', choice }); };
+  const items = [
+    ...(offer.brake ? [button(t('tutorial.offer.brake'), answer('brake'), 'btn-primary')] : []),
+    ...(offer.amateur ? [button(t('tutorial.offer.amateur'), answer('amateur'), offer.brake ? '' : 'btn-primary')] : []),
+    button(t('tutorial.offer.no'), answer('no')),
+  ];
+  const list = createFocusList(items, { sfx: api.sfx });
+  const el = screenFrame('assistOffer', null,
+    h('div', { class: 'tut-done glass' },
+      h('h1', { class: 'screen-title', text: t('tutorial.offer.assistTitle') }),
+      h('p', { class: 'tut-sub', text: t('tutorial.offer.assistSub') }),
+      ...(offer.brake ? [h('p', { class: 'hint', text: t('tutorial.offer.brakeHint') })] : []),
+      ...(offer.amateur ? [h('p', { class: 'hint', text: t('tutorial.offer.amateurHint') })] : []),
+      h('div', { class: 'actions' }, items.map((i) => i.el)),
+    ),
+  );
+  return { el, nav: (nav) => listNav(list, nav, api.sfx, answer('no')) };
 }
 
 // ───────────────────────────── Painel da corrida ─────────────────────────────

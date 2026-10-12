@@ -53,6 +53,7 @@ import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
 import { isCupUnlocked, loadSave, saveSave } from './save';
 import { loadSettings, saveSettings } from './settings';
+import { applyAssistChoice, markOffered, newAssistOffer, offerDue, recordRaceEnd } from './assist-offer';
 import { createTutorialSession, type TutorialSession } from './tutorial-session';
 
 const DT = 1 / TICK_RATE;
@@ -175,6 +176,9 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   let voiceHud: VoiceHud | null = null;
   /** Overlay das dicas da 1ª corrida (render/hud-tips.ts): nasce na primeira dica; nunca em Node. */
   let tipsHud: TipsHud | null = null;
+  /** Oferta de assistência depois de 2 eliminações seguidas (assist-offer.ts): a conta vive na sessão; `held` é a largada que a pergunta segurou. */
+  const assistOffer = newAssistOffer();
+  let held: { event: MenuEvent; seats: number[] } | null = null;
   let idleTrack: Track = getTrack(TRACKS[0].id);
   let idleTimer = 0;
 
@@ -351,10 +355,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     beginRace(config, 'cup', humans);
   }
 
-  function retryRace(): void {
+  function retryRace(fresh = false): void {
     const r = session.race;
     if (!r) { toMain(); return; }
     const config: RaceConfig = { ...r.state.config, seed: randomSeed() };
+    // Depois da oferta de assistência (O3) a nova largada já sai com a dificuldade e a assistência que o jogador acabou de escolher.
+    if (fresh) { config.difficulty = settings.difficulty; config.humans = assistedHumans(withoutLook(r.humans), settings.seatAssists); }
     beginRace(config, r.mode, r.humans);
   }
 
@@ -476,6 +482,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
 
   function finishRace(r: ActiveRace): void {
     const { newRecords, achievements, newStamp } = settle(r);
+    recordRaceEnd(assistOffer, r.mode, champ?.eliminated === true);
     logRace(r);
     const data = { mode: r.mode, trackDef: r.track.def, results: r.state.results ?? [], humans: withRaceAssists(r.humans, r.state.config.humans), champ, newRecords, achievements, party: party.raceFinished(r.mode, r.state), newStamp: newStamp ?? null };
     if (r.driver) r.driver.finished(data);
@@ -723,9 +730,34 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     }
   }
 
+  /** Os eventos que largam uma corrida de copa/Expedição: é neles que a oferta de assistência, se estiver na hora, passa na frente. */
+  const RACE_STARTS: ReadonlySet<MenuEvent['type']> = new Set(['startCup', 'continueCup', 'nextRace', 'retryRace', 'careerRace']);
+
+  function holdForAssistOffer(e: MenuEvent): boolean {
+    if (!RACE_STARTS.has(e.type)) return false;
+    const seats = ('humans' in e ? e.humans : session.race?.humans ?? []).map((h) => h.seat);
+    const due = offerDue(assistOffer, settings.difficulty, settings.seatAssists, seats);
+    if (!due) return false;
+    markOffered(assistOffer); // uma vez por sessão, aceita ou recusada
+    held = { event: e, seats };
+    menus.show('assistOffer', due);
+    return true;
+  }
+
+  function answerAssistOffer(choice: 'brake' | 'amateur' | 'no'): void {
+    const pending = held;
+    held = null;
+    if (!pending) return;
+    if (choice !== 'no') applySettings(applyAssistChoice(choice, settings, pending.seats));
+    if (pending.event.type === 'retryRace' && choice !== 'no') { menus.hide(); retryRace(true); return; }
+    handleMenuEvent(pending.event);
+  }
+
   function handleMenuEvent(e: MenuEvent): void {
     if (getActivePlaylog()?.askSurveyBefore(e, session.race !== null && session.race.state.phase !== 'finished')) { menus.show('survey'); return; }
+    if (holdForAssistOffer(e)) return;
     switch (e.type) {
+      case 'assistOfferAnswer': answerAssistOffer(e.choice); break;
       case 'startCup': startCup(e.cupId, e.humans); break;
       case 'startQuick': startQuick(e.trackId, e.laps, e.humans); break;
       case 'startTimeTrial': startQuick(e.trackId, settings.quickLaps, e.humans, true); break;
