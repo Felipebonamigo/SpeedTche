@@ -65,6 +65,40 @@ export function hasOwnLines(rival: Rival): boolean {
   return RIVAL_LINE_KINDS.every((k) => t(`rivals.line.${rival.key}.${k}`) !== `rivals.line.${rival.key}.${k}`);
 }
 
+// ───────────────────────────── Placar (O4) ─────────────────────────────
+
+/** Como o perfil está contra o rival: sem corrida, o rival 2 ou mais à frente, você 2 ou mais à frente, ou equilibrado. */
+export type ScoreState = 'none' | 'rival' | 'you' | 'even';
+
+export function scoreState(s: RivalScore): ScoreState {
+  if (s.you === 0 && s.rival === 0) return 'none';
+  if (s.rival - s.you >= 2) return 'rival';
+  if (s.you - s.rival >= 2) return 'you';
+  return 'even';
+}
+
+/** "Zé Turbo 7 × 5 você": o placar do perfil contra o rival, no idioma atual (as vitórias do rival primeiro). */
+export function scoreLine(rival: Rival, s: RivalScore): string {
+  return t('rivals.scoreLine', { name: rival.name, r: s.rival, y: s.you });
+}
+
+/** A frase do rival que cita o placar (pela personalidade e pelo estado), ou null sem placar. */
+export function rivalScoreLine(rival: Rival, s: RivalScore): string | null {
+  const state = scoreState(s);
+  return state === 'none' ? null : t(`rivals.score.${rival.personality ?? 'clean'}.${state}`, { r: s.rival, y: s.you });
+}
+
+/** A fala escolhida pelo placar: a apresentação vira a frase do placar quando já há corridas; o resto é como sempre (já cita o resultado). */
+export function rivalLineFor(rival: Rival, kind: RivalLineKind, score?: RivalScore): string {
+  return (kind === 'intro' && score ? rivalScoreLine(rival, score) : null) ?? rivalLine(rival, kind);
+}
+
+/** O texto do balão/mensagem da corrida: "Nome: fala". Com placar, apresentação, provocação e revanche citam-no; o respeito não (ele concede). */
+export function rivalBalloon(rival: Rival, kind: RivalLineKind, score?: RivalScore): string {
+  const cites = score && kind !== 'respect' ? rivalScoreLine(rival, score) : null;
+  return `${rival.name}: ${cites ?? rivalLine(rival, kind)}`;
+}
+
 export function ordinal(n: number): string {
   if (getLanguage() !== 'en') return t('rivals.ordinal', { n, s: '' });
   const m100 = n % 100;

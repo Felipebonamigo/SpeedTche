@@ -9,7 +9,7 @@
 import { TICK_RATE } from '../core/constants';
 import { personalityOf } from '../core/data/drivers';
 import type { RaceState } from '../core/types';
-import { driverKey, duelLineKind, rivalLine, type Rival, type RivalLineKind } from './rivals';
+import { driverKey, duelLineKind, rivalBalloon, type Rival, type RivalLineKind, type RivalScore } from './rivals';
 
 /** A apresentação sai este tanto depois do "JÁ!" (1,5 s: a largada passa e o piloto levanta o olho). */
 export const INTRO_DELAY_TICKS = 90;
@@ -41,9 +41,9 @@ export function rivalByName(name: string): Rival {
   return { name, personality: personalityOf(name), key: driverKey(name) };
 }
 
-/** "Zé Turbo: <fala>" no idioma atual (sem tipo novo de mensagem no HUD: sai como "info"). */
-export function rivalTalkText(rival: Rival, kind: RivalLineKind): string {
-  return `${rival.name}: ${rivalLine(rival, kind)}`;
+/** "Zé Turbo: <fala>" no idioma atual (sem tipo novo de mensagem no HUD: sai como "info"). Com o placar do perfil, a fala o cita (O4). */
+export function rivalTalkText(rival: Rival, kind: RivalLineKind, score?: RivalScore): string {
+  return rivalBalloon(rival, kind, score);
 }
 
 /** Chamar logo depois de cada `stepRace`; `localSeats` são os assentos deste computador. */
