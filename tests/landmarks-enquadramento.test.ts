@@ -142,7 +142,8 @@ const SHAPE_LIMITED: Readonly<Record<string, number>> = {
 describe('enquadramento: os marcos das pistas', () => {
   it(`todo marco fica à vista: perto e longe ≥ ${LANDMARK_SIGHT_MIN.near} s, horizonte ≥ ${LANDMARK_SIGHT_MIN.skyline} s (o primeiro, da largada)`, () => {
     const bad: string[] = [];
-    const stale: string[] = [];
+    // O mesmo marco pode aparecer mais de uma vez na pista (perLap): a exceção vale para o pior lugar, e só "passou" se TODOS passam.
+    const worst = new Map<string, { seen: number; base: number }>();
     for (const def of TRACKS) {
       if (!(placeOf(def.id)?.landmarks.length)) continue;
       const track = getTrack(def.id);
@@ -150,11 +151,13 @@ describe('enquadramento: os marcos das pistas', () => {
         const key = `${def.id} ${r.id}`;
         const base = ROADSIDE_BUILDINGS.has(def.scenery) ? ROADSIDE_MIN[r.place] : LANDMARK_SIGHT_MIN[r.place];
         const listed = SHAPE_LIMITED[key] ?? (r.first ? WINDOW_LIMITED[key] : undefined);
-        if (listed !== undefined && r.seen >= base) stale.push(`${key}: ${r.seen.toFixed(1)} s, já passa de ${base} s`);
+        const w = worst.get(key);
+        if (listed !== undefined && (!w || r.seen < w.seen)) worst.set(key, { seen: r.seen, base });
         const min = listed ?? base;
         if (r.seen < min) bad.push(`${key}#${r.seg} (${r.place}${r.first ? ', 1º' : ''}, x ${r.x.toFixed(0)} m): ${r.seen.toFixed(1)} s < ${min} s`);
       }
     }
+    const stale = [...worst].filter(([, w]) => w.seen >= w.base).map(([key, w]) => `${key}: ${w.seen.toFixed(1)} s, já passa de ${w.base} s`);
     expect(bad, `${bad.length} marcos pouco vistos`).toEqual([]);
     expect(stale, 'saiam de WINDOW_LIMITED / SHAPE_LIMITED').toEqual([]);
   }, 180000);

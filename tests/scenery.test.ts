@@ -197,7 +197,9 @@ describe('cenário: decoração só visual', () => {
           if (p.sprite || Math.abs(p.x) < CAR_REACH_M) continue;
           const k0 = i + n;
           const k = k0 < 2 * n ? k0 : i;
-          const x = px[k] + p.x * Math.cos(hd[k]); const z = pz[k] + p.x * Math.sin(hd[k]);
+          // Onde o renderizador põe o objeto: na fração `f` do segmento (a pista fechada cruza a si mesma, e 4 m ao longo decidem um acerto).
+          const h = hd[k] + (hd[k + 1] - hd[k]) * p.f;
+          const x = px[k] + (px[k + 1] - px[k]) * p.f + p.x * Math.cos(h); const z = pz[k] + (pz[k + 1] - pz[k]) * p.f + p.x * Math.sin(h);
           for (let q = Math.max(0, k - 180); q <= Math.min(2 * n, k + 180); q += 3) {
             const d = Math.hypot(px[q] - x, pz[q] - z);
             if (d < ROAD_HALF_WIDTH_M + 3) { bad.push(`${track.def.id}#${i} ${layout.models[p.model]} a ${d.toFixed(1)} m do trecho ${q % n}`); break; }

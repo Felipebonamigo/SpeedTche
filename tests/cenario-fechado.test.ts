@@ -111,7 +111,7 @@ function overlapsOf(track: Track, layout: Layout): Found {
       total++;
       const [x, z] = at(w, i, p);
       const info = infoOf(layout.models[p.model], p);
-      const solid = p.solid;
+      const solid = p.sprite; // sprite do núcleo (sólido ou não): não se move
       let box: Box | null = null;
       if (info.landmark) {
         const b = modelBounds(info.id); const k = i + w.n;
@@ -124,7 +124,14 @@ function overlapsOf(track: Track, layout: Layout): Found {
       if (clear <= 0) continue;
       let hit = false;
       const k0 = i + w.n;
-      grid.near(x, z, clear, (k) => { if (!hit && Math.abs(k - k0) > MIN_ARC && Math.abs(k - k0) <= WINDOW) hit = true; });
+      const lane = ROAD_HALF_WIDTH_M + 3 - SLACK;
+      grid.near(x, z, Math.max(clear, lane), (k) => {
+        const arc = Math.abs(k - k0);
+        if (hit || arc > WINDOW) return;
+        const d = Math.hypot(w.px[k] - x, w.pz[k] - z);
+        // Outro trecho: a faixa do carro (ou a pista, o que anda por cima); qualquer trecho, até o próprio dobrado sobre si na curva fechada: a pista com 3 m de folga.
+        if ((arc > MIN_ARC && d < clear) || (!solid && arc > 8 && d < lane)) hit = true;
+      });
       if (!hit) continue;
       if (solid) solidOnRoad++;
       else onRoad.push(`${track.def.id}#${i} ${info.id}${info.low ? ' (baixo)' : ''}`);
@@ -172,13 +179,10 @@ function overlapsOf(track: Track, layout: Layout): Found {
   return { onRoad, solidOnRoad, solidOverLandmark, objectOverObject, overLandmark, total };
 }
 
-// Teto, por pista, dos sprites sólidos do núcleo que caem na pista de outro trecho (medido na M6 com o layout já limpo; só desce).
+// Teto, por pista, dos sprites do núcleo (sólidos ou não) que caem na pista de outro trecho (medido na M6 com o layout já limpo; só desce).
 // Nada a fazer no render: a colisão os quer onde estão. Pista fora da tabela = 0.
 const SOLID_CEILING: Readonly<Record<string, number>> = {
-  serra_dos_orgaos: 10, ilhabela: 7, campos_do_jordao: 9, ouro_preto: 66, serra_do_mar: 39, camboriu: 23, rio_do_rastro: 8, lago_paranoa: 15,
-  chapada_veadeiros: 16, chapada_guimaraes: 1, maragogi: 15, joao_pessoa: 7, pedra_da_boca: 2, natal: 16, delta_parnaiba: 22, lencois: 18,
-  serra_do_navio: 14, geoglifos: 5, jalapao: 34, rota_66: 25, canion: 30, las_vegas: 67, baia_toquio: 56, monte_fuji: 80, osaka_neon: 117,
-  autobahn: 11, passo_alpino: 65, monaco_noite: 52,
+  serra_dos_orgaos: 13, ilhabela: 11, campos_do_jordao: 9, ouro_preto: 90, serra_do_mar: 48, camboriu: 23, rio_do_rastro: 8, lago_paranoa: 25, chapada_veadeiros: 31, chapada_guimaraes: 6, maragogi: 21, joao_pessoa: 13, pedra_da_boca: 2, natal: 20, delta_parnaiba: 28, lencois: 22, serra_do_navio: 18, geoglifos: 7, jalapao: 40, rota_66: 30, canion: 35, las_vegas: 69, baia_toquio: 74, monte_fuji: 80, osaka_neon: 135, autobahn: 14, passo_alpino: 65, monaco_noite: 69,
 };
 
 describe('M6 (a): o cenário da pista fechada', () => {
@@ -196,7 +200,7 @@ describe('M6 (a): o cenário da pista fechada', () => {
     expect(bad.slice(0, 12), `${n} objetos em cima de outro trecho`).toEqual([]);
   }, 600000);
 
-  it('os sólidos do núcleo em cima de outro trecho não passam do teto medido por pista (a física os quer ali)', () => {
+  it('os sprites do núcleo em cima de outro trecho não passam do teto medido por pista (a física e a ordem dos sprites os querem ali)', () => {
     const over: string[] = [];
     for (const id of crossing) {
       const o = overlaps(getTrack(id));

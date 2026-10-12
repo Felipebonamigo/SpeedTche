@@ -52,8 +52,6 @@ export interface Placement {
   r: number; g: number; b: number;
   /** Sprite do núcleo: vai para o lote com sombra de verdade. */
   sprite: boolean;
-  /** Sprite que COLIDE no núcleo (a física o quer onde está): a limpeza do cenário que cai em outro trecho (overlap.ts) não o move. */
-  solid: boolean;
   /** Fios: segmentos até o próximo poste (0 = não é fio) e o ponto dele. */
   linkSeg: number; linkF: number; linkX: number; linkY: number;
   /**
@@ -92,7 +90,7 @@ class ModelTable {
 function base(model: number): Placement {
   return {
     model, far: -1, farFrom: 1e9, maxAhead: 1e9, f: 0.5, x: 0, y: 0, yaw: 0, pitch: 0, yawC: 1, yawS: 0, sx: 1, sy: 1, sz: 1,
-    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, solid: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
+    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
   };
 }
 
@@ -186,7 +184,7 @@ function placeSprites(track: Track, table: ModelTable, out: Placement[][], occ: 
       const small = vis.mode === 'round' && !farId && sp.kind !== 'tower';
       for (const m of vis.models) {
         const p = base(table.of(m.id));
-        p.x = x; p.y = gy; p.yaw = yaw; p.sx = s; p.sy = sy; p.sz = s; p.sprite = true; p.solid = sp.solid;
+        p.x = x; p.y = gy; p.yaw = yaw; p.sx = s; p.sy = sy; p.sz = s; p.sprite = true;
         if (farId && m === vis.models[0]) { p.far = table.of(farId); p.farFrom = 90; }
         if (small) p.maxAhead = 110;
         p.ox = m.dx ?? 0; p.oy = m.dy ?? 0; p.oz = m.dz ?? 0; p.spin = m.spin ?? 0; p.spinY = m.spinY ?? 0;

@@ -6,8 +6,9 @@
 //   1. um objeto que cairia na pista, ou na faixa onde o carro anda, de OUTRO trecho é descartado;
 //   2. dois objetos altos de trechos diferentes que se sobrepõem: fica o que a física ou o marco exige e, no resto, o primeiro do layout.
 // "Outro trecho" = a linha central a mais de MIN_ARC segmentos de arco (o próprio trecho e a vizinhança de curva fechada já são resolvidos pela ocupação do layout),
-// dentro da janela que o renderizador desenha. O que o núcleo manda NÃO se move: sprite sólido (a colisão) e marco (placeLandmarks já o afasta das pistas à vista,
-// LANDMARK_CLEAR_M). Puro e determinístico (sem azar, só geometria, na ordem do layout).
+// dentro da janela que o renderizador desenha; e, de qualquer trecho (inclusive o próprio, na curva fechada: o grampo cruza a si mesmo), a faixa da pista com 3 m de
+// folga. O que o núcleo manda NÃO se move: sprite (sólido ou não: a ordem dos sprites do segmento é o contrato com o núcleo) e marco (placeLandmarks já o afasta das
+// pistas à vista, LANDMARK_CLEAR_M). Puro e determinístico (sem azar, só geometria, na ordem do layout).
 import type { Track } from '../../core/types';
 import { FRAME_AHEAD, FRAME_BEHIND } from '../roadframe';
 import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve } from '../units';
@@ -18,6 +19,8 @@ import type { Placement } from './layout';
 export const OVERLAP_MIN_ARC = 40;
 /** A janela do renderizador (30 atrás + o maior alcance à frente): o que está além dela nunca aparece junto. */
 export const OVERLAP_WINDOW = FRAME_BEHIND + Math.max(...Object.values(FRAME_AHEAD));
+/** Arco (segmentos) até o qual a pista "é a do próprio trecho" na regra da faixa: a forração mora a 9,6 m do eixo e vê o vértice 2 a 4 segmentos adiante a < 12 m. */
+const LANE_MIN_ARC = 8;
 /** Altura (m) até a qual o objeto é "baixo": o carro passa por cima dele (forração, calçadão). */
 const LOW_M = 1.1;
 /** Folga (m) sobre a regra: a linha central é medida nos vértices, a cada 4 m. */
@@ -32,7 +35,7 @@ interface Item {
   group: Placement[] | null;
   /** Raio (m) da pegada no chão, com a escala. */
   r: number;
-  low: boolean; landmark: boolean; solid: boolean;
+  low: boolean; landmark: boolean;
   /** Caixa orientada do marco (referencial local, já com a escala) e o giro do modelo no mundo. */
   box?: { minX: number; maxX: number; minZ: number; maxZ: number; ct: number; st: number };
 }
@@ -103,7 +106,7 @@ export function cullCrossings(track: Track, models: readonly string[], bySeg: Pl
       const cx = px[k] + (px[k + 1] - px[k]) * p.f; const cz = pz[k] + (pz[k + 1] - pz[k]) * p.f;
       const h = hd[k] + (hd[k + 1] - hd[k]) * p.f;
       const x = cx + p.x * Math.cos(h); const z = cz + p.x * Math.sin(h);
-      const it: Item = { i, p, x, z, group: groups.get(p) ?? null, r: radiusOf(id) * Math.max(p.sx, p.sz), low: !landmark && modelHeight(id) * p.sy <= LOW_M, landmark, solid: p.solid };
+      const it: Item = { i, p, x, z, group: groups.get(p) ?? null, r: radiusOf(id) * Math.max(p.sx, p.sz), low: !landmark && modelHeight(id) * p.sy <= LOW_M, landmark };
       if (landmark) {
         const b = modelBounds(id);
         // O modelo gira `yaw` sobre o rumo da pista (o three gira por −rumo + yaw): o mesmo ct/st do `LandmarkFoot` do layout.
@@ -117,14 +120,18 @@ export function cullCrossings(track: Track, models: readonly string[], bySeg: Pl
   const drop = new Set<Item>();
   // 1) Na pista (ou na faixa do carro) de outro trecho.
   for (const it of items) {
-    if (it.landmark || it.solid) continue;
+    if (it.landmark || it.p.sprite) continue;
     const clear = (it.low ? ROAD_HALF_WIDTH_M + 3 : carReachM + it.r) + MARGIN_M;
     const k0 = it.i + n;
     let hit = false;
+    const lane = ROAD_HALF_WIDTH_M + 3 + MARGIN_M;
     road.around(it.x, it.z, clear, (k) => {
       if (hit) return;
       const arc = Math.abs(k - k0);
-      if (arc > OVERLAP_MIN_ARC && arc <= OVERLAP_WINDOW && Math.hypot(px[k] - it.x, pz[k] - it.z) < clear) hit = true;
+      if (arc > OVERLAP_WINDOW) return;
+      const d = Math.hypot(px[k] - it.x, pz[k] - it.z);
+      // Outro trecho: a faixa do carro (ou, o que anda por cima, a pista); qualquer trecho, até o próprio dobrado sobre si na curva fechada: a pista com 3 m de folga.
+      if ((arc > OVERLAP_MIN_ARC && d < clear) || (arc > LANE_MIN_ARC && d < lane)) hit = true;
     });
     if (hit) drop.add(it);
   }
@@ -132,7 +139,7 @@ export function cullCrossings(track: Track, models: readonly string[], bySeg: Pl
   // 2) Objetos altos de trechos diferentes que se sobrepõem. Os fixos (marco, sólido do núcleo) ficam; no resto fica o primeiro do layout.
   const apart = (a: number, b: number): boolean => { const d = Math.abs(a - b); return Math.min(d, n - d) > OVERLAP_MIN_ARC; };
   const marks = items.filter((it) => it.landmark && it.box);
-  const movable = items.filter((it) => !it.low && !it.landmark && !it.solid && !drop.has(it));
+  const movable = items.filter((it) => !it.low && !it.landmark && !it.p.sprite && !drop.has(it));
   // 2a) Em cima de um marco de outro trecho (a caixa orientada dele contra o raio do objeto, qualquer tamanho).
   for (const it of movable) {
     for (const m of marks) {
@@ -148,7 +155,7 @@ export function cullCrossings(track: Track, models: readonly string[], bySeg: Pl
   const placed = new Grid(24);
   const list: Item[] = [];
   const add = (it: Item): void => { placed.add(list.length, it.x, it.z); list.push(it); };
-  for (const it of items) if (it.solid && !it.low && it.r >= 1.4) add(it);
+  for (const it of items) if (it.p.sprite && !it.low && it.r >= 1.4) add(it);
   for (const it of movable) {
     if (drop.has(it) || it.r < 1.4) continue;
     let hit = false;
