@@ -3,7 +3,7 @@
 import { getTrack } from '../../core/track';
 import { TRACKS } from '../../core/track/tracks';
 import type { CarDef, CarLook, TimeOfDay, TrackDef } from '../../core/types';
-import type { DeviceId, MenuContext, MenuEvent, MenuNav, MenuScreen, RaceMode, ResultsScreenData, StandingsScreenData, TutorialDoneData } from '../../game/contracts';
+import type { DeviceId, MenuContext, MenuEvent, MenuNav, MenuScreen, RaceMode, ResultsScreenData, StandingsScreenData, TutorialDoneData, UiSound } from '../../game/contracts';
 import { ORIGINAL_PAINT, paintedCar } from '../../game/paints';
 import { getLanguage, t } from '../../i18n';
 import { trackTitle } from '../../core/data/places';
@@ -45,7 +45,7 @@ export interface ScreenApi {
   /** Volta para a tela anterior do histórico; sem histórico, vai para o menu principal. */
   back(): void;
   emit(event: MenuEvent): void;
-  sfx(kind: 'move' | 'confirm' | 'back'): void;
+  sfx(kind: UiSound): void;
   /** Reconstrói a tela atual (troca de idioma). */
   refresh(): void;
 }

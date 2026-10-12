@@ -8,11 +8,16 @@ import '../../access/access.css';
 import { achievementDescription, achievementName } from '../../game/achievements';
 import type { ResultsScreenData, StandingsScreenData } from '../../game/contracts';
 import { cupRival } from '../../game/rivals';
+import { paintColors } from '../../game/paints';
+import { createHoldSkip, guardConfirm, planPostRace, sequenceFor, type PostRace, type PostStepId } from '../../game/post-race';
+import { mountPodium, type StageHandle } from '../../render/stage-mount';
+import type { PodiumEntry } from '../../render/stage-bus';
 import '../../career/strings';
 import { t } from '../../i18n';
 import '../../stats/strings';
 import './records.css';
 import './passport.css';
+import './payout.css';
 import { button, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { isVipRow, partyResultsParts } from './party';
 import { VIP_COLOR } from '../../core/modes';
@@ -20,7 +25,7 @@ import { BRAZIL_REGIONS } from '../../core/data/cups';
 import '../passport/strings';
 
 /** Título grande com um chip ao lado (pista ou copa), em vez de "Resultado — Nome" numa linha só que quebra. */
-function titleRow(title: string, chip: string): HTMLElement {
+export function titleRow(title: string, chip: string): HTMLElement {
   return h('div', { class: 'screen-title-row' }, h('h1', { class: 'screen-title', text: title }), h('span', { class: 'chip', text: chip }));
 }
 import { icon, medal } from './icons';
@@ -62,6 +67,45 @@ function positionCell(position: number): HTMLElement {
   return h('td', { class: 'mono pos' }, m ?? String(position));
 }
 
+/** O botão de ir à classificação da copa (a carreira passa por aqui depois do Pagamento); `null` sem copa em andamento. */
+export function standingsButton(api: ScreenApi, d: ResultsScreenData): FocusItem | null {
+  const champ = d.champ;
+  if (!champ || !(d.mode === 'cup' || d.mode === 'career')) return null;
+  const cup = api.ctx.cups.find((c) => c.id === champ.cupId);
+  if (!cup) return null;
+  return button(t('ui.results.standings'), () => api.go('standings', { champ, humans: d.humans, cup, career: d.mode === 'career' }), 'btn-primary');
+}
+
+/** Os três primeiros que terminaram, com carro e pintura (a do humano; a IA corre com a de fábrica), para o pódio 3D. */
+export function podiumEntries(d: ResultsScreenData): PodiumEntry[] {
+  return [...d.results]
+    .filter((r) => r.finished && r.position >= 1 && r.position <= 3)
+    .sort((a, b) => a.position - b.position)
+    .map((r) => ({
+      place: r.position as 1 | 2 | 3, carId: r.carDefId,
+      paint: r.seat >= 0 ? paintColors(d.humans.find((x) => x.seat === r.seat)?.look?.paint) : null,
+    }));
+}
+
+/** O plano do pós-corrida desta corrida: chegada e pódio 3D (fora do Retrô) e, na carreira com relatório, o Pagamento. */
+export function postRacePlan(api: ScreenApi, d: ResultsScreenData): PostStepId[] {
+  return planPostRace({
+    mode: d.mode,
+    podium: api.ctx.settings.renderStyle !== 'retro' && podiumEntries(d).length > 0,
+    payout: d.mode === 'career' && !!api.ctx.save.career?.lastReport,
+  });
+}
+
+/** O botão A de algum controle está apertado agora (o menu só recebe bordas; segurar se vê aqui). */
+export function gamepadAHeld(api: ScreenApi): boolean {
+  const input = api.ctx.input;
+  for (const dev of input?.devices?.() ?? []) {
+    if (!dev.connected || !dev.id.startsWith('gp')) continue;
+    if (input.peek(dev.id)?.buttons.includes(0)) return true;
+  }
+  return false;
+}
+
 export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance {
   const d = data as ResultsScreenData | undefined;
   if (!d || !('results' in d)) {
@@ -84,19 +128,33 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
   const rivalName = cupLike && d.champ ? cupRival(d.champ.cupId).name : null;
   const isRival = (r: RaceResultRow) => r.seat < 0 && r.name === rivalName;
 
+  // O pós-corrida (N4): chegada → pódio → pagamento → a decisão. Só corrida de verdade tem sequência; festa e contra-relógio não.
+  const post: PostRace = sequenceFor(d, () => postRacePlan(api, d));
+  const sequenced = post.plan.length > 0;
+  const podium = post.plan.includes('podium') ? podiumEntries(d) : [];
+  // A tabela de 20 linhas fica recolhida: o top 3 e a linha de cada humano ("VER TODOS" abre as 20).
+  const isMine = (r: RaceResultRow) => r.seat >= 0 || isVipRow(d, r);
+  const collapsedRows = rows.filter((r) => r.position <= 3 || isMine(r));
+  const collapsible = sequenced && collapsedRows.length < rows.length;
+  let expanded = false;
+
+  const buildRow = (r: RaceResultRow, delay: number) => h('tr', { class: isMine(r) ? 'human' : isRival(r) ? 'rival' : '', style: `${isVipRow(d, r) ? `--seat:${VIP_COLOR}` : rowStyle(d.humans, r.seat, ctx.settings.colorPalette)};--rv:${delay}` },
+    positionCell(r.position),
+    h('td', {}, r.name, isRival(r) ? rivalTag() : null, r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null),
+    h('td', { class: 'muted-cell', text: carName(r.carDefId) }),
+    h('td', { class: 'mono' }, r.finished ? formatTicks(r.totalTicks) : t('ui.results.dnf'), badge(r.seat, 'race')),
+    h('td', { class: 'mono' }, formatTicks(r.bestLapTicks), badge(r.seat, 'lap')),
+    h('td', { class: 'mono num', text: String(r.points) }),
+  );
+  /** As linhas à vista: na chegada elas entram de baixo para cima no pódio (3º, 2º, 1º), depois as dos humanos. */
+  const bodyRows = () => (collapsible && !expanded ? collapsedRows : rows).map((r) => buildRow(r, collapsible && !expanded ? (r.position <= 3 ? 3 - r.position : 3) : 0));
+  const tbody = h('tbody', {}, bodyRows());
   const table = h('table', { class: 'table results-table' },
     h('thead', {}, h('tr', {},
       h('th', { text: '#' }), h('th', { text: t('ui.results.name') }), h('th', { text: t('ui.results.car') }),
       h('th', { text: t('ui.results.time') }), h('th', { text: t('ui.results.bestLap') }), h('th', { class: 'num', text: t('ui.results.points') }),
     )),
-    h('tbody', {}, rows.map((r: RaceResultRow) => h('tr', { class: r.seat >= 0 || isVipRow(d, r) ? 'human' : isRival(r) ? 'rival' : '', style: isVipRow(d, r) ? `--seat:${VIP_COLOR}` : rowStyle(d.humans, r.seat, ctx.settings.colorPalette) },
-      positionCell(r.position),
-      h('td', {}, r.name, isRival(r) ? rivalTag() : null, r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null),
-      h('td', { class: 'muted-cell', text: carName(r.carDefId) }),
-      h('td', { class: 'mono' }, r.finished ? formatTicks(r.totalTicks) : t('ui.results.dnf'), badge(r.seat, 'race')),
-      h('td', { class: 'mono' }, formatTicks(r.bestLapTicks), badge(r.seat, 'lap')),
-      h('td', { class: 'mono num', text: String(r.points) }),
-    ))),
+    tbody,
   );
 
   const extras: HTMLElement[] = [];
@@ -119,10 +177,7 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
   const items: FocusItem[] = [];
   if (party.items) items.push(...party.items);
   else if (cupLike && d.champ) {
-    const champ = d.champ;
-    const cup = ctx.cups.find((c) => c.id === champ.cupId);
-    if (cup) items.push(button(t('ui.results.standings'), () => api.go('standings', { champ, humans: d.humans, cup, career: d.mode === 'career' }), 'btn-primary'));
-    else items.push(button(t('ui.results.menu'), () => api.emit({ type: 'toMain' })));
+    items.push(standingsButton(api, d) ?? button(t('ui.results.menu'), () => api.emit({ type: 'toMain' })));
   } else if (d.mode === 'quick') {
     // Corrida rápida: "Mais uma?" na próxima pista, com os mesmos humanos (assentos, carros e pinturas).
     const next = nextQuickTrackId(ctx.cups, d.trackDef.id);
@@ -134,26 +189,106 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
     items.push(button(t('ui.results.retry'), () => api.emit({ type: 'retryRace' }), 'btn-primary'));
     items.push(button(t('ui.results.menu'), () => api.emit({ type: 'toMain' })));
   }
+  // "VER TODOS (20)": o último item, para o botão principal continuar sendo o primeiro foco.
+  const toggle = collapsible ? button(t('ui.results.showAll', { n: rows.length }), () => setExpanded(!expanded)) : null;
+  if (toggle) items.push(toggle);
   const list = createFocusList(items, { sfx: api.sfx });
   const unlocked = achievementsPanel(d, ctx.settings.colorPalette);
   const wrap = h('div', { class: 'table-wrap glass' }, table);
+
+  // A janela do pódio 3D e a cortina que a esconde na chegada (o palco é uma tela atrás da interface: a cortina é opaca).
+  const curtain = podium.length > 0 ? h('div', { class: 'results-podium-curtain' }, icon('trophy'), h('span', { text: t('ui.results.podium') })) : null;
+  const podiumEl = podium.length > 0 ? h('div', { class: 'results-podium stage-window' }, curtain) : null;
+  const hint = h('p', { class: 'hint payout-skip results-skip', text: t('ui.results.skip') });
+  hint.addEventListener('click', () => skipAll());
+
   const el = screenFrame('results', null,
     titleRow(t('ui.results.title'), trackName(d.trackDef.id, d.trackDef.name)),
     h('div', { class: 'results-head' }, extras),
     unlocked,
+    podiumEl,
     wrap,
+    sequenced ? hint : null,
     h('div', { class: 'actions' }, items.map((i) => i.el)),
   );
+  if (podiumEl) el.classList.add('stage3d');
+
+  let handle: StageHandle | null = null;
+  if (podiumEl) {
+    const first = d.humans[0];
+    handle = mountPodium(podiumEl, podium, {
+      id: 'results:podium', quality: ctx.settings.quality, reduceEffects: ctx.settings.reduceEffects,
+      ring: first ? seatColor(first.seat, ctx.settings.colorPalette) : undefined,
+    });
+  }
+
+  function setExpanded(on: boolean): void {
+    expanded = on;
+    tbody.replaceChildren(...bodyRows());
+    el.classList.toggle('expanded', on);
+    if (toggle) toggle.el.textContent = on ? t('ui.results.showTop') : t('ui.results.showAll', { n: rows.length });
+    if (on) revealRow(wrap, table.querySelector('tr.human'));
+    else wrap.scrollTop = 0;
+  }
+
+  const hold = createHoldSkip();
+  let left = false;
+  function paint(): void {
+    const step = post.step;
+    el.setAttribute('data-post-ready', post.ready ? '1' : '0');
+    el.setAttribute('data-post-step', step ?? 'ready');
+    // Para o playtest (orçamento de tempo): quantos segundos de sequência já correram e se foi pulada.
+    el.setAttribute('data-post-elapsed', post.elapsed.toFixed(2));
+    el.setAttribute('data-post-skipped', post.skipped ? '1' : '0');
+    // O pódio aparece quando a chegada acaba; pulado ou pronto, já está à mostra.
+    const podiumAt = post.plan.indexOf('podium');
+    curtain?.classList.toggle('up', !post.ready && podiumAt >= 0 && post.stepIndex < podiumAt);
+    el.classList.toggle('arrival', step === 'arrival');
+    hint.classList.toggle('done', post.ready);
+    for (const i of items) i.el.classList.toggle('pending', !post.ready);
+  }
+  function skipAll(): void {
+    if (post.ready) return;
+    post.skip();
+    paint();
+    // Pulou: com o Pagamento no plano, é ele que fecha a sequência (já com os números finais).
+    if (post.plan.includes('payout')) goPayout();
+  }
+  function goPayout(): void {
+    if (left) return;
+    left = true;
+    api.go('payout', d);
+  }
+  paint();
+
   let revealed = false;
   return {
     el,
-    nav: (nav) => listNav(list, nav, api.sfx),
-    update() {
-      // No primeiro quadro já montado: a tabela pode não caber (muitos carros, conquistas em cima)
-      // e o foco fica nos botões — rola até o primeiro humano para ele se ver sem mexer em nada.
-      if (revealed || !el.isConnected) return;
+    nav(nav) {
+      // Enter segurado (a repetição do teclado vira `start`) e o Start do controle pulam a sequência; o confirmar solto, com ela
+      // andando, é engolido: quem martela o botão na chegada não larga a próxima corrida por acidente.
+      if (nav.start && !post.ready) { skipAll(); return; }
+      const guarded = nav.confirm && !guardConfirm(post);
+      listNav(list, guarded ? { ...nav, confirm: false } : nav, api.sfx);
+    },
+    update(dt) {
+      if (!el.isConnected) return;
+      if (!post.ready) {
+        if (hold.observe(dt, gamepadAHeld(api))) { skipAll(); return; }
+        const before = post.step;
+        post.advance(dt);
+        // O Pagamento é outra tela: a sequência chega nele sozinha.
+        if (post.step === 'payout' && before !== 'payout') goPayout();
+        paint();
+      }
+      // No primeiro quadro já montado: a tabela completa pode não caber e o foco fica nos botões — rola até o primeiro humano.
+      if (revealed) return;
       revealed = true;
-      revealRow(wrap, table.querySelector('tr.human'));
+      if (!sequenced) revealRow(wrap, table.querySelector('tr.human'));
+    },
+    destroy() {
+      handle?.release();
+      handle = null;
     },
   };
 }

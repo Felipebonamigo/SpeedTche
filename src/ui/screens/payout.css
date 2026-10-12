@@ -1,0 +1,78 @@
+/* Pagamento (src/ui/screens/payout.ts) e o fim da corrida em sequência (results.ts): pódio 3D, tabela recolhida, dica de pular.
+   Nada aqui muda de altura durante a sequência: a tela nasce com o layout final e as fases só mexem em opacidade e transformação. */
+
+/* ───────────── Pagamento ───────────── */
+
+.payout-board { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--gap); width: min(100%, calc(1100 * var(--u))); }
+.payout-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, calc(300 * var(--u)))); gap: var(--gap); justify-content: center; width: 100%; }
+.payout-col {
+  display: flex; flex-direction: column; align-items: center; gap: calc(4 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u)); box-sizing: border-box; min-width: 0;
+  border-top: calc(4 * var(--u)) solid var(--seat, var(--accent));
+}
+.payout-col.team { --seat: #ffd23f; }
+.pc-head { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); font-size: var(--fs-md); max-width: 100%; }
+.pc-name { font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; overflow-wrap: anywhere; text-align: center; }
+.pc-car { font-size: var(--fs-sm); text-align: center; }
+.pc-pos { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); font-size: var(--fs-md); font-weight: 800; }
+.pc-pos .ico { width: 1.5em; height: 1.5em; }
+.pc-line, .pc-wallet { display: flex; flex-direction: column; align-items: center; gap: calc(1 * var(--u)); }
+.pc-wallet { margin-top: calc(4 * var(--u)); padding-top: calc(6 * var(--u)); border-top: 1px solid var(--line); align-self: stretch; }
+.pc-label { font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.pc-prize-val { font-size: calc(32 * var(--u) * var(--text-scale, 1)); line-height: 1.1; color: var(--ok); }
+.pc-wallet-val { font-size: var(--fs-lg); line-height: 1.15; }
+.pc-wallet-val, .pv-val { display: inline-block; transition: transform 120ms ease-out, color 120ms ease-out; }
+.pc-wallet-val.bump, .pv-val.bump { transform: scale(1.14); color: #ffd23f; }
+.payout-vault {
+  display: flex; flex-direction: column; align-items: center; gap: calc(2 * var(--u));
+  padding: calc(8 * var(--u)) calc(40 * var(--u)); box-sizing: border-box; min-width: min(100%, calc(360 * var(--u)));
+  border-top: calc(4 * var(--u)) solid #ffd23f;
+}
+.pv-val { font-size: calc(40 * var(--u) * var(--text-scale, 1)); font-weight: 900; line-height: 1.1; }
+.payout-buy {
+  visibility: hidden; display: flex; align-items: center; justify-content: center; min-height: calc(40 * var(--u)); box-sizing: border-box;
+  padding: calc(4 * var(--u)) calc(28 * var(--u)); border-radius: 999px; font-size: var(--fs-md); font-weight: 800; text-align: center;
+  color: #ffd23f; background: rgba(255, 210, 63, 0.14); border: 1px solid rgba(255, 210, 63, 0.6);
+  box-shadow: 0 0 calc(36 * var(--u) * var(--flash, 0)) rgba(255, 210, 63, var(--flash, 0));
+}
+.payout-buy.on { visibility: visible; }
+.payout-skip { min-height: 1.3em; }
+.payout-skip.done { visibility: hidden; }
+.btn.pending { opacity: 0.62; }
+
+/* A moeda: um disco dourado que sai da linha do prêmio e cai na carteira. Fica fora do fluxo (não ocupa lugar nenhum). */
+.payout-coins { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.payout-coin {
+  position: absolute; left: 0; top: 0; width: calc(22 * var(--u)); height: calc(22 * var(--u)); border-radius: 50%; opacity: 0; will-change: transform;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, #ffd23f 45%, #d99a00 100%); border: calc(2 * var(--u)) solid #b87a00; box-sizing: border-box;
+  box-shadow: 0 calc(2 * var(--u)) calc(6 * var(--u)) rgba(0, 0, 0, 0.4);
+}
+.payout-coin::after { content: ''; position: absolute; inset: 22%; border-radius: 50%; border: calc(1.5 * var(--u)) solid rgba(160, 100, 0, 0.6); }
+
+/* ───────────── Resultado em sequência ───────────── */
+
+/* O pódio 3D: uma janela do palco (o canvas atrás da interface) entre o cabeçalho e a tabela. Cede altura quando falta (14 conquistas). */
+.scr-results.stage3d { background: none; }
+.results-podium {
+  position: relative; flex: 1 1 calc(110 * var(--u)); min-height: 0; max-height: calc(250 * var(--u));
+  width: min(100%, calc(780 * var(--u))); border-radius: var(--r); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.scr-results.expanded .results-podium { display: none; }
+/* A cortina cobre a janela na chegada (opaca: o palco desenha atrás da interface) e abre quando o pódio entra. */
+.results-podium-curtain {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(6 * var(--u));
+  border-radius: inherit; color: var(--muted); font-size: var(--fs-sm); font-weight: 800; letter-spacing: 0.3em;
+  background: linear-gradient(180deg, #101826, #070a10); opacity: 0; transition: opacity 600ms ease-out; pointer-events: none;
+}
+.results-podium-curtain .ico { width: calc(34 * var(--u)); height: calc(34 * var(--u)); color: #ffd23f; }
+.results-podium-curtain.up { opacity: 1; transition: none; }
+/* Na chegada as linhas do pódio entram uma a uma, de baixo para cima (3º, 2º, 1º), depois as dos humanos. */
+.scr-results.arrival .results-table tbody tr { animation: row-in 320ms ease-out both; animation-delay: calc(var(--rv, 0) * 150ms); }
+@keyframes row-in { from { opacity: 0; transform: translateX(calc(-24 * var(--u))); } to { opacity: 1; transform: none; } }
+.scr-results .results-skip { margin: 0; }
+
+/* A dica de pular não ocupa linha: fica sobre a borda de baixo (texto grande não cabia com ela no fluxo). */
+.scr-results .results-skip, .scr-payout .payout-skip { position: absolute; left: 0; right: 0; bottom: calc(2 * var(--u)); pointer-events: auto; }
+.scr-results .table-wrap { flex: 0 1 auto; min-height: 0; }
+.scr-results .actions { margin-top: 0; }
+.scr-payout .payout-cols { flex: 0 1 auto; }

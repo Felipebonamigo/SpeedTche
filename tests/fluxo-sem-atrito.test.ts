@@ -25,6 +25,7 @@ class FakeEl {
   innerHTML = '';
   value = '';
   disabled = false;
+  isConnected = true;
   style = { setProperty() {} };
   attrs: Record<string, string> = {};
   listeners: Record<string, Array<(ev: unknown) => void>> = {};
@@ -286,9 +287,15 @@ describe('resultado e classificação: a próxima largada em foco', () => {
   it('corrida rápida: "MAIS UMA?" em foco, com a próxima pista na tela', () => {
     const d = quickData('quick');
     const screen = resultsScreen(api(sanitizeSave({}), ['kb1', null, null, null]), d);
-    expect(actions(screen)).toEqual(['MAIS UMA?', 'TENTAR DE NOVO', 'MENU']);
+    // N4: a tabela de 20 linhas fica recolhida e "VER TODOS" entra por último; o foco segue em "MAIS UMA?".
+    expect(actions(screen)).toEqual(['MAIS UMA?', 'TENTAR DE NOVO', 'MENU', 'VER TODOS (20)']);
     expect(focused(firstAction(screen))).toBe(true);
     expect(text(one(screen.el, hasClass('status-line')))).toContain(trackName('paraty'));
+    // N4: com a sequência do fim da corrida andando o confirmar é engolido (tests/results-sequence.test.ts); quem espera os 5,5 s
+    // dela (chegada + pódio) não aperta nada, e a entrada que larga a próxima continua sendo UMA.
+    press(screen, 'kb1', 'confirm');
+    expect(events).toEqual([]);
+    for (let i = 0; i < 80; i++) screen.update?.(0.1);
     press(screen, 'kb1', 'confirm');
     expect(events).toEqual([{ type: 'startQuick', trackId: 'paraty', laps: DEFAULT_SETTINGS.quickLaps, humans: d.humans }]);
   });
