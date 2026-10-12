@@ -33,6 +33,7 @@ import { createTutorialPanel } from '../ui/screens/tutorial';
 import { newTelemetry, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
+import { rollSession } from './expedition';
 import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menus, RaceDriver, RaceMode, RenderFrame, Renderer, RenderStyle, Settings, ViewportSpec } from './contracts';
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
@@ -140,6 +141,9 @@ function makeRenderer(style: RenderStyle, canvas: HTMLCanvasElement, hudRoot: HT
 export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, uiRoot: HTMLElement): Session {
   const settings = loadSettings();
   const save = loadSave();
+  // N5: o que a sessão anterior rendeu vira o quadro "Desde a última vez" do menu (src/game/expedition.ts); grava o ponto de partida desta.
+  rollSession(save, new Date().toISOString());
+  saveSave(save);
   setLanguage(settings.language);
 
   let renderer: Renderer = makeRenderer(settings.renderStyle, canvas, hudRoot);
