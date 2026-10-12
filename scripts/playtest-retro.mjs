@@ -18,7 +18,7 @@ const press = async (key, n = 1) => { for (let i = 0; i < n; i++) { await page.k
 const focused = () => page.evaluate(() => document.querySelector('#ui .focus')?.textContent?.trim() ?? '');
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);

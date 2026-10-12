@@ -36,6 +36,8 @@ registerStrings('expedition', {
     'garageHub.shop': 'Concessionária',
     'garageHub.shop.hint': 'Os carros à venda girando no palco: veja, experimente a cor e compre',
     'garageHub.shop.hint.noExpedition': 'A vitrine dos carros à venda. Comece a Expedição para comprar.',
+    'garageHub.summary': 'Resumo da Expedição',
+    'garageHub.summary.hint': 'Dinheiro, copa e pilotos; é aqui que você começa uma Expedição nova',
 
     'goals.title': 'Próximo objetivo',
     'goal.startExpedition': 'Comece a Expedição e corra a 1ª corrida',
@@ -93,6 +95,8 @@ registerStrings('expedition', {
     'garageHub.shop': 'Dealership',
     'garageHub.shop.hint': 'The cars for sale on the turntable: look, try a paint and buy',
     'garageHub.shop.hint.noExpedition': 'The showroom of cars for sale. Start the Expedition to buy.',
+    'garageHub.summary': 'Expedition summary',
+    'garageHub.summary.hint': 'Money, cup and drivers; this is where you start a new Expedition',
 
     'goals.title': 'Next goal',
     'goal.startExpedition': 'Start the Expedition and run the 1st race',

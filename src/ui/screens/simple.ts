@@ -82,7 +82,9 @@ export function mainScreen(api: ScreenApi): ScreenInstance {
         m: api.ctx.cups.find((c) => c.id === save.career?.cupId)?.trackIds.length ?? 1,
       });
   const cards: HomeEntry[] = [
-    { label: t('expedition.card.expedition'), hint: expeditionHint, run: route.kind === 'new' ? mode('career') : open('career') },
+    // Expedição nova: lobby direto. Em andamento: CONTINUA direto (um Enter até o lobby de religar os controles, como o antigo "Continuar" da copa).
+    // Concluída: o resumo, de onde se começa outra. O resumo e o "Nova Expedição" de quem está no meio ficam em Garagem > Resumo da Expedição.
+    { label: t('expedition.card.expedition'), hint: expeditionHint, run: route.kind === 'new' ? mode('career') : route.completed ? open('career') : mode('career', true) },
     { label: t('expedition.card.together'), hint: t('expedition.card.together.hint'), run: open('party') },
     {
       label: t('expedition.card.free'),
@@ -212,6 +214,7 @@ export function freeScreen(api: ScreenApi): ScreenInstance {
  * "Garagem" (N5): a garagem da Expedição e a Concessionária. A Concessionária fica AQUI, e não solta no menu: é o outro lado da
  * mesma garagem (ver × comprar), e um botão dentro de `garage.ts` mexeria no painel 3D e nas combinações do playtest-layout.
  * "Minha garagem" passa pelo lobby de "Continuar" (religa os controles, que o menu principal desliga) e cai na garagem.
+ * "Resumo da Expedição" é a tela `career` (dinheiro, copa, pilotos e o "Nova Expedição" com confirmação).
  */
 export function garageHubScreen(api: ScreenApi): ScreenInstance {
   let device: DeviceId | null = null;
@@ -227,6 +230,7 @@ export function garageHubScreen(api: ScreenApi): ScreenInstance {
     },
     hint: t(career ? 'expedition.garageHub.shop.hint' : 'expedition.garageHub.shop.hint.noExpedition'),
   });
+  if (career) entries.push({ label: t('expedition.garageHub.summary'), hint: t('expedition.garageHub.summary.hint'), run: () => api.go('career') });
   return listMenuScreen(api, 'garage-hub', t('expedition.garageHub.title'), t('expedition.card.garage.hint'), entries, { onDevice: (d) => { device = d; } });
 }
 

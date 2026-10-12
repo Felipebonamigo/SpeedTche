@@ -71,7 +71,7 @@ await page.evaluate(() => {
 // ───────────── Preparação: uma corrida de copa de verdade (resultado, classificação, "Continuar") ─────────────
 // Com NC_LAYOUT_ONLY sem as telas que dependem dela (resultado, classificação, "Continuar" no menu), pula a corrida.
 const ONLY = process.env.NC_LAYOUT_ONLY?.split(',') ?? null;
-if (!ONLY || ONLY.some((id) => ['main', 'results', 'results-busy', 'results-stamp', 'standings'].includes(id))) {
+if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub', 'results', 'results-busy', 'results-stamp', 'standings'].includes(id))) {
   console.log('preparando: corrida da Copa Rio de Janeiro com 2 jogadores…');
   await page.evaluate((h) => { const s = window.nc.session; s.menus.hide(); s.debugBind(0, 'kb1'); s.debugBind(1, 'kb2'); s.startCup('br_rj', h); }, humans(2));
   await page.keyboard.down('ArrowUp'); await page.keyboard.down('KeyW');
@@ -180,6 +180,19 @@ const SCREENS = [
   // Carimbo novo que fecha a região (Espírito Santo, com o Sudeste todo carimbado no save): a linha a mais do resultado.
   ['results-stamp', () => window.nc.session.menus.show('results', { ...window.__shown.results, newStamp: 'ES' })],
   ['standings', () => { window.nc.session.menus.show('results', window.__shown.results); document.querySelector('.scr-results .actions .btn-primary')?.click(); }],
+  // N5: "Jogar livre" com a copa avulsa em andamento (a lista mais longa: Continuar + os 4 modos) e a Garagem com a Concessionária.
+  ['free', () => window.nc.session.menus.show('free')],
+  // Pior caso do menu principal: Expedição versus de 4 pilotos (uma meta curta por piloto), a copa avulsa em andamento (selo no cartão) e o
+  // quadro "Desde a última vez" com os 7 contadores.
+  ['main-expedition', () => {
+    const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));
+    const hs = [0, 1, 2, 3].map((i) => ({ seat: i, name: `Piloto ${i + 1}`, carId: ['falcao', 'trovao', 'tornado', 'camelo'][i], teamId: i, color: '#fff' }));
+    s.handleMenuEvent({ type: 'startCareer', humans: hs, resume: false });
+    const snap = { at: '2026-10-10T20:00:00.000Z', racesRun: 1, racesWon: 1, stamps: 1, cupsCompleted: 1, achievements: 1, carsBought: 1, earned: 1 };
+    s.debugSave().recap = { before: snap, after: { ...snap, racesRun: 31, racesWon: 12, stamps: 3, cupsCompleted: 3, achievements: 6, carsBought: 4, earned: 1_234_567 } };
+    s.menus.show('main');
+  }],
+  ['garage-hub', () => window.nc.session.menus.show('garageHub')],
   ['pause', () => window.nc.session.menus.show('pause')],
 ].filter(([id]) => !ONLY || ONLY.includes(id));
 

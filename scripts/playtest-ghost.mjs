@@ -33,7 +33,7 @@ async function focusBy(re, key = 'ArrowDown', max = 20) {
 }
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);
@@ -80,7 +80,11 @@ await frame();
 check(await menu() === 'title', 'abre no título');
 await press('Enter');
 check(await menu() === 'main', 'menu principal');
-const tt = await mainIndex('contra|time trial');
+// N5: o contra-relógio mora em "Jogar livre" (submenu do menu principal).
+const freeI = await mainIndex('^jogar livre$|^free play$');
+for (let i = 0; i < freeI; i++) await press('ArrowDown');
+await press('Enter');
+const tt = await page.evaluate(() => [...document.querySelectorAll('.scr-free .btn-main')].findIndex((el) => /contra|time trial/i.test((el.textContent ?? '').trim())));
 for (let i = 0; i < tt; i++) await press('ArrowDown');
 await press('Enter');
 check(await menu() === 'lobby', 'Contra-relógio abre o lobby');

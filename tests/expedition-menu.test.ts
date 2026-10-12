@@ -154,12 +154,23 @@ describe('menu principal: cinco cartões e um canto', () => {
     expect(bound[0]).toBe('gp0');
   });
 
-  it('com Expedição salva: o 1º cartão abre o resumo (Continuar em foco lá), e a dica diz onde parou', () => {
+  it('com Expedição em andamento: o 1º cartão CONTINUA direto (lobby de "continuar", sem passar pelo resumo), e a dica diz onde parou', () => {
     const save = withCareer();
     const screen = mainScreen(api(save));
+    press(screen, 'gp1', 'confirm');
+    expect(went).toEqual(['lobby']);
+    expect(lobby.mode).toBe('career');
+    expect(lobby.resume).toBe(true);
+    expect(bound[0]).toBe('gp1');
+    expect(text(one(screen.el, hasClass('main-hint')))).toContain('corrida 1 de 3');
+  });
+
+  it('Expedição concluída: o 1º cartão abre o resumo (onde se começa outra), não um beco sem saída', () => {
+    const career = newCareer([human(0, 0)]);
+    career.completed = true;
+    const screen = mainScreen(api(sanitizeSave({ career })));
     press(screen, 'kb1', 'confirm');
     expect(went).toEqual(['career']);
-    expect(text(one(screen.el, hasClass('main-hint')))).toContain('corrida 1 de 3');
   });
 
   it('só campeonato salvo: o 1º cartão abre uma Expedição NOVA e a copa fica no save, intacta', () => {
@@ -336,10 +347,10 @@ describe('Garagem (com a Concessionária dentro)', () => {
     expect(bound[0]).toBe('gp1'); // o menu principal desliga os assentos: o P1 senta com quem confirmou
   });
 
-  it('com Expedição: Minha garagem (passa pelo lobby de "continuar") e Concessionária', () => {
+  it('com Expedição: Minha garagem (passa pelo lobby de "continuar"), Concessionária e o resumo (onde se começa outra Expedição)', () => {
     const save = withCareer();
     const screen = garageHubScreen(api(save));
-    expect(items(screen)).toEqual(['Minha garagem', 'Concessionária']);
+    expect(items(screen)).toEqual(['Minha garagem', 'Concessionária', 'Resumo da Expedição']);
     press(screen, 'kb1', 'confirm');
     expect(went).toEqual(['lobby']);
     expect(lobby.mode).toBe('career');
@@ -349,5 +360,10 @@ describe('Garagem (com a Concessionária dentro)', () => {
     press(again, 'kb1', 'down');
     press(again, 'kb1', 'confirm');
     expect(went).toEqual(['dealership']);
+    went.length = 0;
+    const third = garageHubScreen(api(save));
+    press(third, 'kb1', 'down', 2);
+    press(third, 'kb1', 'confirm');
+    expect(went).toEqual(['career']);
   });
 });

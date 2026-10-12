@@ -34,7 +34,7 @@ import { newTelemetry, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
 import { rollSession } from './expedition';
-import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menus, RaceDriver, RaceMode, RenderFrame, Renderer, RenderStyle, Settings, ViewportSpec } from './contracts';
+import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menus, RaceDriver, RaceMode, RenderFrame, Renderer, RenderStyle, SaveData, Settings, ViewportSpec } from './contracts';
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
@@ -125,6 +125,8 @@ export interface Session {
   startCup(cupId: string, humans: HumanEntry[]): void;
   /** Só para o playtest automatizado: liga assentos ao teclado sem passar pelo lobby. */
   debugBind(seat: number, device: 'kb1' | 'kb2'): void;
+  /** O save em memória (playtest-layout monta o pior caso do menu principal sem recarregar a página). */
+  debugSave(): SaveData;
   /** Só para o playtest: avança N ticks da corrida agora, com a entrada atual, sem esperar quadros. */
   debugStep(ticks: number): void;
 }
@@ -195,6 +197,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     race: null, paused: false, speed: 1,
     start, stop, frame, handleMenuEvent, startQuick, startCup,
     debugBind(seat, device) { input.bindSeat(seat, device); },
+    debugSave: () => save,
     debugStep(ticks) {
       const r = session.race;
       if (!r || session.paused) return;

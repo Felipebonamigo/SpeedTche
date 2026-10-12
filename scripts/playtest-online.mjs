@@ -67,7 +67,7 @@ const press = async (p, key, n = 1) => { for (let i = 0; i < n; i++) { await p.k
 /** Posição de um item do menu principal pelo texto (o menu muda com Carreira, Online, Continuar…; contar setas quebra). */
 const mainIndex = (p, pattern) => p.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);
@@ -87,7 +87,10 @@ const host = await openPage('anfitrião');
 const guest = await openPage('convidado');
 for (const p of [host, guest]) {
   await press(p, 'Enter'); // título → menu
-  await press(p, 'ArrowDown', await mainIndex(p, '^online$'));
+  // N5: o Online mora em "Jogar livre" (submenu do menu principal).
+  await press(p, 'ArrowDown', await mainIndex(p, '^jogar livre$|^free play$'));
+  await press(p, 'Enter');
+  await press(p, 'ArrowDown', await p.evaluate(() => [...document.querySelectorAll('.scr-free .btn-main')].findIndex((el) => /^online$/i.test((el.textContent ?? '').trim()))));
   await press(p, 'Enter');
 }
 let h = await info(host);

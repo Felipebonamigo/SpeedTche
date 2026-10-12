@@ -40,7 +40,7 @@ export function goalText(goal: Goal): string {
 }
 
 function goalRow(goal: Goal, tag: string | null): HTMLElement {
-  const bar = goal.progress === null ? null : h('span', { class: 'goal-bar', attrs: { 'aria-hidden': 'true' } },
+  const bar = goal.progress === null || goal.id === 'canBuy' ? null : h('span', { class: 'goal-bar', attrs: { 'aria-hidden': 'true' } },
     h('i', { style: `width:${Math.round(Math.max(0, Math.min(1, goal.progress)) * 100)}%` }));
   return h('li', { class: `goal-row goal-${goal.term}${goal.id === 'canBuy' ? ' ready' : ''}` },
     tag ? h('b', { class: 'goal-tag', text: tag }) : null,
