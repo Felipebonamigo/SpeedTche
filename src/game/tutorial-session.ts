@@ -5,15 +5,14 @@
 // pura e mora em tutorial.ts; aqui ficam os efeitos (HUD, painel, save, menus). Em session.ts ficam
 // só os ganchos que chamam este módulo. Só local: o tutorial não existe no online.
 import { DT } from '../core/constants';
-import { CUPS } from '../core/data/cups';
 import { createRace } from '../core/sim/race';
 import { seatColor } from '../core/data/drivers';
 import type { HumanEntry, PlayerInput, RaceConfig, RaceState } from '../core/types';
 import { NEUTRAL_INPUT } from '../core/types';
 import { t } from '../i18n';
 import '../tutorial/strings';
-import type { BindAction, ControlBindings } from '../ui/remap/bindings';
-import { actionLabel, buttonLabel, codesLabel, keyLabel, padStyleOf, type LayoutMap } from '../ui/remap/labels';
+import type { ControlBindings } from '../ui/remap/bindings';
+import { actionChips, actionKeys, buttonLabel, keyLabel, padStyleOf, type KeyChip, type LayoutMap } from '../ui/remap/labels';
 import { compactHumans, type SeatBinder } from './career-session';
 import type { DeviceInfo, HudMessage, Menus, RaceDriver, SaveData, Settings } from './contracts';
 import { withLook, withoutLook } from './paints';
@@ -29,7 +28,7 @@ export const END_DELAY_TICKS = 150;
 const MAX_TICKS_PER_FRAME = 8;
 
 /** Uma tecla/botão a mostrar no painel: o que faz e o que apertar. */
-export interface PanelKey { label: string; keys: string }
+export type PanelKey = KeyChip;
 
 /** O painel de um assento, já com os textos no idioma atual. */
 export interface PanelSeat {
@@ -65,7 +64,8 @@ export interface TutorialHost {
   beginRace(config: RaceConfig, humans: HumanEntry[], driver: RaceDriver, state: RaceState): void;
   /** Sai da corrida para o fundo dos menus, sem desligar os assentos (chama driver.dispose). */
   toIdle(): void;
-  startCup(cupId: string, humans: HumanEntry[]): void;
+  /** Fim do tutorial → Expedição (O3): `resume` = já existe uma, e ela continua (nunca é apagada). */
+  startExpedition(humans: HumanEntry[], resume: boolean): void;
   randomSeed(): number;
   /** Grava o save. */
   persist(): void;
@@ -76,7 +76,7 @@ export interface TutorialHost {
 export interface TutorialSession {
   /** "Como jogar" → Começar: corrida guiada com estes jogadores (assentos já ligados). */
   start(humans: HumanEntry[]): void;
-  /** Tela final → primeira copa, com os mesmos jogadores. */
+  /** Tela final → Expedição (a copa avulsa sem dinheiro não é mais o destino, N5), com os mesmos jogadores. */
   firstCup(): void;
   /** Máquina da corrida guiada em curso (playtest); null fora dela. */
   current(): TutorialState | null;
@@ -84,26 +84,7 @@ export interface TutorialSession {
 
 // ───────────────────────────── Textos do painel ─────────────────────────────
 
-/** Teclas/botões de uma ação no dispositivo do jogador, com o remapeamento das opções. */
-export function actionKeys(device: string | null, action: BindAction, controls: ControlBindings, padName = '', layout: LayoutMap | null = null): string {
-  if (device && device.startsWith('gp')) return codesLabel(controls.gamepad[action], padStyleOf(padName));
-  return codesLabel(controls[device === 'kb2' ? 'kb2' : 'kb1'][action], 'xbox', layout);
-}
-
-function panelKeys(actions: readonly BindAction[], device: string | null, controls: ControlBindings, padName: string, layout: LayoutMap | null): PanelKey[] {
-  const out: PanelKey[] = [];
-  const pad = device !== null && device.startsWith('gp');
-  for (const a of actions) {
-    if (a === 'right' && actions.includes('left')) continue; // esquerda e direita num chip só
-    if (a === 'left' && actions.includes('right')) {
-      const keys = `${actionKeys(device, 'left', controls, padName, layout)} ${actionKeys(device, 'right', controls, padName, layout)}`;
-      out.push({ label: t('tutorial.key.steer'), keys: pad ? `${t('tutorial.key.stick')} / ${keys}` : keys });
-      continue;
-    }
-    out.push({ label: actionLabel(a), keys: actionKeys(device, a, controls, padName, layout) });
-  }
-  return out;
-}
+export { actionKeys };
 
 /** Monta o painel de um assento: passo, instrução, teclas do dispositivo dele e o aviso de repetir. */
 export function describeSeat(
@@ -117,10 +98,10 @@ export function describeSeat(
   if (view.step === 'stalled' && view.parked) text = t('tutorial.step.stalled.parked', params);
   return {
     seat: who.seat, color: who.color, name: who.name, view,
-    counter: view.step === 'done' ? '' : t('tutorial.counter', { n: view.index, total: view.total }),
+    counter: view.step === 'done' ? '' : view.step === 'launch' ? t('tutorial.counter.launch') : t('tutorial.counter', { n: view.index, total: view.total }),
     title: t(`tutorial.step.${view.step}.title`),
     text,
-    keys: panelKeys(view.actions, device, controls, padName, layout),
+    keys: actionChips(view.actions, device, controls, padName, layout),
     retry: view.retry ? t(`tutorial.retry.${view.retry}`) : null,
     skip: view.step === 'done' ? '' : t('tutorial.skip', { key: pad ? buttonLabel(9, padStyleOf(padName)) : keyLabel('Escape') }),
   };
@@ -166,6 +147,9 @@ export function createTutorialSession(host: TutorialHost): TutorialSession {
       switch (e.type) {
         case 'stepDone': if (e.step !== 'tow') host.hud(e.seat, t('tutorial.ok'), 'good', 1.5); break;
         case 'retry': host.hud(e.seat, t(`tutorial.retry.${e.reason}`), 'warn', 3); break;
+        case 'launch':
+          host.hud(e.seat, t(e.perfect ? 'tutorial.launch.perfect' : 'tutorial.launch.none'), e.perfect ? 'good' : 'warn', 3);
+          break;
         case 'noNitro': host.hud(e.seat, t('tutorial.noNitro'), 'warn', 2.5); break;
         case 'parked':
           for (const h of r.humans) {
@@ -259,8 +243,7 @@ export function createTutorialSession(host: TutorialHost): TutorialSession {
   }
 
   function firstCup(): void {
-    const cup = CUPS[0];
-    if (cup && lastHumans.length > 0) host.startCup(cup.id, lastHumans);
+    if (lastHumans.length > 0) host.startExpedition(lastHumans, host.save.career !== null);
   }
 
   return { start, firstCup, current: () => run?.tut ?? null };

@@ -18,7 +18,7 @@ import { resultsScreen, standingsScreen } from './screens/results';
 import { cupsScreen, tracksScreen } from './screens/select';
 import { creditsScreen, freeScreen, garageHubScreen, loadingScreen, mainScreen, pauseScreen, titleScreen } from './screens/simple';
 import { surveyScreen } from './screens/survey';
-import { tutorialDoneScreen, tutorialScreen } from './screens/tutorial';
+import { assistOfferScreen, tutorialDoneScreen, tutorialScreen } from './screens/tutorial';
 import { getActivePlaylog } from '../game/playlog';
 import './strings';
 
@@ -82,6 +82,7 @@ const FACTORIES: Readonly<Record<MenuScreen, ScreenFactory>> = {
   access: accessScreen,
   tutorial: tutorialScreen,
   tutorialDone: tutorialDoneScreen,
+  assistOffer: assistOfferScreen,
   passport: passportScreen,
   survey: surveyScreen,
 };

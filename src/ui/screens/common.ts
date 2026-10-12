@@ -3,7 +3,7 @@
 import { getTrack } from '../../core/track';
 import { TRACKS } from '../../core/track/tracks';
 import type { CarDef, CarLook, TimeOfDay, TrackDef } from '../../core/types';
-import type { DeviceId, MenuContext, MenuEvent, MenuNav, MenuScreen, RaceMode, ResultsScreenData, StandingsScreenData, TutorialDoneData, UiSound } from '../../game/contracts';
+import type { AssistOfferData, DeviceId, MenuContext, MenuEvent, MenuNav, MenuScreen, RaceMode, ResultsScreenData, StandingsScreenData, TutorialDoneData, UiSound } from '../../game/contracts';
 import { ORIGINAL_PAINT, paintedCar } from '../../game/paints';
 import { getLanguage, t } from '../../i18n';
 import { trackTitle } from '../../core/data/places';
@@ -34,7 +34,7 @@ export interface LobbyState {
   resume?: boolean;
 }
 
-export type ScreenData = ResultsScreenData | StandingsScreenData | TutorialDoneData | undefined;
+export type ScreenData = ResultsScreenData | StandingsScreenData | TutorialDoneData | AssistOfferData | undefined;
 
 /** O que cada tela recebe do `createMenus`. */
 export interface ScreenApi {

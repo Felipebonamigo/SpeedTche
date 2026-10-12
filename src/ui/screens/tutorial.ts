@@ -6,13 +6,13 @@ import './tutorial.css';
 import '../../tutorial/strings';
 import { seatColor } from '../../core/data/drivers';
 import type { HumanEntry } from '../../core/types';
-import type { DeviceId, MenuContext, MenuNav, SaveData, TutorialDoneData } from '../../game/contracts';
+import type { AssistOfferData, DeviceId, MenuContext, MenuNav, SaveData, TutorialDoneData } from '../../game/contracts';
 import { seatLook, withLook } from '../../game/paints';
 import type { PanelSeat, TutorialPanel } from '../../game/tutorial-session';
 import { t } from '../../i18n';
 import { uiScale, viewportRects } from '../../render/layout';
 import { isKeyboard } from '../input';
-import type { LayoutMap } from '../remap/labels';
+import { systemLayout } from '../remap/labels';
 import { button, createFocusList, h, listNav, screenFrame, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { icon } from './icons';
 import { availableCars, LOBBY_SEATS } from './lobby';
@@ -150,10 +150,10 @@ function isDoneData(data: ScreenData): data is TutorialDoneData {
 
 export function tutorialDoneScreen(api: ScreenApi, data?: ScreenData): ScreenInstance {
   const info: TutorialDoneData = isDoneData(data) ? data : { completed: false, players: 1 };
-  const cup = api.ctx.cups[0];
   const toMain = () => { api.sfx('back'); api.emit({ type: 'toMain' }); };
   const items = [
-    ...(cup ? [button(t('tutorial.done.cup', { cup: t(`core.cup.${cup.id}`) }), () => api.emit({ type: 'tutorialFirstCup' }), 'btn-primary')] : []),
+    // O destino é a Expedição (N5/O3), com dinheiro e garagem; quem já tem uma continua a dela.
+    button(t(api.ctx.save.career ? 'tutorial.done.expeditionResume' : 'tutorial.done.expedition'), () => api.emit({ type: 'tutorialFirstCup' }), 'btn-primary'),
     button(t('tutorial.done.main'), toMain),
   ];
   const list = createFocusList(items, { sfx: api.sfx });
@@ -168,6 +168,37 @@ export function tutorialDoneScreen(api: ScreenApi, data?: ScreenData): ScreenIns
     ),
   );
   return { el, nav: (nav) => listNav(list, nav, api.sfx, toMain) };
+}
+
+// ───────────────────────────── Oferta de assistência (O3) ─────────────────────────────
+
+function isOfferData(data: ScreenData): data is AssistOfferData {
+  return typeof data === 'object' && data !== null && 'brake' in data && 'amateur' in data;
+}
+
+/**
+ * Depois de 2 eliminações seguidas: Freio automático ou Amador, ou seguir como está. Voltar (Esc/B) é recusar; quem responde
+ * larga a corrida que a pergunta segurou (a sessão cuida, src/game/session.ts). Cada opção só aparece se ainda ajuda.
+ */
+export function assistOfferScreen(api: ScreenApi, data?: ScreenData): ScreenInstance {
+  const offer: AssistOfferData = isOfferData(data) ? data : { brake: true, amateur: true };
+  const answer = (choice: 'brake' | 'amateur' | 'no') => () => { api.sfx(choice === 'no' ? 'back' : 'confirm'); api.emit({ type: 'assistOfferAnswer', choice }); };
+  const items = [
+    ...(offer.brake ? [button(t('tutorial.offer.brake'), answer('brake'), 'btn-primary')] : []),
+    ...(offer.amateur ? [button(t('tutorial.offer.amateur'), answer('amateur'), offer.brake ? '' : 'btn-primary')] : []),
+    button(t('tutorial.offer.no'), answer('no')),
+  ];
+  const list = createFocusList(items, { sfx: api.sfx });
+  const el = screenFrame('assistOffer', null,
+    h('div', { class: 'tut-done glass' },
+      h('h1', { class: 'screen-title', text: t('tutorial.offer.assistTitle') }),
+      h('p', { class: 'tut-sub', text: t('tutorial.offer.assistSub') }),
+      ...(offer.brake ? [h('p', { class: 'hint', text: t('tutorial.offer.brakeHint') })] : []),
+      ...(offer.amateur ? [h('p', { class: 'hint', text: t('tutorial.offer.amateurHint') })] : []),
+      h('div', { class: 'actions' }, items.map((i) => i.el)),
+    ),
+  );
+  return { el, nav: (nav) => listNav(list, nav, api.sfx, answer('no')) };
 }
 
 // ───────────────────────────── Painel da corrida ─────────────────────────────
@@ -191,17 +222,6 @@ function setText(el: HTMLElement, text: string): void {
   if (el.textContent !== text) el.textContent = text;
 }
 
-let layoutMap: LayoutMap | null = null;
-let layoutAsked = false;
-
-/** Mapa do layout do teclado do sistema (Chromium/Electron), pedido uma vez; null sem suporte. */
-function askLayout(): void {
-  if (layoutAsked) return;
-  layoutAsked = true;
-  const kb = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { keyboard?: { getLayoutMap?: () => Promise<LayoutMap> } }).keyboard;
-  if (kb && typeof kb.getLayoutMap === 'function') kb.getLayoutMap().then((m) => { layoutMap = m; }).catch(() => undefined);
-}
-
 /**
  * Painel do tutorial dentro de `root` (o #hud): um cartão por jogador, no viewport dele. O DOM só
  * nasce no primeiro uso — a sessão cria o painel sempre, inclusive nos testes em Node.
@@ -211,7 +231,7 @@ export function createTutorialPanel(root: HTMLElement): TutorialPanel {
   let cards: Card[] = [];
 
   function build(count: number): void {
-    if (!el) { askLayout(); el = h('div', { class: 'nc-tut hidden' }); root.appendChild(el); }
+    if (!el) { systemLayout(); el = h('div', { class: 'nc-tut hidden' }); root.appendChild(el); }
     const host = el;
     host.replaceChildren();
     cards = Array.from({ length: count }, () => {
@@ -275,6 +295,6 @@ export function createTutorialPanel(root: HTMLElement): TutorialPanel {
       });
     },
     hide() { el?.classList.add('hidden'); },
-    layout: () => layoutMap,
+    layout: systemLayout,
   };
 }

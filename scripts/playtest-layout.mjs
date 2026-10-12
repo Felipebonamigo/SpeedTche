@@ -192,6 +192,8 @@ const SCREENS = [
   ['tutorial', () => { const s = window.nc.session; ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('tutorial'); }],
   ['tutorial-done', () => window.nc.session.menus.show('tutorialDone', { completed: true, players: 4 })],
   ['tutorial-skipped', () => window.nc.session.menus.show('tutorialDone', { completed: false, players: 1 })],
+  // O3: a oferta de Freio automático ou Amador depois de 2 eliminações seguidas (as duas opções: o pior caso de altura).
+  ['assist-offer', () => window.nc.session.menus.show('assistOffer', { brake: true, amateur: true })],
   ['results', () => window.nc.session.menus.show('results', window.__shown.results)],
   ['results-busy', (ach) => window.nc.session.menus.show('results', { ...window.__shown.results, achievements: ach.map((id) => ({ id, seats: [0, 1] })) }), ACH],
   // Carimbo novo que fecha a região (Espírito Santo, com o Sudeste todo carimbado no save): a linha a mais do resultado.
@@ -499,6 +501,89 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
     await page.screenshot({ path: `${out}-hud-${n}p-${w}x${h}${hudScale !== 1 ? '-80' : ''}.png` });
   }
   await page.evaluate(() => { const s = window.nc.session; s.settings.hudScale = 1; s.handleMenuEvent({ type: 'settingsChanged', settings: s.settings }); });
+}
+
+
+// ───────────── Dicas da 1ª corrida (O3): cada dica, por viewport, sem cobrir os painéis do HUD ─────────────
+// A dica mora embaixo, no meio (entre o combustível e o velocímetro), acima da legenda dos marcos. Mede: o cartão dentro do viewport, texto e
+// teclas com pelo menos 12 px (o piso do HUD) e nenhuma sobreposição com os painéis do mesmo viewport. Os casos de HUD são 150% (a maior
+// opção de acessibilidade, com 1 e 2 jogadores) e 80% (a menor, com 4 jogadores em 1024×640, o pior caso de espaço).
+if (!process.env.NC_LAYOUT_SKIP_HUD) {
+  const TIPS = ['launch', 'brake', 'drift', 'nitro', 'pit'];
+  for (const [n, w, h, hudScale] of [[1, 1280, 720, 1], [1, 1280, 720, 1.5], [2, 1280, 800, 1], [2, 1280, 720, 1.5], [4, 1280, 800, 1], [4, 1024, 640, 0.8], [4, 1024, 640, 1]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.evaluate(({ hs, hudScale }) => {
+      const s = window.nc.session;
+      window.dispatchEvent(new Event('resize'));
+      s.settings.hudScale = hudScale; s.settings.reduceEffects = false;
+      s.handleMenuEvent({ type: 'settingsChanged', settings: s.settings });
+      s.menus.hide();
+      for (let i = 0; i < 4; i++) s.input.unbindSeat(i);
+      s.debugBind(0, 'kb1'); if (hs.length > 1) s.debugBind(1, 'kb2');
+      s.debugSave().racesRun = 0; s.debugSave().career = null;
+      s.startCup('br_rj', hs);
+      s.debugStep(30);
+      s.speed = 0; // o quadro desenha sem avançar a simulação: a dica posta à mão fica
+    }, { hs: humans(n), hudScale });
+    const tag = `Dicas ${n}P a ${w}×${h}${hudScale !== 1 ? ` (HUD ${Math.round(hudScale * 100)}%)` : ''}`;
+    // Duas passadas: sem legenda de marco na tela, e com a legenda no pior caso (o nome mais comprido, forçada ligada): ela mora na mesma
+    // faixa do pé do viewport, e o cartão tem que subir acima dela (`--lift`), nunca cobri-la.
+    for (const caption of [false, true]) {
+      await page.evaluate(({ caption }) => {
+        for (const cap of document.querySelectorAll('#hud .vp .lmk')) {
+          cap.classList.toggle = (c, on) => { if (on === undefined ? !cap.classList.contains(c) : on) cap.classList.add(c); else cap.classList.remove(c); }; // o quadro não a desliga
+          if (caption) {
+            cap.querySelector('.lmk-name').textContent = 'Passarela nas copas do Daintree';
+            const where = cap.querySelector('.lmk-where'); where.textContent = 'Território do Norte · Austrália'; where.classList.remove('empty');
+            cap.classList.add('show');
+          } else cap.classList.remove('show');
+        }
+      }, { caption });
+      for (const id of caption ? ['launch', 'pit'] : TIPS) {
+        await page.evaluate(({ id }) => {
+          const s = window.nc.session;
+          for (const [seat, st] of s.race.tips.seats) { st.active = id; st.near = true; st.since = s.race.state.tick; st.shown[id] = 1; void seat; }
+          s.frame(performance.now());
+          s.frame(performance.now()); // o 2º quadro já enxerga a legenda ligada pelo 1º e sobe o cartão
+        }, { id });
+        await page.waitForTimeout(caption ? 700 : 50);
+        await page.evaluate(() => { for (const a of document.getAnimations()) { try { if (a.effect?.target?.closest?.('.ht-root')) a.finish(); } catch { /* infinita */ } } }); // a entrada do cartão (220 ms) já acabou
+        const m = await page.evaluate(() => {
+          const cards = [...document.querySelectorAll('.ht-vp .ht-card.show')];
+          const vps = [...document.querySelectorAll('#hud .vp')].filter((v) => v.style.display !== 'none');
+          const px = (el) => (el ? parseFloat(getComputedStyle(el).fontSize) : 99);
+          return cards.map((card, i) => {
+            const c = card.getBoundingClientRect(); const box = card.parentElement.getBoundingClientRect();
+            const panels = [...(vps[i]?.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini, :scope > .lmk') ?? [])]
+              .filter((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0 && (!e.classList.contains('lmk') || e.classList.contains('show')));
+            const hit = panels.filter((p) => { const a = p.getBoundingClientRect(); return Math.min(a.right, c.right) - Math.max(a.left, c.left) > 1 && Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top) > 1; }).map((p) => p.className.split(' ')[0]);
+            return {
+              inside: c.left >= box.left - 0.5 && c.right <= box.right + 0.5 && c.top >= box.top - 0.5 && c.bottom <= box.bottom + 0.5,
+              text: px(card.querySelector('.ht-text')), kbd: Math.min(...[...card.querySelectorAll('kbd')].map(px), 99), hit,
+            };
+          });
+        });
+        const where = `${tag}${caption ? ' com a legenda do marco na tela' : ''}, dica ${id}`;
+        check(m.length === n && m.every((x) => x.inside), `${where}: um cartão por viewport, dentro dele`);
+        check(m.every((x) => x.text >= 11.95 && x.kbd >= 11.95), `${where}: texto ${Math.min(...m.map((x) => x.text)).toFixed(1)}px e teclas ${Math.min(...m.map((x) => x.kbd)).toFixed(1)}px (mín. 12)`);
+        check(m.every((x) => x.hit.length === 0), `${where}: sem cobrir os painéis do HUD (${m.flatMap((x) => x.hit).join(', ') || 'nenhum'})`);
+        if (!caption && (id === 'pit' || id === 'drift')) await page.screenshot({ path: `${out}-dicas-${id}-${n}p-${w}x${h}${hudScale !== 1 ? `-${Math.round(hudScale * 100)}` : ''}.png` });
+        if (caption && id === 'launch') await page.screenshot({ path: `${out}-dicas-com-legenda-${n}p-${w}x${h}${hudScale !== 1 ? `-${Math.round(hudScale * 100)}` : ''}.png` });
+      }
+    }
+    // "Reduzir efeitos": a seta do box não pulsa; sem ele, pulsa quando o box está perto.
+    for (const reduce of [false, true]) {
+      await page.evaluate(({ reduce }) => {
+        const s = window.nc.session;
+        s.settings.reduceEffects = reduce; s.handleMenuEvent({ type: 'settingsChanged', settings: s.settings });
+        for (const [, st] of s.race.tips.seats) { st.active = 'pit'; st.near = true; st.since = s.race.state.tick; }
+        s.frame(performance.now());
+      }, { reduce });
+      const anim = await page.evaluate(() => { const a = document.querySelector('.ht-arrow.on'); return a ? getComputedStyle(a).animationName : 'sem seta'; });
+      check(reduce ? anim === 'none' : anim === 'ht-pulse', `${tag}: seta do box ${reduce ? 'parada com "Reduzir efeitos"' : 'pulsando perto do box'} (${anim})`);
+    }
+    await page.evaluate(() => { const s = window.nc.session; s.speed = 1; s.settings.reduceEffects = false; s.settings.hudScale = 1; s.handleMenuEvent({ type: 'settingsChanged', settings: s.settings }); });
+  }
 }
 
 check(errors.length === 0, `sem erros no console (${errors.slice(0, 3).join(' | ')})`);

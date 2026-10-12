@@ -30,6 +30,8 @@ import { addBalloon, ageBalloons, audibleFor, createVoiceRace, hornGain, newWhee
 import { createVoiceHud, type VoiceHud } from '../voice/hud';
 import { isMuted } from '../voice/prefs';
 import { createTutorialPanel } from '../ui/screens/tutorial';
+import { createTipsHud, describeTip, newTipMemory, observeTips, tipOf, tipsEnabled, type TipMemory, type TipsHud } from '../render/hud-tips';
+import { systemLayout } from '../ui/remap/labels';
 import { newTelemetry, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
@@ -51,6 +53,7 @@ import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
 import { isCupUnlocked, loadSave, saveSave } from './save';
 import { loadSettings, saveSettings } from './settings';
+import { applyAssistChoice, markOffered, newAssistOffer, offerDue, recordRaceEnd } from './assist-offer';
 import { createTutorialSession, type TutorialSession } from './tutorial-session';
 
 const DT = 1 / TICK_RATE;
@@ -98,6 +101,8 @@ interface ActiveRace {
   talk: RivalTalk | null;
   /** Voz do carro (N6): buzina, roda de frases e balões. Só visual e sonoro: fora do estado da corrida (voice.ts). */
   voice: VoiceRace;
+  /** Dicas da 1ª corrida (O3, render/hud-tips.ts): só na 1ª corrida local de copa/Expedição; null nas outras. Só visual: fora do estado. */
+  tips: TipMemory | null;
   heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown' | 'taunt'> | undefined>;
   /** Online: o atraso de entrada do lockstep, em ticks; 0 no sofá e no tutorial. A contagem (luzes, bipes, "JÁ!") anda adiantada por ele (N1). */
   inputLead: number;
@@ -169,6 +174,11 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   let rafId = 0;
   /** Roda de frases e balões (voice/hud.ts): criado na primeira vez que alguém fala ou abre a roda; nunca em Node. */
   let voiceHud: VoiceHud | null = null;
+  /** Overlay das dicas da 1ª corrida (render/hud-tips.ts): nasce na primeira dica; nunca em Node. */
+  let tipsHud: TipsHud | null = null;
+  /** Oferta de assistência depois de 2 eliminações seguidas (assist-offer.ts): a conta vive na sessão; `held` é a largada que a pergunta segurou. */
+  const assistOffer = newAssistOffer();
+  let held: { event: MenuEvent; seats: number[] } | null = null;
   let idleTrack: Track = getTrack(TRACKS[0].id);
   let idleTimer = 0;
 
@@ -229,7 +239,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     save, settings, menus, input, baseConfig, beginRace, toIdle, randomSeed, persist: () => saveSave(save),
   });
   session.tutorial = createTutorialSession({
-    save, settings, menus, input, toIdle, startCup, randomSeed, persist: () => saveSave(save),
+    save, settings, menus, input, toIdle, startExpedition: (humans, resume) => career.start(humans, resume), randomSeed, persist: () => saveSave(save),
     beginRace: (config, humans, driver, state) => beginRace(config, 'quick', humans, { driver, localSeats: humans.map((h) => h.seat), state }),
     hud: pushMessage,
     panel: createTutorialPanel(hudRoot),
@@ -284,6 +294,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       ...raceVisuals(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
       scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null, voice: createVoiceRace(),
+      tips: tipsEnabled(save, mode, net !== undefined) ? newTipMemory() : null,
       inputLead: net && net.driver === online ? Math.max(0, online.status().delayTicks) : 0,
     };
     getActivePlaylog()?.raceStarted({ mode, trackId: config.trackId, humans: localSeats.length });
@@ -344,10 +355,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     beginRace(config, 'cup', humans);
   }
 
-  function retryRace(): void {
+  function retryRace(fresh = false): void {
     const r = session.race;
     if (!r) { toMain(); return; }
     const config: RaceConfig = { ...r.state.config, seed: randomSeed() };
+    // Depois da oferta de assistência (O3) a nova largada já sai com a dificuldade e a assistência que o jogador acabou de escolher.
+    if (fresh) { config.difficulty = settings.difficulty; config.humans = assistedHumans(withoutLook(r.humans), settings.seatAssists); }
     beginRace(config, r.mode, r.humans);
   }
 
@@ -469,6 +482,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
 
   function finishRace(r: ActiveRace): void {
     const { newRecords, achievements, newStamp } = settle(r);
+    recordRaceEnd(assistOffer, r.mode, champ?.eliminated === true);
     logRace(r);
     const data = { mode: r.mode, trackDef: r.track.def, results: r.state.results ?? [], humans: withRaceAssists(r.humans, r.state.config.humans), champ, newRecords, achievements, party: party.raceFinished(r.mode, r.state), newStamp: newStamp ?? null };
     if (r.driver) r.driver.finished(data);
@@ -541,6 +555,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     for (const sc of scrapes) if (involvesLocalSeat(r, sc)) audio.scrape?.(sc.strength); // dublês de teste podem não ter
     for (const c of rumbleCues(r.state, rumbleMemory, scrapes)) input.rumble(c.seat, c.strength, c.ms);
     for (const cue of observeVoice(r.voice.mem, r.state, inputs)) handleVoiceCue(r, cue);
+    if (r.tips) observeTips(r.tips, r.state, r.track, inputs);
     if (r.talk && r.state.config.rival) {
       const rival = rivalByName(r.state.config.rival);
       for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind), 'info', RIVAL_LINE_TTL);
@@ -588,6 +603,23 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     voiceHud?.update({
       width: window.innerWidth, height: window.innerHeight, viewports: f.viewports.map((vp) => ({ seat: vp.seat, color: vp.color, name: vp.name })), wheels,
       balloons: r.voice.balloons, paused: session.paused || !f.showHud, reduceEffects: f.options.reduceEffects === true,
+    });
+  }
+
+  /** O overlay das dicas da 1ª corrida: um cartão por viewport local, com as teclas do dispositivo e do remapeamento de cada jogador. */
+  function drawTips(r: ActiveRace | null, f: RenderFrame | null): void {
+    if (!r?.tips || !f) { tipsHud?.hide(); return; }
+    if (!tipsHud) tipsHud = createTipsHud(hudRoot);
+    const devices = input.devices();
+    const layout = systemLayout();
+    tipsHud?.update({
+      width: window.innerWidth, height: window.innerHeight, paused: session.paused || !f.showHud, reduceEffects: f.options.reduceEffects === true,
+      viewports: f.viewports.map((vp) => {
+        const view = r.tips ? tipOf(r.tips, vp.seat) : null;
+        const device = input.seatDevice(vp.seat);
+        const padName = devices.find((d) => d.id === device)?.label ?? '';
+        return { seat: vp.seat, color: vp.color, tip: view ? describeTip(view, device, settings.controls, padName, layout) : null };
+      }),
     });
   }
 
@@ -646,11 +678,13 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       renderer.render(f);
       audio.update(session.paused ? { ...f, paused: true } : f, dtRaw);
       drawVoice(r, f);
+      drawTips(r, f);
     } else {
       idleTimer += dtRaw;
       renderer.renderIdle(idleTimer, idleTrack);
       audio.update(null, dtRaw);
       drawVoice(null, null);
+      drawTips(null, null);
     }
 
     // Só o menu que já estava aberto recebe as bordas deste quadro: a pausa (ou o resultado) que
@@ -696,9 +730,34 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     }
   }
 
+  /** Os eventos que largam uma corrida de copa/Expedição: é neles que a oferta de assistência, se estiver na hora, passa na frente. */
+  const RACE_STARTS: ReadonlySet<MenuEvent['type']> = new Set(['startCup', 'continueCup', 'nextRace', 'retryRace', 'careerRace']);
+
+  function holdForAssistOffer(e: MenuEvent): boolean {
+    if (!RACE_STARTS.has(e.type)) return false;
+    const seats = ('humans' in e ? e.humans : session.race?.humans ?? []).map((h) => h.seat);
+    const due = offerDue(assistOffer, settings.difficulty, settings.seatAssists, seats);
+    if (!due) return false;
+    markOffered(assistOffer); // uma vez por sessão, aceita ou recusada
+    held = { event: e, seats };
+    menus.show('assistOffer', due);
+    return true;
+  }
+
+  function answerAssistOffer(choice: 'brake' | 'amateur' | 'no'): void {
+    const pending = held;
+    held = null;
+    if (!pending) return;
+    if (choice !== 'no') applySettings(applyAssistChoice(choice, settings, pending.seats));
+    if (pending.event.type === 'retryRace' && choice !== 'no') { menus.hide(); retryRace(true); return; }
+    handleMenuEvent(pending.event);
+  }
+
   function handleMenuEvent(e: MenuEvent): void {
     if (getActivePlaylog()?.askSurveyBefore(e, session.race !== null && session.race.state.phase !== 'finished')) { menus.show('survey'); return; }
+    if (holdForAssistOffer(e)) return;
     switch (e.type) {
+      case 'assistOfferAnswer': answerAssistOffer(e.choice); break;
       case 'startCup': startCup(e.cupId, e.humans); break;
       case 'startQuick': startQuick(e.trackId, e.laps, e.humans); break;
       case 'startTimeTrial': startQuick(e.trackId, settings.quickLaps, e.humans, true); break;

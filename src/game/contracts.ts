@@ -379,7 +379,7 @@ export type UiSound = 'move' | 'confirm' | 'back' | 'coin' | 'count' | 'chime';
 
 export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'payout' | 'online' | 'free' | 'garageHub'
   | 'party' | 'tournament' | 'handoff' | 'tournamentTable' | 'access'
-  | 'tutorial' | 'tutorialDone' | 'passport' | 'survey';
+  | 'tutorial' | 'tutorialDone' | 'assistOffer' | 'passport' | 'survey';
 
 /** Modos de festa, só locais (docs/MODOS.md; src/game/party-session.ts). */
 export type PartyMode = 'tournament' | 'escort' | 'relay';
@@ -411,8 +411,10 @@ export type MenuEvent =
   | { type: 'tournamentHeat' }
   /** "Como jogar": corrida guiada com quem entrou na tela do tutorial (assentos já ligados). */
   | { type: 'startTutorial'; humans: HumanEntry[] }
-  /** Fim do tutorial → "Primeira copa", com os mesmos jogadores. */
-  | { type: 'tutorialFirstCup' };
+  /** Fim do tutorial → Expedição (N5/O3; o nome do evento vem de quando era a primeira copa), com os mesmos jogadores. */
+  | { type: 'tutorialFirstCup' }
+  /** Oferta de assistência depois de 2 eliminações seguidas (O3): a resposta; a largada que a oferta segurou sai em seguida. */
+  | { type: 'assistOfferAnswer'; choice: 'brake' | 'amateur' | 'no' };
 
 /** O que o resultado mostra de um modo de festa (preenchido pela sessão da festa no fim da corrida). */
 export type PartyResultsInfo =
@@ -434,6 +436,12 @@ export interface ResultsScreenData {
   party?: PartyResultsInfo;
   /** Expedição Brasil: sigla do estado carimbado no passaporte nesta corrida (o resultado anuncia). */
   newStamp?: string | null;
+}
+
+/** O que a oferta de assistência traz (src/game/assist-offer.ts): cada opção só existe se ainda ajuda. */
+export interface AssistOfferData {
+  brake: boolean;
+  amateur: boolean;
 }
 
 /** Tela final do tutorial: concluído (parabéns) ou pulado/sem tempo (só as regras de ouro). */
@@ -474,7 +482,8 @@ export interface Menus {
   show(screen: 'results', data: ResultsScreenData): void;
   show(screen: 'standings', data: StandingsScreenData): void;
   show(screen: 'tutorialDone', data: TutorialDoneData): void;
-  show(screen: Exclude<MenuScreen, 'results' | 'standings' | 'tutorialDone'>): void;
+  show(screen: 'assistOffer', data: AssistOfferData): void;
+  show(screen: Exclude<MenuScreen, 'results' | 'standings' | 'tutorialDone' | 'assistOffer'>): void;
   hide(): void;
   current(): MenuScreen | null;
   /** Navegação por gamepad, chamada a cada quadro pela sessão (o teclado e o mouse os menus tratam sozinhos). */

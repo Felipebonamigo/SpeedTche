@@ -3,7 +3,8 @@
 // no Chromium/Electron) a letra mostrada é a da tecla de verdade — AZERTY, e no ABNT2 a tecla
 // `Semicolon` aparece como Ç.
 import { t } from '../../i18n';
-import type { BindAction, BindCode, BindDevice } from './bindings';
+import '../../tutorial/strings';
+import type { BindAction, BindCode, BindDevice, ControlBindings } from './bindings';
 import './strings';
 
 export type LayoutMap = ReadonlyMap<string, string>;
@@ -88,4 +89,48 @@ export function deviceLabel(device: BindDevice): string {
 /** Dica da coluna: o nome completo do dispositivo e o que continua fixo nele. */
 export function deviceTitle(device: BindDevice): string {
   return device === 'gamepad' ? t('remap.gamepadNote') : t(`remap.deviceTitle.${device}`, { name: t(`ui.device.${device}`) });
+}
+
+/** Uma tecla/botão a mostrar na tela: o que faz e o que apertar. */
+export interface KeyChip { label: string; keys: string }
+
+/**
+ * Teclas/botões de uma ação no dispositivo do jogador ('kb1', 'kb2' ou 'gp0'…), com o remapeamento das opções. O painel do
+ * tutorial e as dicas da 1ª corrida (render/hud-tips.ts) usam esta mesma conta: a dica nunca mostra a tecla do padrão a quem remapeou.
+ */
+export function actionKeys(device: string | null, action: BindAction, controls: ControlBindings, padName = '', layout: LayoutMap | null = null): string {
+  if (device && device.startsWith('gp')) return codesLabel(controls.gamepad[action], padStyleOf(padName));
+  return codesLabel(controls[device === 'kb2' ? 'kb2' : 'kb1'][action], 'xbox', layout);
+}
+
+/** As teclas das ações como chips: esquerda e direita num chip só ("Virar"), e o controle lembra do analógico. */
+export function actionChips(actions: readonly BindAction[], device: string | null, controls: ControlBindings, padName = '', layout: LayoutMap | null = null): KeyChip[] {
+  const out: KeyChip[] = [];
+  const pad = device !== null && device.startsWith('gp');
+  for (const a of actions) {
+    if (a === 'right' && actions.includes('left')) continue;
+    if (a === 'left' && actions.includes('right')) {
+      const keys = `${actionKeys(device, 'left', controls, padName, layout)} ${actionKeys(device, 'right', controls, padName, layout)}`;
+      out.push({ label: t('tutorial.key.steer'), keys: pad ? `${t('tutorial.key.stick')} / ${keys}` : keys });
+      continue;
+    }
+    out.push({ label: actionLabel(a), keys: actionKeys(device, a, controls, padName, layout) });
+  }
+  return out;
+}
+
+let layoutMap: LayoutMap | null = null;
+let layoutAsked = false;
+
+/**
+ * Mapa do layout do teclado do sistema (Chromium/Electron), pedido uma vez; null sem suporte ou antes de a resposta chegar.
+ * O painel do tutorial e as dicas da 1ª corrida o usam: no ABNT2 o `;` do padrão aparece como Ç, no AZERTY o W aparece como Z.
+ */
+export function systemLayout(): LayoutMap | null {
+  if (!layoutAsked) {
+    layoutAsked = true;
+    const kb = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { keyboard?: { getLayoutMap?: () => Promise<LayoutMap> } }).keyboard;
+    if (kb && typeof kb.getLayoutMap === 'function') kb.getLayoutMap().then((m) => { layoutMap = m; }).catch(() => undefined);
+  }
+  return layoutMap;
 }
