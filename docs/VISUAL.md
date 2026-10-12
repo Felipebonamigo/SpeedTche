@@ -754,3 +754,7 @@ soltos num gramado, sem a pista (ids em `catalog.ts`).
 ## Céu e luz por bioma (M2)
 
 O sol do entardecer tem azimute e elevação por bioma (`palette.ts`), conferidos por teste contra o anel de montanhas (`horizonElevation`, folga ≥ 2°). A tinta das sombras do `stylizeGrade` some no preto. Reflexo de lente: 1 malha, só no entardecer, Média ou melhor; `Sky.setFlare(on)` é ligado a Reduzir efeitos no renderizador. Para a M6: elevação do dia 34°, entardecer 9–10,5°, noite 20°; `flare`, `seaGlint` e `seaSpec` também interpolam; `flareColor` é a mesma nos 3 períodos de um bioma.
+
+## A corrida que muda (M6)
+
+`racePeriodPlan` (dia → entardecer na última volta, entardecer → noite nas duas últimas) e `blendPalette` interpolam a `PALETTE_TABLE` campo a campo. As duas pontas de cada pista são montadas uma vez e cada passo é só uniforme, a cada 1/512 do `t`. O env map é refeito no máximo 8× por transição. Traçado 3D = mapa: escala por pista `2π/|Σcurve|` (0,69 a 26,9; 17 pistas ≥ 10×); 28 pistas cruzam a si mesmas, em cruzamento plano.
