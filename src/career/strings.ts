@@ -5,14 +5,14 @@ import { registerStrings } from '../i18n';
 
 registerStrings('ui', {
   pt: {
-    'main.career': 'Carreira',
+    'main.career': 'Expedição',
     'main.continue': 'Continuar',
     'main.hint.career': 'Prêmios em dinheiro, catorze carros e melhorias de copa em copa',
     'main.hint.continue': '{cup} — corrida {n} de {m}',
     'standings.garage': 'GARAGEM',
   },
   en: {
-    'main.career': 'Career',
+    'main.career': 'Expedition',
     'main.continue': 'Continue',
     'main.hint.career': 'Prize money, fourteen cars and upgrades, cup after cup',
     'main.hint.continue': '{cup} — race {n} of {m}',
@@ -48,12 +48,12 @@ registerStrings('career', {
     'mode.versus': 'Versus',
     'mode.solo': 'Solo',
 
-    'hub.title': 'Carreira',
+    'hub.title': 'Expedição',
     'hub.intro': 'Corra as copas em ordem. Cada corrida paga um prêmio pela posição; entre as corridas, a garagem vende carros e melhorias. Os rivais também evoluem de copa em copa.',
     'hub.introCoop': 'No cooperativo a equipe divide um cofre e ganha bônus pela colocação da equipe; no versus, cada um tem a sua carteira.',
     'hub.none': 'Nenhuma carreira salva.',
-    'hub.continue': 'Continuar carreira',
-    'hub.new': 'Nova carreira',
+    'hub.continue': 'Continuar Expedição',
+    'hub.new': 'Nova Expedição',
     'hub.confirmNew': 'Apagar a salva e começar outra?',
     'hub.cup': 'Copa atual',
     'hub.race': 'corrida {n} de {m}',
@@ -128,12 +128,12 @@ registerStrings('career', {
     'mode.versus': 'Versus',
     'mode.solo': 'Solo',
 
-    'hub.title': 'Career',
+    'hub.title': 'Expedition',
     'hub.intro': 'Race the cups in order. Every race pays prize money by position; between races the garage sells cars and upgrades. Rivals get stronger cup after cup.',
     'hub.introCoop': 'In co-op the team shares one vault and earns a bonus for the team placing; in versus everyone keeps their own wallet.',
     'hub.none': 'No saved career.',
-    'hub.continue': 'Continue career',
-    'hub.new': 'New career',
+    'hub.continue': 'Continue Expedition',
+    'hub.new': 'New Expedition',
     'hub.confirmNew': 'Erase the saved one and start over?',
     'hub.cup': 'Current cup',
     'hub.race': 'race {n} of {m}',

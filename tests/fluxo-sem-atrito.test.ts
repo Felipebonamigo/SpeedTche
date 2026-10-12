@@ -218,7 +218,7 @@ describe('keyNav', () => {
 describe('menu principal', () => {
   it('Enter ou A num modo do menu já senta o P1 com esse dispositivo', () => {
     const bound: Array<DeviceId | null> = [null, null, null, null];
-    press(mainScreen(api(sanitizeSave({}), bound)), 'gp0', 'confirm'); // 1º item: Campeonato
+    press(mainScreen(api(sanitizeSave({}), bound)), 'gp0', 'confirm'); // 1º cartão: Expedição (N5)
     expect(went).toEqual(['lobby']);
     expect(bound[0]).toBe('gp0');
     went.length = 0;
@@ -238,9 +238,12 @@ describe('menu principal', () => {
     expect(focused(card)).toBe(true);
     press(screen, 'kb1', 'confirm');
     expect(went).toEqual(['tutorial']);
-    // → também chega ao cartão; ← volta ao 1º item.
+    // N5: → de um cartão salta ao 1º botão do canto e anda por ele; depois do último chega ao cartão; ← no cartão volta ao 1º cartão.
     const again = mainScreen(api(sanitizeSave({}), [null, null, null, null]));
+    const corner = one(again.el, hasClass('main-corner')).children as FakeEl[];
     press(again, 'kb1', 'right');
+    expect(focused(corner[0])).toBe(true);
+    for (let i = 0; i < corner.length; i++) press(again, 'kb1', 'right');
     expect(focused(one(again.el, hasClass('tut-offer')))).toBe(true);
     press(again, 'kb1', 'left');
     expect(focused(one(again.el, hasClass('menu-list')).children[0] as FakeEl)).toBe(true);

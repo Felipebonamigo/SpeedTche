@@ -15,7 +15,7 @@ import { optionsScreen } from './screens/options';
 import { passportScreen } from './screens/passport';
 import { resultsScreen, standingsScreen } from './screens/results';
 import { cupsScreen, tracksScreen } from './screens/select';
-import { creditsScreen, loadingScreen, mainScreen, pauseScreen, titleScreen } from './screens/simple';
+import { creditsScreen, freeScreen, garageHubScreen, loadingScreen, mainScreen, pauseScreen, titleScreen } from './screens/simple';
 import { surveyScreen } from './screens/survey';
 import { tutorialDoneScreen, tutorialScreen } from './screens/tutorial';
 import { getActivePlaylog } from '../game/playlog';
@@ -70,6 +70,8 @@ const FACTORIES: Readonly<Record<MenuScreen, ScreenFactory>> = {
   career: careerScreen,
   garage: garageScreen,
   dealership: dealershipScreen,
+  free: freeScreen,
+  garageHub: garageHubScreen,
   online: onlineScreen,
   party: partyScreen,
   tournament: tournamentScreen,
