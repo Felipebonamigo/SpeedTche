@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
-import type { Track } from '../core/types';
+import type { TimeOfDay, Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer } from '../game/contracts';
 import { cameraExtraFor, ChaseCamera, IdleCamera, newCameraExtra } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
@@ -22,7 +22,8 @@ import { Cars } from './cars';
 import { Effects, type Shake } from './effects';
 import { Hud } from './hud';
 import { viewportRects, type Rect } from './layout';
-import { palette, type Palette } from './palette';
+import { palette, racePeriodPlan, type LivePalette, type Palette } from './palette';
+import { PeriodClock } from './period-clock';
 import { DynamicResolution, dynamicResolutionDefault } from './postfx/dynres';
 import { ViewportPipeline } from './postfx/pipeline';
 import { planFor, radialBlurStrength, shadowPlan, type PostPlan } from './postfx/plan';
@@ -74,6 +75,8 @@ export type GameRenderer = Renderer & {
   pinDynamicScale(scale: number | null): void;
   /** Fixa a força do desfoque radial (0..1) no lugar da velocidade e do nitro (harness e testes); nulo volta ao normal. */
   pinRadialBlur(strength: number | null): void;
+  /** Quantas vezes a paleta ao vivo foi entregue (M6): no máximo ~520 numa corrida inteira, nunca por quadro. */
+  liveApplied(): number;
 };
 
 export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement): GameRenderer {
@@ -143,9 +146,38 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   let carLight = 1;
   let lastStageAt = -1;
 
-  let horizonFor: { id: string; p: Palette } | null = null;
+  let horizonFor: { id: string; p: Palette; pTo?: Palette } | null = null;
   function rebuildHorizon(): void {
-    if (horizonFor) terrain.setHorizon(buildHorizon(horizonFor.id, horizonFor.p, quality ?? 'high'));
+    if (horizonFor) terrain.setHorizon(buildHorizon(horizonFor.id, horizonFor.p, quality ?? 'high', horizonFor.pTo));
+  }
+
+  // A corrida que muda (M6, b; docs/ondas/M/M6.md): o período anda durante a corrida, só visual. As duas pontas de cada pista (a dela e a seguinte) são montadas UMA vez em
+  // `ensureTrack` (texturas, tabelas de cor, anéis); daí em diante cada passo é só uniforme (`applyLive`), sem material novo e sem programa recompilado.
+  const clock = new PeriodClock();
+  /** Os períodos das duas pontas da pista atual (a pista de noite não tem a seguinte). */
+  let liveTimes: { a: TimeOfDay; b: TimeOfDay } = { a: 'day', b: 'day' };
+  /** A faixa de luz dos carros (≥ 0,8 · 0,5–0,8 · < 0,5): `cars.setLight` só é chamado quando ela muda (os SpotLights ligam em 0,8). */
+  let lightBand = 0;
+  const bandOf = (light: number): number => (light >= 0.8 ? 2 : light >= 0.5 ? 1 : 0);
+  /** Pista de dia com período seguinte: os SpotLights dos carros vão ligar no meio da corrida (muda o número de luzes da cena e recompila os programas): o primeiro quadro desenha uma vez com eles ligados. */
+  let prewarmLights = false;
+  /** Quantas vezes `applyLive` rodou (o teste e o banco de prova conferem: nunca por quadro). */
+  let liveApplied = 0;
+
+  function applyLive(live: LivePalette): void {
+    liveApplied++;
+    const p = live.p;
+    const envBefore = sky.liveEnvRebuilds;
+    sky.setLive(live, liveTimes.a, liveTimes.b, quality ?? 'high');
+    road.setLive(live);
+    terrain.setLive(live);
+    scenery.setLive(p);
+    renderer.toneMappingExposure = setStylizePalette(p).exposure;
+    bloom = p.bloom;
+    for (const pipe of pipes) pipe?.setBloom(bloom);
+    const band = bandOf(p.light);
+    if (band !== lightBand) { lightBand = band; cars.setLight(p.light); carLight = p.light; }
+    if (sky.liveEnvRebuilds !== envBefore) effects.setPalette(p);
   }
 
   function ensureTrack(track: Track): void {
@@ -154,14 +186,21 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     trackKey = key;
     const p = palette(track.def.scenery, track.def.timeOfDay);
     const night = p.light < 0.8;
+    // A paleta do período seguinte (se a corrida o alcança): a segunda ponta das tabelas de cor, das texturas e dos anéis.
+    const next = racePeriodPlan(track.def.timeOfDay, track.def.laps)?.to;
+    const pTo = next ? palette(track.def.scenery, next) : undefined;
+    liveTimes = { a: track.def.timeOfDay, b: next ?? track.def.timeOfDay };
+    clock.reset();
     sky.setPalette(p, track.def.timeOfDay, key);
-    road.setPalette(p, track.def.timeOfDay === 'night', key);
-    terrain.setTrack(track, p, key);
-    horizonFor = { id: track.def.id, p };
+    road.setPalette(p, track.def.timeOfDay === 'night', key, pTo);
+    terrain.setTrack(track, p, key, pTo);
+    horizonFor = { id: track.def.id, p, pTo };
     rebuildHorizon();
     scenery.setNight(night);
     cars.setLight(p.light);
     carLight = p.light;
+    lightBand = bandOf(p.light);
+    prewarmLights = pTo !== undefined && lightBand === 2;
     effects.setPalette(p);
     effects.clear();
     renderer.toneMappingExposure = setStylizePalette(p).exposure;
@@ -182,6 +221,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     scene.traverse((o) => { if (o instanceof THREE.Mesh) { const m = o.material as THREE.Material; m.needsUpdate = true; } });
     disposePosts(); // os passes de cada degrau são outros
     dynamic.reset();
+    prewarmLights = liveTimes.a !== liveTimes.b && lightBand === 2; // os programas do degrau novo também precisam ser aquecidos
   }
 
   function disposePosts(): void {
@@ -261,6 +301,13 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     sky.setFlare(!frame.options.reduceEffects);
     const q = frame.options.quality;
     const track = frame.track;
+    {
+      // O líder entre os carros que uma tela mostra decide o período (a corrida que muda); o relógio nunca volta e só avisa quando o `t` andou 1/512.
+      const progresses: number[] = [];
+      for (let i = 0; i < Math.min(4, frame.viewports.length); i++) { const c = frame.state.cars[frame.viewports[i].carIndex]; if (c) progresses.push(c.progress); }
+      const f = clock.step(track.def.scenery, track.def.timeOfDay, frame.state.config.laps, track.length, progresses);
+      if (f.changed) applyLive(f.live);
+    }
     cars.update(frame);
     effects.update(frame);
     const n = Math.max(1, Math.min(4, frame.viewports.length));
@@ -302,6 +349,19 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       radial[i] += (blurTarget - radial[i]) * (1 - Math.exp(-blurDt * 7));
       if (pinnedRadial !== null) radial[i] = pinnedRadial;
       setViewport(rect);
+      if (prewarmLights) {
+        // Aquece os faróis: uma vez, desenha este viewport com os SpotLights ligados (é o que a corrida faz no meio, e muda o número de luzes: todo programa lit recompilaria na hora, no quadro).
+        // Desenhado, e não `renderer.compile`: o programa muda com o alvo de renderização (tone mapping e espaço de cor) e o compile solto compilaria outras variantes.
+        prewarmLights = false;
+        cars.setLight(0.7);
+        const flare = sky.flare.visible; // o reflexo de lente (entardecer) também compila na primeira vez que aparece
+        if (q !== 'low') sky.flare.visible = true;
+        const n0 = vpCount;
+        drawViewport(i, rect, cam.camera, q, plan, 0);
+        vpCount = n0;
+        sky.flare.visible = flare;
+        cars.setLight(carLight);
+      }
       const due = shadowRing && sp.enabled ? shadowRing.beginViewport(i, car.z, track.length) : false;
       drawViewport(i, rect, cam.camera, q, plan, radial[i]);
       if (shadowRing && sp.enabled) shadowRing.endViewport(i, due, car.z);
@@ -354,6 +414,9 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     const t0 = performance.now();
     ensureTrack(track);
     ensureQuality(quality ?? 'high');
+    // O fundo do menu é o período da pista (o do `track.def`), não o da corrida que acabou.
+    const idle = clock.idle(track.def.scenery, track.def.timeOfDay, track.def.laps);
+    if (idle.changed) applyLive(idle.live);
     tickDynamic(t0);
     const z = (time * IDLE_SPEED) % track.length;
     const rf = buildRoadFrame(track, z, BEHIND, AHEAD[quality ?? 'high'], frames[0]);
@@ -399,6 +462,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
 
   return {
     canvas, resize, render, renderIdle, dispose,
+    liveApplied: () => liveApplied,
     debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })), post: { builds, resizes, scale: lastScale, dynamic: dynamic.enabled } }),
     setDynamicResolution: (on: boolean) => { dynamic.setEnabled(on); if (!on) lastScale = 1; },
     pinDynamicScale: (scale: number | null) => { pinned = scale; },

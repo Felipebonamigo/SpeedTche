@@ -59,6 +59,8 @@ const lang = q.get('lang') ?? 'pt';
 const speedMul = Number(q.get('speed') ?? 1);
 const seq = q.get('seq') === '1';
 const readyAt = Number(q.get('frames') ?? 14);
+// live=<0..1> (M6): a fração da corrida do líder (a corrida que muda: o período anda na última volta); só o `progress` que o renderizador lê, o resto da cena não mexe.
+const liveFraction = q.get('live') === null ? -1 : Number(q.get('live'));
 setLanguage(lang);
 
 // Estilos sem carro nos dados (os carros novos são de outra tarefa): um carro de demonstração só no
@@ -250,6 +252,7 @@ function loop(now) {
     if (draftForced) { const lead = state.cars.find((c) => c !== me); if (lead) { lead.z = (me.z + 700) % track.length; lead.x = me.x; lead.speed = lead.stats.topSpeed; } }
     if (hitFrame >= 0) { const top = me.stats.topSpeed; if (frames < hitFrame) { me.speed = top * 0.8; me.collisionCooldown = 0; } else if (frames === hitFrame) { me.speed = top * 0.4; me.collisionCooldown = 20; } else me.collisionCooldown = Math.max(0, 20 - (frames - hitFrame)); }
     ageMessages(dt);
+    if (liveFraction >= 0) me.progress = liveFraction * state.config.laps * track.length;
     renderer.render(raceFrame());
     if (extraCam) renderExtra(showroom ? (carview ?? 'front34') : (carview || 'rear34'), showroom ? SHOWROOM_VIEWS : VIEWS);
   } else {

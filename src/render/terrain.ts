@@ -850,7 +850,7 @@ export class Terrain {
   setHorizon(h: Horizon | null): void {
     if (this.horizon) { this.farGroup.remove(this.horizon); this.horizon.dispose(); }
     this.horizon = h;
-    if (h) this.farGroup.add(h);
+    if (h) { h.setBlend(this.blend); this.farGroup.add(h); }
   }
 
   dispose(): void {

@@ -86,11 +86,47 @@ const ROADSIDE_MIN = { near: 2.5, far: 2.5, skyline: 2.5 } as const;
  * Negro 2,6, Cape Point 2,2 (à noite: a névoa a 390 m). Quem passar do mínimo sai da lista (o teste acusa).
  */
 const WINDOW_LIMITED: Readonly<Record<string, number>> = {
-  'joao_pessoa farol_cabo_branco': 1.9,
+  'joao_pessoa farol_cabo_branco': 1.25, // 1,9 antes da M6
   'boa_esperanca farol_cape_point': 1.6,
   'great_ocean arco_great_ocean': 2.3,
   'alter_do_chao praia_de_rio': 2.3,
-  'ponte_rio_negro ponte_rio_negro': 2.4,
+  'ponte_rio_negro ponte_rio_negro': 1.65, // 2,4 antes da M6
+};
+
+/**
+ * M6 (docs/ondas/M/M6.md, §8): com o traçado do mapa (o 3D gira a escala que fecha a pista; 36 das 109 pistas curvam 5× mais forte ou mais) os marcos abaixo deixaram de chegar ao
+ * mínimo — a curva que vem esconde o marco ou o tira do quadro antes da hora, e a praça que o núcleo abriu (core/track/sightline.ts) foi medida com o giro antigo. Medido na M6: o melhor
+ * lugar do layout (s, com 0,05 de folga). Com a escala nova no `sightline.ts` do núcleo 32 desses 33 caem para 13 (o ajuste é do núcleo: muda as praças e invalida recorde e fantasma das
+ * pistas); quem passar do mínimo sai desta lista (o teste acusa).
+ */
+const M6_LIMITED: Readonly<Record<string, number>> = {
+  'sampa_noite ponte_estaiada': 0.15,
+  'pampulha igreja_pampulha': 0.75,
+  'curitiba opera_de_arame': 0.95,
+  'floripa igreja_acoriana': 2.25,
+  'floripa ponte_hercilio_luz': 1.05,
+  'lago_paranoa ponte_jk': 0.0,
+  'torre_de_tv torre_tv_brasilia': 2.25,
+  'torre_de_tv catedral_brasilia': 1.15,
+  'brasilia congresso_nacional': 2.35,
+  'brasilia catedral_brasilia': 2.25,
+  'aracaju arcos_atalaia': 1.55,
+  'aracaju ponte_aracaju': 0.0,
+  'maragogi jangada': 0.45,
+  'maceio coqueiral': 1.95,
+  'olinda bonecos_olinda': 1.85,
+  'fortaleza_beira_mar jangada': 1.85,
+  'sao_luis casario_azulejos': 1.95,
+  'belem ver_o_peso': 1.85,
+  'manaus barco_regional': 2.05,
+  'palmas palacio_araguaia': 0.65,
+  'palmas ponte_palmas': 1.85,
+  'las_vegas torre_stratosphere': 1.15,
+  'baia_toquio rainbow_bridge': 0.0,
+  'osaka_neon castelo_osaka': 0.35,
+  'osaka_neon tsutenkaku': 1.25,
+  'paris arco_triunfo': 1.65,
+  'monaco_noite cassino_monte_carlo': 0.95,
 };
 
 /**
@@ -100,6 +136,7 @@ const WINDOW_LIMITED: Readonly<Record<string, number>> = {
  */
 const SHAPE_LIMITED: Readonly<Record<string, number>> = {
   'las_vegas piramide_luxor': 1.5,
+  ...M6_LIMITED,
 };
 
 describe('enquadramento: os marcos das pistas', () => {

@@ -191,8 +191,35 @@ function fxScene(quality: Quality, forced: boolean): { debug: DebugInfo; meshes:
   return { debug, meshes };
 }
 
+/**
+ * A corrida que muda (M6, b): a mesma cena com o líder em cada fração da corrida de `fractions` (cada uma `repeat` quadros), sem mexer no que o quadro desenha: só o
+ * `progress` do carro do jogador, que o renderizador lê para o período. Devolve, por quadro, o que o renderizador contou, os programas vivos e quantas vezes a paleta ao vivo
+ * foi entregue (nunca por quadro), e o relatório de compilação no fim.
+ */
+function liveScene(quality: Quality, trackId: string, fractions: number[], repeat: number): {
+  frames: Array<{ fraction: number; calls: number; triangles: number; programs: number; applied: number; names: string[] }>; report: ProgramReport;
+} {
+  setup(trackId, 1, 300);
+  if (!current) throw new Error('lab.setup primeiro');
+  const { state, track } = current;
+  const me = state.cars.find((c) => c.seat >= 0);
+  if (!me) throw new Error('sem humano');
+  const frames: Array<{ fraction: number; calls: number; triangles: number; programs: number; applied: number; names: string[] }> = [];
+  for (const fraction of fractions) {
+    for (let k = 0; k < repeat; k++) {
+      tick++;
+      const f = frameFor(quality);
+      me.progress = fraction * state.config.laps * track.length;
+      renderer.render(f);
+      const d = renderer.debugInfo();
+      frames.push({ fraction, calls: d.viewports[0].calls, triangles: d.viewports[0].triangles, programs: (gl.info.programs ?? []).length, applied: renderer.liveApplied(), names: (gl.info.programs ?? []).map((p) => `${(p as unknown as { name: string }).name}|${(p as unknown as { cacheKey: string }).cacheKey}`) });
+    }
+  }
+  return { frames, report: programs() };
+}
+
 const lab = {
-  renderer, setup, render, idle, programs, collect, blob, fxScene,
+  renderer, setup, render, idle, programs, collect, blob, fxScene, liveScene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),
   dynamic: (on: boolean, pin: number | null) => { renderer.setDynamicResolution(on); renderer.pinDynamicScale(pin); },
