@@ -54,7 +54,7 @@
 /* O pódio 3D: uma janela do palco (o canvas atrás da interface) entre o cabeçalho e a tabela. Cede altura quando falta (14 conquistas). */
 .scr-results.stage3d { background: none; }
 .results-podium {
-  position: relative; flex: 1 1 calc(130 * var(--u)); min-height: calc(86 * var(--u)); max-height: calc(250 * var(--u));
+  position: relative; flex: 1 1 calc(110 * var(--u)); min-height: 0; max-height: calc(250 * var(--u));
   width: min(100%, calc(780 * var(--u))); border-radius: var(--r); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 .scr-results.expanded .results-podium { display: none; }
@@ -70,3 +70,8 @@
 .scr-results.arrival .results-table tbody tr { animation: row-in 320ms ease-out both; animation-delay: calc(var(--rv, 0) * 150ms); }
 @keyframes row-in { from { opacity: 0; transform: translateX(calc(-24 * var(--u))); } to { opacity: 1; transform: none; } }
 .scr-results .results-skip { margin: 0; }
+
+/* A dica de pular não ocupa linha: fica sobre a borda de baixo (texto grande não cabia com ela no fluxo). */
+.scr-results .results-skip, .scr-payout .payout-skip { position: absolute; left: 0; right: 0; bottom: calc(2 * var(--u)); pointer-events: auto; }
+.scr-results .table-wrap { flex: 0 1 auto; min-height: calc(50 * var(--u)); }
+.scr-payout .payout-cols { flex: 0 1 auto; }

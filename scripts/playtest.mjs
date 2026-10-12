@@ -27,6 +27,17 @@ let presses = 0;
 const key = async (k) => { presses++; await page.keyboard.press(k); await page.waitForTimeout(300); };
 // Segurar: o 2º keyboard.down sem up sai com repeat=true (é o que o sistema manda com a tecla presa). Conta uma entrada.
 const hold = async (k) => { presses++; await page.keyboard.down(k); await page.waitForTimeout(150); await page.keyboard.down(k); await page.waitForTimeout(150); await page.keyboard.up(k); await page.waitForTimeout(300); };
+/** N4: espera a sequência do fim da corrida (data-post-ready na tela atual); devolve tela, segundos de sequência, se foi pulada e o tempo real. */
+async function postReady(maxMs = 45000) {
+  const t0 = Date.now();
+  for (;;) {
+    const r = await page.evaluate(() => { const e = document.querySelector('#ui .screen'); return { menu: window.nc.session.menus.current(), ready: e?.getAttribute('data-post-ready'), elapsed: Number(e?.getAttribute('data-post-elapsed') ?? 'NaN'), skipped: e?.getAttribute('data-post-skipped') === '1' }; });
+    if (r.ready === '1' || Date.now() - t0 > maxMs) return { ...r, ms: Date.now() - t0 };
+    await page.waitForTimeout(100);
+  }
+}
+/** Segurar Enter (a repetição vira "start") pula a sequência. Não conta como entrada: quem espera os segundos dela não aperta nada. */
+const skipPost = async () => { await page.keyboard.down('Enter'); await page.waitForTimeout(150); await page.keyboard.down('Enter'); await page.waitForTimeout(150); await page.keyboard.up('Enter'); await page.waitForTimeout(300); };
 const focusText = () => page.evaluate(() => (document.querySelector('#ui .focus')?.textContent ?? '').trim());
 /** Leva a corrida atual ao fim: win=true, os humanos cruzam primeiro; false, a IA cruza antes e os humanos chegam por último. */
 async function endRace(win) {
@@ -164,6 +175,12 @@ await page.keyboard.up('ArrowUp');
 for (let i = 0; i < 30; i++) { await page.waitForTimeout(500); st = await S(); if (st.menu === 'results') break; }
 check(st.menu === 'results', `resultado aparece ao fim (${st.menu}, fase ${st.race?.phase})`);
 await page.screenshot({ path: `${out}-08-results.png` });
+{
+  // N4, orçamento de tempo: da bandeirada (3 s) à decisão de "próxima" são no máximo 15 s; a sequência (chegada + pódio) tem de caber em 12 s.
+  const q = await postReady();
+  check(q.menu === 'results' && !q.skipped && q.elapsed <= 12 && q.ms <= 12500, `orçamento (rápida): pronta em ${q.elapsed}s de sequência, ${q.ms} ms reais (+3 s de bandeirada ≤ 15 s)`);
+  await page.screenshot({ path: `${out}-08a-results-pronto.png` });
+}
 
 // Estatísticas e conquistas da corrida (passo 3.6; ganchos em src/game/raceEnd.ts): gravadas no save e no resultado.
 const end = await page.evaluate(() => {
@@ -200,13 +217,14 @@ const busy = await page.evaluate(() => {
   const rowH = box(wrap.querySelector('tbody tr')).height; const headH = box(wrap.querySelector('thead')).height;
   return {
     clipped: [...panel.querySelectorAll('.ach-chip')].filter((c) => { const b = box(c); return b.top < p.top - 0.5 || b.bottom > p.bottom + 0.5; }).length,
-    rows: Math.floor((w.height - headH) / rowH),
+    rows: Math.floor((w.height - headH) / rowH), podium: box(document.querySelector('.scr-results .results-podium')).height,
     btnsIn: [...document.querySelectorAll('.scr-results .actions .btn')].every((b) => box(b).bottom <= innerHeight),
   };
 });
-check(busy.clipped === 0 && busy.rows >= 5 && busy.btnsIn, `resultado com 20 carros e 14 conquistas: nenhum cartão cortado (${busy.clipped}), ${busy.rows} linhas da tabela à vista, botões na tela`);
+check(busy.clipped === 0 && busy.rows >= 4 && busy.podium >= 40 && busy.btnsIn, `resultado com 20 carros e 14 conquistas: nenhum cartão cortado (${busy.clipped}), ${busy.rows} linhas da tabela recolhida à vista, pódio de ${Math.round(busy.podium)} px, botões na tela`);
 // "Mais uma?" (o pior caso acima também é um resultado de corrida rápida em copacabana): 1 entrada até a contagem.
 // Só depois do pior caso: com uma corrida nova rodando, o getAnimations().finish() dele lança (animação infinita do HUD).
+await skipPost();
 presses = 0;
 await key('Enter');
 st = await S();
@@ -236,6 +254,7 @@ const freshCup = (h) => { const s = window.nc.session; s.menus.hide(); for (let 
 await page.evaluate(freshCup, humans(1));
 if (!(await endRace(false))) check(false, 'eliminado: a corrida não chegou ao resultado');
 else {
+  await skipPost();
   presses = 0;
   await key('Enter'); // CLASSIFICAÇÃO
   const elim = await page.evaluate(() => !!document.querySelector('.scr-standings .verdict.bad'));
@@ -251,6 +270,7 @@ await page.evaluate(freshCup, humans(1));
 let cupOk = true;
 for (let race = 1; race <= 3 && cupOk; race++) {
   if (!(await endRace(true))) { check(false, `campeão: a corrida ${race} não chegou ao resultado`); cupOk = false; break; }
+  await skipPost();
   presses = 0;
   await key('Enter'); // CLASSIFICAÇÃO
   if (race < 3) {
@@ -266,6 +286,42 @@ if (cupOk) {
   await key('Enter');
   const nx = await page.evaluate(() => window.nc.session.race?.state.config.trackId);
   check(nx === 'ilhabela' && presses <= 2, `"Próxima copa" larga ${nx} em ${presses} entradas (meta: ilhabela, ≤ 2)`);
+}
+
+// N4: Pagamento da carreira (solo, versus, co-op) e o pulo. Espera a sequência natural, confere colunas, cofre e os números finais.
+const fmt = (n) => n.toLocaleString('pt-BR');
+for (const [name, n, coop] of [['solo', 1, false], ['versus', 2, false], ['coop', 2, true]]) {
+  await page.evaluate(({ h }) => { const s = window.nc.session; s.menus.hide(); for (let i = 0; i < 4; i++) s.input.unbindSeat(i); h.forEach((x, i) => s.debugBind(i, ['kb1', 'kb2'][i])); s.handleMenuEvent({ type: 'startCareer', humans: h, resume: false }); s.handleMenuEvent({ type: 'careerRace' }); },
+    { h: humans(n).map((x) => ({ ...x, teamId: coop ? 0 : x.seat })) });
+  if (!(await endRace(true))) { check(false, `carreira ${name}: a corrida não chegou ao resultado`); continue; }
+  const r = await postReady();
+  check(r.menu === 'payout' && !r.skipped && r.elapsed <= 12 && r.ms <= 15000, `orçamento (carreira ${name}): Pagamento pronto em ${r.elapsed}s de sequência, ${r.ms} ms reais (+3 s de bandeirada ≤ 15 s)`);
+  await page.screenshot({ path: `${out}-19-pagamento-${name}.png` });
+  const p = await page.evaluate(() => ({
+    cols: document.querySelectorAll('.scr-payout .payout-col').length, team: document.querySelectorAll('.scr-payout .payout-col.team').length, vault: document.querySelectorAll('.scr-payout .payout-vault').length,
+    wallets: [...document.querySelectorAll('.scr-payout .pc-wallet-val, .scr-payout .pv-val')].map((e) => Number(e.textContent.replace(/\D/g, ''))),
+    saved: JSON.parse(localStorage.getItem('speed-tche.save') ?? 'null')?.career?.wallets ?? null,
+    coins: document.querySelectorAll('.scr-payout .payout-coin').length,
+  }));
+  check(p.cols === n + (coop ? 1 : 0) && p.team === (coop ? 1 : 0) && p.vault === (coop ? 1 : 0), `Pagamento ${name}: ${p.cols} colunas, equipe ${p.team}, cofre ${p.vault}`);
+  check(JSON.stringify(p.wallets) === JSON.stringify(p.saved), `Pagamento ${name}: carteiras na tela ${JSON.stringify(p.wallets)} = as do save ${JSON.stringify(p.saved)}`);
+  check(p.coins > 0, `Pagamento ${name}: moedas no DOM (${p.coins})`);
+  check((await focusText()) === 'CLASSIFICAÇÃO', `Pagamento ${name}: foco em CLASSIFICAÇÃO (${await focusText()})`);
+  presses = 0; await key('Enter');
+  check((await S()).menu === 'standings' && presses === 1, `Pagamento ${name}: uma entrada leva à classificação (${(await S()).menu})`);
+}
+{
+  // Pulo: segurar Enter no resultado da carreira leva ao Pagamento pronto, sem moedas com "Reduzir efeitos".
+  await page.evaluate((h) => { const s = window.nc.session; s.settings.reduceEffects = true; s.menus.hide(); for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.debugBind(0, 'kb1'); s.handleMenuEvent({ type: 'startCareer', humans: h, resume: false }); s.handleMenuEvent({ type: 'careerRace' }); }, humans(1));
+  if (await endRace(true)) {
+    const t0 = Date.now();
+    await skipPost();
+    const r = await postReady(3000);
+    check(r.menu === 'payout' && r.skipped && Date.now() - t0 <= 1500 + 400, `pulo: segurar Enter leva ao Pagamento pronto em ${Date.now() - t0} ms (menu ${r.menu})`);
+    check(await page.evaluate(() => document.querySelectorAll('.scr-payout .payout-coin').length === 0), 'pulo com Reduzir efeitos: nenhuma moeda, só o número');
+    await page.screenshot({ path: `${out}-19-pagamento-pulado.png` });
+  } else check(false, 'pulo: a corrida não chegou ao resultado');
+  await page.evaluate(() => { window.nc.session.settings.reduceEffects = false; });
 }
 
 // Menus restantes por teclado: volta ao principal e passeia pelas telas.

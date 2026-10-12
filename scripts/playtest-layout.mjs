@@ -85,6 +85,23 @@ if (!ONLY || ONLY.some((id) => ['main', 'results', 'results-busy', 'results-stam
   for (let i = 0; i < 60 && (await page.evaluate(() => window.nc.session.menus.current())) !== 'results'; i++) await page.waitForTimeout(500);
   check(await page.evaluate(() => !!window.__shown.results), 'corrida terminada e resultado guardado para as medições');
 }
+// N4: o Pagamento precisa de uma carreira com a corrida somada (`lastReport`): o pior caso é o co-op com 4 pilotos (4 colunas, equipe e cofre).
+if (!ONLY || ONLY.includes('payout-4')) {
+  console.log('preparando: corrida de carreira co-op com 4 pilotos…');
+  await page.evaluate(() => { window.__shown.cupResults = window.__shown.results; });
+  await page.evaluate((h) => {
+    const s = window.nc.session; s.menus.hide(); for (let i = 0; i < 4; i++) s.input.unbindSeat(i);
+    s.debugBind(0, 'kb1'); s.debugBind(1, 'kb2'); ['gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i + 2, d));
+    s.handleMenuEvent({ type: 'startCareer', humans: h, resume: false }); s.handleMenuEvent({ type: 'careerRace' });
+  }, humans(4));
+  await page.keyboard.down('ArrowUp'); await page.keyboard.down('KeyW');
+  for (let i = 0; i < 60; i++) { const phase = await page.evaluate(() => { window.nc.session.debugStep(600); return window.nc.session.race?.state.phase; }); if (phase === 'finished') break; }
+  await page.keyboard.up('ArrowUp'); await page.keyboard.up('KeyW');
+  await page.evaluate(() => { const r = window.nc.session.race; if (r) r.overFor = 99; });
+  for (let i = 0; i < 60 && (await page.evaluate(() => window.nc.session.menus.current())) !== 'results'; i++) await page.waitForTimeout(500);
+  check(await page.evaluate(() => window.nc.session.menus.current() === 'results'), 'corrida de carreira terminada (Pagamento)');
+  await page.evaluate(() => { window.__shown.careerResults = window.__shown.results; window.__shown.results = window.__shown.cupResults ?? window.__shown.results; });
+}
 if (process.env.NC_LAYOUT_CSS) await page.addStyleTag({ content: readFileSync(process.env.NC_LAYOUT_CSS, 'utf8') });
 // Daqui em diante só DOM: o laço de quadros (3D por software, ~1 quadro/s) para de competir com as medições.
 await page.evaluate(() => { window.nc.session.stop(); });
@@ -180,6 +197,8 @@ const SCREENS = [
   // Carimbo novo que fecha a região (Espírito Santo, com o Sudeste todo carimbado no save): a linha a mais do resultado.
   ['results-stamp', () => window.nc.session.menus.show('results', { ...window.__shown.results, newStamp: 'ES' })],
   ['standings', () => { window.nc.session.menus.show('results', window.__shown.results); document.querySelector('.scr-results .actions .btn-primary')?.click(); }],
+  // N4: o Pagamento (tela nova), co-op com 4 pilotos: quatro colunas, a da equipe e o cofre.
+  ['payout-4', () => window.nc.session.menus.show('payout', window.__shown.careerResults)],
   ['pause', () => window.nc.session.menus.show('pause')],
 ].filter(([id]) => !ONLY || ONLY.includes(id));
 
