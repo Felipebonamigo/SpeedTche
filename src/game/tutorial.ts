@@ -1,14 +1,14 @@
 // Tutorial de 90 segundos (passo 1.9): a máquina de passos, pura e sem DOM. Recebe o estado da
 // corrida a cada tick e devolve o que mudou (passo cumprido, repetir, carro parado, fim); a visão
 // de cada assento diz o passo, as ações a mostrar e o progresso. Nada aqui muda a corrida: o único
-// efeito é o comando do carro que o passo 6 para de propósito (tutorialInput), aplicado pela sessão
+// efeito é o comando do carro que o passo do empurrão para de propósito (tutorialInput), aplicado pela sessão
 // antes do stepRace — como qualquer outra entrada.
 //
-// Cada jogador anda pelos passos 1–5 no próprio ritmo; os que dependem de um trecho (curvas, box)
-// só contam uma passagem inteira por ele, do começo ao fim. O passo 6 (empurrão) é da equipe e só
+// Cada jogador anda pelos passos 1–6 no próprio ritmo; os que dependem de um trecho (curvas, box)
+// só contam uma passagem inteira por ele, do começo ao fim. O último passo (empurrão) é da equipe e só
 // existe com 2+ jogadores: quando todos passaram do box, o líder é parado na reta e qualquer
 // companheiro que passar colado conclui.
-import { OFFROAD_X, SEGMENT_LENGTH, SPEED_TO_KMH } from '../core/constants';
+import { DRIFT_LEVEL_TICKS, OFFROAD_X, SEGMENT_LENGTH, SPEED_TO_KMH } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import { holdableSpeedFraction } from '../core/sim/physics';
 import { carStats, nitroCharges } from '../core/sim/stats';
@@ -17,8 +17,9 @@ import { NEUTRAL_INPUT } from '../core/types';
 import type { BindAction } from '../ui/remap/bindings';
 import { inSection, STRONG_CURVE, type SectionId } from './tutorial-track';
 
-export type TutorialStepId = 'throttle' | 'curve' | 'brake' | 'nitro' | 'pit' | 'tow';
-export const TUTORIAL_STEPS: readonly TutorialStepId[] = ['throttle', 'curve', 'brake', 'nitro', 'pit', 'tow'];
+export type TutorialStepId = 'throttle' | 'curve' | 'brake' | 'nitro' | 'pit' | 'drift' | 'tow';
+/** O empurrão continua o último (só com 2+); a derrapagem (O3) vem antes dele e usa a curva média da volta seguinte ao box. */
+export const TUTORIAL_STEPS: readonly TutorialStepId[] = ['throttle', 'curve', 'brake', 'nitro', 'pit', 'drift', 'tow'];
 const TOW_STEP = TUTORIAL_STEPS.indexOf('tow');
 
 /** Passo 1: velocidade a alcançar. */
@@ -29,9 +30,9 @@ export const START_FUEL = 0.22;
 export const REFUEL_TARGET = 0.6;
 /** Passo 3: a entrada da curva forte aceita até esta folga sobre a velocidade que o carro segura nela. */
 export const BRAKE_MARGIN = 1.15;
-/** Passo 6: o carro escolhido só para quando está nesta faixa lateral (no asfalto, longe do box). */
+/** Empurrão (último passo): o carro escolhido só para quando está nesta faixa lateral (no asfalto, longe do box). */
 const PARK_MAX_X = 0.9;
-/** Passo 6: ultrapassar o carro parado a menos disto (u) sem empurrar conta como "passou direto". */
+/** Empurrão (último passo): ultrapassar o carro parado a menos disto (u) sem empurrar conta como "passou direto". */
 const TOW_PASS_WINDOW = SEGMENT_LENGTH * 10;
 
 /**
@@ -39,7 +40,7 @@ const TOW_PASS_WINDOW = SEGMENT_LENGTH * 10;
  * box, ou entrou no box e saiu antes de abastecer (o limitador do box só freia aos poucos: quem entra
  * embalado atravessa a faixa sem tempo de encher).
  */
-export type RetryReason = 'offroad' | 'fast' | 'pitMissed' | 'pitShort';
+export type RetryReason = 'offroad' | 'fast' | 'pitMissed' | 'pitShort' | 'noDrift';
 
 export interface SeatProgress {
   seat: number;
@@ -51,7 +52,7 @@ export interface SeatProgress {
   tracking: boolean;
   /** Motivo da última repetição, para o painel; limpo quando o passo é cumprido. */
   retry: RetryReason | null;
-  /** Passo 6: estava atrás do carro parado no tick anterior (null = ainda não visto). */
+  /** Empurrão (último passo): estava atrás do carro parado no tick anterior (null = ainda não visto). */
   towBehind: boolean | null;
 }
 
@@ -61,7 +62,7 @@ export interface TutorialState {
   seats: SeatProgress[];
   /** Total de passos: 6 com 2+ jogadores, 5 sozinho (o empurrão fica de fora). */
   total: number;
-  /** Assento do carro que o passo 6 para de propósito (−1 = ainda não escolhido). */
+  /** Assento do carro que o passo do empurrão para de propósito (−1 = ainda não escolhido). */
   towSeat: number;
   /** O carro escolhido já está parado esperando o empurrão. */
   parked: boolean;
@@ -165,12 +166,22 @@ function stepSeat(p: SeatProgress, car: CarState, seg: number, state: RaceState,
       if (car.inPit) p.tracking = true;
       if (!inSection('pit', seg) && inSection('pit', p.lastSeg)) retry(p, p.tracking ? 'pitShort' : 'pitMissed', events);
       break;
+    case 'drift': {
+      // Derrapagem (O3): carregar o 1º nível (evento drift_charge) DENTRO da curva média conta; atravessá-la sem isso, não.
+      const inside = inSection('curve', seg);
+      const wasInside = inSection('curve', p.lastSeg);
+      if (inside && !wasInside) p.tracking = true;
+      if (inside && p.tracking && state.events.some((e) => e.type === 'drift_charge' && e.carId === car.id)) advance(p, events);
+      else if (inside && p.tracking && Math.abs(car.x) > OFFROAD_X) retry(p, 'offroad', events);
+      else if (!inside && wasInside && p.tracking) retry(p, 'noDrift', events);
+      break;
+    }
     default:
       break;
   }
 }
 
-/** Passo 6: escolhe o líder, para o carro dele na reta e espera o empurrão de um companheiro. */
+/** Passo do empurrão: escolhe o líder, para o carro dele na reta e espera o empurrão de um companheiro. */
 function stepTow(tut: TutorialState, state: RaceState, events: TutorialEvent[]): void {
   if (tut.total <= TOW_STEP || !tut.seats.every((p) => p.step >= TOW_STEP)) return;
   if (tut.towSeat < 0) {
@@ -230,7 +241,7 @@ export function updateTutorial(tut: TutorialState, state: RaceState): TutorialEv
   return events;
 }
 
-/** O comando que vai para a simulação: o carro parado no passo 6 fica no freio, o resto passa igual. */
+/** O comando que vai para a simulação: o carro parado no empurrão fica no freio, o resto passa igual. */
 export function tutorialInput(tut: TutorialState, seat: number, input: PlayerInput): PlayerInput {
   if (tut.phase === 'running' && tut.parked && seat === tut.towSeat) return { ...NEUTRAL_INPUT, brake: true };
   return input;
@@ -240,7 +251,7 @@ export function tutorialInput(tut: TutorialState, seat: number, input: PlayerInp
 
 /**
  * O que o painel mostra a um assento. `step` 'wait' = já passou do box e espera a equipe;
- * 'stalled' = é o carro que o passo 6 para (antes ou depois de parar, ver `parked`); 'done' = acabou.
+ * 'stalled' = é o carro que o passo do empurrão para (antes ou depois de parar, ver `parked`); 'done' = acabou.
  */
 export interface TutorialView {
   step: TutorialStepId | 'wait' | 'stalled' | 'done';
@@ -252,7 +263,7 @@ export interface TutorialView {
   retry: RetryReason | null;
   /** 0..1 para a barra do passo (velocidade, tanque); null = sem barra. */
   progress: number | null;
-  /** Assento do carro parado no passo 6 (para o nome); −1 fora dele. */
+  /** Assento do carro parado no empurrão (para o nome); −1 fora dele. */
   towSeat: number;
   parked: boolean;
 }
@@ -263,6 +274,7 @@ const ACTIONS: Readonly<Record<TutorialView['step'], BindAction[]>> = {
   brake: ['brake'],
   nitro: ['nitro'],
   pit: ['right', 'brake'],
+  drift: ['left', 'right', 'drift'],
   tow: ['throttle', 'left', 'right'],
   wait: ['throttle'],
   stalled: [],
@@ -283,5 +295,6 @@ export function tutorialView(tut: TutorialState, state: RaceState, seat: number)
   let progress: number | null = null;
   if (car && step === 'throttle') progress = Math.min(1, (car.speed * SPEED_TO_KMH) / TARGET_KMH);
   if (car && step === 'pit') progress = Math.min(1, car.fuel / REFUEL_TARGET);
+  if (car && step === 'drift') progress = car.driftDir === 0 ? 0 : Math.min(1, car.driftCharge / DRIFT_LEVEL_TICKS[0]);
   return { ...base, step, index: p.step + 1, actions: ACTIONS[step], progress };
 }

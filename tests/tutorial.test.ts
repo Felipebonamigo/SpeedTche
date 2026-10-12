@@ -4,7 +4,8 @@ import { CAR_HALF_WIDTH, PIT_X, SEGMENT_LENGTH, SPEED_TO_KMH, TICK_RATE, TOW_MIN
 import { carDef } from '../src/core/data/cars';
 import { seatColor } from '../src/core/data/drivers';
 import { CUPS } from '../src/core/data/cups';
-import { centrifugalRate, holdableSpeedFraction, steerRate } from '../src/core/sim/physics';
+import { counterSteer } from '../src/core/sim/ai';
+import { holdableSpeedFraction } from '../src/core/sim/physics';
 import { createRace, stepRace } from '../src/core/sim/race';
 import { carStats } from '../src/core/sim/stats';
 import { getTrack, TRACKS, trackDef } from '../src/core/track';
@@ -175,7 +176,7 @@ describe('máquina de passos', () => {
     expect(types(at(tut, state, 0, TUTORIAL_SECTIONS.nitro.start + 5))).toEqual(['noNitro', 'stepDone']);
   });
 
-  it('passo 5: abastecer no box conclui (sozinho, é o último); passar reto manda repetir', () => {
+  it('passo 5: abastecer no box avança para a derrapagem; passar reto manda repetir', () => {
     const { state } = tutorialRace();
     const tut = newTutorial([0]);
     tut.seats[0].step = 4;
@@ -188,35 +189,71 @@ describe('máquina de passos', () => {
     expect(at(tut, state, 0, p.end, { fuel: 0.45 })).toEqual([{ type: 'retry', seat: 0, step: 'pit', reason: 'pitShort' }]);
     at(tut, state, 0, p.start - 3);
     expect(types(at(tut, state, 0, p.start + 5, { x: PIT_X, inPit: true, fuel: REFUEL_TARGET - 0.01 }))).toEqual([]);
-    expect(types(at(tut, state, 0, p.start + 6, { x: PIT_X, inPit: true, fuel: REFUEL_TARGET }))).toEqual(['stepDone', 'done']);
-    expect(tut.phase).toBe('done');
-    expect(tutorialView(tut, state, 0).step).toBe('done');
+    expect(types(at(tut, state, 0, p.start + 6, { x: PIT_X, inPit: true, fuel: REFUEL_TARGET }))).toEqual(['stepDone']);
+    expect(tut.phase).toBe('running');
+    expect(tutorialView(tut, state, 0).step).toBe('drift');
   });
 
-  it('com 1 jogador o passo 6 (empurrão) não existe: 5 passos', () => {
+  it('passo 6 (O3): derrapar na curva média — carregar o 1º nível dentro dela conclui (sozinho, é o último)', () => {
+    const { state } = tutorialRace();
+    const tut = newTutorial([0]);
+    tut.seats[0].step = 5;
+    const c = TUTORIAL_SECTIONS.curve;
+    const car = humanCar(state, 0);
+    at(tut, state, 0, c.start - 1);
+    at(tut, state, 0, c.start + 5);
+    expect(tutorialView(tut, state, 0)).toMatchObject({ step: 'drift', actions: ['left', 'right', 'drift'] });
+    // Derrapar fora da curva (ou outro carro carregar) não conta.
+    state.events = [{ type: 'drift_charge', carId: car.id + 7, level: 1 }];
+    expect(types(updateTutorial(tut, state))).toEqual([]);
+    state.events = [{ type: 'drift_charge', carId: car.id, level: 1 }];
+    expect(types(updateTutorial(tut, state))).toEqual(['stepDone', 'done']);
+    expect(tut.phase).toBe('done');
+  });
+
+  it('passo 6 (O3): atravessar a curva sem carregar a derrapagem manda repetir; sair do asfalto também', () => {
+    const { state } = tutorialRace();
+    const tut = newTutorial([0]);
+    tut.seats[0].step = 5;
+    const c = TUTORIAL_SECTIONS.curve;
+    at(tut, state, 0, c.start - 1);
+    at(tut, state, 0, c.start + 5);
+    expect(at(tut, state, 0, c.end)).toEqual([{ type: 'retry', seat: 0, step: 'drift', reason: 'noDrift' }]);
+    expect(tutorialView(tut, state, 0).retry).toBe('noDrift');
+    at(tut, state, 0, c.start - 1);
+    at(tut, state, 0, c.start + 5);
+    expect(at(tut, state, 0, c.start + 30, { x: -1.2 })).toEqual([{ type: 'retry', seat: 0, step: 'drift', reason: 'offroad' }]);
+    // Entrou pelo meio da curva: espera a próxima passagem inteira.
+    const mid = at(tut, state, 0, c.start + 40);
+    expect(mid).toEqual([]);
+    expect(tut.seats[0].step).toBe(5);
+  });
+
+  it('com 1 jogador o passo do empurrão não existe: 6 passos (com a derrapagem, O3); com 2, 7', () => {
     const { state } = tutorialRace(1);
     const tut = newTutorial([0]);
-    expect(tut.total).toBe(5);
-    expect(tutorialView(tut, state, 0)).toMatchObject({ index: 1, total: 5 });
-    expect(newTutorial([0, 1]).total).toBe(6);
+    expect(tut.total).toBe(6);
+    expect(tutorialView(tut, state, 0)).toMatchObject({ index: 1, total: 6 });
+    expect(newTutorial([0, 1]).total).toBe(7);
   });
 
-  it('passo 6 com 2 jogadores: espera a equipe, para o líder na reta e conclui com o empurrão', () => {
+  it('passo 7 com 2 jogadores: espera a equipe, para o líder na reta e conclui com o empurrão', () => {
     const { state } = tutorialRace(2);
     const tut = newTutorial([0, 1]);
-    tut.seats[0].step = 5;
-    tut.seats[1].step = 4;
+    tut.seats[0].step = 6;
+    tut.seats[1].step = 5;
     expect(tutorialView(tut, state, 0).step).toBe('wait');
     const p1 = humanCar(state, 0); const p2 = humanCar(state, 1);
-    // P2 abastece: todos passaram do box. P1 está à frente → é quem vai parar.
+    // P2 deriva na curva: todos passaram dela. P1 está à frente → é quem vai parar.
     Object.assign(p1, { z: (TUTORIAL_SECTIONS.grid.start + 5) * SEGMENT_LENGTH, x: 0 });
-    Object.assign(p2, { z: (TUTORIAL_SECTIONS.pit.start + 5) * SEGMENT_LENGTH, x: PIT_X, inPit: true, fuel: 0.9 });
-    state.events = [];
+    Object.assign(p2, { z: (TUTORIAL_SECTIONS.curve.start + 5) * SEGMENT_LENGTH, x: 0 });
+    tut.seats[1].lastSeg = TUTORIAL_SECTIONS.curve.start + 4; tut.seats[1].tracking = true;
+    state.events = [{ type: 'drift_charge', carId: p2.id, level: 1 }];
     expect(types(updateTutorial(tut, state))).toEqual(['stepDone']);
     expect(tut.towSeat).toBe(0);
     expect(tut.parked).toBe(false);
     expect(tutorialView(tut, state, 0).step).toBe('stalled');
-    expect(tutorialView(tut, state, 1)).toMatchObject({ step: 'tow', index: 6, total: 6, parked: false });
+    expect(tutorialView(tut, state, 1)).toMatchObject({ step: 'tow', index: 7, total: 7, parked: false });
     const throttle: PlayerInput = { ...NEUTRAL_INPUT, throttle: true };
     expect(tutorialInput(tut, 0, throttle)).toBe(throttle);
     // Na reta, no asfalto: para.
@@ -233,10 +270,10 @@ describe('máquina de passos', () => {
     expect(tutorialInput(tut, 0, throttle)).toBe(throttle);
   });
 
-  it('passo 6: companheiro que passa direto pelo carro parado é avisado', () => {
+  it('passo 7: companheiro que passa direto pelo carro parado é avisado', () => {
     const { state } = tutorialRace(2);
     const tut = newTutorial([0, 1]);
-    tut.seats.forEach((s) => { s.step = 5; });
+    tut.seats.forEach((s) => { s.step = 6; });
     const p1 = humanCar(state, 0);
     Object.assign(p1, { z: 30 * SEGMENT_LENGTH, x: 0, progress: 99_999 });
     at(tut, state, 0, 30);
@@ -298,8 +335,8 @@ describe('painel: teclas do dispositivo de cada jogador', () => {
     expect(kb.title).toBe('Curva média');
   });
 
-  it('textos do passo 6 mudam antes e depois de o carro parar, com o nome de quem parou', () => {
-    const base = { index: 6, total: 6, actions: [] as never[], retry: null, progress: null, towSeat: 0 };
+  it('textos do passo do empurrão mudam antes e depois de o carro parar, com o nome de quem parou', () => {
+    const base = { index: 7, total: 7, actions: [] as never[], retry: null, progress: null, towSeat: 0 };
     expect(describeSeat({ ...base, step: 'tow', parked: false }, who, 'Bia', 'kb1', DEFAULT_BINDINGS).text).toContain('fique atrás');
     expect(describeSeat({ ...base, step: 'tow', parked: true }, who, 'Bia', 'kb1', DEFAULT_BINDINGS).text).toContain('Bia parou');
     expect(describeSeat({ ...base, step: 'stalled', parked: true }, who, 'Bia', 'kb1', DEFAULT_BINDINGS).text).toContain('Seu carro parou');
@@ -373,9 +410,11 @@ function botInput(state: RaceState, track: Track, tut: TutorialState, seat: numb
   }
   const sf = Math.min(1, car.speed / s.topSpeed);
   const curve = track.segments[seg % track.segments.length].curve;
-  const counter = sf > 0.05 ? (centrifugalRate(s) * sf * curve) / steerRate(s) : 0;
-  const steer = Math.max(-1, Math.min(1, (lane - car.x) * 5 + counter));
-  return { steer, throttle, brake, nitro, gearUp: false, gearDown: false };
+  // Passo da derrapagem: segura DERRAPAR dentro da curva média (com 0,3+ de volante para entrar) e solta na saída.
+  const drift = view.step === 'drift' && inSection('curve', seg) && seg < TUTORIAL_SECTIONS.curve.end - 8;
+  const counter = counterSteer(s, sf, curve, car.driftDir);
+  const steer = Math.max(-1, Math.min(1, (lane - car.x) * 5 + counter + (drift && car.driftDir === 0 ? 0.35 : 0)));
+  return { steer, throttle, brake, nitro, gearUp: false, gearDown: false, drift };
 }
 
 function playThrough(players: number, maxSeconds: number): { run: FakeRun; seconds: number; tut: TutorialState } {
@@ -409,7 +448,7 @@ describe('sessão do tutorial', () => {
     expect(state?.config.assists.tow).toBe(true);
   });
 
-  it('1 jogador: um piloto que segue o painel conclui os 5 passos em menos de 90 s; tela final e flag no save', () => {
+  it('1 jogador: um piloto que segue o painel conclui os 6 passos em menos de 90 s; tela final e flag no save', () => {
     const { run, seconds, tut } = playThrough(1, 120);
     expect(tut.phase).toBe('done');
     expect(seconds).toBeLessThan(90);
@@ -434,10 +473,12 @@ describe('sessão do tutorial', () => {
     const race = run.race;
     const tut = session.current();
     if (!race || !tut) throw new Error('sem corrida');
-    tut.seats[0].step = 4;
+    tut.seats[0].step = 5;
     const car = humanCar(race.state, 0);
-    Object.assign(car, { z: (TUTORIAL_SECTIONS.pit.start + 5) * SEGMENT_LENGTH, x: PIT_X, fuel: 0.95 });
-    race.driver.force(COUNTDOWN_PLUS, [NEUTRAL_INPUT], (i) => stepRace(race.state, race.track, i));
+    Object.assign(car, { z: (TUTORIAL_SECTIONS.curve.start - 12) * SEGMENT_LENGTH, x: 0, speed: carStats(car).topSpeed * 0.8 });
+    skipCountdown(race.state, race.track);
+    Object.assign(car, { z: (TUTORIAL_SECTIONS.curve.start - 12) * SEGMENT_LENGTH, x: 0, speed: carStats(car).topSpeed * 0.8 });
+    for (let i = 0; i < COUNTDOWN_PLUS && tut.phase === 'running'; i++) race.driver.force(1, [botInput(race.state, race.track, tut, 0, 0)], (inputs) => stepRace(race.state, race.track, inputs));
     expect(tut.phase).toBe('done');
     expect(run.shown).toEqual([]);
     const stopped = race.state.tick;
