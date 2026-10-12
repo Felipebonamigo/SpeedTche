@@ -34,7 +34,7 @@ export class DynamicResolution {
   private calmMs = 0;
   private upWait: number;
   private sinceUp = Infinity;
-  private readonly target: number;
+  private target: number;
   private readonly downAfter: number;
   private readonly upAfterBase: number;
 
@@ -47,6 +47,9 @@ export class DynamicResolution {
 
   get scale(): number { return this.on ? DYNRES_STEPS[this.index] : 1; }
   get enabled(): boolean { return this.on; }
+
+  /** Muda a meta de tempo de quadro (33 ms no modo de 30 fps travados; 1000/60 no normal). */
+  setTargetMs(ms: number): void { if (ms > 0 && ms !== this.target) { this.target = ms; this.restart(); } }
 
   setEnabled(on: boolean): void {
     if (on === this.on) return;

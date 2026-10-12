@@ -101,6 +101,9 @@ export function sanitizeSettings(raw: unknown): Settings {
     reduceEffects: pickBool(r.reduceEffects, d.reduceEffects),
     // Config de antes da legenda (sem o campo) liga: ela é o padrão.
     landmarkCaptions: pickBool(r.landmarkCaptions, d.landmarkCaptions),
+    lockFps30: pickBool(r.lockFps30, d.lockFps30),
+    // Sem o campo (save de antes da L2b) fica ausente de propósito: só a 1ª abertura de verdade o grava.
+    ...(QUALITIES.includes(r.autoQuality as Quality) ? { autoQuality: r.autoQuality as Quality } : {}),
   };
 }
 

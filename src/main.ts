@@ -8,6 +8,10 @@ import { createSession, type Session } from './game/session';
 import { loadCarAssets, type CarAssetReport } from './render/cars/assets';
 import { loadLandmarkAssets, loadLandmarkParts, type LandmarkAssetReport } from './render/scenery/landmarks/assets';
 import { createPlaylog, getActivePlaylog, setActivePlaylog } from './game/playlog';
+import { applyAutoQuality, collectProbe, pickAutoQuality, shouldAutoQuality } from './game/auto-quality';
+import { SAVE_KEY } from './game/save';
+import { loadSettings, sanitizeSettings, SETTINGS_KEY } from './game/settings';
+import { setRenderPrefs } from './render/prefs';
 import { readJson, saveHealth, setSpaceFreers, writeJson } from './game/storage';
 import { showFatal } from './errors/fatal';
 import { createErrorToast, createSaveToast } from './errors/toast';
@@ -82,6 +86,14 @@ async function boot(): Promise<void> {
     await runBench(location.search, { canvas, hud, ui, desktop });
     return;
   }
+
+  // Qualidade automática (L2b): só na 1ª abertura de verdade (nem opções nem save de antes), nunca sob automação; grava antes de a sessão ler as opções.
+  const savedSettings = readJson(SETTINGS_KEY);
+  if (shouldAutoQuality(savedSettings ?? readJson(SAVE_KEY), { webdriver: navigator.webdriver === true, search: location.search })) {
+    const q = pickAutoQuality(await collectProbe(desktop !== null));
+    writeJson(SETTINGS_KEY, sanitizeSettings(applyAutoQuality(savedSettings, q)));
+  }
+  setRenderPrefs(loadSettings()); // o fundo do menu e o limitador de quadros leem daqui (render/prefs.ts)
 
   const s = createSession(canvas, hud, ui);
   session = s;

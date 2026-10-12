@@ -2,6 +2,7 @@
 import type { CoopAssists } from '../../core/types';
 import type { Settings } from '../../game/contracts';
 import { DIFFICULTIES, QUALITIES, QUICK_LAPS_MAX, RENDER_STYLES, QUICK_LAPS_MIN, TOTAL_CARS_MAX, TOTAL_CARS_MIN, saveSettings } from '../../game/settings';
+import { setRenderPrefs } from '../../render/prefs';
 import { accessEntry } from '../../access/screen';
 import { optionsFooter } from '../../errors/options';
 import { getLanguage, setLanguage, t, type Lang } from '../../i18n';
@@ -57,8 +58,15 @@ export function qualitySelector(api: ScreenApi, commit: () => void): Selector {
   return selector(t('ui.options.quality'), () => t(`ui.options.quality.${s.quality}`), (d) => { s.quality = cycle(QUALITIES, s.quality, d); commit(); }, { sfx: api.sfx });
 }
 
+/** 30 fps travados na Média com 3 e 4 jogadores (L2b): desligado por padrão. */
+export function fps30Selector(api: ScreenApi, commit: () => void): Selector {
+  const s = api.ctx.settings;
+  return selector(t('ui.options.fps30'), () => onOff(s.lockFps30), () => { s.lockFps30 = !s.lockFps30; commit(); }, { sfx: api.sfx });
+}
+
 export function commitSettings(api: ScreenApi): void {
   saveSettings(api.ctx.settings);
+  setRenderPrefs(api.ctx.settings); // o fundo do menu e o limitador de quadros leem daqui (render/prefs.ts)
   api.emit({ type: 'settingsChanged', settings: api.ctx.settings });
 }
 
@@ -88,6 +96,7 @@ export function optionsScreen(api: ScreenApi): ScreenInstance {
     // usuário pode pedir tela cheia, e este handler de teclado/clique é o gesto.
     selector(t('ui.options.fullscreen'), () => onOff(s.fullscreen), () => { s.fullscreen = !s.fullscreen; if (!api.ctx.isDesktop) applyFullscreen(s.fullscreen); commit(); }, { sfx }),
     qualitySelector(api, commit),
+    fps30Selector(api, commit),
     // Visual: o 3D moderno ou o pseudo-3D Retrô (a sessão troca o renderizador na hora; src/render-pseudo3d).
     // Cada coluna comporta dez linhas (docs/TELAS.md): para esta caber, o "Tremor de tela" foi para a Acessibilidade.
     selector(t('ui.options.renderStyle'), () => t(`ui.options.renderStyle.${s.renderStyle}`), (d) => { s.renderStyle = cycle(RENDER_STYLES, s.renderStyle, d); commit(); }, { sfx }),

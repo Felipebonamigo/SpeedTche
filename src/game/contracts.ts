@@ -120,6 +120,10 @@ export interface Settings {
   reduceEffects: boolean;
   /** Legenda com o nome do marco turístico quando ele entra bem à vista (src/render/caption/, Opções › Acessibilidade). */
   landmarkCaptions: boolean;
+  /** 30 fps travados na Média com 3 e 4 jogadores (Opções › Visual; onda L, L2b). Desligado por padrão. */
+  lockFps30: boolean;
+  /** A qualidade que a escolha automática da 1ª abertura gravou (L2b). Ausente = não rodou (save de antes, ou automação): é campo aditivo, sem padrão. */
+  autoQuality?: Quality;
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
@@ -131,7 +135,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   serverUrl: 'ws://localhost:8787',
   ghost: true,
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
-  landmarkCaptions: true,
+  landmarkCaptions: true, lockFps30: false,
 });
 
 export interface BestLap {
