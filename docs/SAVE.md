@@ -156,3 +156,7 @@ JSON, lixo, copa salva com e sem a pintura) e `tests/paint-screens.test.ts` (as 
 ## Visual do carro (`seatLooks`, N3)
 
 `seatLooks: Array<Record<carId, CarLook>>` (4 assentos, só quem personalizou) substitui o `seatPaints`. Migração na leitura: cada `seatPaints[assento][carro]` válido e diferente do original vira `{paint}` quando o `seatLooks` não tem aquele carro; quem tem os dois fica com o `seatLooks`. O save regravado sai sem `seatPaints`. Copa salva: lê `look` e, na falta, o `paint` antigo. Exemplo: `"seatLooks": [{ "falcao": { "paint": "rubi", "finish": "perolado", "wheel": "mag", "stripe": "ab" } }, {}, {}, {}]`. Testes: `tests/paint.test.ts` ("migração do seatPaints para o seatLooks").
+
+## Expedição (N5)
+
+Dois campos aditivos: `sessionStart` (retrato dos contadores na abertura da sessão) e `recap` ({before, after}: o que a sessão anterior rendeu, para o quadro 'Desde a última vez'). `rollSession` roda uma vez na criação da sessão: se houve progresso desde o `sessionStart`, vira `recap`; sessão sem progresso preserva o `recap` antigo. Save antigo abre normal. A 0.1.2 descarta os dois campos ao regravar e lê o resto igual. `career` e `cupInProgress` não mudaram de formato nem se convertem; a copa avulsa salva é retomada em Jogar livre.
