@@ -229,7 +229,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     save, settings, menus, input, baseConfig, beginRace, toIdle, randomSeed, persist: () => saveSave(save),
   });
   session.tutorial = createTutorialSession({
-    save, settings, menus, input, toIdle, startCup, randomSeed, persist: () => saveSave(save),
+    save, settings, menus, input, toIdle, startExpedition: (humans, resume) => career.start(humans, resume), randomSeed, persist: () => saveSave(save),
     beginRace: (config, humans, driver, state) => beginRace(config, 'quick', humans, { driver, localSeats: humans.map((h) => h.seat), state }),
     hud: pushMessage,
     panel: createTutorialPanel(hudRoot),

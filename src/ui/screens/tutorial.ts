@@ -150,10 +150,10 @@ function isDoneData(data: ScreenData): data is TutorialDoneData {
 
 export function tutorialDoneScreen(api: ScreenApi, data?: ScreenData): ScreenInstance {
   const info: TutorialDoneData = isDoneData(data) ? data : { completed: false, players: 1 };
-  const cup = api.ctx.cups[0];
   const toMain = () => { api.sfx('back'); api.emit({ type: 'toMain' }); };
   const items = [
-    ...(cup ? [button(t('tutorial.done.cup', { cup: t(`core.cup.${cup.id}`) }), () => api.emit({ type: 'tutorialFirstCup' }), 'btn-primary')] : []),
+    // O destino é a Expedição (N5/O3), com dinheiro e garagem; quem já tem uma continua a dela.
+    button(t(api.ctx.save.career ? 'tutorial.done.expeditionResume' : 'tutorial.done.expedition'), () => api.emit({ type: 'tutorialFirstCup' }), 'btn-primary'),
     button(t('tutorial.done.main'), toMain),
   ];
   const list = createFocusList(items, { sfx: api.sfx });

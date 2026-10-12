@@ -5,7 +5,6 @@
 // pura e mora em tutorial.ts; aqui ficam os efeitos (HUD, painel, save, menus). Em session.ts ficam
 // só os ganchos que chamam este módulo. Só local: o tutorial não existe no online.
 import { DT } from '../core/constants';
-import { CUPS } from '../core/data/cups';
 import { createRace } from '../core/sim/race';
 import { seatColor } from '../core/data/drivers';
 import type { HumanEntry, PlayerInput, RaceConfig, RaceState } from '../core/types';
@@ -65,7 +64,8 @@ export interface TutorialHost {
   beginRace(config: RaceConfig, humans: HumanEntry[], driver: RaceDriver, state: RaceState): void;
   /** Sai da corrida para o fundo dos menus, sem desligar os assentos (chama driver.dispose). */
   toIdle(): void;
-  startCup(cupId: string, humans: HumanEntry[]): void;
+  /** Fim do tutorial → Expedição (O3): `resume` = já existe uma, e ela continua (nunca é apagada). */
+  startExpedition(humans: HumanEntry[], resume: boolean): void;
   randomSeed(): number;
   /** Grava o save. */
   persist(): void;
@@ -76,7 +76,7 @@ export interface TutorialHost {
 export interface TutorialSession {
   /** "Como jogar" → Começar: corrida guiada com estes jogadores (assentos já ligados). */
   start(humans: HumanEntry[]): void;
-  /** Tela final → primeira copa, com os mesmos jogadores. */
+  /** Tela final → Expedição (a copa avulsa sem dinheiro não é mais o destino, N5), com os mesmos jogadores. */
   firstCup(): void;
   /** Máquina da corrida guiada em curso (playtest); null fora dela. */
   current(): TutorialState | null;
@@ -259,8 +259,7 @@ export function createTutorialSession(host: TutorialHost): TutorialSession {
   }
 
   function firstCup(): void {
-    const cup = CUPS[0];
-    if (cup && lastHumans.length > 0) host.startCup(cup.id, lastHumans);
+    if (lastHumans.length > 0) host.startExpedition(lastHumans, host.save.career !== null);
   }
 
   return { start, firstCup, current: () => run?.tut ?? null };

@@ -8,7 +8,7 @@ import { centrifugalRate, holdableSpeedFraction, steerRate } from '../src/core/s
 import { createRace, stepRace } from '../src/core/sim/race';
 import { carStats } from '../src/core/sim/stats';
 import { getTrack, TRACKS, trackDef } from '../src/core/track';
-import { NEUTRAL_INPUT, type CarState, type HumanEntry, type PlayerInput, type RaceConfig, type RaceState, type Track } from '../src/core/types';
+import { NEUTRAL_INPUT, type CarState, type PlayerInput, type RaceConfig, type RaceState, type Track } from '../src/core/types';
 import { DEFAULT_SAVE, DEFAULT_SETTINGS, type DeviceInfo, type RaceDriver, type SaveData, type TutorialDoneData } from '../src/game/contracts';
 import { sanitizeSave } from '../src/game/save';
 import {
@@ -313,7 +313,7 @@ interface FakeRun {
   shown: Array<{ screen: string; data: TutorialDoneData | undefined }>;
   hud: Array<{ seat: number; text: string; kind: string }>;
   persisted: number;
-  cups: Array<{ cupId: string; humans: HumanEntry[] }>;
+  expeditions: Array<{ seats: number[]; resume: boolean }>;
   race: { driver: RaceDriver; state: RaceState; track: Track } | null;
   idled: number;
 }
@@ -321,7 +321,7 @@ interface FakeRun {
 function fakeHost(save: SaveData = sanitizeSave({})): FakeRun {
   const seats: Array<string | null> = ['kb1', 'kb2', null, null];
   const devices: DeviceInfo[] = [];
-  const run: FakeRun = { host: null as unknown as TutorialHost, shown: [], hud: [], persisted: 0, cups: [], race: null, idled: 0 };
+  const run: FakeRun = { host: null as unknown as TutorialHost, shown: [], hud: [], persisted: 0, expeditions: [], race: null, idled: 0 };
   run.host = {
     save, settings: { ...DEFAULT_SETTINGS },
     menus: { show: ((screen: string, data?: TutorialDoneData) => { run.shown.push({ screen, data }); }) as TutorialHost['menus']['show'] },
@@ -333,7 +333,7 @@ function fakeHost(save: SaveData = sanitizeSave({})): FakeRun {
     },
     beginRace: (_config, _humans, driver, state) => { run.race = { driver, state, track: tutorialTrack() }; },
     toIdle: () => { run.idled++; run.race?.driver.dispose(); run.race = null; },
-    startCup: (cupId, humans) => { run.cups.push({ cupId, humans }); },
+    startExpedition: (humans, resume) => { run.expeditions.push({ seats: humans.map((h) => h.seat), resume }); },
     randomSeed: () => 9,
     persist: () => { run.persisted++; },
     hud: (seat, text, kind) => { run.hud.push({ seat, text, kind }); },
@@ -471,15 +471,26 @@ describe('sessão do tutorial', () => {
     expect(steps).toBe(0);
   });
 
-  it('"Primeira copa" começa a primeira copa com os mesmos jogadores', () => {
+  it('o fim leva à Expedição (O3, pendência da N5): carreira nova com os mesmos jogadores, sem copa avulsa', () => {
     const run = fakeHost();
     const session = createTutorialSession(run.host);
     session.firstCup(); // sem tutorial antes: nada
-    expect(run.cups).toEqual([]);
+    expect(run.expeditions).toEqual([]);
     session.start([human(0), human(1)]);
     run.race?.driver.pauseKey();
     session.firstCup();
-    expect(run.cups.map((c) => [c.cupId, c.humans.map((h) => h.seat)])).toEqual([[CUPS[0].id, [0, 1]]]);
+    expect(run.expeditions).toEqual([{ seats: [0, 1], resume: false }]);
+  });
+
+  it('quem já tem Expedição continua a que existe: o fim do tutorial nunca a apaga', () => {
+    const save = sanitizeSave({});
+    save.career = { ...(save.career ?? {}), cupId: 'br_rj' } as unknown as SaveData['career'];
+    const run = fakeHost(save);
+    const session = createTutorialSession(run.host);
+    session.start([human(0)]);
+    run.race?.driver.pauseKey();
+    session.firstCup();
+    expect(run.expeditions).toEqual([{ seats: [0], resume: true }]);
   });
 });
 

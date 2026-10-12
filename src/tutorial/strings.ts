@@ -66,7 +66,8 @@ registerStrings('tutorial', {
     'rule.nitro': 'Nitro rende mais na reta. São 3 por corrida; no co-op, um cofre da equipe.',
     'rule.pit': 'Tanque piscando? Box à direita na reta de largada.',
     'rule.tow': 'Companheiro parado? Passe colado e dê um empurrão.',
-    'done.cup': 'Correr a {cup}',
+    'done.expedition': 'Começar a Expedição',
+    'done.expeditionResume': 'Continuar a Expedição',
     'done.main': 'Menu principal',
   },
   en: {
@@ -132,7 +133,8 @@ registerStrings('tutorial', {
     'rule.nitro': 'Nitro pays off on straights. 3 per race; in co-op, a team pool.',
     'rule.pit': 'Fuel gauge blinking? Pit lane on the right of the start straight.',
     'rule.tow': 'Teammate stalled? Drive right behind them and give a push.',
-    'done.cup': 'Race the {cup}',
+    'done.expedition': 'Start the Expedition',
+    'done.expeditionResume': 'Continue the Expedition',
     'done.main': 'Main menu',
   },
 });
