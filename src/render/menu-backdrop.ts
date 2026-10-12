@@ -32,12 +32,13 @@ function carIdFor(slot: number): string {
 export class MenuBackdrop {
   private readonly cars: CarState[] = SLOTS.map((s, i) => {
     const def = CARS.find((c) => c.id === carIdFor(i)) ?? CARS[0];
+    const { topSpeed, accel, brake, handling, fuelPerUnit } = def; // de fábrica: é o que o fundo decorativo tem (não há melhorias nem corrida)
     return {
       id: i, seat: -1, name: '', teamId: 0, carId: def.id, z: 0, x: s.x, speed: CAMERA_SPEED, gear: 3, fuel: 1, nitroMeter: 0, throttleHeld: 0,
       launch: 2, draftTicks: 0, gainLock: 0, nitroTicks: 0, lap: 1, lapTicks: [], lapStartTick: 0, finished: false, finishTick: 0, position: i + 1,
       progress: 0, inPit: false, collisionCooldown: 0, towCooldown: 0, skidTicks: 0, steerPose: 0, driftDir: 0, driftTicks: 0, driftCharge: 0,
       driftBoostTicks: 0, ai: null,
-      stats: { topSpeed: def.topSpeed, accel: def.accel, brake: def.brake, handling: def.handling, fuelPerUnit: def.fuelPerUnit, nitro: 1 },
+      stats: { topSpeed, accel, brake, handling, fuelPerUnit, nitro: 1 },
     } satisfies CarState;
   });
 

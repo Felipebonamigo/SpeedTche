@@ -33,3 +33,8 @@ fundo do menu; o fundo com carros entra na compilação).
 - Fundo com carros usa os mesmos materiais dos da corrida: na 1ª vez compila programas (aquecimento do primeiro quadro do menu).
 - Pular desenho não pode deixar o HUD parado nem a resolução dinâmica descer por engano (por isso o alvo de 33 ms).
 - Nenhuma migration: campos novos são aditivos com padrão (`lockFps30: false`, `autoQuality` ausente).
+
+### Registro da execução (12/10/2026)
+- Feito: fundo com 3 (Média) ou 5 (Alta/Ultra) carros, 0 na Baixa e com "reduzir efeitos"; qualidade automática só sem settings nem save; 30 fps travados (opção na **Acessibilidade**, coluna de direção: as colunas das Opções já têm as 10 linhas e a 11ª reprovava o `playtest-layout`); resolução dinâmica já existia (só a meta de tempo ficou mutável); `tools/folha-contorno.mjs`.
+- `playtest-layout` completo: tudo verde. `playtest-memoria` (36 blocos): único ✗ é `textures` 95 → 103, **idêntico no `main` 01c383e** (pré-existente, não é desta frente); heap +335 KB, programas/materiais/objetos/DOM sem crescimento.
+- Suíte completa: 1 falha (`career.test.ts`, varredura que proíbe `.topSpeed` em `src/render`), corrigida e revalidada isolada; o resto verde (191/192 arquivos).
