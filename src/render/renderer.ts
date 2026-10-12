@@ -25,6 +25,9 @@ import { viewportRects, type Rect } from './layout';
 import { palette, racePeriodPlan, type LivePalette, type Palette } from './palette';
 import { PeriodClock } from './period-clock';
 import { DynamicResolution, dynamicResolutionDefault } from './postfx/dynres';
+import { fpsLockActive, FrameLimiter, LOCK_MS } from './postfx/fps-lock';
+import { backdropCount, MenuBackdrop } from './menu-backdrop';
+import { getRenderPrefs } from './prefs';
 import { ViewportPipeline } from './postfx/pipeline';
 import { planFor, radialBlurStrength, shadowPlan, type PostPlan } from './postfx/plan';
 import { ShadowRing } from './postfx/shadows';
@@ -58,7 +61,7 @@ export interface ViewportDebug {
   postPx: number;
 }
 /** O que o renderizador conta de si: composers criados (um por viewport usado, nunca mais um por resize ou lotação) e os redimensionamentos em lugar. */
-export interface PostDebug { builds: number; resizes: number; scale: number; dynamic: boolean }
+export interface PostDebug { builds: number; resizes: number; scale: number; dynamic: boolean; /** Quadros cujo desenho o modo de 30 fps travados pulou (L2b). */ skipped: number; /** Carros decorativos desenhados no fundo do menu no último `renderIdle` (L2b). */ backdropCars: number }
 export interface DebugInfo {
   calls: number; triangles: number; frameMs: number; quality: Quality | null; shadows: boolean; viewports: ViewportDebug[];
   post: PostDebug;
@@ -129,10 +132,15 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   let lastScale = 1;
   let pinnedRadial: number | null = null;
   let lastRenderAt = -1;
+  // L2b: 30 fps travados (postfx/fps-lock.ts) e os carros decorativos do fundo do menu (menu-backdrop.ts).
+  const limiter = new FrameLimiter();
+  let skipped = 0;
+  const backdrop = new MenuBackdrop();
+  let backdropShown = 0;
   let lastBlurAt = 0;
   /** Desfoque radial suavizado por viewport (0..1). */
   const radial = [0, 0, 0, 0];
-  const debug: DebugInfo = { calls: 0, triangles: 0, frameMs: 0, quality: null, shadows: false, viewports: [], post: { builds: 0, resizes: 0, scale: 1, dynamic: true }, shadowUpdates: 0 };
+  const debug: DebugInfo = { calls: 0, triangles: 0, frameMs: 0, quality: null, shadows: false, viewports: [], post: { builds: 0, resizes: 0, scale: 1, dynamic: true, skipped: 0, backdropCars: 0 }, shadowUpdates: 0 };
   // O sol é uma luz só (sky.ts); a sombra dele é por viewport com 3 e 4 jogadores (postfx/shadows.ts).
   const sun = scene.children.find((o): o is THREE.DirectionalLight => (o as THREE.DirectionalLight).isDirectionalLight === true);
   const shadowRing = sun ? new ShadowRing(sun.shadow) : null;
@@ -312,6 +320,14 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     effects.update(frame);
     const n = Math.max(1, Math.min(4, frame.viewports.length));
     const rects = viewportRects(n, width, height);
+    // 30 fps travados (L2b): pula só o DESENHO; carros, efeitos e HUD seguem a cada quadro do navegador. Pausado, desenha sempre.
+    const lockOn = fpsLockActive(q, n, getRenderPrefs().lockFps30);
+    dynamic.setTargetMs(lockOn ? LOCK_MS : 1000 / 60);
+    if (!limiter.shouldDraw(frame.time * 1000, lockOn && !frame.paused)) {
+      skipped++;
+      if (frame.showHud) hud.update(frame, width, height, captions); else hud.hide();
+      return;
+    }
     const plan = planFor(q, n);
     const sp = shadowPlan(q, n);
     tickDynamic(t0);
@@ -413,7 +429,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     if (renderStage(time)) return;
     const t0 = performance.now();
     ensureTrack(track);
-    ensureQuality(quality ?? 'high');
+    ensureQuality(getRenderPrefs().quality ?? quality ?? 'high');
     // O fundo do menu é o período da pista (o do `track.def`), não o da corrida que acabou.
     const idle = clock.idle(track.def.scenery, track.def.timeOfDay, track.def.laps);
     if (idle.changed) applyLive(idle.live);
@@ -422,7 +438,16 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     const rf = buildRoadFrame(track, z, BEHIND, AHEAD[quality ?? 'high'], frames[0]);
     frames[0] = rf;
     poseWorld(rf, track, z, time);
-    cars.hide();
+    // Fundo com carros correndo (L2b, menu-backdrop.ts): só com a qualidade das Opções (Média ou mais) e sem "reduzir efeitos"; a Baixa e o Retrô ficam como eram.
+    const prefs = getRenderPrefs();
+    const bq = prefs.quality ?? quality ?? 'high';
+    backdropShown = backdropCount(bq, prefs.reduceEffects);
+    if (backdropShown > 0) {
+      const list = backdrop.update(time, z, track.length, backdropShown);
+      const f = { state: { cars: list, party: undefined }, track, time, options: { reduceEffects: false }, looks: undefined, paints: undefined } as unknown as RenderFrame;
+      cars.update(f);
+      cars.pose(rf, f.state, track, -1, [], time);
+    } else cars.hide();
     effects.clear();
     effects.pose(rf, track, 1);
     idleCamera.setAspect(width / Math.max(1, height));
@@ -463,7 +488,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   return {
     canvas, resize, render, renderIdle, dispose,
     liveApplied: () => liveApplied,
-    debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })), post: { builds, resizes, scale: lastScale, dynamic: dynamic.enabled } }),
+    debugInfo: () => ({ ...debug, viewports: vps.slice(0, vpCount).map((v) => ({ ...v })), post: { builds, resizes, scale: lastScale, dynamic: dynamic.enabled, skipped, backdropCars: backdropShown } }),
     setDynamicResolution: (on: boolean) => { dynamic.setEnabled(on); if (!on) lastScale = 1; },
     pinDynamicScale: (scale: number | null) => { pinned = scale; },
     pinRadialBlur: (strength: number | null) => { pinnedRadial = strength; },

@@ -48,6 +48,14 @@ describe('30 fps travados (L2b)', () => {
     expect(l.shouldDraw(1090, true)).toBe(true);
   });
 
+  it('o relógio que volta atrás (corrida nova, tempo zerado) desenha na hora em vez de congelar a tela', () => {
+    const l = new FrameLimiter();
+    expect(l.shouldDraw(500000, true)).toBe(true);
+    expect(l.shouldDraw(10, true)).toBe(true);
+    expect(l.shouldDraw(20, true)).toBe(false);
+    expect(l.shouldDraw(45, true)).toBe(true);
+  });
+
   it('a resolução dinâmica mede contra 33 ms no modo travado (senão desceria à toa)', () => {
     const free = new DynamicResolution();
     for (let i = 0; i < 100; i++) free.update(33.3);

@@ -19,3 +19,6 @@ export function setRenderPrefs(s: { quality: Quality; reduceEffects: boolean; lo
   prefs.reduceEffects = s.reduceEffects;
   prefs.lockFps30 = s.lockFps30 === true;
 }
+
+/** Volta ao "não sei" do começo (testes e laboratório). */
+export function resetRenderPrefs(): void { prefs.quality = null; prefs.reduceEffects = false; prefs.lockFps30 = false; }

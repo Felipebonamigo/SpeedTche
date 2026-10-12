@@ -38,6 +38,8 @@ interface LabApi {
   info(): DebugInfo;
   dynamic(on: boolean, pin: number | null): void;
   blob(): { found: boolean; count: number };
+  prefs(p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null): void;
+  idle(quality: Quality, frames: number): DebugInfo[];
 }
 declare global { interface Window { lab: LabApi; labReady: boolean } }
 
@@ -198,6 +200,42 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500
       return (['low', 'medium', 'high', 'ultra'] as const).map((q) => { L.render(q, 1); return { q, ...L.blob() }; });
     });
     for (const x of r) { expect(x.found, `${x.q}: a malha da mancha`).toBe(true); expect(x.count, `${x.q}: instâncias`).toBeGreaterThanOrEqual(1); }
+  });
+
+  it('fundo do menu com carros correndo (L2b): 3 na Média, 5 na Alta e no Ultra, nenhum na Baixa nem com "reduzir efeitos"; as chamadas sobem só com carros', async () => {
+    const r = await page.evaluate(() => {
+      const L = window.lab; L.setup('copacabana', 1, 300); L.dynamic(false, null);
+      const out: Array<{ q: string; reduce: boolean; cars: number; calls: number }> = [];
+      for (const q of ['low', 'medium', 'high', 'ultra'] as const) {
+        for (const reduce of [false, true]) { L.prefs({ quality: q, reduceEffects: reduce }); const d = L.idle(q, 3)[2]; out.push({ q, reduce, cars: d.post.backdropCars, calls: d.calls }); }
+      }
+      L.prefs(null);
+      return out;
+    });
+    const at = (q: string, reduce: boolean) => r.find((x) => x.q === q && x.reduce === reduce)!;
+    expect([at('low', false).cars, at('medium', false).cars, at('high', false).cars, at('ultra', false).cars]).toEqual([0, 3, 5, 5]);
+    for (const q of LEVELS) expect(at(q, true).cars, `${q} com reduzir efeitos`).toBe(0);
+    for (const q of ['medium', 'high', 'ultra']) expect(at(q, false).calls, `${q}: carros somam chamadas`).toBeGreaterThan(at(q, true).calls);
+    expect(at('low', false).calls).toBe(at('low', true).calls);
+  });
+
+  it('30 fps travados (L2b): só na Média com 3 e 4 jogadores e a opção ligada; pula o desenho, não a animação', async () => {
+    const r = await page.evaluate(() => {
+      const L = window.lab; L.dynamic(false, null);
+      const run = (q: 'medium' | 'high', n: number, lock: boolean) => {
+        L.prefs({ quality: q, reduceEffects: false, lockFps30: lock }); L.setup('copacabana', n, 300);
+        const before = L.info().post.skipped; L.render(q, 12); return L.info().post.skipped - before;
+      };
+      const out = { lock4: run('medium', 4, true), lock3: run('medium', 3, true), free4: run('medium', 4, false), lock2: run('medium', 2, true), high4: run('high', 4, true) };
+      L.prefs(null);
+      return out;
+    });
+    expect(r.lock4, '4 jogadores, Média, travado').toBeGreaterThanOrEqual(4);
+    expect(r.lock4).toBeLessThanOrEqual(7);
+    expect(r.lock3).toBeGreaterThanOrEqual(4);
+    expect(r.free4).toBe(0);
+    expect(r.lock2).toBe(0);
+    expect(r.high4).toBe(0);
   });
 
   it('a Baixa não usa resolução dinâmica (desenha direto na tela)', async () => {

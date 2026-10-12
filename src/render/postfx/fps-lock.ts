@@ -18,7 +18,9 @@ export class FrameLimiter {
   /** Este quadro (instante `nowMs`) deve ser desenhado? Inativo, sempre sim; ativo, só se passou o suficiente desde o último desenho. */
   shouldDraw(nowMs: number, active: boolean): boolean {
     if (!active) { this.last = nowMs; return true; }
-    if (nowMs - this.last >= DRAW_AFTER) { this.last = nowMs; return true; }
+    const gap = nowMs - this.last;
+    // gap < 0: o relógio recomeçou (corrida nova); desenha em vez de esperar o tempo alcançar o antigo.
+    if (gap < 0 || gap >= DRAW_AFTER) { this.last = nowMs; return true; }
     return false;
   }
 }

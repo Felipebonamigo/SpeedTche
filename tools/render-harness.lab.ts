@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/co
 import { paintsOfLooks, raceLooks } from '../src/game/paints';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
+import { resetRenderPrefs, setRenderPrefs } from '../src/render/prefs';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLElement;
@@ -219,6 +220,8 @@ function liveScene(quality: Quality, trackId: string, fractions: number[], repea
 }
 
 const lab = {
+  /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
+  prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   renderer, setup, render, idle, programs, collect, blob, fxScene, liveScene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),
