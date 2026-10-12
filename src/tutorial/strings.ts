@@ -24,6 +24,11 @@ registerStrings('tutorial', {
     'key.steer': 'Virar',
     'key.stick': 'Analógico',
 
+    'tip.launch': 'Largada: aperte o acelerador junto com o JÁ! Segurar desde o começo não vale.',
+    'tip.brake': 'Curva forte à frente: freie ANTES dela.',
+    'tip.drift': 'Curva forte: segure DERRAPAR e vire. Soltar na saída dá turbo.',
+    'tip.nitro': 'Nitro pronto! A barra enche quando você derrapa, raspa, ultrapassa e larga bem.',
+    'tip.pit': 'Combustível baixo: siga a seta, freie e entre no box, à direita.',
     'step.launch.title': 'Largada',
     'step.launch.text': 'Aperte o acelerador junto com o JÁ! Segurar desde o começo da contagem não vale.',
     'counter.launch': 'LARGADA',
@@ -99,6 +104,11 @@ registerStrings('tutorial', {
     'key.steer': 'Steer',
     'key.stick': 'Stick',
 
+    'tip.launch': 'Launch: press the throttle right on GO! Holding it from the start does not count.',
+    'tip.brake': 'Sharp corner ahead: brake BEFORE it.',
+    'tip.drift': 'Sharp corner: hold DRIFT and steer. Releasing at the exit gives a boost.',
+    'tip.nitro': 'Nitro ready! The bar fills when you drift, scrape, overtake and launch well.',
+    'tip.pit': 'Low fuel: follow the arrow, brake and take the pit lane on the right.',
     'step.launch.title': 'Launch',
     'step.launch.text': 'Hit the throttle right on GO! Holding it from the start of the countdown does not count.',
     'counter.launch': 'LAUNCH',

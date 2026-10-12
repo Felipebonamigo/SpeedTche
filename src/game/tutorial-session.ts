@@ -11,8 +11,8 @@ import type { HumanEntry, PlayerInput, RaceConfig, RaceState } from '../core/typ
 import { NEUTRAL_INPUT } from '../core/types';
 import { t } from '../i18n';
 import '../tutorial/strings';
-import type { BindAction, ControlBindings } from '../ui/remap/bindings';
-import { actionLabel, buttonLabel, codesLabel, keyLabel, padStyleOf, type LayoutMap } from '../ui/remap/labels';
+import type { ControlBindings } from '../ui/remap/bindings';
+import { actionChips, actionKeys, buttonLabel, keyLabel, padStyleOf, type KeyChip, type LayoutMap } from '../ui/remap/labels';
 import { compactHumans, type SeatBinder } from './career-session';
 import type { DeviceInfo, HudMessage, Menus, RaceDriver, SaveData, Settings } from './contracts';
 import { withLook, withoutLook } from './paints';
@@ -28,7 +28,7 @@ export const END_DELAY_TICKS = 150;
 const MAX_TICKS_PER_FRAME = 8;
 
 /** Uma tecla/botão a mostrar no painel: o que faz e o que apertar. */
-export interface PanelKey { label: string; keys: string }
+export type PanelKey = KeyChip;
 
 /** O painel de um assento, já com os textos no idioma atual. */
 export interface PanelSeat {
@@ -84,26 +84,7 @@ export interface TutorialSession {
 
 // ───────────────────────────── Textos do painel ─────────────────────────────
 
-/** Teclas/botões de uma ação no dispositivo do jogador, com o remapeamento das opções. */
-export function actionKeys(device: string | null, action: BindAction, controls: ControlBindings, padName = '', layout: LayoutMap | null = null): string {
-  if (device && device.startsWith('gp')) return codesLabel(controls.gamepad[action], padStyleOf(padName));
-  return codesLabel(controls[device === 'kb2' ? 'kb2' : 'kb1'][action], 'xbox', layout);
-}
-
-function panelKeys(actions: readonly BindAction[], device: string | null, controls: ControlBindings, padName: string, layout: LayoutMap | null): PanelKey[] {
-  const out: PanelKey[] = [];
-  const pad = device !== null && device.startsWith('gp');
-  for (const a of actions) {
-    if (a === 'right' && actions.includes('left')) continue; // esquerda e direita num chip só
-    if (a === 'left' && actions.includes('right')) {
-      const keys = `${actionKeys(device, 'left', controls, padName, layout)} ${actionKeys(device, 'right', controls, padName, layout)}`;
-      out.push({ label: t('tutorial.key.steer'), keys: pad ? `${t('tutorial.key.stick')} / ${keys}` : keys });
-      continue;
-    }
-    out.push({ label: actionLabel(a), keys: actionKeys(device, a, controls, padName, layout) });
-  }
-  return out;
-}
+export { actionKeys };
 
 /** Monta o painel de um assento: passo, instrução, teclas do dispositivo dele e o aviso de repetir. */
 export function describeSeat(
@@ -120,7 +101,7 @@ export function describeSeat(
     counter: view.step === 'done' ? '' : view.step === 'launch' ? t('tutorial.counter.launch') : t('tutorial.counter', { n: view.index, total: view.total }),
     title: t(`tutorial.step.${view.step}.title`),
     text,
-    keys: panelKeys(view.actions, device, controls, padName, layout),
+    keys: actionChips(view.actions, device, controls, padName, layout),
     retry: view.retry ? t(`tutorial.retry.${view.retry}`) : null,
     skip: view.step === 'done' ? '' : t('tutorial.skip', { key: pad ? buttonLabel(9, padStyleOf(padName)) : keyLabel('Escape') }),
   };

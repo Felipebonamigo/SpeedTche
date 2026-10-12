@@ -1,0 +1,25 @@
+/* Dicas da 1ª corrida (O3; src/render/hud-tips.ts). Overlay sobre o HUD: tudo escala por --s (uiScale do viewport × --hud-scale das
+   opções). Texto nunca abaixo de 12 px efetivos (o piso do HUD). Fica embaixo, no meio — entre o combustível/nitro (esquerda) e o
+   velocímetro/minimapa (direita) —, a mesma faixa livre do painel do tutorial; a mensagem grande do HUD mora no alto (30%). */
+.ht-root { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; font-family: var(--font-display, inherit); }
+.ht-root.hidden { display: none; }
+.ht-vp { position: absolute; overflow: hidden; --s: 1; --seat: #ffd23f; }
+.ht-card { display: none; position: absolute; left: 50%; bottom: calc(14px * var(--s)); transform: translateX(-50%); box-sizing: border-box;
+  width: max-content; max-width: max(160px, calc(100% - 400px * var(--s))); padding: calc(6px * var(--s)) calc(12px * var(--s));
+  align-items: center; gap: calc(10px * var(--s)); color: #f4f6fb; background: rgba(6, 10, 18, 0.7); border: 1px solid rgba(255, 255, 255, 0.18);
+  border-top: max(2px, calc(3px * var(--s))) solid var(--seat); border-radius: calc(12px * var(--s)); box-shadow: 0 calc(4px * var(--s)) calc(16px * var(--s)) rgba(0, 0, 0, 0.4);
+  animation: ht-in 220ms ease-out both; }
+.ht-card.show { display: flex; }
+.ht-body { display: flex; flex-direction: column; gap: calc(3px * var(--s)); min-width: 0; }
+.ht-text { font-size: max(12px, calc(15px * var(--s))); font-weight: 700; line-height: 1.2; text-wrap: balance; }
+.ht-keys { display: flex; flex-wrap: wrap; gap: calc(3px * var(--s)) calc(10px * var(--s)); }
+.ht-key { display: inline-flex; align-items: center; gap: calc(5px * var(--s)); font-size: max(12px, calc(12px * var(--s))); font-weight: 700; color: #a9b2c8; }
+.ht-key kbd { font: inherit; font-size: max(12px, calc(14px * var(--s))); font-weight: 900; color: #0b0f16; background: #f4f6fb; border-radius: calc(5px * var(--s)); padding: 0 calc(7px * var(--s)); white-space: nowrap;
+  box-shadow: 0 calc(2px * var(--s)) 0 rgba(255, 255, 255, 0.35); }
+/* A seta do box: só no cartão do box; aponta para a direita, onde fica a faixa. Pulsa quando o box está perto (e nunca com "Reduzir efeitos"). */
+.ht-arrow { display: none; flex: none; font-size: max(18px, calc(26px * var(--s))); line-height: 1; color: #ffd23f; }
+.ht-arrow.on { display: block; }
+.ht-arrow.near { animation: ht-pulse 700ms ease-in-out infinite alternate; }
+@keyframes ht-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes ht-pulse { from { transform: translateX(0); } to { transform: translateX(calc(6px * var(--s))); } }
+.reduce-fx .ht-card, .reduce-fx .ht-arrow { animation: none; }
