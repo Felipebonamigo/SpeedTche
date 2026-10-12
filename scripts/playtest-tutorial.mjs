@@ -79,8 +79,8 @@ check(st.menu === null && st.track === 'tutorial' && st.cars === 2 && st.fuel.ev
 
 // ── Corrida guiada, dirigida por teclas. Cada jogador segue o painel dele.
 const KEYS = [
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', nitro: 'Space' },
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', nitro: 'KeyF' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', nitro: 'Space', drift: 'ShiftRight' },
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', nitro: 'KeyF', drift: 'ShiftLeft' },
 ];
 const held2 = new Set();
 async function setKey(code, on) {
@@ -95,11 +95,11 @@ const snapshot = () => page.evaluate(() => {
     tick: r.state.tick, start: r.state.startTick, phase: r.state.phase, towSeat: tut.towSeat, parked: tut.parked, tphase: tut.phase,
     steps: [...document.querySelectorAll('.nc-tut .tut-vp')].map((v) => v.dataset.step),
     retry: [...document.querySelectorAll('.nc-tut .tut-retry')].map((v) => v.textContent),
-    cars: r.state.cars.map((c) => ({ seat: c.seat, seg: seg(c), x: c.x, speed: c.speed, top: c.stats.topSpeed, nitroTicks: c.nitroTicks, curve: r.track.segments[seg(c)].curve, progress: c.progress, fuel: c.fuel, inPit: c.inPit, handling: c.stats.handling })),
+    cars: r.state.cars.map((c) => ({ seat: c.seat, seg: seg(c), x: c.x, speed: c.speed, top: c.stats.topSpeed, nitroTicks: c.nitroTicks, driftDir: c.driftDir, curve: r.track.segments[seg(c)].curve, progress: c.progress, fuel: c.fuel, inPit: c.inPit, handling: c.stats.handling })),
   };
 });
 // Mesma regra do teste (tests/tutorial.test.ts: botInput), com o volante digital das teclas.
-const STRONG = { start: 310, end: 400 }; const PIT = { start: 560, end: 610 };
+const STRONG = { start: 310, end: 400 }; const PIT = { start: 560, end: 610 }; const CURVE = { start: 120, end: 220 };
 function decide(s, seat) {
   const car = s.cars.find((c) => c.seat === seat);
   const step = s.steps[seat];
@@ -110,6 +110,9 @@ function decide(s, seat) {
   let lane = seat === 0 ? -0.3 : 0.3; let up = true; let down = false;
   if (car.seg >= STRONG.start - 45 && car.seg < STRONG.end - 10 && car.speed > limit * 0.9) { up = false; down = true; }
   const nitro = step === 'nitro' && car.nitroTicks === 0;
+  // O3: a largada-foguete é apertar o acelerador na janela do JÁ (não segurar desde o começo da contagem); a derrapagem é DERRAPAR dentro da curva média.
+  if (s.phase === 'countdown' || step === 'launch') up = s.phase === 'racing' || s.tick >= 200;
+  const drift = step === 'drift' && car.seg >= CURVE.start && car.seg < CURVE.end - 8;
   if (step === 'pit' && car.seg >= PIT.start - 25 && car.seg < PIT.end) {
     if (car.seg >= PIT.start - 4) lane = 1.55;
     if (car.speed > car.top * 0.3) { up = false; down = true; }
@@ -122,9 +125,10 @@ function decide(s, seat) {
     if (s.parked && target.speed > target.top * 0.2 && gap > 0 && gap < 200 * 25) { up = false; down = car.speed > 1500; }
   }
   if (step === 'wait') { up = car.seg < 40 || car.seg > 600 ? true : car.speed < car.top * 0.5; }
-  const counter = sf > 0.05 ? (centr * sf * car.curve) / steerRate : 0;
-  const steer = (lane - car.x) * 5 + counter;
-  return { up, down, left: steer < -0.25, right: steer > 0.25, nitro };
+  const plain = sf > 0.05 ? (centr * sf * car.curve) / steerRate : 0;
+  const counter = car.driftDir === 0 ? plain : 0.55 * plain - car.driftDir * 0.4; // derrapando: a centrífuga cai a 55% e o puxão para dentro ajuda
+  const steer = (lane - car.x) * 5 + counter + (drift && car.driftDir === 0 ? 0.35 : 0);
+  return { up, down, left: steer < -0.25, right: steer > 0.25, nitro, drift };
 }
 await page.setViewportSize(SMALL);
 await page.evaluate(() => { window.dispatchEvent(new Event('resize')); });
@@ -168,6 +172,7 @@ for (let i = 0; i < 1400; i++) {
     const k = KEYS[seat];
     await setKey(k.up, d.up); await setKey(k.down, d.down); await setKey(k.left, d.left); await setKey(k.right, d.right);
     await setKey(k.nitro, d.nitro);
+    await setKey(k.drift, d.drift);
   }
   await page.evaluate(() => window.nc.session.debugStep(4));
   for (const seat of [0, 1]) await setKey(KEYS[seat].nitro, false);
@@ -176,15 +181,15 @@ for (const code of held2) await page.keyboard.up(code);
 held2.clear();
 st = await page.evaluate(() => ({ menu: window.nc.session.menus.current(), race: !!window.nc.session.race, save: JSON.parse(localStorage.getItem('speed-tche.save') ?? 'null') }));
 check(st.menu === 'tutorialDone' && !st.race, `tutorial concluído → tela final (${st.menu}); passos vistos: ${shots.join(', ')}`);
-check(['throttle', 'curve', 'brake', 'nitro', 'pit', 'tow'].every((s) => shots.includes(s)), 'os 6 passos apareceram no painel');
+check(['launch', 'throttle', 'curve', 'brake', 'nitro', 'pit', 'drift', 'tow'].every((s) => shots.includes(s)), 'a largada e os 7 passos (com a derrapagem) apareceram no painel');
 check(st.save?.tutorialDone === true, `flag tutorialDone gravada no save (${st.save?.tutorialDone})`);
 const done = await page.evaluate(() => ({ title: document.querySelector('.scr-tutorialDone .screen-title')?.textContent, rules: document.querySelectorAll('.tut-rules li').length }));
 check(done.title === 'Parabéns!' && done.rules === 5, `tela final: ${done.title}, ${done.rules} regras de ouro (co-op inclui o empurrão)`);
 await shot(`${String(shots.length + 4).padStart(2, '0')}-final-parabens`);
 await held('Enter');
-st = await page.evaluate(() => { const s = window.nc.session; return { menu: s.menus.current(), mode: s.race?.mode, track: s.race?.track.def.id, humans: s.race?.humans.length }; });
-check(st.menu === null && st.mode === 'cup' && st.track === 'copacabana' && st.humans === 2, `"Correr a Copa Brasil" começa a primeira copa com os 2 (${JSON.stringify(st)})`);
-await shot('20-primeira-copa');
+st = await page.evaluate(() => { const s = window.nc.session; return { menu: s.menus.current(), career: s.debugSave().career?.drivers.length, expedition: s.debugSave().career?.cupId }; });
+check(st.menu === 'garage' && st.career === 2 && st.expedition === 'br_rj', `o fim leva à Expedição (garagem) com os 2 pilotos, na Copa Rio de Janeiro (${JSON.stringify(st)})`);
+await shot('20-expedicao-garagem');
 
 // ── Segunda rodada: 1 jogador, Esc pula e mostra só as regras de ouro; o menu parou de oferecer.
 await page.evaluate(() => window.nc.session.handleMenuEvent({ type: 'toMain' }));
@@ -200,7 +205,7 @@ check(await page.evaluate(() => window.nc.session.race?.track.def.id) === 'tutor
 await page.evaluate(() => window.nc.session.debugStep(60 * 4));
 await shot('21-solo-passo1');
 const solo = await page.evaluate(() => document.querySelector('.nc-tut .tut-counter')?.textContent);
-check(solo === 'PASSO 1/5', `sozinho são 5 passos (${solo})`);
+check(solo === 'PASSO 1/6', `sozinho são 6 passos (${solo})`);
 await held('Escape');
 st = await page.evaluate(() => ({ menu: window.nc.session.menus.current(), race: !!window.nc.session.race, title: document.querySelector('.scr-tutorialDone .screen-title')?.textContent, rules: document.querySelectorAll('.tut-rules li').length, panel: document.querySelector('.nc-tut')?.classList.contains('hidden') }));
 check(st.menu === 'tutorialDone' && !st.race && st.title === 'Regras de ouro' && st.rules === 4 && st.panel === true, `Esc pula: ${JSON.stringify(st)}`);
