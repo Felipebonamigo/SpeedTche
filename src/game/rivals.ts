@@ -21,6 +21,12 @@ export interface Rival {
 export type RivalLineKind = 'intro' | 'taunt' | 'respect' | 'revenge';
 export const RIVAL_LINE_KINDS: readonly RivalLineKind[] = ['intro', 'taunt', 'respect', 'revenge'];
 
+/** Placar de um perfil contra um rival, em corridas de copa: quantas ele ficou à frente do rival e quantas o rival ficou à frente dele. */
+export interface RivalScore {
+  you: number;
+  rival: number;
+}
+
 export function driverKey(name: string): string {
   return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
