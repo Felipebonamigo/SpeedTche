@@ -22,7 +22,7 @@ describe('fundo do menu com carros (L2b)', () => {
       expect(cars).toHaveLength(5);
       for (const c of cars) {
         const ahead = (((c.z - camZ) % length) + length) % length;
-        expect(ahead, 'à frente da câmera (unidades de pista)').toBeGreaterThan(700);
+        expect(ahead, 'à frente da câmera (unidades de pista)').toBeGreaterThan(500);
         expect(ahead).toBeLessThan(6000);
         expect(Math.abs(c.x)).toBeLessThanOrEqual(0.8);
         expect(c.speed).toBeGreaterThan(1500);
@@ -47,7 +47,7 @@ describe('fundo do menu com carros (L2b)', () => {
       const cars = b.update(t, 0, 1e9, 5);
       for (const c of cars) { min = Math.min(min, c.z); max = Math.max(max, c.z); }
     }
-    expect(min).toBeGreaterThan(700);
+    expect(min).toBeGreaterThan(500);
     expect(max).toBeLessThan(6000);
   });
 });

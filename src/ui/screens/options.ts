@@ -96,7 +96,6 @@ export function optionsScreen(api: ScreenApi): ScreenInstance {
     // usuário pode pedir tela cheia, e este handler de teclado/clique é o gesto.
     selector(t('ui.options.fullscreen'), () => onOff(s.fullscreen), () => { s.fullscreen = !s.fullscreen; if (!api.ctx.isDesktop) applyFullscreen(s.fullscreen); commit(); }, { sfx }),
     qualitySelector(api, commit),
-    fps30Selector(api, commit),
     // Visual: o 3D moderno ou o pseudo-3D Retrô (a sessão troca o renderizador na hora; src/render-pseudo3d).
     // Cada coluna comporta dez linhas (docs/TELAS.md): para esta caber, o "Tremor de tela" foi para a Acessibilidade.
     selector(t('ui.options.renderStyle'), () => t(`ui.options.renderStyle.${s.renderStyle}`), (d) => { s.renderStyle = cycle(RENDER_STYLES, s.renderStyle, d); commit(); }, { sfx }),

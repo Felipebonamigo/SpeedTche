@@ -14,11 +14,11 @@ export function backdropCount(q: Quality, reduceEffects: boolean): number {
 
 /** Posição de cada vaga: distância média à frente (unidades de pista; 200 = 4 m), faixa (x), vaivém e fase. */
 const SLOTS = [
-  { ahead: 1500, x: -0.38, sway: 420, w: 0.21, ph: 0.0, car: 'falcao' },
-  { ahead: 2300, x: 0.34, sway: 520, w: 0.17, ph: 1.7, car: 'trovao' },
-  { ahead: 3300, x: -0.05, sway: 600, w: 0.13, ph: 3.1, car: 'falcao' },
-  { ahead: 2000, x: 0.62, sway: 380, w: 0.24, ph: 4.4, car: 'trovao' },
-  { ahead: 4300, x: -0.6, sway: 500, w: 0.11, ph: 5.2, car: 'falcao' },
+  { ahead: 900, x: -0.55, sway: 300, w: 0.21, ph: 0.0, car: 'falcao' },
+  { ahead: 1300, x: 0.5, sway: 350, w: 0.17, ph: 1.7, car: 'trovao' },
+  { ahead: 1800, x: -0.2, sway: 400, w: 0.13, ph: 3.1, car: 'falcao' },
+  { ahead: 1100, x: 0.7, sway: 300, w: 0.24, ph: 4.4, car: 'trovao' },
+  { ahead: 2400, x: 0.15, sway: 450, w: 0.11, ph: 5.2, car: 'falcao' },
 ] as const;
 /** Velocidade da câmera do fundo (a mesma `IDLE_SPEED` do renderizador, unidades por segundo). */
 const CAMERA_SPEED = 2600;
