@@ -30,6 +30,8 @@ import { addBalloon, ageBalloons, audibleFor, createVoiceRace, hornGain, newWhee
 import { createVoiceHud, type VoiceHud } from '../voice/hud';
 import { isMuted } from '../voice/prefs';
 import { createTutorialPanel } from '../ui/screens/tutorial';
+import { createTipsHud, describeTip, newTipMemory, observeTips, tipOf, tipsEnabled, type TipMemory, type TipsHud } from '../render/hud-tips';
+import { systemLayout } from '../ui/remap/labels';
 import { newTelemetry, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
@@ -98,6 +100,8 @@ interface ActiveRace {
   talk: RivalTalk | null;
   /** Voz do carro (N6): buzina, roda de frases e balões. Só visual e sonoro: fora do estado da corrida (voice.ts). */
   voice: VoiceRace;
+  /** Dicas da 1ª corrida (O3, render/hud-tips.ts): só na 1ª corrida local de copa/Expedição; null nas outras. Só visual: fora do estado. */
+  tips: TipMemory | null;
   heldEdges?: Array<Pick<PlayerInput, 'nitro' | 'gearUp' | 'gearDown' | 'taunt'> | undefined>;
   /** Online: o atraso de entrada do lockstep, em ticks; 0 no sofá e no tutorial. A contagem (luzes, bipes, "JÁ!") anda adiantada por ele (N1). */
   inputLead: number;
@@ -169,6 +173,8 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   let rafId = 0;
   /** Roda de frases e balões (voice/hud.ts): criado na primeira vez que alguém fala ou abre a roda; nunca em Node. */
   let voiceHud: VoiceHud | null = null;
+  /** Overlay das dicas da 1ª corrida (render/hud-tips.ts): nasce na primeira dica; nunca em Node. */
+  let tipsHud: TipsHud | null = null;
   let idleTrack: Track = getTrack(TRACKS[0].id);
   let idleTimer = 0;
 
@@ -284,6 +290,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       ...raceVisuals(state.cars, humans),
       feel: Object.fromEntries(localSeats.map((s) => carIndexOfSeat(state, s)).filter((c) => c >= 0).map((c) => [c, createFeelTracker(c)])), logged: false,
       scrapes: createScrapeMemory(), talk: config.rival ? createRivalTalk(previousDuel(champ)) : null, voice: createVoiceRace(),
+      tips: tipsEnabled(save, mode, net !== undefined) ? newTipMemory() : null,
       inputLead: net && net.driver === online ? Math.max(0, online.status().delayTicks) : 0,
     };
     getActivePlaylog()?.raceStarted({ mode, trackId: config.trackId, humans: localSeats.length });
@@ -541,6 +548,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     for (const sc of scrapes) if (involvesLocalSeat(r, sc)) audio.scrape?.(sc.strength); // dublês de teste podem não ter
     for (const c of rumbleCues(r.state, rumbleMemory, scrapes)) input.rumble(c.seat, c.strength, c.ms);
     for (const cue of observeVoice(r.voice.mem, r.state, inputs)) handleVoiceCue(r, cue);
+    if (r.tips) observeTips(r.tips, r.state, r.track, inputs);
     if (r.talk && r.state.config.rival) {
       const rival = rivalByName(r.state.config.rival);
       for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind), 'info', RIVAL_LINE_TTL);
@@ -588,6 +596,23 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     voiceHud?.update({
       width: window.innerWidth, height: window.innerHeight, viewports: f.viewports.map((vp) => ({ seat: vp.seat, color: vp.color, name: vp.name })), wheels,
       balloons: r.voice.balloons, paused: session.paused || !f.showHud, reduceEffects: f.options.reduceEffects === true,
+    });
+  }
+
+  /** O overlay das dicas da 1ª corrida: um cartão por viewport local, com as teclas do dispositivo e do remapeamento de cada jogador. */
+  function drawTips(r: ActiveRace | null, f: RenderFrame | null): void {
+    if (!r?.tips || !f) { tipsHud?.hide(); return; }
+    if (!tipsHud) tipsHud = createTipsHud(hudRoot);
+    const devices = input.devices();
+    const layout = systemLayout();
+    tipsHud?.update({
+      width: window.innerWidth, height: window.innerHeight, paused: session.paused || !f.showHud, reduceEffects: f.options.reduceEffects === true,
+      viewports: f.viewports.map((vp) => {
+        const view = r.tips ? tipOf(r.tips, vp.seat) : null;
+        const device = input.seatDevice(vp.seat);
+        const padName = devices.find((d) => d.id === device)?.label ?? '';
+        return { seat: vp.seat, color: vp.color, tip: view ? describeTip(view, device, settings.controls, padName, layout) : null };
+      }),
     });
   }
 
@@ -646,11 +671,13 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       renderer.render(f);
       audio.update(session.paused ? { ...f, paused: true } : f, dtRaw);
       drawVoice(r, f);
+      drawTips(r, f);
     } else {
       idleTimer += dtRaw;
       renderer.renderIdle(idleTimer, idleTrack);
       audio.update(null, dtRaw);
       drawVoice(null, null);
+      drawTips(null, null);
     }
 
     // Só o menu que já estava aberto recebe as bordas deste quadro: a pausa (ou o resultado) que

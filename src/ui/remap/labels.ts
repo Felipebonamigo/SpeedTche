@@ -118,3 +118,19 @@ export function actionChips(actions: readonly BindAction[], device: string | nul
   }
   return out;
 }
+
+let layoutMap: LayoutMap | null = null;
+let layoutAsked = false;
+
+/**
+ * Mapa do layout do teclado do sistema (Chromium/Electron), pedido uma vez; null sem suporte ou antes de a resposta chegar.
+ * O painel do tutorial e as dicas da 1ª corrida o usam: no ABNT2 o `;` do padrão aparece como Ç, no AZERTY o W aparece como Z.
+ */
+export function systemLayout(): LayoutMap | null {
+  if (!layoutAsked) {
+    layoutAsked = true;
+    const kb = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { keyboard?: { getLayoutMap?: () => Promise<LayoutMap> } }).keyboard;
+    if (kb && typeof kb.getLayoutMap === 'function') kb.getLayoutMap().then((m) => { layoutMap = m; }).catch(() => undefined);
+  }
+  return layoutMap;
+}

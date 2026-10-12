@@ -12,7 +12,7 @@ import type { PanelSeat, TutorialPanel } from '../../game/tutorial-session';
 import { t } from '../../i18n';
 import { uiScale, viewportRects } from '../../render/layout';
 import { isKeyboard } from '../input';
-import type { LayoutMap } from '../remap/labels';
+import { systemLayout } from '../remap/labels';
 import { button, createFocusList, h, listNav, screenFrame, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { icon } from './icons';
 import { availableCars, LOBBY_SEATS } from './lobby';
@@ -191,17 +191,6 @@ function setText(el: HTMLElement, text: string): void {
   if (el.textContent !== text) el.textContent = text;
 }
 
-let layoutMap: LayoutMap | null = null;
-let layoutAsked = false;
-
-/** Mapa do layout do teclado do sistema (Chromium/Electron), pedido uma vez; null sem suporte. */
-function askLayout(): void {
-  if (layoutAsked) return;
-  layoutAsked = true;
-  const kb = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { keyboard?: { getLayoutMap?: () => Promise<LayoutMap> } }).keyboard;
-  if (kb && typeof kb.getLayoutMap === 'function') kb.getLayoutMap().then((m) => { layoutMap = m; }).catch(() => undefined);
-}
-
 /**
  * Painel do tutorial dentro de `root` (o #hud): um cartão por jogador, no viewport dele. O DOM só
  * nasce no primeiro uso — a sessão cria o painel sempre, inclusive nos testes em Node.
@@ -211,7 +200,7 @@ export function createTutorialPanel(root: HTMLElement): TutorialPanel {
   let cards: Card[] = [];
 
   function build(count: number): void {
-    if (!el) { askLayout(); el = h('div', { class: 'nc-tut hidden' }); root.appendChild(el); }
+    if (!el) { systemLayout(); el = h('div', { class: 'nc-tut hidden' }); root.appendChild(el); }
     const host = el;
     host.replaceChildren();
     cards = Array.from({ length: count }, () => {
@@ -275,6 +264,6 @@ export function createTutorialPanel(root: HTMLElement): TutorialPanel {
       });
     },
     hide() { el?.classList.add('hidden'); },
-    layout: () => layoutMap,
+    layout: systemLayout,
   };
 }
