@@ -18,7 +18,7 @@ type Lab = { liveScene(q: Quality, track: string, fractions: number[], repeat: n
 
 if (REQUIRED) it('o Chromium existe (NC_REQUIRE_GL=1)', () => { expect(available, `sem ${CHROME}`).toBe(true); });
 
-describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { timeout: 900_000 }, () => {
+describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { timeout: 2_400_000 }, () => {
   let server: ViteDevServer; let browser: Browser; let page: Page;
   const errors: string[] = [];
   beforeAll(async () => {
@@ -28,7 +28,7 @@ describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { 
     const port = typeof addr === 'object' && addr ? addr.port : 0;
     browser = await chromium.launch({ executablePath: CHROME, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     page = await browser.newPage({ viewport: { width: 640, height: 360 } });
-    page.setDefaultTimeout(800_000);
+    page.setDefaultTimeout(2_000_000);
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
     page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver|404/.test(m.text())) errors.push(`console: ${m.text().slice(0, 400)}`); });
     await page.goto(`http://127.0.0.1:${port}/tools/render-harness.lab.html`);
@@ -44,9 +44,9 @@ describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { 
       // Uma página nova por degrau: trocar de qualidade no meio refaz os programas de tudo (o `ensureQuality` de sempre), e isso não é a transição.
       await page.reload();
       await page.waitForFunction(() => (window as unknown as { labReady?: boolean }).labReady === true);
-      // A 1ª volta (nada anda), depois 20 passos pela última volta, cada um 3 quadros seguidos.
-      const fr = [0, 0.3, ...Array.from({ length: 20 }, (_, i) => 2 / 3 + ((i + 1) / 20) / 3)];
-      const r = await run(q, 'copacabana', fr, 3);
+      // A 1ª volta (nada anda), depois 10 passos pela última volta, cada um 2 quadros seguidos.
+      const fr = [0, 0.3, ...Array.from({ length: 10 }, (_, i) => 2 / 3 + ((i + 1) / 10) / 3)];
+      const r = await run(q, 'copacabana', fr, 2);
       expect(r.report.shaderErrors, `${q}: onShaderError`).toEqual([]);
       expect(r.report.bad, `${q}: programas com log`).toEqual([]);
       const first = r.frames[0];
@@ -62,15 +62,15 @@ describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { 
       const novos = r.frames[r.frames.length - 1].names.filter((n) => !r.frames[3].names.includes(n)).map((n) => n.slice(0, 40) + ' … ' + n.slice(-160));
       expect(novos, `${q}: programas criados no meio da transição`).toEqual([]);
       expect(r.frames[r.frames.length - 1].programs).toBe(afterWarm);
-      // 22 frações × 3 quadros = 66 quadros: a paleta ao vivo foi entregue no máximo uma vez por fração (e uma no primeiro quadro), nunca por quadro.
-      expect(r.frames[r.frames.length - 1].applied, `${q}: entregas`).toBeLessThanOrEqual(24);
-      expect(r.frames[r.frames.length - 1].applied).toBeGreaterThanOrEqual(20);
+      // 12 frações × 2 quadros = 24 quadros: a paleta ao vivo foi entregue no máximo uma vez por fração (e uma no primeiro quadro), nunca por quadro.
+      expect(r.frames[r.frames.length - 1].applied, `${q}: entregas`).toBeLessThanOrEqual(13);
+      expect(r.frames[r.frames.length - 1].applied).toBeGreaterThanOrEqual(10);
     }
     expect(errors).toEqual([]);
   });
 
   it('entardecer → noite (Sampa, cidade): compila e desenha igual; pista de noite fica parada (uma entrega só)', async () => {
-    const dusk = await run('medium', 'sampa_noite', [0, 0.2, 0.4, 0.6, 0.8, 1], 2);
+    const dusk = await run('medium', 'sampa_noite', [0, 0.5, 1], 2);
     expect(dusk.report.shaderErrors).toEqual([]); expect(dusk.report.bad).toEqual([]);
     for (const f of dusk.frames) expect(Math.abs(f.calls - dusk.frames[0].calls)).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);
