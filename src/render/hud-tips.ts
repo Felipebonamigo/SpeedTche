@@ -154,13 +154,15 @@ function setText(e: HTMLElement, s: string): void { if (e.textContent !== s) e.t
 function setClass(e: HTMLElement, cls: string, on: boolean): void { if (e.classList.contains(cls) !== on) e.classList.toggle(cls, on); }
 function setStyle(e: HTMLElement, prop: string, value: string): void { if (e.style.getPropertyValue(prop) !== value) e.style.setProperty(prop, value); }
 
-interface Node { vp: HTMLElement; card: HTMLElement; arrow: HTMLElement; text: HTMLElement; keys: HTMLElement; keysSig: string; shownId: string }
+interface Node { vp: HTMLElement; card: HTMLElement; arrow: HTMLElement; text: HTMLElement; keys: HTMLElement; keysSig: string }
 
 /** Sem DOM (Node, testes de sessão) não existe: devolve null. Os nós nascem uma vez; por quadro só mudam texto, classe e estilo. */
 export function createTipsHud(root: HTMLElement): TipsHud | null {
   if (typeof document === 'undefined') return null;
   let host: HTMLElement | null = null;
   let nodes: Node[] = [];
+  /** Os viewports do HUD (um `.vp` por jogador local, criados por render/hud.ts), na ordem dos viewports. */
+  const hudViewports = (): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>('.vp')).filter((v) => v.style.display !== 'none');
 
   function build(count: number): void {
     if (!host) { host = document.createElement('div'); host.className = 'ht-root hidden'; root.appendChild(host); }
@@ -176,7 +178,7 @@ export function createTipsHud(root: HTMLElement): TipsHud | null {
       card.append(arrow, body);
       vp.appendChild(card);
       host?.appendChild(vp);
-      return { vp, card, arrow, text, keys, keysSig: '', shownId: '' };
+      return { vp, card, arrow, text, keys, keysSig: '' };
     });
   }
 
@@ -186,6 +188,7 @@ export function createTipsHud(root: HTMLElement): TipsHud | null {
       if (!host || view.viewports.length !== nodes.length) build(view.viewports.length);
       host?.classList.remove('hidden');
       const rects = viewportRects(view.viewports.length, view.width, view.height);
+      const hud = hudViewports();
       view.viewports.forEach((vp, i) => {
         const n = nodes[i]; const rect = rects[i];
         if (!n || !rect) return;
@@ -193,7 +196,12 @@ export function createTipsHud(root: HTMLElement): TipsHud | null {
         setStyle(n.vp, '--s', `calc(${uiScale(rect).toFixed(3)} * var(--hud-scale, 1))`); setStyle(n.vp, '--seat', vp.color);
         const tip = vp.tip;
         setClass(n.card, 'show', tip !== null);
-        if (!tip) { n.shownId = ''; return; }
+        // A legenda dos marcos (caption.ts) mora na mesma faixa: com ela na tela, o cartão sobe para ficar acima dela.
+        const hudVp = hud[i];
+        const lmk = tip && hudVp ? hudVp.querySelector<HTMLElement>(':scope > .lmk.show') : null;
+        const lift = hudVp && lmk ? Math.max(0, Math.round(hudVp.getBoundingClientRect().bottom - lmk.getBoundingClientRect().top)) : 0;
+        setStyle(n.vp, '--lift', `${lift}px`);
+        if (!tip) return;
         n.card.dataset.tip = tip.id;
         setText(n.text, tip.text);
         setClass(n.arrow, 'on', tip.arrow);
@@ -209,7 +217,6 @@ export function createTipsHud(root: HTMLElement): TipsHud | null {
             return chip;
           }));
         }
-        n.shownId = tip.id;
       });
     },
     hide() { host?.classList.add('hidden'); },

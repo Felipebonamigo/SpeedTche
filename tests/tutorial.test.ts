@@ -345,7 +345,7 @@ describe('largada-foguete no tutorial (O3)', () => {
     const tut = rawTutorial([0]);
     const seat = describeSeat(tutorialView(tut, state, 0), { seat: 0, name: 'Ana', color: '#fff' }, '', 'kb1', DEFAULT_BINDINGS);
     expect(seat.counter).toBe('LARGADA');
-    expect(seat.title).toBe('Largada');
+    expect(seat.title).toBe('Aperte no JÁ!');
     expect(seat.text).toContain('JÁ');
     expect(seat.keys).toEqual([{ label: 'Acelerar', keys: '↑' }]);
   });

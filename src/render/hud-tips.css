@@ -1,11 +1,13 @@
 /* Dicas da 1ª corrida (O3; src/render/hud-tips.ts). Overlay sobre o HUD: tudo escala por --s (uiScale do viewport × --hud-scale das
    opções). Texto nunca abaixo de 12 px efetivos (o piso do HUD). Fica embaixo, no meio — entre o combustível/nitro (esquerda) e o
-   velocímetro/minimapa (direita) —, a mesma faixa livre do painel do tutorial; a mensagem grande do HUD mora no alto (30%). */
+   velocímetro/minimapa (direita) —, a mesma faixa da legenda dos marcos (caption.css): quando a legenda está na tela, o JS
+   (`--lift`, hud-tips.ts) sobe o cartão acima dela. A mensagem grande do HUD mora no alto (30%). Largura: a da legenda (o que sobra
+   entre os painéis dos cantos, com o piso de 156 px das letras). */
 .ht-root { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; font-family: var(--font-display, inherit); }
 .ht-root.hidden { display: none; }
 .ht-vp { position: absolute; overflow: hidden; --s: 1; --seat: #ffd23f; }
-.ht-card { display: none; position: absolute; left: 50%; bottom: calc(14px * var(--s)); transform: translateX(-50%); box-sizing: border-box;
-  width: max-content; max-width: max(160px, calc(100% - 400px * var(--s))); padding: calc(6px * var(--s)) calc(12px * var(--s));
+.ht-card { display: none; position: absolute; left: 50%; bottom: calc(16px * var(--s) + var(--lift, 0px)); transform: translateX(-50%); box-sizing: border-box;
+  width: max-content; max-width: calc(100% - 2 * max(240px * var(--s), 156px)); padding: calc(6px * var(--s)) calc(12px * var(--s));
   align-items: center; gap: calc(10px * var(--s)); color: #f4f6fb; background: rgba(6, 10, 18, 0.7); border: 1px solid rgba(255, 255, 255, 0.18);
   border-top: max(2px, calc(3px * var(--s))) solid var(--seat); border-radius: calc(12px * var(--s)); box-shadow: 0 calc(4px * var(--s)) calc(16px * var(--s)) rgba(0, 0, 0, 0.4);
   animation: ht-in 220ms ease-out both; }
