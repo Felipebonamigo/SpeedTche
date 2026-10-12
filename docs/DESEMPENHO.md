@@ -551,3 +551,7 @@ Chamadas iguais nas 16 amostras do gate. Triângulos: `copa-1p/high` 263.788 →
 ## Efeitos e câmera (M5, contagens em swiftshader, sem FPS)
 
 Todos os efeitos acesos: no máximo 5 chamadas extras por viewport (4 na Baixa, sem anel); cada efeito é uma malha ou instância. Teto de pontos das marcas de pneu 192 / 640 / 1.280 / 2.048 por degrau; linhas de velocidade 14 / 24 / 36 / 48 (metade com 3 ou 4 jogadores). Na largada, a malha de traços custa +1 chamada acima de 85% da máxima (`copa-2p/medium` 77 → 78, `copa-4p/medium` 79 → 80, limite subido; provisório até o bench). Medir com `tools/render-harness.lab.ts` (`fxScene`) e `tests/efeitos-gl.test.ts`. Parâmetros do harness: `driftlevel=1|2|3`, `top=<fração>`, `draft=1`, `reduce=1`, `win=<s>`, `nitroat=<quadro>`, `ticks=205`.
+
+## L2b (12/10/2026, contagens, sem FPS)
+
+`playtest-memoria` a 36 blocos: único ✗ é `textures` 95→103 por ciclo, igual no `main` 01c383e (pré-existente); programas, materiais, objetos, DOM e ouvintes estáveis. Falta o dono medir com `--bench` o fundo do menu e o modo de 30 fps.
