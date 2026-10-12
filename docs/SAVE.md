@@ -160,3 +160,7 @@ JSON, lixo, copa salva com e sem a pintura) e `tests/paint-screens.test.ts` (as 
 ## Expedição (N5)
 
 Dois campos aditivos: `sessionStart` (retrato dos contadores na abertura da sessão) e `recap` ({before, after}: o que a sessão anterior rendeu, para o quadro 'Desde a última vez'). `rollSession` roda uma vez na criação da sessão: se houve progresso desde o `sessionStart`, vira `recap`; sessão sem progresso preserva o `recap` antigo. Save antigo abre normal. A 0.1.2 descarta os dois campos ao regravar e lê o resto igual. `career` e `cupInProgress` não mudaram de formato nem se convertem; a copa avulsa salva é retomada em Jogar livre.
+
+## Estrelas (O4)
+
+Campo aditivo `stars: { profiles: [{ name, tracks: {pista: bits 1=classificou, 2=venceu o rival, 4=objetivo}, rivals: {chave: {you, rival}} }], last: [...] }`. Saneador `sanitizeStars` (`src/game/stars.ts`, chamado por `sanitizeSave`): descarta pista ou rival desconhecido, bits fora de `& 7`, contagens fora de 0..99999, perfil repetido e perfis acima de 32. Save sem o campo abre com `{profiles: [], last: []}`. A 0.1.3 abre o save novo sem erro e descarta `stars` na próxima gravação dela (lista branca de chaves). `last` é a última corrida, lida pelo Pagamento.

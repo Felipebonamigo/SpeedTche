@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.3 — versão de teste para amigos** (build de 12/10/2026)
+**Speed Tchê 0.1.4 — versão de teste para amigos** (build de 12/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.3-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.3-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.4-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.4-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.4: **estrelas por corrida** (até 3), troféu por copa, placar contra cada rival e retratos; **a primeira corrida ensina** (dicas com as suas teclas; largada-foguete = apertar o acelerador NO "JÁ!"); oferta de Freio automático depois de 2 eliminações; **fundo do menu com carros**; **qualidade automática** na primeira abertura; modo de 30 fps (Acessibilidade).
 
 Novidades da 0.1.3: **menu novo de 5 cartões** (Expedição, Jogar junto, Jogar livre, Garagem, Passaporte), **tela de Pagamento** depois da corrida (segure Enter/A para pular), **traçado 3D igual ao mapa** (curvas mais fechadas em várias pistas: digam se ficou exagerado) e **a corrida muda** (dia → entardecer → noite durante a prova).
 
@@ -19,7 +21,7 @@ Novidades da 0.1.2 (a maior mudança até agora, **ainda não vista por ninguém
 - **Garagem 3D e Concessionária** (a compra de carro agora é lá) e **visual do carro** (acabamentos, rodas, faixa, cor da chama).
 - **Qualidade gráfica** Baixa, Média, Alta e Ultra em Opções › Visual. Se ficar pesado, baixe um degrau e conte o que aconteceu.
 
-O save da 0.1.1 abre normalmente, mas não volte para a 0.1.1 depois de abrir numa versão mais nova.
+O save da 0.1.1 abre normalmente, mas não volte para uma versão anterior depois de abrir numa mais nova (as estrelas somem se voltar para a 0.1.3).
 
 Achou um bug? Opções › **Copiar relatório** e mande para o Felipe com o que estava fazendo (o relatório leva também o diário de jogo, sem nomes).
 

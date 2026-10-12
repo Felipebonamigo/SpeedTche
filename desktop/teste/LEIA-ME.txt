@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.3, build de 12/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.4, build de 12/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -24,6 +24,14 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.4 (sobre a 0.1.3):
+  * ESTRELAS: até 3 por corrida (classificar, vencer o rival da copa e cumprir o objetivo da pista, que aparece antes da largada),
+    troféu bronze/prata/ouro por copa, contador de estrelas, placar contra cada rival ("Zé Turbo 7 × 5 você") e retratos dos pilotos.
+  * A PRIMEIRA CORRIDA ENSINA: dicas na tela com as suas teclas (largada, box, nitro...). Largada-foguete: aperte o acelerador
+    NA HORA do "JÁ!" (segurar antes não vale). Depois de 2 eliminações seguidas o jogo oferece Freio automático ou Nível Amador.
+    O "Como jogar" agora ensina largada e derrapagem e termina na Expedição.
+  * FUNDO DO MENU com carros andando; QUALIDADE AUTOMÁTICA na primeira abertura (dá para trocar em Opções);
+    modo de 30 fps travados para 3–4 jogadores (Acessibilidade, desligado por padrão).
 - NOVIDADES DA 0.1.3 (sobre a 0.1.2):
   * MENU NOVO com 5 cartões: Expedição, Jogar junto, Jogar livre, Garagem, Passaporte. Recordes, Como jogar, Opções,
     Controles e Créditos ficam no canto. A Concessionária está dentro de Garagem. "Carreira" virou "Expedição" e
@@ -51,7 +59,7 @@ O QUE TESTAR
 - Depois da 3ª corrida o jogo faz 3 perguntas rápidas (pode pular). As respostas ficam só no seu computador.
 - O nome da pista agora começa pela cidade ("Rio de Janeiro · Orla de Copacabana") e o minimapa mostra o nome.
 - O online ainda NÃO funciona nesta versão (falta o servidor no ar). Joguem juntos na mesma máquina.
-- Seu save da 0.1.1 ou 0.1.2 abre normalmente (as pinturas antigas são migradas), mas não volte para a 0.1.1 depois de abrir numa versão mais nova.
+- Seu save da 0.1.1 ou 0.1.2 abre normalmente (as pinturas antigas são migradas), mas não volte para uma versão anterior depois de abrir numa mais nova (as estrelas somem se voltar para a 0.1.3).
 - Se a corrida ficar lenta (principalmente com 3–4 jogadores na tela dividida), diga a placa/computador e a qualidade usada.
 
 ACHOU UM PROBLEMA?
