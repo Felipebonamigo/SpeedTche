@@ -8,7 +8,7 @@
 // só contam uma passagem inteira por ele, do começo ao fim. O último passo (empurrão) é da equipe e só
 // existe com 2+ jogadores: quando todos passaram do box, o líder é parado na reta e qualquer
 // companheiro que passar colado conclui.
-import { DRIFT_LEVEL_TICKS, OFFROAD_X, SEGMENT_LENGTH, SPEED_TO_KMH } from '../core/constants';
+import { DRIFT_LEVEL_TICKS, LAUNCH_PENDING, LAUNCH_PERFECT, OFFROAD_X, SEGMENT_LENGTH, SPEED_TO_KMH } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import { holdableSpeedFraction } from '../core/sim/physics';
 import { carStats, nitroCharges } from '../core/sim/stats';
@@ -54,6 +54,8 @@ export interface SeatProgress {
   retry: RetryReason | null;
   /** Empurrão (último passo): estava atrás do carro parado no tick anterior (null = ainda não visto). */
   towBehind: boolean | null;
+  /** O resultado da largada já foi dito a este assento (O3). */
+  launchSeen?: boolean;
 }
 
 export type TutorialPhase = 'running' | 'done' | 'skipped' | 'timeout';
@@ -74,6 +76,8 @@ export type TutorialEvent =
   | { type: 'retry'; seat: number; step: TutorialStepId; reason: RetryReason }
   /** Passo 4 sem carga de nitro (gasta antes): segue sem ele. */
   | { type: 'noNitro'; seat: number }
+  /** A largada foi decidida (O3): perfeita (arranque de nitro) ou normal. Sai uma vez por assento. */
+  | { type: 'launch'; seat: number; perfect: boolean }
   | { type: 'parked'; seat: number }
   | { type: 'towed'; seat: number; bySeat: number }
   /** Um companheiro passou pelo carro parado sem empurrar (rápido demais ou longe demais do lado). */
@@ -227,6 +231,7 @@ export function updateTutorial(tut: TutorialState, state: RaceState): TutorialEv
     const car = carOf(state, p.seat);
     if (!car) continue;
     const seg = segmentOf(car);
+    if (!p.launchSeen && car.launch !== LAUNCH_PENDING) { p.launchSeen = true; events.push({ type: 'launch', seat: p.seat, perfect: car.launch === LAUNCH_PERFECT }); }
     if (state.phase === 'racing' && p.step < tut.total) stepSeat(p, car, seg, state, events);
     p.lastSeg = seg;
   }
@@ -254,7 +259,7 @@ export function tutorialInput(tut: TutorialState, seat: number, input: PlayerInp
  * 'stalled' = é o carro que o passo do empurrão para (antes ou depois de parar, ver `parked`); 'done' = acabou.
  */
 export interface TutorialView {
-  step: TutorialStepId | 'wait' | 'stalled' | 'done';
+  step: TutorialStepId | 'launch' | 'wait' | 'stalled' | 'done';
   /** Passo em 1..total (o painel mostra "PASSO 2/6"). */
   index: number;
   total: number;
@@ -270,6 +275,7 @@ export interface TutorialView {
 
 const ACTIONS: Readonly<Record<TutorialView['step'], BindAction[]>> = {
   throttle: ['throttle'],
+  launch: ['throttle'],
   curve: ['left', 'right'],
   brake: ['brake'],
   nitro: ['nitro'],
@@ -288,6 +294,8 @@ export function tutorialView(tut: TutorialState, state: RaceState, seat: number)
   if (!p || p.step >= tut.total || tut.phase === 'done') return { ...base, step: 'done', index: tut.total, actions: [], progress: 1 };
   const id = TUTORIAL_STEPS[p.step];
   let step: TutorialView['step'] = id;
+  // Antes do JÁ (O3): a largada-foguete, uma lição sem número que vem antes do passo 1.
+  if (p.step === 0 && state.phase === 'countdown' && car?.launch === LAUNCH_PENDING) return { ...base, step: 'launch', index: 0, actions: ACTIONS.launch, progress: null };
   if (id === 'tow') {
     const everyone = tut.seats.every((s) => s.step >= TOW_STEP);
     step = !everyone ? 'wait' : seat === tut.towSeat ? 'stalled' : 'tow';

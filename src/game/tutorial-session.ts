@@ -117,7 +117,7 @@ export function describeSeat(
   if (view.step === 'stalled' && view.parked) text = t('tutorial.step.stalled.parked', params);
   return {
     seat: who.seat, color: who.color, name: who.name, view,
-    counter: view.step === 'done' ? '' : t('tutorial.counter', { n: view.index, total: view.total }),
+    counter: view.step === 'done' ? '' : view.step === 'launch' ? t('tutorial.counter.launch') : t('tutorial.counter', { n: view.index, total: view.total }),
     title: t(`tutorial.step.${view.step}.title`),
     text,
     keys: panelKeys(view.actions, device, controls, padName, layout),
@@ -166,6 +166,9 @@ export function createTutorialSession(host: TutorialHost): TutorialSession {
       switch (e.type) {
         case 'stepDone': if (e.step !== 'tow') host.hud(e.seat, t('tutorial.ok'), 'good', 1.5); break;
         case 'retry': host.hud(e.seat, t(`tutorial.retry.${e.reason}`), 'warn', 3); break;
+        case 'launch':
+          host.hud(e.seat, t(e.perfect ? 'tutorial.launch.perfect' : 'tutorial.launch.none'), e.perfect ? 'good' : 'warn', 3);
+          break;
         case 'noNitro': host.hud(e.seat, t('tutorial.noNitro'), 'warn', 2.5); break;
         case 'parked':
           for (const h of r.humans) {

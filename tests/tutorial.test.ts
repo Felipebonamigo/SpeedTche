@@ -1,6 +1,6 @@
 // Tutorial de 90 segundos (passo 1.9): pista própria, máquina de passos, sessão (driver) e save.
 import { describe, expect, it } from 'vitest';
-import { CAR_HALF_WIDTH, PIT_X, SEGMENT_LENGTH, SPEED_TO_KMH, TICK_RATE, TOW_MIN_SPEED_FACTOR } from '../src/core/constants';
+import { CAR_HALF_WIDTH, COUNTDOWN_TICKS, LAUNCH_NONE, LAUNCH_PERFECT, PIT_X, SEGMENT_LENGTH, SPEED_TO_KMH, TICK_RATE, TOW_MIN_SPEED_FACTOR } from '../src/core/constants';
 import { carDef } from '../src/core/data/cars';
 import { seatColor } from '../src/core/data/drivers';
 import { CUPS } from '../src/core/data/cups';
@@ -13,7 +13,7 @@ import { NEUTRAL_INPUT, type CarState, type PlayerInput, type RaceConfig, type R
 import { DEFAULT_SAVE, DEFAULT_SETTINGS, type DeviceInfo, type RaceDriver, type SaveData, type TutorialDoneData } from '../src/game/contracts';
 import { sanitizeSave } from '../src/game/save';
 import {
-  newTutorial, REFUEL_TARGET, skipTutorial, START_FUEL, strongCurveEntryLimit, TARGET_KMH, tutorialInput, tutorialView,
+  newTutorial as rawTutorial, REFUEL_TARGET, skipTutorial, START_FUEL, strongCurveEntryLimit, TARGET_KMH, tutorialInput, tutorialView,
   updateTutorial, type TutorialEvent, type TutorialState,
 } from '../src/game/tutorial';
 import { actionKeys, createTutorialSession, describeSeat, END_DELAY_TICKS, type TutorialHost } from '../src/game/tutorial-session';
@@ -24,6 +24,13 @@ import { shouldOfferTutorial, tutorialHumans } from '../src/ui/screens/tutorial'
 import { ALL_ASSISTS, human, humanCar, skipCountdown } from './helpers';
 
 setLanguage('pt');
+
+/** A máquina com a largada já dita (a corrida do helper começa depois do JÁ): os testes de passo não veem o evento `launch`. */
+function newTutorial(seats: readonly number[]): TutorialState {
+  const tut = rawTutorial(seats);
+  for (const p of tut.seats) p.launchSeen = true;
+  return tut;
+}
 
 function tutorialRace(players = 1): { state: RaceState; track: Track } {
   const track = tutorialTrack();
@@ -299,6 +306,60 @@ describe('máquina de passos', () => {
     expect(types(at(tut, state, 0, 10, { lap: TUTORIAL_LAPS - 1 }))).toEqual([]);
     expect(types(at(tut, state, 0, 10, { lap: TUTORIAL_LAPS }))).toEqual(['timeout']);
     expect(tut.phase).toBe('timeout');
+  });
+});
+
+// ───────────────────────────── Largada (O3) ─────────────────────────────
+
+describe('largada-foguete no tutorial (O3)', () => {
+  function rawRace(): { state: RaceState; track: Track } {
+    const track = tutorialTrack();
+    const config: RaceConfig = { trackId: TUTORIAL_TRACK_ID, laps: TUTORIAL_LAPS, humans: [human(0)], totalCars: 1, difficulty: 'profissional', manualGear: false, assists: ALL_ASSISTS, seed: 5 };
+    return { state: createRace(config, track), track };
+  }
+
+  it('antes do JÁ o painel ensina a largada; passada a decisão, volta ao passo 1', () => {
+    const { state, track } = rawRace();
+    const tut = rawTutorial([0]);
+    expect(state.phase).toBe('countdown');
+    expect(tutorialView(tut, state, 0)).toMatchObject({ step: 'launch', index: 0, total: 6, actions: ['throttle'] });
+    skipCountdown(state, track);
+    expect(tutorialView(tut, state, 0)).toMatchObject({ step: 'throttle', index: 1 });
+  });
+
+  it('o resultado da largada sai uma vez: perfeita ou sem bônus', () => {
+    const { state } = tutorialRace();
+    const tut = rawTutorial([0]);
+    const car = humanCar(state, 0);
+    car.launch = LAUNCH_PERFECT;
+    expect(at(tut, state, 0, 5)).toEqual([{ type: 'launch', seat: 0, perfect: true }]);
+    expect(at(tut, state, 0, 6)).toEqual([]);
+    const two = tutorialRace();
+    const tut2 = rawTutorial([0]);
+    humanCar(two.state, 0).launch = LAUNCH_NONE;
+    expect(at(tut2, two.state, 0, 5)).toEqual([{ type: 'launch', seat: 0, perfect: false }]);
+  });
+
+  it('o texto diz a regra de verdade: apertar no JÁ, sem segurar antes (segurar desde o começo larga normal)', () => {
+    const { state } = rawRace();
+    const tut = rawTutorial([0]);
+    const seat = describeSeat(tutorialView(tut, state, 0), { seat: 0, name: 'Ana', color: '#fff' }, '', 'kb1', DEFAULT_BINDINGS);
+    expect(seat.counter).toBe('LARGADA');
+    expect(seat.title).toBe('Largada');
+    expect(seat.text).toContain('JÁ');
+    expect(seat.keys).toEqual([{ label: 'Acelerar', keys: '↑' }]);
+  });
+
+  it('com a largada perfeita o painel avisa no HUD de quem acertou, e a sem bônus ensina de novo', () => {
+    const run = fakeHost();
+    const session = createTutorialSession(run.host);
+    session.start([human(0)]);
+    const race = run.race;
+    if (!race) throw new Error('sem corrida');
+    // Aperta só no JÁ: o último aperto cai na janela.
+    const go = COUNTDOWN_TICKS;
+    for (let i = 0; i < go + 10; i++) race.driver.force(1, [{ ...NEUTRAL_INPUT, throttle: i >= go - 3 }], (inputs) => stepRace(race.state, race.track, inputs));
+    expect(run.hud.some((m) => m.kind === 'good' && m.text === 'Largada perfeita!')).toBe(true);
   });
 });
 
