@@ -13,6 +13,9 @@ import './payout.css';
 import { button, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { formatMoney } from './garage';
 import { medal } from './icons';
+import { profileKey } from '../../game/stats';
+import { portrait, type Face } from '../art/portraits';
+import { goalLabel, starsRow } from './star-widgets';
 import { gamepadAHeld, postRacePlan, standingsButton, titleRow } from './results';
 
 /** O tique da contagem não toca mais que isto por segundo (a contagem muda a cada quadro). */
@@ -44,6 +47,8 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
   const post: PostRace = sequenceFor(d, () => postRacePlan(api, d));
   post.enterStep('payout');
 
+  // O4: o que as estrelas gravaram para ESTA corrida (por nome do perfil); de outra pista, é de uma corrida velha e não entra.
+  const starsOf = (name: string) => api.ctx.save.stars.last.find((l) => l.trackId === d.trackDef.id && profileKey(l.name) === profileKey(name));
   const palette = api.ctx.settings.colorPalette;
   const carName = (id: string) => api.ctx.cars.find((c) => c.id === id)?.name ?? id;
 
@@ -54,12 +59,14 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
   const columns = model.columns.map((c, i) => {
     const prizeVal = h('b', { class: 'pc-prize-val mono', text: '' });
     prizeEls.push(prizeVal);
-    const lines: HTMLElement[] = [
+    const stars = starsOf(c.name);
+    const lines: Array<HTMLElement | null> = [
       h('div', { class: 'pc-head' },
         h('i', { class: 'seat-dot', style: `--seat:${seatColor(c.driver, palette)}` }),
         h('strong', { class: 'pc-name', text: c.name })),
       h('small', { class: 'pc-car muted', text: carName(c.carId) }),
       h('div', { class: 'pc-pos' }, medal(c.position), h('span', { text: t('career.payout.position', { pos: c.position }) })),
+      stars ? h('div', { class: 'pc-stars' }, starsRow(stars.got, { fresh: stars.got & ~stars.was, calm: reduce })) : null,
       h('div', { class: 'pc-line' }, h('span', { class: 'pc-label', text: t(c.kind === 'allowance' ? 'career.payout.allowance' : 'career.payout.prize') }), prizeVal),
     ];
     if (c.wallet) {
@@ -91,6 +98,16 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
     : null;
   if (vaultVal) walletEls[0] = vaultVal;
 
+  // O objetivo da pista e o rival com a cara do duelo (perdeu se algum humano o venceu; senão venceu).
+  const earned = model.columns.map((c) => starsOf(c.name)).filter((l): l is NonNullable<typeof l> => l !== undefined);
+  const rivalName = earned.find((l) => l.rival)?.rival ?? null;
+  const rivalFace: Face = earned.some((l) => l.duel === 'win') ? 'lose' : 'win';
+  const goalEl = earned.length > 0
+    ? h('div', { class: 'payout-goal glass' },
+      rivalName ? h('span', { class: 'rival-face', attrs: { 'data-face': rivalFace } }, portrait(rivalName, rivalFace, 40)) : null,
+      h('span', { class: 'payout-goal-text', text: t('stars.goalLine', { goal: goalLabel(d.trackDef.id) }) }))
+    : null;
+
   const buyText = h('span', { class: 'payout-buy-text', text: '' });
   const buyEl = h('div', { class: 'payout-buy' }, buyText);
   const hint = h('p', { class: 'hint payout-skip', text: t('career.payout.skip') });
@@ -105,6 +122,7 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
   const board = h('div', { class: 'payout-board' },
     h('div', { class: 'payout-cols', style: `--n:${columns.length}` }, columns),
     vaultEl,
+    goalEl,
     buyEl,
   );
   const verdict = model.eliminated ? h('div', { class: 'verdict bad', text: t('career.payout.eliminated') }) : null;

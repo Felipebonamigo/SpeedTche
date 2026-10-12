@@ -12,6 +12,8 @@ import type { HumanEntry, RaceResultRow } from '../src/core/types';
 import { DEFAULT_SETTINGS, type DeviceId, type MenuNav, type ResultsScreenData, type SaveData, type Settings, type UiSound } from '../src/game/contracts';
 import { POST_STEP_SECONDS } from '../src/game/post-race';
 import { sanitizeSave } from '../src/game/save';
+import { STAR_GOAL, STAR_QUALIFY, STAR_RIVAL, type StarsLast } from '../src/game/stars';
+import { goalLabel } from '../src/ui/screens/star-widgets';
 import { setLanguage, t } from '../src/i18n';
 import '../src/ui/strings';
 import type { ScreenApi, ScreenInstance } from '../src/ui/screens/common';
@@ -51,6 +53,8 @@ interface RigOpts {
   settings?: Partial<Settings>;
   pads?: FakeGamepad[];
   noCareer?: boolean;
+  /** O que as estrelas gravaram para esta corrida (`save.stars.last`, O4). */
+  stars?: StarsLast[];
 }
 
 function rig(o: RigOpts = {}): Rig {
@@ -65,6 +69,7 @@ function rig(o: RigOpts = {}): Rig {
   const { report, champ } = settleCareerRace(career, results);
   const save = sanitizeSave({});
   save.career = o.noCareer ? null : career;
+  if (o.stars) save.stars = { profiles: [], last: o.stars };
   const data: ResultsScreenData = { mode: 'career', trackDef: trackDef('copacabana'), results, humans, champ, newRecords: [] };
   const settings: Settings = { ...DEFAULT_SETTINGS, seatAssists: [...DEFAULT_SETTINGS.seatAssists], ...o.settings };
   const bound: Array<DeviceId | null> = ['kb1', 'kb2', 'gp0', 'gp1'].slice(0, Math.max(1, n)) as DeviceId[];
@@ -276,5 +281,69 @@ describe('Pagamento: reduzir efeitos (T5) e idiomas', () => {
         expect(text(r.screen.el), `${lang} ${kind}`).not.toMatch(/\b(career|ui)\.[a-z]+\.[A-Za-z.]+/);
       }
     }
+  });
+});
+
+// ───────────── O4: as estrelas, o objetivo da pista e o rival com rosto no Pagamento ─────────────
+
+const lastOf = (o: Partial<StarsLast> & { name: string }): StarsLast => ({ trackId: 'copacabana', got: 0, was: 0, goal: 'draft20', rival: null, duel: null, ...o });
+const starRows = (r: Rig): FakeEl[] => all(r.screen.el, hasClass('stars'));
+const litOf = (el: FakeEl): boolean[] => all(el, hasClass('star')).map((s) => hasClass('on')(s));
+const newOf = (el: FakeEl): boolean[] => all(el, hasClass('star')).map((s) => hasClass('new')(s));
+const goalStrip = (r: Rig): FakeEl[] => all(r.screen.el, hasClass('payout-goal'));
+const faces = (r: Rig): string[] => all(r.screen.el, (e) => e.innerHTML.includes('data-face=')).map((e) => /data-face="(\w+)"/.exec(e.innerHTML)?.[1] ?? '');
+
+describe('Pagamento: as estrelas (O4)', () => {
+  it('solo: as 3 estrelas da corrida na coluna do piloto, as novas marcadas, e o objetivo da pista embaixo', () => {
+    const r = rig({ kind: 'solo', stars: [lastOf({ name: 'P1', got: STAR_QUALIFY | STAR_GOAL, was: STAR_QUALIFY })] });
+    expect(starRows(r)).toHaveLength(1);
+    expect(litOf(starRows(r)[0])).toEqual([true, false, true]);
+    expect(newOf(starRows(r)[0])).toEqual([false, false, true]);
+    expect(goalStrip(r)).toHaveLength(1);
+    expect(text(goalStrip(r)[0])).toContain(goalLabel('copacabana'));
+    expect(text(goalStrip(r)[0])).toContain(t('stars.goalLine', { goal: goalLabel('copacabana') }));
+  });
+
+  it('versus: cada piloto com as estrelas do seu perfil, pelo nome', () => {
+    const r = rig({ kind: 'versus', stars: [lastOf({ name: 'P1', got: 7 }), lastOf({ name: 'p2', got: STAR_RIVAL })] });
+    const rows = starRows(r);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(litOf)).toEqual([[true, true, true], [false, true, false]]);
+    expect(cols(r).map((c) => all(c, hasClass('stars')).length)).toEqual([1, 1]);
+  });
+
+  it('o rival perde (duelo ganho) com cara de perdeu; ganha com cara de venceu; sem rival, sem rosto', () => {
+    expect(faces(rig({ stars: [lastOf({ name: 'P1', got: 3, rival: 'Zé Turbo', duel: 'win' })] }))).toEqual(['lose']);
+    expect(faces(rig({ stars: [lastOf({ name: 'P1', got: 1, rival: 'Zé Turbo', duel: 'lose' })] }))).toEqual(['win']);
+    expect(faces(rig({ stars: [lastOf({ name: 'P1', got: 1 })] }))).toEqual([]);
+  });
+
+  it('o brilho da estrela nova só existe sem reduceEffects', () => {
+    const stars = [lastOf({ name: 'P1', got: 7, was: 0 })];
+    expect(starRows(rig({ stars })).every((row) => !hasClass('calm')(row))).toBe(true);
+    const calm = rig({ stars, settings: { reduceEffects: true } });
+    expect(starRows(calm).every((row) => hasClass('calm')(row))).toBe(true);
+    expect(litOf(starRows(calm)[0])).toEqual([true, true, true]);
+  });
+
+  it('sem estrelas gravadas, ou de outra pista, a tela é a de antes: nada novo e os mesmos botões', () => {
+    const base = rig({ kind: 'solo' });
+    for (const stars of [undefined, [], [lastOf({ name: 'P1', got: 7, trackId: 'paraty' })], [lastOf({ name: 'Outro', got: 7 })]]) {
+      const r = rig({ kind: 'solo', stars });
+      expect(starRows(r)).toHaveLength(0);
+      expect(goalStrip(r)).toHaveLength(0);
+      expect(faces(r)).toEqual([]);
+      expect(actions(r).length).toBe(actions(base).length);
+    }
+  });
+
+  it('a navegação e o foco são os de sempre com estrelas (mesmos botões, confirmar engolido até acabar)', () => {
+    const base = rig({ kind: 'solo' });
+    const r = rig({ kind: 'solo', stars: [lastOf({ name: 'P1', got: 7, rival: 'Zé Turbo', duel: 'win' })] });
+    expect(actions(r).length).toBe(actions(base).length);
+    press(r, 'confirm');
+    expect(r.events).toEqual([]);
+    run(r, POST_STEP_SECONDS.payout + 0.5);
+    expect(all(r.screen.el, hasClass('payout-skip'))[0].classList.contains('done')).toBe(true);
   });
 });
