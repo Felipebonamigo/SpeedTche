@@ -100,12 +100,12 @@ await app.close();
 
 // ───────────── "Outro computador": a nuvem troca os arquivos em disco antes da 2ª execução ─────────────
 // Conflito de verdade: o localStorage TEM as duas chaves, com valores diferentes dos que a nuvem trouxe.
-writeFileSync(join(userData, 'saves', 'speed-tche.save.json'), JSON.stringify({ racesRun: 42, racesWon: 7, cupsCompleted: ['brasil'] }));
+writeFileSync(join(userData, 'saves', 'speed-tche.save.json'), JSON.stringify({ racesRun: 42, racesWon: 7, cupsCompleted: ['br_rj'] }));
 const cloudSettings = { ...JSON.parse(readFileSync(settingsFile, 'utf8')), language: 'en', quickLaps: 5 };
 writeFileSync(settingsFile, JSON.stringify(cloudSettings));
 ({ app, page, pageErrors } = await launch());
 const local = await page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.save') ?? '{}'));
-check(local.racesRun === 42 && local.cupsCompleted?.[0] === 'brasil', `save do disco venceu o localStorage diferente (racesRun 1 → ${local.racesRun})`);
+check(local.racesRun === 42 && local.cupsCompleted?.[0] === 'br_rj', `save do disco venceu o localStorage diferente (racesRun 1 → ${local.racesRun})`);
 const s2 = await page.evaluate(() => ({ language: window.nc.session.settings.language, quickLaps: window.nc.session.settings.quickLaps, consent: window.nc.session.settings.telemetryConsent }));
 check(s2.language === 'en' && s2.quickLaps === 5, `opções do disco venceram as do localStorage (idioma ${s2.language}, voltas ${s2.quickLaps})`);
 check(s2.consent === 1, 'consentimento da telemetria sobreviveu ao reinício');
