@@ -37,9 +37,11 @@
 }
 .payout-buy.on { visibility: visible; }
 /* O4: as estrelas da corrida na coluna e o objetivo da pista (com o rival com rosto) embaixo do quadro. */
-.pc-stars { display: flex; justify-content: center; }
-.payout-goal { display: flex; align-items: center; justify-content: center; gap: calc(10 * var(--u)); padding: calc(4 * var(--u)) calc(20 * var(--u)); box-sizing: border-box; max-width: 100%; font-size: var(--fs-sm); font-weight: 700; }
-.payout-goal .rival-face { width: calc(40 * var(--u)); height: calc(40 * var(--u)); }
+.pc-stars { display: inline-flex; margin-left: calc(4 * var(--u)); }
+.pc-pos { flex-wrap: wrap; }
+.payout-goal { display: flex; align-items: center; justify-content: center; gap: calc(10 * var(--u)); padding: calc(2 * var(--u)) calc(16 * var(--u)); box-sizing: border-box; max-width: 100%; font-size: var(--fs-sm); font-weight: 700; }
+.payout-goal .rival-face { width: calc(28 * var(--u)); height: calc(28 * var(--u)); }
+.pc-stars .star { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
 .payout-goal-text { min-width: 0; overflow-wrap: anywhere; text-align: center; }
 .payout-skip { min-height: 1.3em; }
 .payout-skip.done { visibility: hidden; }
@@ -81,3 +83,5 @@
 .scr-results .table-wrap { flex: 0 1 auto; min-height: 0; }
 .scr-results .actions { margin-top: 0; }
 .scr-payout .payout-cols { flex: 0 1 auto; }
+/* Com "Texto grande" o Pagamento de 4 pilotos não tem altura para a faixa do objetivo; as estrelas ficam na coluna. */
+#ui.large-text .payout-goal { display: none; }

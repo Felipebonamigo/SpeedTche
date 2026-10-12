@@ -65,8 +65,9 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
         h('i', { class: 'seat-dot', style: `--seat:${seatColor(c.driver, palette)}` }),
         h('strong', { class: 'pc-name', text: c.name })),
       h('small', { class: 'pc-car muted', text: carName(c.carId) }),
-      h('div', { class: 'pc-pos' }, medal(c.position), h('span', { text: t('career.payout.position', { pos: c.position }) })),
-      stars ? h('div', { class: 'pc-stars' }, starsRow(stars.got, { fresh: stars.got & ~stars.was, calm: reduce })) : null,
+      // As estrelas na mesma linha da posição: a coluna não ganha altura (o Pagamento de 4 pilotos é a tela mais alta).
+      h('div', { class: 'pc-pos' }, medal(c.position), h('span', { text: t('career.payout.position', { pos: c.position }) }),
+        stars ? h('span', { class: 'pc-stars' }, starsRow(stars.got, { fresh: stars.got & ~stars.was, calm: reduce })) : null),
       h('div', { class: 'pc-line' }, h('span', { class: 'pc-label', text: t(c.kind === 'allowance' ? 'career.payout.allowance' : 'career.payout.prize') }), prizeVal),
     ];
     if (c.wallet) {
@@ -104,7 +105,7 @@ export function payoutScreen(api: ScreenApi, data?: ScreenData): ScreenInstance 
   const rivalFace: Face = earned.some((l) => l.duel === 'win') ? 'lose' : 'win';
   const goalEl = earned.length > 0
     ? h('div', { class: 'payout-goal glass' },
-      rivalName ? h('span', { class: 'rival-face', attrs: { 'data-face': rivalFace } }, portrait(rivalName, rivalFace, 40)) : null,
+      rivalName ? h('span', { class: 'rival-face', attrs: { 'data-face': rivalFace } }, portrait(rivalName, rivalFace, 28)) : null,
       h('span', { class: 'payout-goal-text', text: t('stars.goalLine', { goal: goalLabel(d.trackDef.id) }) }))
     : null;
 
