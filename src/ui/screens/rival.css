@@ -3,9 +3,9 @@
 
 .rival-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: calc(2 * var(--u));
+  gap: calc(12 * var(--u));
   max-width: min(100%, calc(900 * var(--u)));
   padding: calc(6 * var(--u)) calc(18 * var(--u));
   border-radius: var(--r-sm);
@@ -79,3 +79,15 @@
 /* Classificação: o cartão do rival ocupa uma faixa acima das tabelas; elas encolhem o mesmo tanto para o
    botão continuar na tela em 720p (styles.css: .standings-columns .table-wrap { max-height: 62vh }). */
 .scr-standings:has(.rival-card) .standings-columns .table-wrap { max-height: calc(62vh - 84 * var(--u)); }
+
+/* O4: o rival com rosto (retrato procedural), o placar e o objetivo da pista. O retrato ocupa um quadrado fixo: não decide altura. */
+.rival-face { display: inline-flex; flex: none; width: calc(56 * var(--u)); height: calc(56 * var(--u)); border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 calc(2 * var(--u)) var(--rival-edge, var(--accent)); }
+.rival-face .portrait { width: 100%; height: 100%; }
+.rival-card-body { display: flex; flex-direction: column; align-items: center; gap: calc(2 * var(--u)); min-width: 0; }
+.cup-rival { flex-direction: row; align-items: center; gap: calc(10 * var(--u)); }
+.cup-rival .rival-face { width: calc(48 * var(--u)); height: calc(48 * var(--u)); }
+.cup-rival-body { display: flex; flex-direction: column; gap: calc(2 * var(--u)); min-width: 0; flex: 1 1 auto; }
+.garage-rival .rival-face { width: calc(40 * var(--u)); height: calc(40 * var(--u)); }
+.rival-score { padding: calc(1 * var(--u)) calc(9 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, 0.12); color: var(--text); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; }
+.garage-goal { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); flex: 1 1 100%; min-width: 0; color: var(--muted); }
+.garage-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

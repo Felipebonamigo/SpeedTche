@@ -557,7 +557,7 @@ export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
       b.preview();
     });
     const report = dealer ? null : reportBlock();
-    const rival = !dealer && career ? garageRivalBlock(career) : null;
+    const rival = !dealer && career ? garageRivalBlock(career, ctx.save) : null;
     reportHost.replaceChildren(...[report, rival].filter((x): x is HTMLElement => x !== null));
     panelsEl.replaceChildren(...built.map((b) => b.el));
   }
