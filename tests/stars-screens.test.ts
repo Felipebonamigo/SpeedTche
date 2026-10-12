@@ -69,7 +69,7 @@ describe('troféu e contador', () => {
       const chip = trophyChip(tier, 7, 9) as unknown as FakeEl;
       expect(hasClass(`trophy-${tier}`)(chip)).toBe(true);
       expect(text(chip)).toContain('7/9');
-      expect(text(chip)).toContain(t(`stars.trophy.${tier}`));
+      expect((chip as unknown as FakeEl).title).toContain(t(`stars.trophy.${tier}`)); // o nome vai no título: a linha do detalhe da copa não tem largura
     }
   });
 

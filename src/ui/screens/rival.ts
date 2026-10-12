@@ -106,7 +106,7 @@ export function garageRivalBlock(career: CareerState, save?: RivalSave): HTMLEle
     faceBox(r.name, face, 40),
     h('strong', { text: t('rivals.garage', { name: r.name, personality: personalityName(r.personality) }) }),
     scoreEl(r, score),
-    h('q', { class: 'rival-quote', text: line }),
-    h('span', { class: 'garage-goal' }, starsRow(mask), h('span', { class: 'garage-goal-text', text: t('stars.goalLine', { goal: goalLabel(trackId) }) })),
+    // A fala do rival saiu da garagem para dar lugar ao objetivo (a linha não tem largura para os dois; a fala segue no detalhe da copa e no resultado).
+    h('span', { class: 'garage-goal', attrs: { title: line } }, starsRow(mask), h('span', { class: 'garage-goal-text', text: t('stars.goalLine', { goal: goalLabel(trackId) }) })),
   );
 }

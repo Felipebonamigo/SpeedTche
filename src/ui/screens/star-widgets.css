@@ -26,6 +26,20 @@
 
 /* Detalhe da copa (select.ts): o chip da copa e o troféu na mesma linha; o objetivo da pista na terceira linha de cada corrida. */
 .cup-chips { display: flex; align-items: center; flex-wrap: wrap; gap: calc(6 * var(--u)); min-width: 0; }
-.scr-cups .cup-race-goal { font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.scr-cups .cup-race .stars .star { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
+/* Uma linha entre o rival e a lista de corridas (a thumb menor, abaixo, paga a altura dela). */
+.scr-cups .cup-goal { display: flex; align-items: baseline; gap: calc(8 * var(--u)); margin: 0; padding: 0 calc(12 * var(--u)); font-size: var(--fs-sm); color: var(--text); min-width: 0; }
+.scr-cups .cup-goal-k { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.scr-cups .cup-race .track-thumb { width: calc(50 * var(--u)); height: calc(50 * var(--u)); }
+#ui.large-text .scr-cups .cup-race .track-thumb { width: calc(40 * var(--u)); height: calc(40 * var(--u)); }
+.scr-cups .cup-race .stars { gap: calc(1 * var(--u)); }
+.scr-cups .cup-race .stars .star { width: calc(12 * var(--u)); height: calc(12 * var(--u)); }
 .scr-cups .cup-stage-name .stars-counter { margin-left: auto; text-transform: none; letter-spacing: 0.02em; }
+.scr-cups .cup-race-rating { display: flex; align-items: center; justify-content: flex-end; gap: calc(6 * var(--u)); }
+/* O detalhe da copa é a tela mais apertada: a linha do objetivo paga a altura com a thumb e o rival mais compactos; com "Texto grande" ela
+   some (o objetivo continua no Pagamento e na garagem da Expedição). */
+.scr-cups .cup-race .track-thumb { width: calc(46 * var(--u)); height: calc(46 * var(--u)); }
+.scr-cups .cup-rival { padding-top: calc(3 * var(--u)); padding-bottom: calc(3 * var(--u)); }
+#ui.large-text .scr-cups .cup-goal { display: none; }
+.scr-cups .cup-goal { line-height: 1.05; }
+#ui.large-text .scr-cups .cup-race .stars .star { width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
+#ui.large-text .scr-cups .cup-race-rating { gap: calc(3 * var(--u)); }

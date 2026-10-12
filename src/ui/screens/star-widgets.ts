@@ -44,7 +44,7 @@ export function trophyChip(tier: Trophy, got: number, max: number): HTMLElement 
   if (tier === 'none') return null;
   const name = t(`stars.trophy.${tier}`);
   return h('span', { class: `cup-trophy trophy-${tier}`, title: t('stars.trophyTitle', { tier: name, n: got, total: max }), attrs: { 'data-trophy': tier } },
-    icon('trophy'), h('span', { class: 'mono', text: `${name} ${got}/${max}` }));
+    icon('trophy'), h('span', { class: 'mono', text: `${got}/${max}` }));
 }
 
 /** "x/327": as estrelas do perfil no jogo todo. */
