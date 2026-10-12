@@ -332,7 +332,7 @@ html, body {
 .btn.btn-main.btn-corner { font-size: calc(15 * var(--u)); padding: calc(5 * var(--u)) calc(12 * var(--u)); color: var(--muted); }
 .btn.btn-main.btn-corner.focus { transform: none; color: var(--text); }
 .btn.btn-main.btn-corner.btn-quit { margin-top: 0; }
-.home-box { display: flex; flex-direction: column; gap: calc(6 * var(--u)); max-width: 28em; padding: calc(10 * var(--u)) calc(14 * var(--u)); border: 1px solid var(--line); border-radius: var(--r); background: rgba(255, 255, 255, 0.04); }
+.home-box { display: flex; flex-direction: column; gap: calc(6 * var(--u)); max-width: 28em; padding: calc(10 * var(--u)) calc(14 * var(--u)); border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); backdrop-filter: blur(14px); }
 .home-box-title { margin: 0; font-size: var(--fs-sm); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .goal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(6 * var(--u)); }
 .goal-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: calc(2 * var(--u)) calc(8 * var(--u)); font-size: var(--fs-sm); }
