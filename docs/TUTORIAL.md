@@ -57,6 +57,9 @@ Cada jogador anda pelos passos 1–5 no próprio ritmo; os de trecho só contam 
    aparece); conta estar na faixa do box com ≥ 60%. Passou pelo trecho sem entrar → `pitMissed`;
    entrou mas atravessou embalado (o limitador do box só freia aos poucos) → `pitShort`. O texto
    pede para frear antes.
+6. **Derrapar** (O3) — na curva média (`curve`, força 4, de novo na volta seguinte ao box): segurar DERRAPAR e
+   carregar o 1º nível (evento `drift_charge`) **dentro** dela. Atravessá-la sem carregar → `noDrift`; sair do
+   asfalto → `offroad`; entrar no meio dela espera a próxima passagem inteira. A barra do painel mostra a carga.
 7. **Empurrão** (só com 2+) — quando todos passaram da curva de derrapar, o líder é escolhido; ao chegar na reta
    `accel` (no asfalto), o carro dele fica no freio (`tutorialInput`) até o evento `tow` nele.
    Quem passa direto pelo carro parado sem empurrar recebe um aviso (`towMissed`). O empurrão exige
@@ -64,11 +67,6 @@ Cada jogador anda pelos passos 1–5 no próprio ritmo; os de trecho só contam 
    para ficar atrás até ele parar e passar colado acelerando. Colado é **ao lado**: desde a onda F um carro
    não atravessa o outro (`docs/FISICA.md`), então mirar no carro parado é bater e ficar empurrando-o (ele
    está no freio) a 10% da máxima; o piloto do teste de ponta a ponta passa a 0,31 de lado.
-
-6. **Derrapar** (O3) — na curva média (`curve`, força 4, de novo na volta seguinte ao box): segurar DERRAPAR e
-   carregar o 1º nível (evento `drift_charge`) **dentro** dela. Atravessá-la sem carregar → `noDrift`; sair do
-   asfalto → `offroad`; entrar no meio dela espera a próxima passagem inteira. A barra do painel mostra a carga.
-7. **Empurrão** (só com 2+; era o passo 6) — o que está descrito acima.
 
 Com 1 jogador são 6 passos (7 com 2+). No fim: "TUTORIAL CONCLUÍDO!" por 2,5 s e a tela final.
 
