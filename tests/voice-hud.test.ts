@@ -181,6 +181,15 @@ describe('overlay de voz: os balões', () => {
     expect(all(root, has('vh-own'))[0].classList.contains('show')).toBe(false);
   });
 
+  it('o balão do rival leva o retrato com a cara dele; o de um jogador, não', () => {
+    const { root, hud } = make();
+    hud.update(view({ balloons: [balloon({ id: 5, seat: -1, name: 'Zé Turbo', own: false, text: 'Ha!', face: 'win' })] }));
+    const faces = all(root, has('vh-face')).map((f) => (f as unknown as { innerHTML?: string }).innerHTML ?? '');
+    expect(faces.some((f) => f.includes('data-face="win"'))).toBe(true);
+    hud.update(view({ balloons: [balloon({ id: 6, seat: 3, name: 'Caio', own: false, text: 'Bom jogo!' })] }));
+    expect(all(root, has('vh-face')).every((f) => ((f as unknown as { innerHTML?: string }).innerHTML ?? '') === '')).toBe(true);
+  });
+
   it('só cabem 2 balões de outros no canto (mais que isso desce até o minimapa): ficam os mais novos', () => {
     const { root, hud } = make();
     hud.update(view({

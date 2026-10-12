@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { AI_DRIVERS, CUP_RIVALS } from '../src/core/data/drivers';
 import type { Personality } from '../src/core/types';
-import { RIVAL_LINE_KINDS, cupRival, rivalBalloon, rivalLine, rivalLineFor, rivalScoreLine, scoreLine, scoreState, type RivalScore } from '../src/game/rivals';
+import { RIVAL_LINE_KINDS, cupRival, rivalBalloon, rivalFaceOf, rivalLine, rivalLineFor, rivalScoreLine, rivalSpeech, scoreLine, scoreState, type RivalScore } from '../src/game/rivals';
 import { rivalByName, rivalTalkText } from '../src/game/rival-talk';
 import { getLanguage, setLanguage, t } from '../src/i18n';
 import '../src/rivals/strings';
@@ -90,6 +90,26 @@ describe('as falas escolhidas pelo placar', () => {
     const r = rivalByName('Fulano');
     expect(() => rivalLineFor(r, 'intro', score.rival)).not.toThrow();
     expect(rivalLineFor(r, 'intro', score.rival)).toContain('6 × 2');
+  });
+});
+
+describe('a fala do balão e a cara dele', () => {
+  const score = { you: 2, rival: 6 };
+  it('rivalSpeech é a fala sem o nome; com placar cita-o (menos no respeito); rivalBalloon = "Nome: fala"', () => {
+    for (const k of RIVAL_LINE_KINDS) {
+      expect(rivalSpeech(zeTurbo, k)).toBe(rivalLine(zeTurbo, k));
+      expect(rivalBalloon(zeTurbo, k, score)).toBe(`Zé Turbo: ${rivalSpeech(zeTurbo, k, score)}`);
+    }
+    expect(rivalSpeech(zeTurbo, 'taunt', score)).toContain('6 × 2');
+    expect(rivalSpeech(zeTurbo, 'taunt', score)).not.toContain('Zé Turbo');
+    expect(rivalSpeech(zeTurbo, 'respect', score)).toBe(rivalLine(zeTurbo, 'respect'));
+  });
+
+  it('a cara: provoca na apresentação e na provocação, venceu na revanche, perdeu no respeito', () => {
+    expect(rivalFaceOf('intro')).toBe('taunt');
+    expect(rivalFaceOf('taunt')).toBe('taunt');
+    expect(rivalFaceOf('revenge')).toBe('win');
+    expect(rivalFaceOf('respect')).toBe('lose');
   });
 });
 

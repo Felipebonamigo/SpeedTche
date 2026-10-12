@@ -5,6 +5,7 @@
 import './hud.css';
 import { t } from '../i18n';
 import { uiScale, viewportRects, type Rect } from '../render/layout';
+import { portraitSvg } from '../ui/art/portraits';
 import './strings';
 import { TAUNT_COUNT, tauntText, type Balloon } from './voice';
 
@@ -49,12 +50,14 @@ function setAttr(e: HTMLElement, name: string, value: string): void { if (e.getA
 /** Um balão: o nome de quem falou (só nos balões do alto) e o texto. */
 class BalloonNode {
   readonly root: HTMLElement;
+  private readonly face: HTMLElement;
   private readonly who: HTMLElement;
   private readonly text: HTMLElement;
   private shownId = -1;
 
   constructor(parent: HTMLElement, cls: string, withName: boolean) {
     this.root = el('div', `vh-balloon ${cls}`, parent);
+    this.face = el('span', 'vh-face', this.root);
     this.who = el('b', 'vh-who', this.root);
     if (!withName) setStyle(this.who, 'display', 'none');
     this.text = el('span', 'vh-text', this.root);
@@ -68,6 +71,8 @@ class BalloonNode {
       this.shownId = b.id;
       setText(this.who, b.name);
       setText(this.text, b.text);
+      // O retrato só do rival (marcação constante nossa, sem o nome dentro: `portraitSvg`); o dos jogadores é a cor do assento.
+      this.face.innerHTML = b.seat < 0 && b.face ? portraitSvg(b.name, b.face, 28) : '';
       setAttr(this.root, 'aria-label', t('voice.balloon.label', { name: b.name, text: b.text }));
       setStyle(this.root, '--who', b.color);
       // Reinicia a animação de entrada quando o balão é outro.

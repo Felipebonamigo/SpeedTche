@@ -93,10 +93,19 @@ export function rivalLineFor(rival: Rival, kind: RivalLineKind, score?: RivalSco
   return (kind === 'intro' && score ? rivalScoreLine(rival, score) : null) ?? rivalLine(rival, kind);
 }
 
-/** O texto do balão/mensagem da corrida: "Nome: fala". Com placar, apresentação, provocação e revanche citam-no; o respeito não (ele concede). */
+/** O que ele diz na corrida (sem o nome). Com placar, apresentação, provocação e revanche citam-no; o respeito não (ele concede). */
+export function rivalSpeech(rival: Rival, kind: RivalLineKind, score?: RivalScore): string {
+  return (score && kind !== 'respect' ? rivalScoreLine(rival, score) : null) ?? rivalLine(rival, kind);
+}
+
+/** O texto da mensagem da corrida: "Nome: fala". */
 export function rivalBalloon(rival: Rival, kind: RivalLineKind, score?: RivalScore): string {
-  const cites = score && kind !== 'respect' ? rivalScoreLine(rival, score) : null;
-  return `${rival.name}: ${cites ?? rivalLine(rival, kind)}`;
+  return `${rival.name}: ${rivalSpeech(rival, kind, score)}`;
+}
+
+/** A cara do retrato do rival falando: provoca ao apresentar-se e provocar, comemora a revanche, perdeu no respeito. */
+export function rivalFaceOf(kind: RivalLineKind): 'taunt' | 'win' | 'lose' {
+  return kind === 'revenge' ? 'win' : kind === 'respect' ? 'lose' : 'taunt';
 }
 
 export function ordinal(n: number): string {
