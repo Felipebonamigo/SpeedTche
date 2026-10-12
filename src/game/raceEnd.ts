@@ -7,6 +7,7 @@ import type { ChampionshipState, HumanEntry, PlayerInput, RaceResultRow, RaceSta
 import { achievementMessages, observeTick, unlockAchievements, type AchievementUnlock, type RaceTelemetry } from './achievements';
 import type { HudMessage, RaceMode, SaveData } from './contracts';
 import { markCupCompleted, recordRaceResults, rememberLobby, type NewRecord } from './save';
+import { settleStars } from './stars';
 import { recordRaceStats } from './stats';
 
 /** O que a corrida deixou: recordes novos e conquistas, para o resultado. */
@@ -108,6 +109,8 @@ export function settleRace(save: SaveData, r: SettleTarget, o: SettleOptions): R
       o.effects.achievement(u.id);
     }
     for (const [seat, text] of achievementMessages(out.achievements)) o.effects.hud(seat, { text, kind: 'good', ttl: o.hudTtl });
+    // O4: estrelas e placar do rival, por perfil. Por último: uma falha aqui não perde nada do que já foi somado acima (o `finally` grava).
+    settleStars(save.stars, { mode: r.mode, trackId: r.track.def.id, results: mine, humans: localHumans, telemetry: r.telemetry, rival: r.state.config.rival, champ: cupChamp });
   } finally {
     o.effects.persist();
   }
