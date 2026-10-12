@@ -13,7 +13,7 @@ import '../src/ui/strings';
 import type { ScreenApi, ScreenInstance } from '../src/ui/screens/common';
 import { dealershipScreen } from '../src/ui/screens/dealership';
 import { garageScreen } from '../src/ui/screens/garage';
-import { mainScreen } from '../src/ui/screens/simple';
+import { garageHubScreen, mainScreen } from '../src/ui/screens/simple';
 import { human } from './helpers';
 
 class FakeEl {
@@ -359,18 +359,28 @@ describe('Concessionária: os carros à venda, a compra e a revelação', () => 
 });
 
 describe('Concessionária no menu principal', () => {
-  it('o menu principal tem a Concessionária, que abre a tela dela; PT e EN', () => {
-    const r = rig(mainScreen);
-    const buttons = all(r.screen.el, (el) => el.tag === 'button');
-    const label = t('dealership.menu');
-    expect(label).toBe('Concessionária');
-    const entry = buttons.findIndex((b) => b.textContent === label);
-    expect(entry).toBeGreaterThanOrEqual(0);
-    for (let i = 0; i < entry; i++) press(r, 'kb1', 'down');
-    press(r, 'kb1', 'confirm');
-    expect(r.went).toEqual(['dealership']);
+  // N5: o menu principal tem 5 cartões; a Concessionária mora dentro do cartão Garagem (um cartão + um Enter), com e sem Expedição.
+  it('o cartão Garagem do menu principal abre o submenu, e dele a Concessionária abre a tela dela; PT e EN', () => {
+    const main = rig(mainScreen);
+    const cards = all(main.screen.el, hasClass('btn-card'));
+    expect(cards.map((b) => b.textContent)).toContain('Garagem');
+    for (let i = 0; i < cards.findIndex((b) => b.textContent === 'Garagem'); i++) press(main, 'kb1', 'down');
+    press(main, 'kb1', 'confirm');
+    expect(main.went).toEqual(['garageHub']);
+    for (const noCareer of [true, false]) {
+      const hub = rig(garageHubScreen, { noCareer });
+      const buttons = all(hub.screen.el, (el) => el.tag === 'button' && hasClass('btn-main')(el));
+      const label = t('dealership.menu');
+      expect(label).toBe('Concessionária');
+      const entry = buttons.findIndex((b) => b.textContent === label);
+      expect(entry).toBeGreaterThanOrEqual(0);
+      for (let i = 0; i < entry; i++) press(hub, 'kb1', 'down');
+      press(hub, 'kb1', 'confirm');
+      expect(hub.went).toEqual(['dealership']);
+    }
     setLanguage('en');
     expect(t('dealership.menu')).toBe('Dealership');
+    expect(t('expedition.garageHub.shop')).toBe('Dealership');
     expect(t('dealership.menu.hint')).not.toBe('dealership.menu.hint');
   });
 });
