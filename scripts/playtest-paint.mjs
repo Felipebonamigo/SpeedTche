@@ -19,7 +19,7 @@ const press = async (key, n = 1) => { for (let i = 0; i < n; i++) { await page.k
 const menu = () => page.evaluate(() => window.nc.session.menus.current());
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);
@@ -35,8 +35,20 @@ async function openGame() {
   await press('Enter'); // título → menu principal
   check(await menu() === 'main', 'menu principal');
 }
+/** N5: "Jogar livre" é um submenu do menu principal; o item dele pelo rótulo. */
+const freeIndex = (pattern) => page.evaluate((src) => {
+  const re = new RegExp(src, 'i');
+  const i = [...document.querySelectorAll('.scr-free .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  if (i < 0) throw new Error(`item de Jogar livre não encontrado: ${src}`);
+  return i;
+}, pattern);
+async function toFree(pattern) {
+  await press('ArrowDown', await mainIndex('^jogar livre$|^free play$'));
+  await press('Enter');
+  await press('ArrowDown', await freeIndex(pattern));
+}
 async function quickLobby() {
-  await press('ArrowDown', await mainIndex('corrida r(á|a)pida|quick race'));
+  await toFree('corrida r(á|a)pida|quick race');
   await press('Enter');
   // P1 entra (setas, Enter) e P2 (WASD, F). Com o 3D por software um quadro pode levar mais que a tecla: repete até entrar.
   const occupied = () => page.evaluate(() => document.querySelectorAll('.slot.occupied').length);

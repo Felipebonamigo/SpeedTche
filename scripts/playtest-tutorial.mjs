@@ -33,7 +33,7 @@ async function shot(name) {
 }
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);
@@ -47,26 +47,18 @@ await frame();
 await held('Enter');
 check(await menu() === 'main', `título → menu principal (${await menu()})`);
 check(await page.evaluate(() => !!document.querySelector('.scr-main .tut-offer')), 'primeira abertura: o menu oferece o tutorial');
-// Pior caso de altura: o menu com "Continuar" e "Sair" (13 itens hoje) tem que caber em 1280×720.
+// Pior caso de altura (N5): 5 cartões, o canto com "Sair" e o selo de copa em andamento têm que caber em 1280×720.
 const fit = await page.evaluate(() => {
   const list = document.querySelector('.scr-main .menu-list');
-  const first = list.firstElementChild;
-  const cont = first.cloneNode(true); cont.textContent = 'Continuar'; list.prepend(cont);
-  const quit = first.cloneNode(true); quit.textContent = 'Sair'; quit.classList.add('btn-quit'); list.append(quit);
+  const corner = document.querySelector('.scr-main .main-corner');
+  const quit = corner.firstElementChild.cloneNode(true); quit.textContent = 'Sair'; quit.classList.remove('focus'); quit.classList.add('btn-quit'); corner.append(quit);
+  const badge = document.createElement('span'); badge.className = 'card-badge'; badge.textContent = 'copa em andamento'; list.children[2].append(badge);
+  window.__fake = [quit, badge];
   const box = document.querySelector('.scr-main .main-left').getBoundingClientRect();
-  const r = { items: list.children.length, top: Math.round(box.top), bottom: Math.round(box.bottom), h: innerHeight };
-  cont.remove(); quit.remove();
-  return r;
+  return { items: list.children.length + corner.children.length, top: Math.round(box.top), bottom: Math.round(box.bottom), h: innerHeight };
 });
-check(fit.items >= 12 && fit.top >= 0 && fit.bottom <= fit.h, `menu com ${fit.items} itens cabe em 720p (painel ${fit.top}..${fit.bottom} de ${fit.h})`);
-await page.evaluate(() => {
-  const list = document.querySelector('.scr-main .menu-list');
-  const first = list.firstElementChild;
-  const cont = first.cloneNode(true); cont.textContent = 'Continuar'; cont.classList.remove('focus'); list.prepend(cont);
-  const quit = first.cloneNode(true); quit.textContent = 'Sair'; quit.classList.remove('focus'); quit.classList.add('btn-quit'); list.append(quit);
-  window.__fake = [cont, quit];
-});
-await shot('01-main-12-itens');
+check(fit.items >= 11 && fit.top >= 0 && fit.bottom <= fit.h, `menu com ${fit.items} itens (5 cartões + canto) cabe em 720p (painel ${fit.top}..${fit.bottom} de ${fit.h})`);
+await shot('01-main-5-cartoes');
 await page.evaluate(() => { for (const el of window.__fake) el.remove(); });
 const idx = await mainIndex('^como jogar$');
 for (let i = 0; i < idx; i++) await held('ArrowDown');

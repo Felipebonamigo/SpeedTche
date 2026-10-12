@@ -7,7 +7,8 @@ const out = process.argv[3] ?? 'scratch/pt';
 const exe = process.env.CHROME_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({ executablePath: exe, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-page.setDefaultTimeout(240000);
+// NC_PT_TIMEOUT (ms): com a máquina carregada (3D por software) uma captura passa dos 30 s padrão do Playwright.
+page.setDefaultTimeout(Number(process.env.NC_PT_TIMEOUT ?? 240000));
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
@@ -95,18 +96,19 @@ check(await page.evaluate(() => !!document.querySelector('.scr-main .tut-offer.f
 await page.screenshot({ path: `${out}-02b-main-cartao.png` });
 await page.keyboard.press('ArrowDown'); await page.waitForTimeout(300);
 
-// Lobby pelo fluxo real: Campeonato → lobby; kb1 entra com Enter, kb2 com F.
+// Lobby pelo fluxo real: Expedição (1º cartão, N5) → lobby; kb1 entra com Enter, kb2 com F.
 await page.keyboard.press('Enter'); await page.waitForTimeout(400);
 st = await S();
-check(st.menu === 'lobby', `Campeonato abre o lobby (${st.menu})`);
+check(st.menu === 'lobby', `Expedição abre o lobby (${st.menu})`);
 check(await page.evaluate(() => window.nc.session.input.seatDevice(0)) === 'kb1', 'Enter no menu já senta o P1 (kb1)');
 await page.keyboard.press('KeyF'); await page.waitForTimeout(250);
 const bound = await page.evaluate(() => [0, 1, 2, 3].map((s) => window.nc.session.input.seatDevice(s)));
 check(bound[0] === 'kb1' && bound[1] === 'kb2', `dois assentos ligados no lobby (${JSON.stringify(bound)})`);
 await page.screenshot({ path: `${out}-03-lobby.png` });
 
-// Entradas do menu à contagem (Campeonato, teclado, 1 jogador). Laço adaptativo, igual nos dois builds: Enter, exceto
-// quando o P1 está PRONTO no lobby e o foco não está em INICIAR (aí ↑ até INICIAR).
+// Entradas do menu à contagem (Expedição, teclado, 1 jogador). Laço adaptativo, igual nos dois builds: Enter, exceto
+// quando o P1 está PRONTO no lobby e o foco não está em INICIAR (aí ↑ até INICIAR). N5: depois do lobby vem a garagem da Expedição,
+// onde Enter segurado é o PRONTO (como no lobby): a compra antes da 1ª largada é o que a Expedição tem a mais.
 await page.evaluate(() => window.nc.session.handleMenuEvent({ type: 'toMain' }));
 await page.waitForTimeout(300);
 presses = 0;
@@ -119,7 +121,7 @@ for (let i = 0; i < 20 && (await S()).race?.phase !== 'countdown'; i++) {
   }));
   if (s.m === 'lobby' && s.p1 && !s.ready && !shotSolo) {
     shotSolo = true;
-    check(s.labels.length === 3 && !s.labels.includes('Modo'), `lobby do Campeonato com 1 assento: 3 seletores, sem Modo (${JSON.stringify(s.labels)})`);
+    check(s.labels.length === 3 && !s.labels.includes('Modo'), `lobby da Expedição com 1 assento: 3 seletores, sem Modo (${JSON.stringify(s.labels)})`);
     await page.screenshot({ path: `${out}-03b-lobby-solo.png` });
   }
   if (s.m === 'lobby' && s.ready && !shotReady) {
@@ -127,19 +129,22 @@ for (let i = 0; i < 20 && (await S()).race?.phase !== 'countdown'; i++) {
     check(s.onStart, 'depois do PRONTO o foco do P1 está em INICIAR');
     await page.screenshot({ path: `${out}-03c-lobby-pronto.png` });
   }
-  if (s.m === 'lobby' && s.p1 && s.ready && !s.onStart) await key('ArrowUp'); else await key('Enter');
+  if (s.m === 'garage') await hold('Enter');
+  else if (s.m === 'lobby' && s.p1 && s.ready && !s.onStart) await key('ArrowUp'); else await key('Enter');
 }
 st = await S();
-console.log(`entradas menu→contagem (Campeonato, teclado, 1 jogador): ${presses} (meta ≤ 4; antes da K1: 8)`);
+console.log(`entradas menu→contagem (Expedição, teclado, 1 jogador): ${presses} (meta ≤ 4; antes da K1: 8)`);
 check(st.race?.phase === 'countdown' && presses <= 4, `menu → contagem em ${presses} entradas (meta ≤ 4)`);
-// "Continuar" (a copa que o laço acabou de largar) com Enter segurado no lobby.
+// "Continuar" (a Expedição que o laço acabou de largar, N5): o 1º cartão continua direto (Enter), o lobby de religar os controles
+// com Enter segurado e a garagem com Enter segurado. Eram 2 entradas quando "Continuar" era da copa avulsa e não havia garagem.
 await page.evaluate(() => window.nc.session.handleMenuEvent({ type: 'toMain' }));
 await page.waitForTimeout(300);
 presses = 0;
 await key('Enter');
 await hold('Enter');
+await hold('Enter');
 st = await S();
-check(st.race?.phase === 'countdown' && presses <= 2, `"Continuar" com Enter segurado: contagem em ${presses} entradas (meta ≤ 2)`);
+check(st.race?.phase === 'countdown' && presses <= 3, `"Continuar" a Expedição: contagem em ${presses} entradas (meta ≤ 3: cartão, lobby e garagem)`);
 
 // Corrida de 1 jogador pela API de depuração (não depende do DOM do lobby).
 await page.evaluate((h) => { const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.debugBind(0, 'kb1'); s.startQuick('copacabana', 2, h); }, humans(1));

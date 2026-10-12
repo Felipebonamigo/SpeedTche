@@ -179,6 +179,30 @@ export interface SaveData {
   cupInProgress: SavedCup | null;
   /** Tutorial concluído ou pulado: o menu principal para de oferecê-lo (src/game/tutorial-session.ts). */
   tutorialDone: boolean;
+  /** Retrato do progresso na abertura desta sessão (N5, src/game/expedition.ts `rollSession`); null em save antigo. A 0.1.2 o descarta. */
+  sessionStart: SessionSnapshot | null;
+  /** O que a sessão anterior rendeu, para o quadro "Desde a última vez" do menu; null = nada a mostrar. */
+  recap: SessionRecap | null;
+}
+
+/** Contadores do save num instante (todos inteiros ≥ 0), para o quadro "Desde a última vez" (docs/ondas/N/N5.md §4.2). */
+export interface SessionSnapshot {
+  /** Instante, ISO 8601. */
+  at: string;
+  racesRun: number;
+  racesWon: number;
+  stamps: number;
+  cupsCompleted: number;
+  achievements: number;
+  /** Carros comprados (`carsUnlocked`). */
+  carsBought: number;
+  /** Soma dos prêmios ganhos pelos pilotos da Expedição (`career.drivers[].earnings`). */
+  earned: number;
+}
+
+export interface SessionRecap {
+  before: SessionSnapshot;
+  after: SessionSnapshot;
 }
 
 /** Copa normal salva: a classificação até aqui, a semente do elenco e os humanos (assentos 0..n-1). */
@@ -192,7 +216,7 @@ export const DEFAULT_SAVE: Readonly<SaveData> = Object.freeze({
   cupsCompleted: [], cupsUnlocked: [], stamps: [], bestLaps: {}, bestRaces: {}, achievements: [], racesRun: 0, racesWon: 0,
   seatNames: ['P1', 'P2', 'P3', 'P4'], seatCars: ['falcao', 'trovao', 'tornado', 'camelo'], seatLooks: [{}, {}, {}, {}],
   stats: EMPTY_STATS,
-  carsUnlocked: [], career: null, cupInProgress: null, tutorialDone: false,
+  carsUnlocked: [], career: null, cupInProgress: null, tutorialDone: false, sessionStart: null, recap: null,
 });
 
 // ───────────────────────────── Renderização ─────────────────────────────
@@ -349,7 +373,7 @@ export interface RaceDriver {
 /** Os sons de interface: os de menu e os do Pagamento (N4: `coin`, `count`, `chime`). */
 export type UiSound = 'move' | 'confirm' | 'back' | 'coin' | 'count' | 'chime';
 
-export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'payout' | 'online'
+export type MenuScreen = 'title' | 'main' | 'lobby' | 'cups' | 'tracks' | 'results' | 'standings' | 'pause' | 'options' | 'controls' | 'records' | 'credits' | 'loading' | 'career' | 'garage' | 'dealership' | 'payout' | 'online' | 'free' | 'garageHub'
   | 'party' | 'tournament' | 'handoff' | 'tournamentTable' | 'access'
   | 'tutorial' | 'tutorialDone' | 'passport' | 'survey';
 

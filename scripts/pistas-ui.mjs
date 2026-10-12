@@ -67,12 +67,17 @@ async function open(w, hgt, tag, save = SAVE) {
 async function toSelection(page, modeIndex, tag) {
   await press(page, 'Enter'); // título → menu
   console.log(`[${Math.round((Date.now() - t0) / 1000)}s] ${tag}: ${await menu(page)}`);
-  // Pelo rótulo, não pela posição: o menu ganhou Carreira, Online e Continuar desde que este roteiro nasceu.
-  const label = ['^campeonato$', '^corrida rápida$', '^contra-relógio$'][modeIndex];
-  const steps = await page.evaluate((src) => { const re = new RegExp(src, 'i'); return [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim())); }, label);
-  if (steps < 0) throw new Error(`item do menu principal não encontrado: ${label}`);
+  // Pelo rótulo, não pela posição. N5: o menu tem 5 cartões e "Jogar livre" é um submenu (copa avulsa, corrida rápida, contra-relógio).
+  const label = ['^copa avulsa$', '^corrida rápida$', '^contra-relógio$'][modeIndex];
+  const at = (sel, src) => page.evaluate(([s2, re0]) => { const re = new RegExp(re0, 'i'); return [...document.querySelectorAll(s2)].findIndex((el) => re.test((el.textContent ?? '').trim())); }, [sel, src]);
+  const toFree = await at('.scr-main .btn-main', '^jogar livre$');
+  if (toFree < 0) throw new Error('Jogar livre não encontrado no menu principal');
+  for (let i = 0; i < toFree; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  const steps = await at('.scr-free .btn-main', label);
+  if (steps < 0) throw new Error(`item de Jogar livre não encontrado: ${label}`);
   for (let i = 0; i < steps; i++) await press(page, 'ArrowDown');
-  await press(page, 'Enter'); // Campeonato / Corrida rápida → lobby
+  await press(page, 'Enter'); // Copa avulsa / Corrida rápida / Contra-relógio → lobby
   check(await menu(page) === 'lobby', `${tag} modo ${modeIndex}: lobby aberto`);
   await frame(page); // o lobby ignora o primeiro quadro (carência da borda que o abriu)
   // Enter até o P1 entrar (teclado 1) e de novo até ficar pronto (cursor no carro): cada passo

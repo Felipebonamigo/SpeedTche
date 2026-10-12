@@ -67,7 +67,7 @@ await page.evaluate(() => { window.nc.session.settings.quality = 'low'; });
 
 // Recordes pelo teclado: título → menu → Recordes (pelo rótulo: o menu ganhou Carreira, Online e Passaporte).
 await key('Enter');
-const toRecords = await page.evaluate(() => [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => /^recordes$/i.test((el.textContent ?? '').trim())));
+const toRecords = await page.evaluate(() => [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => /^recordes$/i.test((el.textContent ?? '').trim())));
 await key('ArrowDown', Math.max(0, toRecords));
 await key('Enter');
 check(await current() === 'records', `Recordes abre pelo menu (${await current()})`);

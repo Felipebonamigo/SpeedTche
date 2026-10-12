@@ -6,6 +6,7 @@ import { CUPS, currentCupId, LEGACY_CUP_IDS, legacyCupOpens } from '../core/data
 import type { CupDef, HumanEntry, RaceResultRow } from '../core/types';
 import { sanitizeCareer, sanitizeSavedCup, sanitizeUnlocked } from './career-save';
 import { isFingerprint, lapFingerprint } from './content-version';
+import { sanitizeRecap, sanitizeSnapshot } from './expedition';
 import { sanitizeSeatLooks } from './cosmetics';
 import { DEFAULT_SAVE, type BestLap, type RaceMode, type SaveData } from './contracts';
 import { isRecord, pickNumber, pickString, readJson, writeJson } from './settings';
@@ -119,6 +120,8 @@ export function sanitizeSave(raw: unknown): SaveData {
     career: sanitizeCareer(r.career),
     cupInProgress: sanitizeSavedCup(r.cupInProgress),
     tutorialDone: r.tutorialDone === true,
+    sessionStart: sanitizeSnapshot(r.sessionStart),
+    recap: sanitizeRecap(r.recap),
   };
 }
 

@@ -54,6 +54,8 @@
    ("Copa Rio de Janeiro", "Próxima: Orla de Copacabana — corrida 1 de 3") quebra em três linhas e os painéis rolam. */
 #ui.large-text .garage-head .garage-progress { display: none; }
 #ui.large-text .garage-head > .garage-next { font-size: var(--fs-sm); }
+/* N5: a Expedição versus de 4 pilotos (4 linhas de piloto e de dinheiro) com texto grande rolava 2–6 px; a folga entre linhas cede. */
+#ui.large-text .career-summary { gap: calc(3 * var(--u)); }
 
 /* ───────────── Garagem ───────────── */
 

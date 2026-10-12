@@ -17,10 +17,22 @@ const settings = () => page.evaluate(() => { const s = window.nc.session.setting
 const focused = () => page.evaluate(() => document.querySelector('#ui .focus')?.textContent?.trim() ?? '');
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
-  const i = [...document.querySelectorAll('.scr-main .menu-list > *')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  const i = [...document.querySelectorAll('.scr-main .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
   if (i < 0) throw new Error(`item do menu principal não encontrado: ${src}`);
   return i;
 }, pattern);
+/** N5: "Jogar livre" é um submenu do menu principal; o item dele pelo rótulo. */
+const freeIndex = (pattern) => page.evaluate((src) => {
+  const re = new RegExp(src, 'i');
+  const i = [...document.querySelectorAll('.scr-free .btn-main')].findIndex((el) => re.test((el.textContent ?? '').trim()));
+  if (i < 0) throw new Error(`item de Jogar livre não encontrado: ${src}`);
+  return i;
+}, pattern);
+async function toFree(pattern) {
+  await press('ArrowDown', await mainIndex('^jogar livre$|^free play$'));
+  await press('Enter');
+  await press('ArrowDown', await freeIndex(pattern));
+}
 /** Desce até o item focado começar com `label` (no máximo 40 passos). */
 async function downTo(label, key = 'ArrowDown') {
   for (let i = 0; i < 40; i++) { if ((await focused()).startsWith(label)) return true; await press(key); }
@@ -80,7 +92,7 @@ await press('Enter');
 // Lobby da corrida rápida: P1 (setas) e P2 (WASD) escolhem a direção no próprio cartão.
 await press('Escape'); await press('Escape');
 check(await page.evaluate(() => window.nc.session.menus.current()) === 'main', 'Esc volta às opções e ao menu principal');
-await press('ArrowDown', await mainIndex('corrida r(á|a)pida|quick race'));
+await toFree('corrida r(á|a)pida|quick race');
 await press('Enter');
 await press('KeyF');
 check(await page.evaluate(() => window.nc.session.menus.current()) === 'lobby', 'lobby com dois jogadores');
