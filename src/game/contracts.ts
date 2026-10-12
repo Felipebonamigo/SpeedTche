@@ -10,6 +10,7 @@ import type {
 import type { CareerState } from '../core/career';
 import type { Lang } from '../i18n';
 import type { AchievementUnlock } from './achievements';
+import type { StarsData } from './stars';
 import { EMPTY_STATS, type StatsData } from './stats';
 import { DEFAULT_BINDINGS, type ControlBindings } from '../ui/remap/bindings';
 import type { OnlineController } from './online-session';
@@ -187,6 +188,11 @@ export interface SaveData {
   sessionStart: SessionSnapshot | null;
   /** O que a sessão anterior rendeu, para o quadro "Desde a última vez" do menu; null = nada a mostrar. */
   recap: SessionRecap | null;
+  /**
+   * Estrelas por pista, placar contra cada rival e a última corrida, por perfil (O4, src/game/stars.ts). Aditivo: save sem o campo abre
+   * com ele vazio; a 0.1.3 o ignora e o descarta na próxima gravação dela. Ver docs/SAVE.md ("Estrelas").
+   */
+  stars: StarsData;
 }
 
 /** Contadores do save num instante (todos inteiros ≥ 0), para o quadro "Desde a última vez" (docs/ondas/N/N5.md §4.2). */
@@ -221,6 +227,8 @@ export const DEFAULT_SAVE: Readonly<SaveData> = Object.freeze({
   seatNames: ['P1', 'P2', 'P3', 'P4'], seatCars: ['falcao', 'trovao', 'tornado', 'camelo'], seatLooks: [{}, {}, {}, {}],
   stats: EMPTY_STATS,
   carsUnlocked: [], career: null, cupInProgress: null, tutorialDone: false, sessionStart: null, recap: null,
+  // Literal (e não `emptyStars()`): o contrato não importa `stars.ts` em tempo de execução. O saneador entrega um objeto novo a cada save.
+  stars: { profiles: [], last: [] },
 });
 
 // ───────────────────────────── Renderização ─────────────────────────────

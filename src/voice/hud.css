@@ -49,3 +49,8 @@
 .vh-own { --vh-from: translate(-50%, -100%); }
 .vh-vp.calm .vh-balloon, .vh-vp.calm .vh-wheel.open { animation: none; }
 @media (prefers-reduced-motion: reduce) { .vh-balloon, .vh-wheel.open { animation: none; } }
+
+/* O4: o retrato do rival no balão dele (voice/hud.ts). Só o rival tem; vazio some. */
+.vh-balloon .vh-face { float: left; width: calc(30px * var(--s)); height: calc(30px * var(--s)); margin: calc(1px * var(--s)) calc(8px * var(--s)) 0 0; border-radius: 50%; overflow: hidden; }
+.vh-balloon .vh-face:empty { display: none; }
+.vh-balloon .vh-face svg { display: block; width: 100%; height: 100%; }

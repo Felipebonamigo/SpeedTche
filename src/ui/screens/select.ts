@@ -11,7 +11,9 @@ import { t } from '../../i18n';
 import { blurActive, countryName, createFocusList, dayIcon, dots, h, lapsText, listNav, screenFrame, trackName, trackNameParts, trackThumb, type FocusItem, type FocusList, type ScreenApi, type ScreenInstance } from './common';
 import { icon } from './icons';
 import { lobbyHumans } from './lobby';
+import { findProfile, cupStars, trophyFor, STAR_GOAL } from '../../game/stars';
 import { cupRivalBlock } from './rival';
+import { goalLabel, starsCounter, starsRow, trophyChip } from './star-widgets';
 import './passport.css';
 import './select.css';
 
@@ -149,6 +151,13 @@ function cupDetail(ctx: MenuContext, cup: CupDef, status: CupStatus): HTMLElemen
     chip = h('span', { class: 'cup-chip open' }, icon('flag'), h('span', { text: t('ui.cups.open') }));
   }
   const where = brasil && cup.region ? t(`core.region.${cup.region}`) : countryName(cup.country);
+  // O4: as estrelas e o troféu são do perfil do assento 1 (o nome do lobby; a S3 troca por perfil escolhido).
+  const profile = findProfile(ctx.save.stars, ctx.save.seatNames[0] ?? '');
+  const { got, max } = cupStars(profile, cup);
+  const trophy = trophyChip(trophyFor(got, max), got, max);
+  // O objetivo da próxima corrida: a primeira da copa que ainda não deu a estrela do objetivo (uma linha só: o detalhe é a tela mais apertada).
+  const goalAt = tracks.findIndex((def) => !((profile?.tracks[def.id] ?? 0) & STAR_GOAL));
+  const nextGoal = status !== 'locked' && goalAt >= 0 ? { n: goalAt + 1, id: tracks[goalAt].id } : null;
   return h('div', { class: `cup-detail glass${status === 'locked' ? ' locked' : ''}` },
     h('div', { class: 'cup-detail-head' },
       brasil ? ufBadge(cup, isStamped(ctx, cup), 'big') : h('span', { class: 'cup-detail-flag', text: cup.flag }),
@@ -161,10 +170,11 @@ function cupDetail(ctx: MenuContext, cup: CupDef, status: CupStatus): HTMLElemen
           h('span', { class: 'sep', text: '·' }),
           dots(cupDifficulty(tracks)),
         ),
-        chip,
+        h('span', { class: 'cup-chips' }, chip, trophy),
       ),
     ),
-    cupRivalBlock(cup.id),
+    cupRivalBlock(cup.id, ctx.save),
+    nextGoal ? h('p', { class: 'cup-goal' }, h('span', { class: 'cup-goal-k', text: t('stars.nextGoal', { n: nextGoal.n }) }), h('span', { text: goalLabel(nextGoal.id) })) : null,
     h('ol', { class: 'cup-detail-tracks' }, tracks.map((def, i) => h('li', { class: 'cup-race' },
       h('span', { class: 'cup-race-n mono', text: String(i + 1) }),
       scalableThumb(ctx, def),
@@ -177,7 +187,7 @@ function cupDetail(ctx: MenuContext, cup: CupDef, status: CupStatus): HTMLElemen
         ),
       ),
       h('span', { class: 'cup-race-side' },
-        dots(def.difficulty),
+        h('span', { class: 'cup-race-rating' }, starsRow(profile?.tracks[def.id] ?? 0), dots(def.difficulty)),
         h('span', { class: 'track-best mono' }, icon('timer'), h('span', { text: bestLapText(ctx, def.id) })),
       ),
     ))),
@@ -217,6 +227,7 @@ export function cupsScreen(api: ScreenApi): ScreenInstance {
       h('span', { class: 'cup-stage-name' },
         h('span', { text: t('core.stage.brasil') }),
         h('span', { class: 'cup-stage-count', text: t('core.passport.stamps', { n: stamps, total: brasilCups.length }) }),
+        starsCounter(findProfile(ctx.save.stars, ctx.save.seatNames[0] ?? '')),
       ),
       h('div', { class: 'cup-stage-tabs' }, tabEls.filter((_, i) => tabs[i].stage === 'brasil')),
     ),

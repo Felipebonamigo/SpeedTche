@@ -171,6 +171,8 @@ export interface Balloon {
   total: number;
   /** O falante é um jogador deste computador: o balão fica sobre o carro dele, no viewport dele. */
   own: boolean;
+  /** O rival (seat -1) fala com a cara do momento: o retrato dele aparece no balão (O4). Ausente = sem retrato. */
+  face?: 'taunt' | 'win' | 'lose';
 }
 
 /** Quantos balões vivos, no máximo (quatro jogadores mais o rival e folga). */

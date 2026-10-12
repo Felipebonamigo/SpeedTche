@@ -40,7 +40,8 @@ import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menu
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
-import { cupDuels, gridRival, rivalLine } from './rivals';
+import { cupDuels, gridRival, rivalFaceOf, rivalSpeech, type Rival, type RivalScore } from './rivals';
+import { scoreOf } from './stars';
 import { createRivalTalk, observeRivalTalk, rivalByName, rivalReply, rivalTalkText, type RivalTalk } from './rival-talk';
 import { createOnlineController, type OnlineController } from './online-session';
 import { createPartySession, isPartyRaceMode } from './party-session';
@@ -521,6 +522,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     }
   }
 
+  /** O placar do perfil deste assento contra o rival (O4: o rival o cita). Undefined sem humano no assento. */
+  function scoreFor(r: ActiveRace, seat: number, rival: Rival): RivalScore | undefined {
+    const name = r.humans.find((h) => h.seat === seat)?.name;
+    return name ? scoreOf(save.stars, name, rival.key) : undefined;
+  }
+
   /** Uma buzinada ou frase que contou neste tick (voice.ts: observeVoice): o mesmo tick em todos os computadores. */
   function handleVoiceCue(r: ActiveRace, cue: VoiceCue): void {
     const local = r.localSeats.includes(cue.seat);
@@ -534,7 +541,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     const kind = local && r.talk && rivalName ? rivalReply(r.talk, r.state, cue.seat) : null;
     if (kind && rivalName) {
       const rival = rivalByName(rivalName);
-      addBalloon(r.voice, { seat: -1, name: rival.name, color: RIVAL_COLOR, text: rivalLine(rival, kind), ttl: RIVAL_REPLY_TTL, own: false });
+      addBalloon(r.voice, { seat: -1, name: rival.name, color: RIVAL_COLOR, text: rivalSpeech(rival, kind, scoreFor(r, cue.seat, rival)), ttl: RIVAL_REPLY_TTL, own: false, face: rivalFaceOf(kind) });
       const rivalCar = r.state.cars.find((c) => c.seat < 0 && c.name === rivalName);
       if (rivalCar) audio.horn?.(rivalCar.carId, RIVAL_REPLY_HORN_GAIN);
     }
@@ -558,7 +565,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     if (r.tips) observeTips(r.tips, r.state, r.track, inputs);
     if (r.talk && r.state.config.rival) {
       const rival = rivalByName(r.state.config.rival);
-      for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind), 'info', RIVAL_LINE_TTL);
+      for (const cue of observeRivalTalk(r.talk, r.state, r.localSeats)) pushMessage(cue.seat, rivalTalkText(rival, cue.kind, scoreFor(r, cue.seat, rival)), 'info', RIVAL_LINE_TTL);
     }
   }
 

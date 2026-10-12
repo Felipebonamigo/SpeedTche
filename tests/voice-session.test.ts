@@ -5,6 +5,7 @@ import type { SessionAudio } from '../src/audio/audio';
 import type { MenuContext, MenuNav, MenuScreen, Menus, Renderer } from '../src/game/contracts';
 import { createSession, type Session } from '../src/game/session';
 import { createRivalTalk } from '../src/game/rival-talk';
+import { driverKey } from '../src/game/rivals';
 import { TAUNT_MIN_GAP_TICKS, TAUNT_SHOW_SECONDS, WHEEL_OPEN_SECONDS, tauntText } from '../src/voice/voice';
 import { human } from './helpers';
 
@@ -259,6 +260,56 @@ describe('sessão: o rival da copa responde', () => {
     expect(horn).toHaveBeenCalledWith(rival.carId, expect.any(Number));
     // A resposta conta como fala dele: a conversa guarda o intervalo mínimo.
     expect(session.race?.talk?.lines).toBe(1);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('sessão: o rival cita o placar do perfil (O4)', () => {
+  /** O rival é o carro da IA mais perto do humano; o placar do perfil P1 contra ele é 1 × 4 (ele vence). */
+  function setup() {
+    startRacing();
+    const r = session.race!;
+    const me = r.state.cars.find((c) => c.seat === 0)!;
+    const rival = r.state.cars.filter((c) => c.seat < 0).sort((a, b) => Math.abs(a.position - me.position) - Math.abs(b.position - me.position))[0];
+    r.state.config.rival = rival.name;
+    session.debugSave().stars = { profiles: [{ name: 'P1', tracks: {}, rivals: { [driverKey(rival.name)]: { you: 1, rival: 4 } } }], last: [] };
+    return { r, rival };
+  }
+
+  it('a apresentação na pista sai com o placar (4 × 1)', () => {
+    const { r, rival } = setup();
+    r.talk = createRivalTalk(null);
+    frames(5); // `debugStep` limpa as mensagens ao fim; os quadros as deixam à mostra
+    const said = (r.messages.get(0) ?? []).map((m) => m.text).find((x) => x.startsWith(`${rival.name}:`));
+    expect(said, 'o rival não falou').toBeDefined();
+    expect(said).toContain('4 × 1');
+  });
+
+  it('sem placar gravado, a fala é a de sempre (sem "×")', () => {
+    const { r, rival } = setup();
+    session.debugSave().stars = { profiles: [], last: [] };
+    r.talk = createRivalTalk(null);
+    frames(5); // `debugStep` limpa as mensagens ao fim; os quadros as deixam à mostra
+    const said = (r.messages.get(0) ?? []).map((m) => m.text).find((x) => x.startsWith(`${rival.name}:`));
+    expect(said).toBeDefined();
+    expect(said).not.toContain('×');
+  });
+
+  it('a resposta à buzina é um balão com o rosto dele e o placar', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.37);
+    const { r } = setup();
+    const say = () => { w.down('KeyH'); frames(Math.ceil(WHEEL_OPEN_SECONDS * 60) + 3); w.down('KeyM'); frame(); w.up('KeyM'); frame(); w.up('KeyH'); frames(3); };
+    let reply: { text: string; face?: string } | undefined;
+    for (let attempt = 0; attempt < 40 && !reply; attempt++) {
+      r.talk = createRivalTalk(null);
+      r.talk.introDone = true;
+      say();
+      reply = voice().balloons.find((b) => b.seat === -1);
+      if (!reply) session.debugStep(TAUNT_MIN_GAP_TICKS + 30);
+    }
+    expect(reply, 'o rival nunca respondeu').toBeDefined();
+    expect(['taunt', 'win', 'lose']).toContain(reply?.face);
+    expect(reply?.text).toContain('4 × 1'); // a resposta é provocação ou revanche: as duas citam o placar
     vi.restoreAllMocks();
   });
 });

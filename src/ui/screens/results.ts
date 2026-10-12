@@ -163,7 +163,7 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
     const ok = d.champ.lastVerdict === 'qualified';
     extras.push(h('div', { class: `verdict ${ok ? 'good' : 'bad'}`, text: ok ? t('ui.results.qualified') : t('ui.results.eliminated') }));
   }
-  const rival = cupLike ? rivalRaceCard(d.champ, d.results) : null;
+  const rival = cupLike ? rivalRaceCard(d.champ, d.results, api.ctx.save) : null;
   if (rival) extras.push(rival);
   if (coop && d.humans.length > 0) {
     const teamId = d.humans[0].teamId;
@@ -400,7 +400,7 @@ export function standingsScreen(api: ScreenApi, data?: ScreenData): ScreenInstan
   const list = createFocusList(items, { sfx: api.sfx });
   const el = screenFrame('standings', null,
     titleRow(t('ui.standings.title'), t(`core.cup.${cup.id}`)),
-    h('div', { class: 'results-head' }, status, rivalStandingsCard(champ)),
+    h('div', { class: 'results-head' }, status, rivalStandingsCard(champ, api.ctx.save)),
     h('div', { class: 'standings-columns' },
       h('div', { class: 'table-wrap glass' }, h('h2', { class: 'sub-title', text: t('ui.standings.drivers') }), driverTable),
       h('div', { class: 'table-wrap glass' }, h('h2', { class: 'sub-title', text: t('ui.standings.teams') }), teamTable),

@@ -71,7 +71,7 @@ await page.evaluate(() => {
 // ───────────── Preparação: uma corrida de copa de verdade (resultado, classificação, "Continuar") ─────────────
 // Com NC_LAYOUT_ONLY sem as telas que dependem dela (resultado, classificação, "Continuar" no menu), pula a corrida.
 const ONLY = process.env.NC_LAYOUT_ONLY?.split(',') ?? null;
-if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub', 'results', 'results-busy', 'results-stamp', 'standings'].includes(id))) {
+if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub', 'results', 'results-busy', 'results-stamp', 'standings', 'results-score', 'standings-score'].includes(id))) {
   console.log('preparando: corrida da Copa Rio de Janeiro com 2 jogadores…');
   await page.evaluate((h) => { const s = window.nc.session; s.menus.hide(); s.debugBind(0, 'kb1'); s.debugBind(1, 'kb2'); s.startCup('br_rj', h); }, humans(2));
   await page.keyboard.down('ArrowUp'); await page.keyboard.down('KeyW');
@@ -86,7 +86,7 @@ if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub',
   check(await page.evaluate(() => !!window.__shown.results), 'corrida terminada e resultado guardado para as medições');
 }
 // N4: o Pagamento precisa de uma carreira com a corrida somada (`lastReport`): o pior caso é o co-op com 4 pilotos (4 colunas, equipe e cofre).
-if (!ONLY || ONLY.includes('payout-4')) {
+if (!ONLY || ONLY.includes('payout-4') || ONLY.includes('payout-4-stars')) {
   console.log('preparando: corrida de carreira co-op com 4 pilotos…');
   await page.evaluate(() => { window.__shown.cupResults = window.__shown.results; });
   await page.evaluate((h) => {
@@ -107,6 +107,20 @@ if (process.env.NC_LAYOUT_CSS) await page.addStyleTag({ content: readFileSync(pr
 await page.evaluate(() => { window.nc.session.stop(); });
 
 // Pior caso do resultado: 14 conquistas de uma vez (como no playtest.mjs) sobre a corrida de copa.
+// O4: o pior caso das estrelas, do troféu e do placar (todas as pistas com 3 estrelas = troféu de ouro em toda copa, placar de 3 dígitos
+// contra os 12 rivais). Os ids de pista saem das copas do código-fonte (o script é JS puro e não importa TypeScript).
+const ALL_TRACKS = [...readFileSync('src/core/data/cups.ts', 'utf8').matchAll(/trackIds: \[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]));
+const RIVAL_KEYS = ['ze_turbo', 'caio_brasa', 'duda_ferraz', 'nina_costa', 'dani_souza', 'tom_blake', 'kenji_sato', 'hugo_klein', 'bianca_rey', 'sasha_kova', 'iris_lund', 'marco_rossi'];
+/** Roda na página: grava no save o perfil com tudo (pelo nome do assento 1 e pelos de `names`) e, em `last`, o que a última corrida rendeu. */
+function seedStars({ tracks, rivals }, names = [], lastTrack = null) {
+  const save = window.nc.session.debugSave();
+  const all = [save.seatNames[0], ...names];
+  save.stars = {
+    profiles: all.map((name) => ({ name, tracks: Object.fromEntries(tracks.map((t) => [t, 7])), rivals: Object.fromEntries(rivals.map((r) => [r, { you: 123, rival: 321 }])) })),
+    last: lastTrack ? names.map((name, i) => ({ name, trackId: lastTrack, got: i % 2 ? 3 : 7, was: 1, goal: 'draft20', rival: 'Zé Turbo', duel: i % 2 ? 'lose' : 'win' })) : [],
+  };
+}
+const STARS_ARG = { tracks: ALL_TRACKS, rivals: RIVAL_KEYS, seed: seedStars.toString() };
 const ACH = ['PRIMEIRA_VITORIA', 'EQUIPE_COMPLETA', 'SEM_ARRANHAO', 'NITRO_TRIPLO', 'EMPURRAO', 'VOLTA_PERFEITA', 'MESTRE_DO_VACUO', 'NITRO_NA_BANDEIRA', 'MADRUGADA', 'SEM_BOX', 'PODIO_DE_EQUIPE', 'DO_ULTIMO_AO_PRIMEIRO', 'COPA_BR_RJ', 'CAMPEAO'];
 
 /** Cada tela: como montá-la dentro da página (roda a cada resolução/tamanho de texto, depois do redimensionamento). */
@@ -128,6 +142,14 @@ const SCREENS = [
   }],
   // Uma região de 3 estados (Sul): a lista mais curta, todos carimbados.
   ['cups-sul', () => { window.nc.session.menus.show('cups'); document.querySelector('.cup-tab[data-tab="sul"]')?.click(); }],
+  // O4: o detalhe da copa com o perfil cheio (estrelas, troféu de ouro, placar de 3 dígitos, contador): a lista mais longa e o Mundial de 4 pistas.
+  ['cups-stars', (a) => { new Function(`return (${a.seed})`)()(a); window.nc.session.menus.show('cups'); }, STARS_ARG],
+  ['cups-last-stars', (a) => {
+    new Function(`return (${a.seed})`)()(a);
+    window.nc.session.menus.show('cups');
+    const key = (code, n) => { for (let i = 0; i < n; i++) document.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true })); };
+    key('ArrowRight', 5); key('ArrowDown', 6);
+  }, STARS_ARG],
   ['tracks', () => window.nc.session.menus.show('tracks')],
   // Fim da grade: o Mundial (copas de 4) depois das copas de 3 da Expedição.
   ['tracks-end', () => { window.nc.session.menus.show('tracks'); for (let i = 0; i < 40; i++) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true })); }],
@@ -201,6 +223,18 @@ const SCREENS = [
   ['standings', () => { window.nc.session.menus.show('results', window.__shown.results); document.querySelector('.scr-results .actions .btn-primary')?.click(); }],
   // N4: o Pagamento (tela nova), co-op com 4 pilotos: quatro colunas, a da equipe e o cofre.
   ['payout-4', () => window.nc.session.menus.show('payout', window.__shown.careerResults)],
+  // O4: o Pagamento com as estrelas de cada coluna (a 1ª e a 3ª com tudo, a 2ª e a 4ª com duas), o objetivo da pista e o rival com rosto.
+  ['payout-4-stars', (a) => {
+    const d = window.__shown.careerResults;
+    new Function(`return (${a.seed})`)()(a, d.humans.map((h) => h.name), d.trackDef.id);
+    window.nc.session.menus.show('payout', d);
+  }, STARS_ARG],
+  // O4: o resultado e a classificação da copa com o placar do perfil no cartão do rival (e o retrato).
+  ['results-score', (a) => { new Function(`return (${a.seed})`)()(a, window.__shown.results.humans.map((h) => h.name)); window.nc.session.menus.show('results', window.__shown.results); }, STARS_ARG],
+  ['standings-score', (a) => {
+    new Function(`return (${a.seed})`)()(a, window.__shown.results.humans.map((h) => h.name));
+    window.nc.session.menus.show('results', window.__shown.results); document.querySelector('.scr-results .actions .btn-primary')?.click();
+  }, STARS_ARG],
   // N5: "Jogar livre" com a copa avulsa em andamento (a lista mais longa: Continuar + os 4 modos) e a Garagem com a Concessionária.
   ['free', () => window.nc.session.menus.show('free')],
   // Pior caso do menu principal: Expedição versus de 4 pilotos (uma meta curta por piloto), a copa avulsa em andamento (selo no cartão) e o
@@ -368,6 +402,8 @@ function measure({ ALLOWED_SCROLL, CONTAINED }) {
 }
 
 async function mount(id, fn, arg) {
+  // O4: as estrelas semeadas por uma cena (`seedStars`) ficam no save; as outras cenas medem o save sem elas.
+  await page.evaluate(() => { window.nc.session.debugSave().stars = { profiles: [], last: [] }; });
   await page.evaluate(({ src, arg }) => {
     // eslint-disable-next-line no-new-func
     const f = new Function(`return (${src})`)();

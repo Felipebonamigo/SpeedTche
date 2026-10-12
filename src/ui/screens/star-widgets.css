@@ -1,0 +1,45 @@
+/* Estrelas, troféu e contador (star-widgets.ts). Tamanhos em --u (ver styles.css). O brilho da estrela nova só existe fora de `.calm`
+   (reduceEffects) e fora de prefers-reduced-motion: nesses casos a estrela nova só fica acesa. */
+
+.stars { display: inline-flex; align-items: center; gap: calc(3 * var(--u)); vertical-align: middle; }
+.star { display: inline-flex; width: calc(20 * var(--u)); height: calc(20 * var(--u)); color: rgba(255, 255, 255, 0.28); flex: none; }
+.star-ico { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.star.on { color: #ffc53d; }
+.star.on .star-ico { fill: currentColor; stroke: #b87a00; }
+.star.new { color: #ffe27a; }
+.stars:not(.calm) .star.new .star-ico { animation: star-pop 900ms ease-out 1; }
+@keyframes star-pop {
+  0% { transform: scale(0.4); filter: drop-shadow(0 0 0 rgba(255, 226, 122, 0)); }
+  55% { transform: scale(1.35); filter: drop-shadow(0 0 calc(10 * var(--u)) rgba(255, 226, 122, 0.95)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(255, 226, 122, 0.5)); }
+}
+@media (prefers-reduced-motion: reduce) { .stars .star.new .star-ico { animation: none; } }
+
+.stars-counter { display: inline-flex; align-items: center; gap: calc(4 * var(--u)); font-weight: 700; color: #ffc53d; white-space: nowrap; }
+.stars-counter .star { width: calc(18 * var(--u)); height: calc(18 * var(--u)); }
+
+.cup-trophy { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); padding: calc(1 * var(--u)) calc(10 * var(--u)); border-radius: 999px; font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; min-width: 0; }
+.cup-trophy .ico { flex: none; }
+.cup-trophy.trophy-bronze { color: #e0a070; background: rgba(208, 139, 91, 0.18); }
+.cup-trophy.trophy-silver { color: #dfe6f0; background: rgba(207, 214, 224, 0.16); }
+.cup-trophy.trophy-gold { color: #ffd23f; background: rgba(255, 197, 61, 0.18); }
+
+/* Detalhe da copa (select.ts): o chip da copa e o troféu na mesma linha; o objetivo da pista na terceira linha de cada corrida. */
+.cup-chips { display: flex; align-items: center; flex-wrap: wrap; gap: calc(6 * var(--u)); min-width: 0; }
+/* Uma linha entre o rival e a lista de corridas (a thumb menor, abaixo, paga a altura dela). */
+.scr-cups .cup-goal { display: flex; align-items: baseline; gap: calc(8 * var(--u)); margin: 0; padding: 0 calc(12 * var(--u)); font-size: var(--fs-sm); color: var(--text); min-width: 0; }
+.scr-cups .cup-goal-k { color: var(--muted); font-weight: 700; white-space: nowrap; }
+.scr-cups .cup-race .track-thumb { width: calc(50 * var(--u)); height: calc(50 * var(--u)); }
+#ui.large-text .scr-cups .cup-race .track-thumb { width: calc(40 * var(--u)); height: calc(40 * var(--u)); }
+.scr-cups .cup-race .stars { gap: calc(1 * var(--u)); }
+.scr-cups .cup-race .stars .star { width: calc(12 * var(--u)); height: calc(12 * var(--u)); }
+.scr-cups .cup-stage-name .stars-counter { margin-left: auto; text-transform: none; letter-spacing: 0.02em; }
+.scr-cups .cup-race-rating { display: flex; align-items: center; justify-content: flex-end; gap: calc(6 * var(--u)); }
+/* O detalhe da copa é a tela mais apertada: a linha do objetivo paga a altura com a thumb e o rival mais compactos; com "Texto grande" ela
+   some (o objetivo continua no Pagamento e na garagem da Expedição). */
+.scr-cups .cup-race .track-thumb { width: calc(46 * var(--u)); height: calc(46 * var(--u)); }
+.scr-cups .cup-rival { padding-top: calc(3 * var(--u)); padding-bottom: calc(3 * var(--u)); }
+#ui.large-text .scr-cups .cup-goal { display: none; }
+.scr-cups .cup-goal { line-height: 1.05; }
+#ui.large-text .scr-cups .cup-race .stars .star { width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
+#ui.large-text .scr-cups .cup-race-rating { gap: calc(3 * var(--u)); }

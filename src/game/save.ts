@@ -10,6 +10,7 @@ import { sanitizeRecap, sanitizeSnapshot } from './expedition';
 import { sanitizeSeatLooks } from './cosmetics';
 import { DEFAULT_SAVE, type BestLap, type RaceMode, type SaveData } from './contracts';
 import { isRecord, pickNumber, pickString, readJson, writeJson } from './settings';
+import { sanitizeStars } from './stars';
 import { sanitizeStats } from './stats';
 
 export const SAVE_KEY = 'speed-tche.save';
@@ -122,6 +123,7 @@ export function sanitizeSave(raw: unknown): SaveData {
     tutorialDone: r.tutorialDone === true,
     sessionStart: sanitizeSnapshot(r.sessionStart),
     recap: sanitizeRecap(r.recap),
+    stars: sanitizeStars(r.stars),
   };
 }
 
