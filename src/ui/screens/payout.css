@@ -73,5 +73,6 @@
 
 /* A dica de pular não ocupa linha: fica sobre a borda de baixo (texto grande não cabia com ela no fluxo). */
 .scr-results .results-skip, .scr-payout .payout-skip { position: absolute; left: 0; right: 0; bottom: calc(2 * var(--u)); pointer-events: auto; }
-.scr-results .table-wrap { flex: 0 1 auto; min-height: calc(50 * var(--u)); }
+.scr-results .table-wrap { flex: 0 1 auto; min-height: 0; }
+.scr-results .actions { margin-top: 0; }
 .scr-payout .payout-cols { flex: 0 1 auto; }
