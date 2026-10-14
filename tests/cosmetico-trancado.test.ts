@@ -3,7 +3,11 @@
 // ele), e o save e a rede seguem aceitando todo id do catálogo (nada é apagado).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CARS } from '../src/core/data/cars';
-import { DEFAULT_SETTINGS, type DeviceId, type SaveData, type Settings } from '../src/game/contracts';
+import { createRace } from '../src/core/sim/race';
+import { getTrack } from '../src/core/track';
+import type { RaceConfig, RaceState } from '../src/core/types';
+import { DEFAULT_SAVE, DEFAULT_SETTINGS, type DeviceId, type RaceDriver, type SaveData, type Settings } from '../src/game/contracts';
+import { OnlineController, type OnlineHost } from '../src/game/online-session';
 import { parseLook, sanitizeLook, stepLook, type LookField } from '../src/game/cosmetics';
 import { seatLook } from '../src/game/paints';
 import { cosmeticUnlocked, emptyProgress, type ProgressData } from '../src/game/progression';
@@ -99,5 +103,49 @@ describe('lobby: o editor do visual respeita a maestria do perfil do assento', (
     const a = setup(undefined);
     toRim(a.screen);
     expect(rims(a.save, a.screen)).not.toContain('dourado');
+  });
+});
+
+// ───────────────────────────── Online: o editor da sala usa o mesmo cadeado ─────────────────────────────
+
+
+class FakeSocket {
+  readyState = 0;
+  onopen: (() => void) | null = null;
+  onmessage: ((ev: { data: unknown }) => void) | null = null;
+  onclose: ((ev: { code: number }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  send(): void {}
+  close(): void { this.readyState = 3; }
+  open(): void { this.readyState = 1; this.onopen?.(); }
+  push(msg: unknown): void { this.onmessage?.({ data: JSON.stringify(msg) }); }
+}
+
+function onlineWith(progress: ProgressData | undefined): OnlineController {
+  const host: OnlineHost = {
+    settings: { ...DEFAULT_SETTINGS, assists: { ...DEFAULT_SETTINGS.assists }, seatAssists: [...DEFAULT_SETTINGS.seatAssists] },
+    save: { ...DEFAULT_SAVE, seatNames: ['Ana', 'P2', 'P3', 'P4'], seatCars: ['falcao', 'trovao', 'tornado', 'camelo'], seatLooks: [{}, {}, {}, {}] },
+    input: fakeInput([null, null, null, null]), progress,
+    startRace(config: RaceConfig, _l: number[], _d: RaceDriver, state?: RaceState) { void (state ?? createRace(config, getTrack(config.trackId))); },
+    raceState: () => null, clearRace() {}, showScreen() {}, hideScreen() {}, menuOpen: () => false, exitToMain() {}, persistSettings() {},
+  };
+  const sock = new FakeSocket();
+  const c = new OnlineController(host, { socket: () => sock as unknown as WebSocket, pingMs: 60_000 });
+  c.create('kb1');
+  sock.open();
+  sock.push({ t: 'welcome', room: 'KQXTR', id: 0, token: 'a'.repeat(24), rejoined: false });
+  sock.push({ t: 'room', room: { code: 'KQXTR', host: 0, started: false, settings: null, clients: [{ id: 0, seats: 1, connected: true, info: { players: [{ name: 'Ana', car: 'falcao' }], ready: false } }] } });
+  return c;
+}
+
+describe('online: o editor do visual respeita a maestria do perfil do jogador', () => {
+  it('sem maestria o aro dourado não aparece; com a maestria 1 do Falcão, aparece', () => {
+    for (const [progress, has] of [[emptyProgress(), false], [progressWith({ falcao: 150 }), true], [undefined, false]] as const) {
+      const c = onlineWith(progress);
+      const seen: string[] = [];
+      for (let i = 0; i < 6; i++) { c.stepLookField(0, 'rim', 1); seen.push(c.lookOf(0)?.rim ?? ''); }
+      expect(seen.includes('dourado'), JSON.stringify(progress)).toBe(has);
+      c.leave(false);
+    }
   });
 });
