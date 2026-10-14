@@ -148,29 +148,34 @@ class KerbList {
 const MAP_SAMPLE = 'texture2D( map, vMapUv )';
 const EMISSIVE_SAMPLE = 'texture2D( emissiveMap, vEmissiveMapUv )';
 
+/** Os uniformes da mistura de um material (M6): os MESMOS objetos a vida inteira do material; o `setPalette` só troca o `.value`. */
+interface LiveUniforms { uRoadBlend: { value: number }; uMapB: { value: THREE.Texture | null }; uEmissiveMapB: { value: THREE.Texture | null } }
+
 /**
  * Compõe, com o `onBeforeCompile` e a chave de programa que o material já tem (o estilizador), a mistura da textura da pista com a do período seguinte: o `map` e o
- * `emissiveMap` viram `mix(textura, texturaB, uRoadBlend)`. Só entra no programa de quem tem `userData.roadLive` (pista com período seguinte); a chave de programa distingue os dois.
+ * `emissiveMap` viram `mix(textura, texturaB, uRoadBlend)`. O código só entra no programa de quem tem `userData.roadLive` (pista com período seguinte); a chave de
+ * programa distingue os dois. Os uniformes entram SEMPRE e são objetos fixos (T2, docs/ondas/tecnica-14-10.md): o three só chama o `onBeforeCompile` ao compilar um
+ * programa novo e, ao reusar um já compilado (a pista seguinte), usa os uniformes da ÚLTIMA compilação do material — objetos novos por pista deixavam o shader lendo
+ * as texturas já liberadas da pista anterior (o three as reenviava à GPU, sem dono) e, depois de uma pista de noite, sem `uMapB` nenhum.
  * Falha alto se o three mudar as linhas (senão a mistura viraria no-op calado, como no stylize.ts).
  */
-function installLiveBlend(m: THREE.Material): void {
+function installLiveBlend(m: THREE.Material, blend: { value: number }): LiveUniforms {
+  const uniforms: LiveUniforms = { uRoadBlend: blend, uMapB: { value: null }, uEmissiveMapB: { value: null } };
   const prev = m.onBeforeCompile;
   const prevKey = m.customProgramCacheKey;
   m.onBeforeCompile = (shader, renderer) => {
     prev.call(m, shader, renderer);
-    const live = m.userData.roadLive as { mapB: { value: THREE.Texture }; emissiveB: { value: THREE.Texture } } | undefined;
-    if (!live) return;
+    Object.assign(shader.uniforms, uniforms);
+    if (!m.userData.roadLive) return;
     const mapChunk = THREE.ShaderChunk.map_fragment; const emChunk = THREE.ShaderChunk.emissivemap_fragment;
     if (!mapChunk.includes(MAP_SAMPLE) || !emChunk.includes(EMISSIVE_SAMPLE)) throw new Error('road: o three mudou o map_fragment/emissivemap_fragment (amostra da textura não achada)');
-    shader.uniforms.uRoadBlend = m.userData.roadBlend as { value: number };
-    shader.uniforms.uMapB = live.mapB;
-    shader.uniforms.uEmissiveMapB = live.emissiveB;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', () => '#include <common>\nuniform float uRoadBlend;\nuniform sampler2D uMapB;\nuniform sampler2D uEmissiveMapB;')
       .replace('#include <map_fragment>', () => mapChunk.replace(MAP_SAMPLE, () => `mix( ${MAP_SAMPLE}, texture2D( uMapB, vMapUv ), uRoadBlend )`))
       .replace('#include <emissivemap_fragment>', () => emChunk.replace(EMISSIVE_SAMPLE, () => `mix( ${EMISSIVE_SAMPLE}, texture2D( uEmissiveMapB, vEmissiveMapUv ), uRoadBlend )`));
   };
   m.customProgramCacheKey = () => `${prevKey.call(m)}|road-live:${m.userData.roadLive ? 1 : 0}`;
+  return uniforms;
 }
 
 export class Road {
@@ -192,6 +197,8 @@ export class Road {
   private night = false;
   /** M6 (b): o uniforme de mistura (0 = textura da pista, 1 = a do período seguinte), compartilhado pelos materiais; só vale com `live`. */
   private readonly blend = { value: 0 };
+  /** Os uniformes fixos da mistura de cada material (`installLiveBlend`). */
+  private readonly liveUniforms = new Map<THREE.Material, LiveUniforms>();
   private live = false;
   private lampPool: string | null = null;
   private readonly cBand = [new THREE.Color(), new THREE.Color()];
@@ -214,7 +221,7 @@ export class Road {
     applyStylize(this.pitMaterial, 'road');
     applyStylize(this.decalMaterial, 'road');
     // A mistura ao vivo entra DEPOIS do estilizador (compõe com ele): só há código novo no programa das pistas que têm período seguinte.
-    for (const m of [this.asphaltMaterial, this.shoulderMaterial, this.kerbMaterial, this.pitMaterial, this.decalMaterial]) installLiveBlend(m);
+    for (const m of [this.asphaltMaterial, this.shoulderMaterial, this.kerbMaterial, this.pitMaterial, this.decalMaterial]) this.liveUniforms.set(m, installLiveBlend(m, this.blend));
     this.asphalt = new Strip(capacity, 2, this.asphaltMaterial);
     this.shoulders = new Strip(capacity, 4, this.shoulderMaterial);
     this.pit = new Strip(capacity, 2, this.pitMaterial);
@@ -298,12 +305,18 @@ export class Road {
       this.textures.push(asphaltB.map, asphaltB.glow, kerbB, shoulderB, pitB, decalB);
       const link = (m: THREE.Material, mapB: THREE.Texture, emissiveB: THREE.Texture): void => {
         m.userData.roadBlend = this.blend;
-        m.userData.roadLive = { mapB: { value: mapB }, emissiveB: { value: emissiveB } };
+        m.userData.roadLive = true;
+        const u = this.liveUniforms.get(m);
+        if (u) { u.uMapB.value = mapB; u.uEmissiveMapB.value = emissiveB; }
       };
       link(a, asphaltB.map, asphaltB.glow); link(this.kerbMaterial, kerbB, kerbB); link(this.shoulderMaterial, shoulderB, shoulderB);
       link(this.pitMaterial, pitB, pitB); link(this.decalMaterial, decalB, decalB);
     } else {
-      for (const m of [a, this.kerbMaterial, this.shoulderMaterial, this.pitMaterial, this.decalMaterial]) { delete m.userData.roadLive; delete m.userData.roadBlend; }
+      for (const m of [a, this.kerbMaterial, this.shoulderMaterial, this.pitMaterial, this.decalMaterial]) {
+        delete m.userData.roadLive; delete m.userData.roadBlend;
+        const u = this.liveUniforms.get(m);
+        if (u) { u.uMapB.value = null; u.uEmissiveMapB.value = null; } // nada aponta para as texturas liberadas acima
+      }
     }
     // Faixas de 3 segmentos um pouco mais claras/escuras: o ritmo que dá sensação de velocidade.
     this.cBand[0].setRGB(1, 1, 1); this.cBand[1].setRGB(0.93, 0.93, 0.94);
