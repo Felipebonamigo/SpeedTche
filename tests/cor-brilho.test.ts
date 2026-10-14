@@ -12,6 +12,7 @@ import { createRace } from '../src/core/sim/race';
 import { getTrack } from '../src/core/track';
 import type { RenderFrame } from '../src/game/contracts';
 import { Cars } from '../src/render/cars';
+import { Effects } from '../src/render/effects';
 import * as M from '../src/render/cars/material';
 import * as K from '../src/render/cars/kit';
 import { buildModel } from '../src/render/cars/models';
@@ -268,6 +269,42 @@ describe('1. faróis do jogador: no carro, e no entardecer sem passar a luz do c
     const { cars, spots } = raceWith(0);
     cars.setLight(1);
     for (const s of spots) expect(s.visible && s.intensity > 0).toBe(false);
+  });
+});
+
+describe('1. as linhas de velocidade e do vácuo à noite (as barras brancas de Sampa)', () => {
+  // Em Sampa as barras brancas ao lado dos carros à frente somem sem os efeitos (medido no harness com o grupo `fx-*` escondido): são as linhas
+  // aditivas brancas (M5), com o MESMO brilho de dia e à noite; sobre a cena 10× mais escura elas viram um feixe de farol.
+  function alphaAt(p: Palette): number {
+    const t = getTrack('copacabana');
+    const state = createRace({
+      trackId: 'copacabana', laps: 3, humans: [{ seat: 0, name: 'P1', carId: 'falcao', teamId: 0, color: '#fff' }], totalCars: 4, difficulty: 'profissional',
+      manualGear: false, assists: { sharedNitro: false, tow: false, teamDraft: false, catchup: false }, seed: 42,
+    }, t);
+    state.phase = 'racing'; state.tick = 900;
+    const me = state.cars.find((c) => c.seat === 0)!;
+    for (const c of state.cars) if (c !== me) c.z = (me.z + t.length / 2) % t.length;
+    const frame = { state, track: t, time: 5, paused: false, coop: false, showHud: false,
+      viewports: [{ seat: 0, carIndex: state.cars.indexOf(me), color: '#fff', name: 'P1', messages: [] }],
+      options: { quality: 'high', showMinimap: false, screenShake: false, reduceEffects: false, palette: 'default' } } as unknown as RenderFrame;
+    const fx = new Effects();
+    fx.setPalette(p);
+    let sum = 0; let n = 0;
+    for (let i = 0; i < 90; i++) {
+      me.speed = me.stats.topSpeed; me.z = (me.z + me.speed / 60) % t.length; me.progress += me.speed / 60;
+      frame.time += 1 / 60; fx.update(frame);
+      fx.pose(buildRoadFrame(t, me.z, 30, 200), t, 600, 0);
+    }
+    const color = (fx.streaks as unknown as { color: THREE.BufferAttribute }).color;
+    for (let k = 0; k < fx.streaks.count; k++) { sum += color.getW(k * 4); n++; }
+    expect(n, 'há linhas acesas').toBeGreaterThan(5);
+    return sum / n;
+  }
+
+  it('à noite as linhas brancas têm no máximo 55% do brilho do dia; no entardecer, no máximo 85%', { timeout: 120_000 }, () => {
+    const day = alphaAt(palette('city_night', 'day'));
+    expect(alphaAt(palette('city_night', 'night')) / day).toBeLessThanOrEqual(0.55);
+    expect(alphaAt(palette('city_night', 'dusk')) / day).toBeLessThanOrEqual(0.85);
   });
 });
 
