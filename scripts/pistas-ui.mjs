@@ -94,12 +94,20 @@ async function toSelection(page, modeIndex, tag) {
   await held(page, 'Enter'); // INICIAR
 }
 
-// Espera a rolagem suave terminar (a posição para de mudar por 3 leituras seguidas, ou 8 s).
+// Espera a rolagem suave terminar: o cartão em foco dentro da área da lista e a posição parada por 5 leituras seguidas (ou ~20 s).
+// Só "3 leituras iguais" saía antes da rolagem COMEÇAR com a máquina carregada (visto em 14/10, 1920×1080, carga ~55: a posição ficou
+// parada 2,5 s e só depois rolou; T3). As conferências depois do `settle` (cartão e cabeçalho da copa à vista) não mudam.
 async function settle(page) {
   let last = -1; let still = 0;
-  for (let i = 0; i < 80 && still < 3; i++) {
-    const top = await page.evaluate(() => document.querySelector('#ui .track-scroll')?.scrollTop ?? 0);
-    still = top === last ? still + 1 : 0; last = top;
+  for (let i = 0; i < 200 && still < 5; i++) {
+    const s = await page.evaluate(() => {
+      const box = document.querySelector('#ui .track-scroll');
+      if (!box) return { top: 0, inside: true };
+      const b = box.getBoundingClientRect();
+      const f = document.querySelector('#ui .track-card.focus')?.getBoundingClientRect();
+      return { top: box.scrollTop, inside: !f || (f.top >= b.top - 1 && f.bottom <= b.bottom + 1) };
+    });
+    still = s.inside && s.top === last ? still + 1 : 0; last = s.top;
     await page.waitForTimeout(100);
   }
 }
