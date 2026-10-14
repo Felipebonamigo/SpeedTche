@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- Folha das 3 variações do logo (V3): título, canto do menu e ícone, em fundo escuro e claro. O "cromo" é o do jogo
+     (src/ui/logo.ts); "placa" e "fita" só existem aqui (tools/menu-estilos/logos.ts). Com o vite no ar:
+     /tools/menu-estilos/logos.html (todas) ou ?v=cromo (uma só, para ver grande). Foto: node tools/menu-estilos/logos.mjs <porta>. -->
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Logos do Speed Tchê</title>
+  <style>
+    html, body { margin: 0; background: #14182a; color: #e8ecf4; font: 600 15px Fredoka, system-ui, sans-serif; }
+    .row { display: grid; grid-template-columns: 120px 1fr 1fr 360px; gap: 14px; padding: 14px 18px; border-bottom: 1px solid #2a3046; align-items: center; }
+    .name { font-size: 20px; font-weight: 700; text-transform: uppercase; }
+    .name small { display: block; font-size: 12px; color: #9fb0c6; font-weight: 500; text-transform: none; }
+    .cell { border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .dark { background: linear-gradient(180deg, #2b1747, #0b0f22); }
+    .light { background: linear-gradient(180deg, #bfe3ff, #f4e7cf); }
+    .big { width: 330px; } .small { width: 150px; }
+    .icons { display: flex; gap: 12px; align-items: flex-end; }
+    .icons .i96 { width: 96px; } .icons .i48 { width: 48px; } .icons .i32 { width: 32px; } .icons .i16 { width: 16px; }
+    .icons > div { display: flex; flex-direction: column; gap: 8px; }
+    svg.logo { display: block; width: 100%; height: auto; overflow: visible; }
+    .head { padding: 10px 18px; font-size: 13px; color: #9fb0c6; }
+  </style>
+</head>
+<body>
+  <div class="head">Logo novo (V3): 3 variações · título e canto do menu em fundo escuro e claro · ícone em 96, 48, 32 e 16 px · ★ = a do jogo</div>
+  <div id="rows"></div>
+  <script type="module">
+    import '/src/ui/fonts.css';
+    import { logoVariante, VARIANTES } from '/tools/menu-estilos/logos.ts';
+    const so = new URLSearchParams(location.search).get('v');
+    const DESC = { placa: 'placa marinho, faixa por baixo', cromo: 'duas linhas, faixas atrás ★ jogo', fita: 'fita de pôr do sol' };
+    const rows = document.getElementById('rows');
+    for (const v of VARIANTES.filter((x) => !so || x === so)) {
+      const r = document.createElement('div'); r.className = 'row';
+      const cell = (cls, inner) => `<div class="cell ${cls}">${inner}</div>`;
+      const box = (cls, svg) => `<div class="${cls}">${svg}</div>`;
+      const icons = (bg) => `<div class="icons">${['i96', 'i48', 'i32', 'i16'].map((c) => box(c, logoVariante(v, 'icon'))).join('')}</div>`;
+      r.innerHTML = `<div class="name">${v}<small>${DESC[v]}</small></div>`
+        + cell('dark', box('big', logoVariante(v, 'big')) + box('small', logoVariante(v, 'small')))
+        + cell('light', box('big', logoVariante(v, 'big')) + box('small', logoVariante(v, 'small')))
+        + `<div class="cell" style="background:none">${cell('dark', icons())}${cell('light', icons())}</div>`;
+      rows.appendChild(r);
+    }
+  </script>
+</body>
+</html>

@@ -1,29 +1,50 @@
-// Logo provisório da tela de título (src/ui/logo.ts, onda L, L5): "Speed Tchê" em SVG inline, feito em código com a fonte
-// de exibição (ui/fonts.css). Substitui o texto NITRO CREW, que ainda estava no título, no menu e nos créditos.
+// Logo do Speed Tchê (src/ui/logo.ts). V3 (14/10/2026): o logo novo do tema padrão — "SPEED TCHÊ" em itálico forte numa placa
+// inclinada com a faixa de velocidade, em SVG inline (sem dependência), legível em fundo claro e escuro, em três tamanhos: o do
+// título (`big`), o do canto do menu (`small`) e o ícone quadrado (`icon`). O logo provisório da onda L5 ("Speed" / "Tchê" em
+// degradê) continua só para o ?tema=classico, até a próxima versão (`logoClassicoMarkup`).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { logoMarkup, type LogoSize } from '../src/ui/logo';
+import { logoClassicoMarkup, logoMarkup, type LogoSize } from '../src/ui/logo';
 
-const SIZES: LogoSize[] = ['big', 'small'];
+const SIZES: LogoSize[] = ['big', 'small', 'icon'];
+const viewBox = (m: string) => (m.match(/viewBox="0 0 (\d+) (\d+)"/) ?? []).slice(1).map(Number);
+const ids = (s: string) => [...s.matchAll(/\bid="([^"]+)"/g)].map((x) => x[1]);
 
 describe('logo Speed Tchê', () => {
-  it('é um SVG com viewBox, papel de imagem e nome acessível', () => {
+  it('é um SVG com viewBox, papel de imagem e nome acessível, nos três tamanhos', () => {
     for (const size of SIZES) {
       const m = logoMarkup(size);
       expect(m.startsWith('<svg'), size).toBe(true);
-      expect(m).toContain('viewBox="');
+      expect(viewBox(m).length, size).toBe(2);
       expect(m).toContain('role="img"');
       expect(m).toContain('aria-label="Speed Tchê"');
       expect(m).toContain('class="logo logo-' + size + '"');
     }
   });
 
-  it('desenha as palavras "Speed" e "Tchê" (com circunflexo) usando a fonte de exibição', () => {
-    const m = logoMarkup('big');
+  it('o título e o canto escrevem SPEED e TCHÊ (com circunflexo), em itálico (inclinado) e com a faixa de velocidade', () => {
+    for (const size of ['big', 'small'] as const) {
+      const m = logoMarkup(size);
+      expect(m, size).toContain('>SPEED<');
+      expect(m, size).toContain('>TCHÊ<');
+      expect(m, size).toMatch(/skewX\(-\d+/);
+      expect(m, size).toContain('logo-faixa');
+    }
+  });
+
+  it('o canto do menu é uma linha só (baixo e largo) e o ícone é quadrado', () => {
+    const [w, h] = viewBox(logoMarkup('small'));
+    expect(w / h).toBeGreaterThan(3);
+    const [iw, ih] = viewBox(logoMarkup('icon'));
+    expect(iw).toBe(ih);
+  });
+
+  it('o logo provisório antigo continua para o ?tema=classico', () => {
+    const m = logoClassicoMarkup('big');
     expect(m).toContain('>Speed<');
     expect(m).toContain('>Tchê<');
-    expect(m).toContain('var(--font-display)');
+    expect(m).toContain('class="logo logo-big"');
   });
 
   it('não sobrou NITRO nem CREW: nem no logo nem na tela de título', () => {
@@ -33,11 +54,10 @@ describe('logo Speed Tchê', () => {
     expect(simple).toContain("from '../logo'");
   });
 
-  it('os ids do SVG são únicos por tamanho (dois logos na mesma tela não trocam o gradiente)', () => {
-    const ids = (s: string) => [...s.matchAll(/\bid="([^"]+)"/g)].map((x) => x[1]);
-    const a = ids(logoMarkup('big')); const b = ids(logoMarkup('small'));
-    expect(a.length).toBeGreaterThan(0);
-    for (const id of a) expect(b).not.toContain(id);
-    expect(new Set(a).size).toBe(a.length);
+  it('os ids do SVG são únicos por tamanho e entre o logo novo e o antigo (dois logos na mesma tela não trocam o gradiente)', () => {
+    const all = [...SIZES.map((s) => ids(logoMarkup(s))), ids(logoClassicoMarkup('big')), ids(logoClassicoMarkup('small'))];
+    for (const list of all) expect(list.length).toBeGreaterThan(0);
+    const flat = all.flat();
+    expect(new Set(flat).size).toBe(flat.length);
   });
 });

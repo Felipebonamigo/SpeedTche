@@ -1,0 +1,176 @@
+/* TEMA "speedtche" — o visual padrão dos menus (V3, 14/10/2026; docs/ondas/menu-estilos.md). Escolha do dono: a direção A
+   ("Velocidade": arcade moderno em pôr do sol, Horizon Chase Turbo e Forza Horizon) como base, com os painéis de informação da B
+   ("Vidro": vidro escuro limpo, Gran Turismo 7 e NFS Heat). Na prática:
+   - da A: títulos, botões e cartões em itálico forte; cartões do menu com número grande (01–05) que viram degradê laranja→rosa no
+     foco; botões inclinados; véu de pôr do sol e faixas diagonais laranja/rosa/azul no fundo; números grandes (dinheiro, prêmio) em itálico;
+   - da B: todo painel que mostra informação (vidro, quadros do menu, linhas de opção, tabelas, painéis da garagem, colunas do Pagamento)
+     é vidro escuro com desfoque e fio de 1px, e o texto de dentro é RETO (sem itálico), em cinzas legíveis, com rótulos em caixa alta e
+     espaçados na cor do acento.
+   Só repinta: nenhum tamanho, posição, navegação ou estado muda (o teste de layout mede as 672 combinações sem o parâmetro). O 3D segue
+   à mostra e nada cobre as janelas do palco (regra em tema-base.css). O visual anterior: ?tema=classico, até a próxima versão. */
+
+/* Os tokens ficam no #ui, não na raiz: o HUD de corrida (#hud, irmão do #ui) também lê --accent e --font-display e não muda com o menu (V5). */
+:root[data-tema="speedtche"] #ui {
+  --acc-rgb: 255 122 26;
+  --accent: #ff7a1a;
+  --accent-2: #ff9a3d;
+  --accent-soft: rgba(255, 122, 26, 0.18);
+  --a-pink: #ff3d7f;
+  --a-blue: #2f7bff;
+  --a-sun: #ffd23f;
+  --a-grad: linear-gradient(100deg, #ff8a1f 0%, #ff3d7f 100%);
+  --a-bars: linear-gradient(90deg, #ff8a1f 0 34%, #ff3d7f 34% 67%, #2f7bff 67%);
+  --a-skew: -9deg;
+  --ok: #4be39a;
+  --bad: #ff5470;
+  --text: #f4f6fb;
+  --muted: #aeb9cb;
+  --dim: #717d92;
+  --glass: rgba(8, 10, 18, 0.62);
+  --glass-solid: #0a0e15;
+  --line: rgba(255, 255, 255, 0.12);
+  --r: calc(8 * var(--u));
+  --r-sm: calc(6 * var(--u));
+  --font: "Fredoka Tema", "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Fredoka Tema", "Fredoka", ui-rounded, "Arial Rounded MT Bold", Arial, sans-serif;
+  font-family: var(--font);
+}
+
+/* ── Fundo (A): véu de pôr do sol + faixas diagonais, atrás do conteúdo; nunca nas telas com palco 3D ── */
+:root[data-tema="speedtche"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(58, 16, 88, 0.46) 0%, rgba(80, 22, 84, 0.3) 46%, rgba(6, 8, 22, 0.8) 100%); }
+:root[data-tema="speedtche"] .screen:not(.stage3d)::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 0 74%, rgba(255, 138, 31, 0.18) 74% 76%, transparent 76% 79%, rgba(255, 61, 127, 0.18) 79% 80.5%, transparent 80.5% 83%, rgba(47, 123, 255, 0.2) 83% 84%, transparent 84%);
+}
+:root[data-tema="speedtche"] .screen.scr-title::before {
+  background: linear-gradient(115deg, transparent 0 34%, rgba(255, 138, 31, 0.24) 34% 46%, rgba(255, 61, 127, 0.22) 46% 54%, rgba(47, 123, 255, 0.2) 54% 59%, transparent 59%);
+}
+/* A pausa abre por cima da corrida: o véu de pôr do sol vira só um escurecido (o jogo atrás continua o que é). */
+:root[data-tema="speedtche"] .screen.scr-pause { background: linear-gradient(180deg, rgba(6, 8, 22, 0.55), rgba(6, 8, 22, 0.75)); }
+
+/* ── Painéis de informação (B): vidro escuro limpo, fio de 1px, brilho no alto e um traço curto de pôr do sol ── */
+:root[data-tema="speedtche"] .glass {
+  background: linear-gradient(90deg, #ff8a1f, #ff3d7f 22%, rgba(255, 61, 127, 0) 46%) top left / 100% 2px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 38%), var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 22px 64px rgba(0, 0, 0, 0.45);
+}
+:root[data-tema="speedtche"] .home-box {
+  border-radius: var(--r); border-color: rgba(255, 255, 255, 0.11);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 40%), rgba(8, 10, 18, 0.62);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: inset calc(3 * var(--u)) 0 0 var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+/* Rótulos de painel (B): caixa alta, espaçados, na cor do acento, retos. */
+:root[data-tema="speedtche"] .sub-title,
+:root[data-tema="speedtche"] .home-box-title { color: #ffad6b; letter-spacing: 0.16em; font-weight: 700; }
+:root[data-tema="speedtche"] .goal-row .goal-tag { color: var(--a-sun); }
+:root[data-tema="speedtche"] .goal-bar { height: calc(4 * var(--u)); border-radius: 0; background: rgba(255, 255, 255, 0.12); }
+:root[data-tema="speedtche"] .goal-bar > i { background: var(--a-grad); }
+:root[data-tema="speedtche"] .recap-chip { border-radius: calc(3 * var(--u)); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.16); }
+:root[data-tema="speedtche"] .chip { border-radius: calc(3 * var(--u)); background: rgba(255, 122, 26, 0.12); color: #ffb57a; }
+
+/* ── Títulos (A): itálico forte, sombra dura rosa, sublinhado nas três cores (a mesma altura do atual: o layout não muda) ── */
+:root[data-tema="speedtche"] .screen-title, :root[data-tema="speedtche"] .main-hero-title {
+  font-weight: 700; font-style: italic; letter-spacing: 0.02em;
+  text-shadow: calc(3 * var(--u)) calc(3 * var(--u)) 0 rgba(255, 61, 127, 0.9), 0 calc(6 * var(--u)) calc(24 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+:root[data-tema="speedtche"] .screen-title::after, :root[data-tema="speedtche"] .main-hero-title::after {
+  width: calc(96 * var(--u)); height: calc(4 * var(--u)); border-radius: 0; background: var(--a-bars); transform: skewX(var(--a-skew));
+}
+:root[data-tema="speedtche"] .title-sub { font-style: italic; font-weight: 700; color: #ffe3c2; text-shadow: 0 2px 14px rgba(40, 6, 60, 0.85); }
+:root[data-tema="speedtche"] .title-press {
+  font-style: italic; font-weight: 700; color: #fff; border: 0; border-radius: 0; transform: skewX(var(--a-skew));
+  background: var(--a-grad); box-shadow: 0 10px 34px rgba(255, 61, 127, 0.45);
+}
+:root[data-tema="speedtche"] .title-foot { color: #d6c6e6; }
+:root[data-tema="speedtche"] .main-hint { color: #e3e8f2; text-shadow: 0 1px calc(8 * var(--u)) rgba(2, 4, 12, 0.9); }
+:root[data-tema="speedtche"] .screen > .hint { text-shadow: 0 1px calc(8 * var(--u)) rgba(2, 4, 12, 0.9); }
+:root[data-tema="speedtche"] .logo { filter: drop-shadow(0 calc(10 * var(--u)) calc(22 * var(--u)) rgba(0, 0, 0, 0.5)); }
+
+/* ── Botões (A): inclinados, itálico, degradê no foco. O rótulo do botão é título, não corpo de texto. ── */
+:root[data-tema="speedtche"] .btn {
+  font-style: italic; font-weight: 700; border-radius: calc(5 * var(--u)); transform: skewX(var(--a-skew));
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)); border-color: rgba(255, 255, 255, 0.22);
+}
+:root[data-tema="speedtche"] .btn:hover, :root[data-tema="speedtche"] .btn.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.4)); border-color: #ffb27a; }
+:root[data-tema="speedtche"] .btn.focusable.focus { transform: skewX(var(--a-skew)) translateX(calc(3 * var(--u))) scale(1.04); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 12px 34px rgba(255, 61, 127, 0.4); }
+:root[data-tema="speedtche"] .btn-primary { background: var(--a-grad); border-color: transparent; color: #fff; box-shadow: 0 8px 24px rgba(255, 61, 127, 0.3); }
+:root[data-tema="speedtche"] .btn-primary:hover, :root[data-tema="speedtche"] .btn-primary.focus { background: linear-gradient(100deg, #ffa13d, #ff5a97); }
+:root[data-tema="speedtche"] .btn-primary.disabled { background: rgba(255, 255, 255, 0.07); box-shadow: none; }
+:root[data-tema="speedtche"] .btn.btn-main { background: none; border-color: transparent; box-shadow: none; }
+:root[data-tema="speedtche"] .btn.btn-main.focusable.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.4)); box-shadow: none; }
+:root[data-tema="speedtche"] .focusable::before { background: #fff; border-radius: 0; width: calc(5 * var(--u)); }
+
+/* ── Menu principal (A): cinco cartões com número grande ── */
+:root[data-tema="speedtche"] .menu-list { counter-reset: carta; }
+:root[data-tema="speedtche"] .menu-list .btn.btn-main.btn-card {
+  counter-increment: carta; position: relative; overflow: hidden; border-radius: calc(6 * var(--u)); letter-spacing: 0.03em;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 100%); border: 1px solid rgba(255, 255, 255, 0.14);
+}
+:root[data-tema="speedtche"] .menu-list .btn.btn-main.btn-card::after {
+  content: counter(carta, decimal-leading-zero); margin-left: auto; padding-left: calc(10 * var(--u));
+  font-size: calc(34 * var(--u)); font-weight: 700; font-style: italic; line-height: 1; letter-spacing: 0;
+  color: transparent; -webkit-text-stroke: calc(1.5 * var(--u)) rgba(255, 190, 140, 0.55);
+}
+:root[data-tema="speedtche"] .menu-list .btn.btn-main.btn-card.focus { background: var(--a-grad); border-color: rgba(255, 255, 255, 0.8); }
+:root[data-tema="speedtche"] .menu-list .btn.btn-main.btn-card.focus::after { -webkit-text-stroke-color: rgba(255, 255, 255, 0.95); }
+:root[data-tema="speedtche"] .menu-list .btn.btn-main.btn-card:has(.card-badge)::after { display: none; }
+:root[data-tema="speedtche"] .btn-card .card-badge { white-space: nowrap; margin-left: calc(10 * var(--u)); background: var(--a-sun); color: #3a1450; border-radius: calc(3 * var(--u)); }
+:root[data-tema="speedtche"] .btn.btn-main.btn-corner { color: #dfe5ef; font-size: calc(15 * var(--u)); }
+/* O canto não inclina: os botões ficam a 4u um do outro e a caixa inclinada encostaria no vizinho. */
+:root[data-tema="speedtche"] .btn.btn-main.btn-corner, :root[data-tema="speedtche"] .btn.btn-main.btn-corner.focusable.focus { transform: none; }
+:root[data-tema="speedtche"] .btn.btn-main.btn-corner.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.55), rgba(255, 61, 127, 0.45)); color: #fff; }
+:root[data-tema="speedtche"] .main-corner { border-top: 1px solid; border-image: var(--a-bars) 1; }
+
+/* ── Seletor, barras e tabelas: painel da B (escuro, legível), foco da A ── */
+:root[data-tema="speedtche"] .sel {
+  border-radius: calc(5 * var(--u)); background: rgba(8, 10, 18, 0.66); border-color: rgba(255, 255, 255, 0.07);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+:root[data-tema="speedtche"] .sel.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.42), rgba(255, 61, 127, 0.3)); border-color: rgba(255, 190, 140, 0.6); }
+:root[data-tema="speedtche"] .sel-label { color: #c3cbd8; }
+:root[data-tema="speedtche"] .sel-arrow { color: #ffb27a; }
+:root[data-tema="speedtche"] .car-bar-track, :root[data-tema="speedtche"] .ach-bar { border-radius: 0; }
+:root[data-tema="speedtche"] .car-bar-fill { border-radius: 0; background: var(--a-grad); }
+:root[data-tema="speedtche"] .table th { color: #ffad6b; letter-spacing: 0.14em; }
+:root[data-tema="speedtche"] .table td { border-bottom-color: rgba(255, 255, 255, 0.07); }
+:root[data-tema="speedtche"] .table tr.human td { background: rgba(255, 138, 31, 0.14); }
+:root[data-tema="speedtche"] .verdict.big { font-style: italic; border-radius: calc(4 * var(--u)); transform: skewX(var(--a-skew)); }
+
+/* ── Copas e pistas: lista e detalhe em vidro, a linha em foco em degradê ── */
+:root[data-tema="speedtche"] .scr-cups .cup-row.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.36)); border-color: rgba(255, 255, 255, 0.7); }
+:root[data-tema="speedtche"] .scr-cups .cup-tab { border-radius: calc(5 * var(--u)); background: rgba(8, 10, 18, 0.62); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+:root[data-tema="speedtche"] .scr-cups .cup-tab.active { background: var(--a-grad); color: #fff; box-shadow: inset 0 calc(-3 * var(--u)) 0 #fff; border-color: transparent; }
+:root[data-tema="speedtche"] .scr-cups .cup-tab.active .cup-tab-count { color: #fff; }
+:root[data-tema="speedtche"] .scr-cups .cup-race, :root[data-tema="speedtche"] .scr-tracks .track-card { border-radius: calc(7 * var(--u)); }
+:root[data-tema="speedtche"] .scr-tracks .track-card.focus, :root[data-tema="speedtche"] .track-card.focus {
+  background: linear-gradient(100deg, rgba(255, 138, 31, 0.34), rgba(8, 10, 18, 0.7)); border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 14px 38px rgba(255, 61, 127, 0.35);
+}
+:root[data-tema="speedtche"] .scr-cups .cup-race-n { font-style: italic; color: #ffb27a; }
+:root[data-tema="speedtche"] .dots i.on { background: var(--accent); }
+
+/* ── Garagem e Concessionária: painel de vidro da B; a janela do palco continua inteira à mostra (só o anel muda) ── */
+:root[data-tema="speedtche"] .gp-money b { font-style: italic; color: var(--a-sun); }
+:root[data-tema="speedtche"] .seat-badge { border-radius: calc(3 * var(--u)); }
+:root[data-tema="speedtche"] .gp-part { border-radius: calc(5 * var(--u)); background: rgba(255, 255, 255, 0.035); }
+:root[data-tema="speedtche"] .gp-part.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.4), rgba(255, 61, 127, 0.26)); }
+:root[data-tema="speedtche"] .gp-tag.sale { background: rgba(255, 138, 31, 0.26); color: #ffd9b3; border-radius: calc(4 * var(--u)); }
+:root[data-tema="speedtche"] .gp-tag.ok { border-radius: calc(4 * var(--u)); }
+:root[data-tema="speedtche"] .stage3d .gp-car-name { background: linear-gradient(180deg, rgba(4, 6, 14, 0.8), rgba(4, 6, 14, 0)); }
+:root[data-tema="speedtche"] .stage3d .gp-car.focus .gp-stage { box-shadow: inset 0 0 0 2px #ff9a3d, inset 0 0 calc(26 * var(--u)) rgba(255, 61, 127, 0.38); }
+:root[data-tema="speedtche"] .stage3d .gp-tag { background: rgba(4, 6, 14, 0.78); }
+:root[data-tema="speedtche"] .stage3d .gp::before { background: var(--glass); }
+:root[data-tema="speedtche"] .stage3d .gp-car > .sel-arrow { background: rgba(4, 6, 14, 0.62); color: #ffb27a; }
+
+/* ── Pagamento e resultado: colunas de vidro, números grandes em itálico ── */
+:root[data-tema="speedtche"] .payout-col, :root[data-tema="speedtche"] .payout-vault { border-radius: var(--r); }
+:root[data-tema="speedtche"] .pc-label { letter-spacing: 0.16em; }
+:root[data-tema="speedtche"] .pc-prize-val, :root[data-tema="speedtche"] .pv-val { font-style: italic; }
+
+/* ── Lobby, festa, recordes, controles: cartões de vidro com o foco da A ── */
+:root[data-tema="speedtche"] .slot { border-radius: var(--r); }
+:root[data-tema="speedtche"] .rec-tab.on { background: var(--a-grad); }
+:root[data-tema="speedtche"] .party-card.focus { border-color: #ffb27a; }

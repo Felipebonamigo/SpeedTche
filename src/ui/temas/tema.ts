@@ -1,20 +1,26 @@
-// Temas visuais OPCIONAIS dos menus (docs/ondas/menu-estilos.md): `?tema=a|b|c` na URL liga um deles; sem o parâmetro (ou com
-// qualquer outro valor) nada muda e o visual atual segue como padrão. O tema é só o atributo `data-tema` na raiz (<html>) e no
-// #ui: as folhas tema-a/b/c.css repintam o que já existe (cores, bordas, sombras, fonte) sem mexer em comportamento, navegação
-// ou estado. Reservado para a experimentação do dono: a escolha definitiva vira o padrão e esta camada some.
-import './tema-icones.css';
+// Tema visual do menu (V3, docs/ondas/menu-estilos.md). O padrão, sem parâmetro, é o "speedtche": a direção A (arcade moderno em
+// pôr do sol: itálico forte nos títulos e nos botões, faixas diagonais, números grandes) com os painéis de informação da B (vidro
+// escuro limpo, texto reto e legível). O visual anterior fica acessível só por `?tema=classico` até a próxima versão, para comparar;
+// então este parâmetro, o `logoClassicoMarkup` e este arquivo de escolha saem e o CSS do tema vira o styles.css.
+// O tema é o atributo `data-tema` em <html> e no #ui: as folhas repintam o que já existe (cor, borda, sombra, fonte) sem mexer em
+// comportamento, navegação ou estado. As direções B e C puras saíram do jogo: ficam no histórico e na folha de componentes
+// (tools/menu-estilos/).
 import './tema-base.css';
-import './tema-a.css';
-import './tema-b.css';
-import './tema-c.css';
+import './tema-speedtche.css';
 
-export const TEMAS = ['a', 'b', 'c'] as const;
+export const TEMA_PADRAO = 'speedtche' as const;
+export const TEMAS = [TEMA_PADRAO] as const;
 export type TemaId = typeof TEMAS[number];
 
-/** O tema pedido na query string (`?tema=b`), ou null. */
+/** O tema pedido na query string: o padrão, ou null com `?tema=classico` (o visual anterior). */
 export function temaDaUrl(search: string): TemaId | null {
   const v = new URLSearchParams(search).get('tema')?.toLowerCase() ?? '';
-  return (TEMAS as readonly string[]).includes(v) ? (v as TemaId) : null;
+  return v === 'classico' ? null : TEMA_PADRAO;
+}
+
+/** O tema ligado agora (null = clássico). */
+export function temaAtivo(doc: Document = document): TemaId | null {
+  return doc.documentElement.getAttribute('data-tema') === TEMA_PADRAO ? TEMA_PADRAO : null;
 }
 
 /** Liga (ou, com null, desliga) o tema na raiz e no #ui. */

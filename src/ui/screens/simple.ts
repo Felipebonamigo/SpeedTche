@@ -8,17 +8,19 @@ import '../../party/strings';
 import '../fonts.css';
 import '../../expedition/strings';
 import { expeditionRoute, savedFreeCup } from '../../game/expedition';
-import { logoMarkup, type LogoSize } from '../logo';
+import { logoClassicoMarkup, logoMarkup, type LogoSize } from '../logo';
+import { TEMA_PADRAO } from '../temas/tema';
 import '../passport/strings';
 import { button, createFocusList, h, listNav, screenFrame, type FocusItem, type ScreenApi, type ScreenInstance } from './common';
 import { goalsFor, goalsPanel, recapPanel } from './home-panels';
 import { startCursor } from './lobby';
 import { shouldOfferTutorial, tutorialOfferCard } from './tutorial';
 
-/** O logo provisório (ui/logo.ts): SVG inline na fonte de exibição, no lugar do texto que dizia NITRO CREW. */
+/** O logo (ui/logo.ts): SVG inline. O do tema padrão; com ?tema=classico (sem o atributo), o provisório antigo, até a próxima versão. */
 function logo(size: LogoSize): HTMLElement {
   const wrap = h('div', { class: `logo-wrap logo-wrap-${size}` });
-  wrap.innerHTML = logoMarkup(size); // marcação constante nossa (logo.ts), nunca dado do usuário
+  const classico = typeof document !== 'undefined' && document.documentElement?.getAttribute?.('data-tema') !== TEMA_PADRAO;
+  wrap.innerHTML = classico ? logoClassicoMarkup(size) : logoMarkup(size); // marcação constante nossa (logo.ts), nunca dado do usuário
   return wrap;
 }
 

@@ -1,15 +1,15 @@
 // Captura as telas reais do jogo em cada tema de menu (docs/ondas/menu-estilos.md) a 1280×720.
-// Uma só página: o tema é o atributo `data-tema` da raiz, então troca em tempo de execução (atual = sem atributo) e a corrida de
-// preparação (resultado e Pagamento) roda uma vez só. Exige `npx vite --port P` (ou preview) no ar.
-// Uso: node scripts/menu-estilos-capture.mjs [url] [pasta-de-saída]
-//   NC_ME_TEMAS=atual,a,b,c   NC_ME_TELAS=title,main,...   NC_ME_SKIPRACE=1 (pula a corrida: sem resultado/Pagamento)
+// Uma só página: o tema é o atributo `data-tema` da raiz, então troca em tempo de execução (classico = sem atributo, como o
+// ?tema=classico) e a corrida de preparação (resultado e Pagamento) roda uma vez só. Exige o vite de desenvolvimento no ar.
+// Uso: node tools/menu-estilos/capturar.mjs [url] [pasta-de-saída]
+//   NC_ME_TEMAS=classico,speedtche   NC_ME_TELAS=title,main,...   NC_ME_SKIPRACE=1 (pula a corrida: sem resultado/Pagamento)
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const url = process.argv[2] ?? 'http://localhost:5199/?nosurvey=1&dynres=0';
 const out = process.argv[3] ?? 'scratch/menu-estilos/raw';
 const exe = process.env.CHROME_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const TEMAS = (process.env.NC_ME_TEMAS ?? 'atual,a,b,c').split(',');
+const TEMAS = (process.env.NC_ME_TEMAS ?? 'classico,speedtche').split(',');
 const SKIP_RACE = !!process.env.NC_ME_SKIPRACE;
 fs.mkdirSync(out, { recursive: true });
 
@@ -62,7 +62,7 @@ if (!SKIP_RACE && fs.existsSync(CACHE)) {
   if (process.env.NC_ME_LIVE) {
     if (!process.env.NC_ME_NOSKIP) await page.evaluate(() => document.querySelector('.results-skip')?.click());
     for (const tema of TEMAS) {
-      await page.evaluate((tm) => { for (const el of [document.documentElement, document.getElementById('ui')]) { if (tm === 'atual') el.removeAttribute('data-tema'); else el.setAttribute('data-tema', tm); } }, tema);
+      await page.evaluate((tm) => { for (const el of [document.documentElement, document.getElementById('ui')]) { if (tm === 'classico' || tm === 'atual') el.removeAttribute('data-tema'); else el.setAttribute('data-tema', tm); } }, tema);
       await page.waitForTimeout(Number(process.env.NC_ME_RESULTS_WAIT ?? 3500));
       await page.screenshot({ path: `${out}/${tema}-results.png` });
       console.log('ok', tema, 'results (ao vivo)');
@@ -105,13 +105,33 @@ const TELAS = [
   ['results', () => { window.nc.session.menus.show('results', window.__shown.results); setTimeout(() => document.querySelector('.results-skip')?.click(), 700); }, 3000],
   ['lobby', () => { const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); ['kb1', 'kb2'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('lobby'); }, 1500],
   ['options', () => window.nc.session.menus.show('options'), 800],
+  ['free', () => window.nc.session.menus.show('free'), 1200],
+  ['garage-hub', () => window.nc.session.menus.show('garageHub'), 1200],
+  ['dealership', () => {
+    const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1');
+    s.handleMenuEvent({ type: 'startCareer', humans: [{ seat: 0, name: 'Marina', carId: 'falcao', teamId: 0, color: '#fff' }], resume: false });
+    s.menus.show('dealership');
+  }, 7000],
+  ['lobby-editor', () => {
+    const s = window.nc.session; for (let i = 0; i < 4; i++) s.input.unbindSeat(i); ['kb1', 'kb2'].forEach((d, i) => s.input.bindSeat(i, d));
+    s.menus.show('lobby'); document.querySelector('.slot.occupied .btn-look')?.click();
+  }, 1500],
+  ['access', () => window.nc.session.menus.show('access'), 800],
+  ['controls', () => window.nc.session.menus.show('controls'), 800],
+  ['records', () => window.nc.session.menus.show('records'), 1000],
+  ['pause', () => window.nc.session.menus.show('pause'), 800],
+  ['online', () => window.nc.session.menus.show('online'), 1000],
+  ['tutorial', () => { const s = window.nc.session; ['kb1', 'kb2'].forEach((d, i) => s.input.bindSeat(i, d)); s.menus.show('tutorial'); }, 1200],
+  ['assist-offer', () => window.nc.session.menus.show('assistOffer', { brake: true, amateur: true }), 800],
+  ['survey', () => window.nc.session.menus.show('survey'), 800],
+  ['credits', () => window.nc.session.menus.show('credits'), 800],
   ['passport', () => window.nc.session.menus.show('passport'), 1200],
 ].filter(([id]) => (!process.env.NC_ME_TELAS || process.env.NC_ME_TELAS.split(',').includes(id)) && !(id === 'results' && LIVE_RESULTS));
 
 for (const tela of TELAS) {
   for (const tema of TEMAS) {
     await page.evaluate((tm) => {
-      for (const el of [document.documentElement, document.getElementById('ui')]) { if (tm === 'atual') el.removeAttribute('data-tema'); else el.setAttribute('data-tema', tm); }
+      for (const el of [document.documentElement, document.getElementById('ui')]) { if (tm === 'classico' || tm === 'atual') el.removeAttribute('data-tema'); else el.setAttribute('data-tema', tm); }
     }, tema);
     // As telas com estado (Garagem) são montadas uma vez por tema: a tela sai do histórico e volta.
     await page.evaluate(tela[1]);
