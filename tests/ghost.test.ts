@@ -93,22 +93,23 @@ describe('fantasma: codificação', () => {
     expect(encodeTrace({ sampleTicks: 3, t0: 1, samples: flat }).length).toBeLessThan(40);
   });
 
-  it('volta de verdade em todas as pistas fica abaixo de 20 KB — IA e o pior caso (ziguezague na grama)', () => {
-    for (const def of TRACKS) {
-      const track = getTrack(def.id);
-      for (const driver of [aiDriver, zigzagDriver]) {
-        const { events } = runTimeTrial(track, 1, driver, null);
-        expect(events.length, def.id).toBe(1);
-        const rec = events[0].newBest;
-        expect(rec, def.id).not.toBeNull();
-        if (!rec) continue;
-        expect(new TextEncoder().encode(JSON.stringify(rec)).length, def.id).toBeLessThan(20 * 1024);
-        expect(sanitizeGhostRecord(rec), def.id).toEqual(rec);
-        // A volta de verdade cabe na própria pista e leva a impressão desta versão (sem falso "outra pista").
-        expect(checkGhost(rec), def.id).toBe('ok');
-      }
+  // Um teste por pista (T6, auditoria de 14/10/2026): as 109 pistas × 2 pilotos num teste só custavam ~4,3 s de CPU sozinho (14/10) e
+  // estouravam os 30 s com a máquina carregada (visto com carga 31 rodando só este arquivo). Separado, cada pista custa ~40 ms (a mais
+  // cara, ~350 ms, é a primeira: o aquecimento do JIT) e o tempo-limite de 30 s por pista sobra ~85 vezes. A cobertura é a mesma.
+  it.for(TRACKS.map((d) => d.id))('volta de verdade em %s fica abaixo de 20 KB — IA e o pior caso (ziguezague na grama)', { timeout: 30_000 }, (id) => {
+    const track = getTrack(id);
+    for (const driver of [aiDriver, zigzagDriver]) {
+      const { events } = runTimeTrial(track, 1, driver, null);
+      expect(events.length, id).toBe(1);
+      const rec = events[0].newBest;
+      expect(rec, id).not.toBeNull();
+      if (!rec) continue;
+      expect(new TextEncoder().encode(JSON.stringify(rec)).length, id).toBeLessThan(20 * 1024);
+      expect(sanitizeGhostRecord(rec), id).toEqual(rec);
+      // A volta de verdade cabe na própria pista e leva a impressão desta versão (sem falso "outra pista").
+      expect(checkGhost(rec), id).toBe('ok');
     }
-  }, 30_000); // ~2,5 s sozinho; passava dos 5 s padrão com a máquina carregada
+  });
 
   it('dado corrompido é ignorado sem lançar', () => {
     const good = encodeTrace(syntheticTrace(400));

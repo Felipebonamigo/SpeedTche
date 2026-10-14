@@ -48,8 +48,10 @@ const ghostFrame = () => page.evaluate(() => {
   const g = r.ghost?.frame(r.state);
   return g ? { pose: g.pose ? { z: Math.round(g.pose.z) } : null, delta: g.delta } : null;
 });
+// As malhas do carro-fantasma: material padrão translúcido fora das instâncias (cars.ts; UMA malha, a casca do estilo, desde a onda F).
+// A mancha de contato do cenário (`scenery:blob`, MeshBasicMaterial a 0,32) também é translúcida e não conta (T3, 14/10/2026).
 const translucent = () => page.evaluate(() => {
-  let n = 0; window.nc.session.renderer.__scene.traverse((o) => { if (o.isMesh && !o.isInstancedMesh && o.material?.opacity < 0.5 && o.material?.transparent && o.visible) n++; });
+  let n = 0; window.nc.session.renderer.__scene.traverse((o) => { if (o.isMesh && !o.isInstancedMesh && o.material?.isMeshStandardMaterial && o.material.opacity < 0.5 && o.material.transparent && o.visible) n++; });
   return n;
 });
 const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('speed-tche.ghosts') ?? 'null'));
@@ -114,11 +116,18 @@ await toResults();
 
 // ───────────── 2) No contra-relógio seguinte ele aparece ─────────────
 await timeTrial();
+// Perde tempo de propósito: 1 s freando logo depois da linha (o relógio da volta e o do fantasma começam nela; ~0,6 s de diferença).
+// Pilotando igual à volta gravada a diferença só passava de 0,12 s por ruído do teclado (visto: no máximo 0,1206 s numa volta), e quando
+// não passava a corrida acabava e o fantasma sumia antes da conferência (T3, 14/10/2026).
+await drive((k) => k.lap >= 1 && k.phase === 'racing' && k.z > 2000 && k.z < 100000, 6);
+await page.keyboard.down('ArrowDown');
+await page.evaluate(() => window.nc.session.debugStep(60));
+await page.keyboard.up('ArrowDown');
 await drive(async (k) => { if (k.lap < 1 || k.phase !== 'racing') return false; const g = await ghostFrame(); return !!g?.pose && g.delta > 0.12; }, 2);
 const g2 = await ghostFrame();
 await frame(); await frame();
 const n2 = await translucent();
-check(g2?.pose != null && typeof g2.delta === 'number' && n2 >= 2, `fantasma aparece (pose z=${g2?.pose?.z}, diferença ${g2?.delta?.toFixed(2)}, ${n2} malhas translúcidas)`);
+check(g2?.pose != null && typeof g2.delta === 'number' && n2 >= 1, `fantasma aparece (pose z=${g2?.pose?.z}, diferença ${g2?.delta?.toFixed(2)}, ${n2} malhas translúcidas)`);
 await page.screenshot({ path: `${out}-01-fantasma-aparece.png` });
 
 // ───────────── 3) Impressão trocada: não aparece; a volta grava um novo ─────────────

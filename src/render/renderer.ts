@@ -367,6 +367,10 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       radial[i] += (blurTarget - radial[i]) * (1 - Math.exp(-blurDt * 7));
       if (pinnedRadial !== null) radial[i] = pinnedRadial;
       setViewport(rect);
+      // A sombra do viewport ANTES de qualquer desenho dele, inclusive o aquecimento abaixo (T2, docs/ondas/tecnica-14-10.md): com a sombra por
+      // viewport (3 e 4 jogadores) o mapa que o three cria num desenho fora dela era trocado pelo do assento no `beginViewport` e ficava na GPU
+      // sem dono (1 mapa, 2 texturas, por largada). Dentro dela, o aquecimento desenha o mapa do assento e o desenho de verdade o reaproveita.
+      const due = shadowRing && sp.enabled ? shadowRing.beginViewport(i, car.z, track.length) : false;
       if (prewarmLights) {
         // Aquece os faróis: uma vez, desenha este viewport com os SpotLights ligados (é o que a corrida faz no meio, e muda o número de luzes: todo programa lit recompilaria na hora, no quadro).
         // Desenhado, e não `renderer.compile`: o programa muda com o alvo de renderização (tone mapping e espaço de cor) e o compile solto compilaria outras variantes.
@@ -380,7 +384,6 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
         sky.flare.visible = flare;
         cars.setLight(carLight);
       }
-      const due = shadowRing && sp.enabled ? shadowRing.beginViewport(i, car.z, track.length) : false;
       drawViewport(i, rect, cam.camera, q, plan, radial[i]);
       if (shadowRing && sp.enabled) shadowRing.endViewport(i, due, car.z);
     }

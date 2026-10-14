@@ -105,12 +105,19 @@ describe('carros: textos', () => {
 });
 
 describe('carros: balanceamento (o mesmo piloto, sozinho, a corrida inteira em cada pista)', () => {
-  // scripts/car-balance.ts imprime a tabela; aqui ficam as regras. ~450 corridas curtas (um carro só).
+  // scripts/car-balance.ts imprime a tabela; aqui ficam as regras. Uma corrida inteira solo por carro e pista (14 × 109 = 1.526).
   const tracks = TRACKS.map((t) => t.id);
   let times: Record<string, Record<string, number>> = {};
+  /**
+   * Tempo-limite do hook proporcional ao trabalho (T6, auditoria de 14/10/2026). Medido em 14/10: ~0,1 s de CPU por corrida (5 µs por tick × ~14 mil ticks;
+   * o custo é a própria simulação, a pista já vem do cache) — o arquivo sozinho gastou 160 s de CPU. Com a máquina carregada o relógio anda bem mais devagar
+   * que a CPU: com carga ~45, só este arquivo levou 786 s (~0,5 s por corrida) e estourava os 600 s fixos de antes. 1 s por corrida dá o dobro disso e cresce
+   * sozinho com carro ou pista nova; o laço infinito não é o risco (cada corrida para em `MAX_TICKS`, scripts/car-balance-lib.ts).
+   */
+  const MS_PER_SOLO_RACE = 1000;
   beforeAll(() => {
     times = Object.fromEntries(CARS.map((c) => [c.id, Object.fromEntries(tracks.map((t) => [t, soloRaceTicks(t, c.id)]))]));
-  }, 600_000);
+  }, CARS.length * tracks.length * MS_PER_SOLO_RACE);
   const faster = (a: string, b: string) => tracks.filter((t) => times[a][t] < times[b][t]);
   // Onda N (N1): com o nitro que se ganha (o piloto solo também derrapa e enche a barra), o Camelo X passou a ganhar do Falcão GT por 5 ticks (0,08 s,
   // 0,04%) numa pista de 109 (Pampulha): ruído do nitro, não ritmo. "Ganhar" para a exceção do Camelo é ganhar por mais que isto.

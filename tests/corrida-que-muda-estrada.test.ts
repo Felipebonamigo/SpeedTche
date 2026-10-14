@@ -79,6 +79,37 @@ describe('M6 (b): a pista ao vivo', () => {
     expect(mats(live)[0].customProgramCacheKey()).not.toBe(mats(still)[0].customProgramCacheKey());
   });
 
+  it('trocar de pista com o programa já compilado: os uniformes que o three guardou leem o período seguinte da pista ATUAL (nem textura velha, nem uniforme faltando)', () => {
+    // O three só chama o `onBeforeCompile` ao compilar um programa novo; ao reusar um (mesma chave) ele usa os uniformes da ÚLTIMA compilação
+    // do material (WebGLRenderer.getProgram). Aqui: compila com uma pista de dia, troca para outra (mesma chave: sem compilar), passa por uma
+    // de noite (chave sem mistura: compila e os uniformes dela viram os do material) e volta ao dia (reusa o programa com mistura).
+    const shaderStub = (): THREE.WebGLProgramParametersWithUniforms => ({ uniforms: {}, vertexShader: '', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <emissivemap_fragment>' }) as unknown as THREE.WebGLProgramParametersWithUniforms;
+    type U = Record<string, { value: unknown } | undefined>;
+    const compile = (m: Mat): U => { const s = shaderStub(); m.onBeforeCompile(s, {} as THREE.WebGLRenderer); return s.uniforms as U; };
+    const r = new Road(8, 1);
+    const current = (): THREE.Texture[] => (r as unknown as { textures: THREE.Texture[] }).textures;
+    /** A textura do período seguinte da pista atual: está entre as da pista agora e não é a do período dela (o `map`). */
+    const expectNext = (u: U, m: Mat, tag: string): void => {
+      for (const name of ['uMapB', 'uEmissiveMapB']) {
+        const tex = u[name]?.value as THREE.Texture | undefined;
+        expect(tex, `${tag}: ${name} nos uniformes`).toBeDefined();
+        expect(current(), `${tag}: ${name} é da pista atual (não uma já liberada)`).toContain(tex);
+        expect(tex, `${tag}: ${name} é do período seguinte`).not.toBe(m.map);
+      }
+    };
+    r.setPalette(palette('coast', 'day'), false, 'k8', palette('coast', 'dusk'));
+    const day = mats(r).map(compile);
+    r.setPalette(palette('city_night', 'dusk'), false, 'k9', palette('city_night', 'night'));
+    mats(r).forEach((m, k) => expectNext(day[k], m, `material ${k}, segunda pista de dia`));
+    r.setPalette(palette('coast', 'night'), true, 'k10');
+    const night = mats(r).map(compile);
+    r.setPalette(palette('coast', 'day'), false, 'k11', palette('coast', 'dusk'));
+    mats(r).forEach((m, k) => expectNext(night[k], m, `material ${k}, de volta ao dia depois da noite`));
+    // A mistura que o `setLive` move é a que os dois programas leem.
+    r.setLive(livePalette('coast', 'day', 3, 1));
+    mats(r).forEach((_, k) => { expect(day[k].uRoadBlend?.value).toBe(1); expect(night[k].uRoadBlend?.value).toBe(1); });
+  });
+
   it('trocar de pista solta as texturas das duas pontas (nada vaza)', () => {
     const r = new Road(8, 1);
     r.setPalette(palette('coast', 'day'), false, 'k6', palette('coast', 'dusk'));
