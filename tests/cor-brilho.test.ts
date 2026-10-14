@@ -15,6 +15,7 @@ import { Cars } from '../src/render/cars';
 import { Effects } from '../src/render/effects';
 import * as M from '../src/render/cars/material';
 import * as K from '../src/render/cars/kit';
+import * as F from '../src/render/cars/flame';
 import { buildModel } from '../src/render/cars/models';
 import { TAIL } from '../src/render/cars/paints';
 import { palette, SCENERIES, TIMES_OF_DAY, type Palette } from '../src/render/palette';
@@ -404,5 +405,63 @@ describe('4. pintura com reflexo do céu e do horizonte, coerente com o período
       M.setCarQuality(material, q, uniforms);
       expect(u.uVarnish?.value ?? 0, q).toSatisfy((v: number) => (on ? v > 0 : v === 0));
     }
+  });
+});
+
+// ───────────────────────────── 5. chama do nitro ─────────────────────────────
+
+describe('5. chama do nitro: língua de fogo alongada, não gota branca', () => {
+  /** Raio de cada anel da malha (por posição ao longo da chama, 0 no escape e 1 na ponta). */
+  const rings = (): Array<[number, number]> => {
+    const pos = F.buildFlameGeometry().getAttribute('position');
+    const by = new Map<number, number>();
+    for (let i = 0; i < pos.count; i++) { const t = Math.round(pos.getZ(i) * 1000) / 1000; by.set(t, Math.max(by.get(t) ?? 0, Math.hypot(pos.getX(i), pos.getY(i)))); }
+    return [...by.entries()].sort((a, b) => a[0] - b[0]);
+  };
+  // O tamanho da chama no carro: o exportado novo, ou o de hoje (largura 0,5, comprimento 2,3 em cars.ts) se ele não existe.
+  const size = (): { width: number; length: number } => (F as unknown as { FLAME_SIZE?: { width: number; length: number } }).FLAME_SIZE ?? { width: 0.5, length: 2.3 };
+
+  it('afina: o raio maior fica junto do escape (t ≤ 0,15) e só diminui até a ponta; no carro, o comprimento é ≥ 5× o diâmetro (era uma gota de barriga a 25%)', () => {
+    const r = rings();
+    const max = r.reduce((m, x) => (x[1] > m[1] ? x : m));
+    expect(max[0], `raio máximo ${max[1].toFixed(2)} em t = ${max[0]}`).toBeLessThanOrEqual(0.15);
+    for (let i = 1; i < r.length; i++) if (r[i][0] > max[0]) expect(r[i][1], `t = ${r[i][0]}`).toBeLessThanOrEqual(r[i - 1][1] + 1e-9);
+    const { width, length } = size();
+    expect(length / (2 * max[1] * width), 'comprimento ÷ diâmetro').toBeGreaterThanOrEqual(5);
+  });
+
+  function flameAt(reduce: boolean, light = 1): { len: number; level: number; gain: number } {
+    const restore = fakeCanvasDocument();
+    const track = getTrack('copacabana');
+    const state = createRace({
+      trackId: 'copacabana', laps: 2, humans: [{ seat: 0, name: 'P1', carId: 'falcao', teamId: 0, color: '#fff' }], totalCars: 4, difficulty: 'profissional',
+      manualGear: false, assists: { sharedNitro: false, tow: false, teamDraft: false, catchup: false }, seed: 42,
+    }, track);
+    const own = state.cars.findIndex((c) => c.seat === 0);
+    state.cars.forEach((c, i) => { if (i !== own) c.z = state.cars[own].z - 100_000; });
+    state.cars[own].nitroTicks = 90;
+    const cars = new Cars(new THREE.Scene());
+    restore();
+    cars.setLight(light);
+    const frame: RenderFrame = {
+      state, track, viewports: [], time: 0.5, paused: true, coop: false, showHud: false,
+      options: { quality: 'high', showMinimap: false, screenShake: false, reduceEffects: reduce, palette: 'default' },
+    };
+    cars.update(frame); cars.pose(buildRoadFrame(track, state.cars[own].z, 8, 60), state, track, own, [], 0.5);
+    const inner = cars as unknown as { flames: THREE.InstancedMesh; flameExtra: THREE.InstancedBufferAttribute; flameMaterial: THREE.ShaderMaterial };
+    const m = new THREE.Matrix4(); inner.flames.getMatrixAt(0, m);
+    const sc = new THREE.Vector3(); m.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
+    const gain = (inner.flameMaterial.uniforms as Record<string, { value: number } | undefined>).uFlameGain?.value ?? 1;
+    return { len: sc.z, level: inner.flameExtra.getY(0), gain };
+  }
+
+  it('"Reduzir efeitos": a chama fica mais curta (≤ 0,7×) e mais fraca (força ≤ 0,6×)', { timeout: 120_000 }, () => {
+    const full = flameAt(false); const calm = flameAt(true);
+    expect(calm.len / full.len).toBeLessThanOrEqual(0.7);
+    expect(calm.level / full.level).toBeLessThanOrEqual(0.6);
+  });
+
+  it('a força da chama segue a luz do período: à noite ≤ 0,75× a do dia (legível de dia, sem estourar no escuro)', { timeout: 120_000 }, () => {
+    expect(flameAt(false, 0.32).gain / flameAt(false, 1).gain).toBeLessThanOrEqual(0.75);
   });
 });

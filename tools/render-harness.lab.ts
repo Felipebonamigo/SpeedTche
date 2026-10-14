@@ -321,8 +321,56 @@ function bloomHalo(hdr: number, bloom: [number, number, number], px = 8): { halo
   return { halo, core };
 }
 
+/**
+ * Chama do nitro isolada (cor-brilho): o nitro do carro do jogador ligado na corrida parada (a câmera abre o FOV no nitro: ele fica ligado nas duas imagens),
+ * o desfoque radial preso em 0, os efeitos da M5 (faíscas do escape, halo) escondidos, e a malha da chama visível ou não (`material.visible`, que o `pose`
+ * não mexe) — a diferença entre as duas imagens é só a chama.
+ */
+function nitro(flame: boolean): void {
+  if (!current) throw new Error('lab.setup primeiro');
+  const me = current.state.cars.find((c) => c.seat >= 0);
+  if (!me) throw new Error('sem humano');
+  me.nitroTicks = 100;
+  renderer.pinRadialBlur(0);
+  scene.traverse((o) => {
+    if (o.name.startsWith('fx-') && o.parent) o.parent.visible = false;
+    const m = o as THREE.InstancedMesh;
+    if (m.isInstancedMesh && m.geometry.getAttribute('aFlame')) (m.material as THREE.Material).visible = flame;
+  });
+}
+
+/** Desenha os dois quadros (sem e com nitro) e mede o que a chama acrescenta na caixa `box`: pixels que mudaram, os quase brancos, a cor média somada. */
+function flameDiff(quality: Quality, frames: number, box: [number, number, number, number, number, number]): {
+  changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number;
+} {
+  const read = (): { buf: Uint8Array; W: number; H: number } => {
+    for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+    const ctx = gl.getContext();
+    const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+    const buf = new Uint8Array(W * H * 4);
+    ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+    return { buf, W, H };
+  };
+  nitro(false); const off = read();
+  nitro(true); const on = read();
+  const [st] = shoot(quality, 0, [{ box }]); // só a caixa em px (sem desenhar de novo)
+  const { W, H } = on;
+  let changed = 0; let white = 0; const add = [0, 0, 0]; let luma = 0; let n = 0;
+  for (let y = st.y0; y <= st.y1; y++) for (let x = st.x0; x <= st.x1; x++) {
+    const i = ((H - 1 - y) * W + x) * 4; n++;
+    const d = [on.buf[i] - off.buf[i], on.buf[i + 1] - off.buf[i + 1], on.buf[i + 2] - off.buf[i + 2]];
+    const dl = (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) / 255;
+    if (dl > 0.04) {
+      changed++; add[0] += d[0]; add[1] += d[1]; add[2] += d[2]; luma += dl;
+      if (on.buf[i] > 235 && on.buf[i + 1] > 235 && on.buf[i + 2] > 225) white++;
+    }
+  }
+  const k = Math.max(1, changed);
+  return { changed: changed / Math.max(1, n), whiteOfChanged: white / k, addRgb: [add[0] / k, add[1] / k, add[2] / k], addLuma: luma / k, x0: st.x0, y0: st.y0, x1: st.x1, y1: st.y1 };
+}
+
 const lab = {
-  freeze, headlights, shoot, bloomHalo,
+  freeze, headlights, shoot, bloomHalo, nitro, flameDiff,
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },

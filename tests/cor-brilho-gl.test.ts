@@ -22,11 +22,14 @@ interface Lab {
   headlights(on: boolean): void;
   shoot(q: Quality, frames: number, probes: Probe[]): ProbeStat[];
   bloomHalo(hdr: number, bloom: [number, number, number], px?: number): { halo: number; core: number };
+  flameDiff(q: Quality, frames: number, box: [number, number, number, number, number, number]): { changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number };
   programs(): { total: number; bad: string[]; shaderErrors: string[] };
 }
 
 /** A pista à frente do carro do jogador, de 6 a 45 m, 6 m para cada lado, do chão a 1,6 m: onde ficam os carros que ele persegue. */
 const AHEAD: Probe = { box: [-6, 0, -45, 6, 1.6, -6] };
+/** Atrás do carro do jogador (+z é para trás), do escape até 6,5 m: onde a chama do nitro aparece na câmera de corrida. */
+const FLAME_BOX = [-1.6, 0, 2.0, 1.6, 1.6, 6.5];
 /** Pixels estourados que os faróis podem ACRESCENTAR à região (fração): as "bolhas brancas". */
 const BLOWN = 0.0005;
 /**
@@ -112,6 +115,26 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
       expect(chroma, `${name}: traseira rgb(${s.rgb.join(',')}) em ${s.x0},${s.y0}`).toBeLessThanOrEqual(0.25);
       expect(Math.min(R, B) - G, `${name}: magenta rgb(${s.rgb.join(',')})`).toBeLessThanOrEqual(8);
       expect(Math.max(R, G, B), `${name}: a traseira é clara (é a lataria, não a lanterna nem a placa)`).toBeGreaterThan(70);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it('a chama do nitro de trás, na câmera de corrida, de dia e à noite: fogo (a cor somada é quente, R ≥ G ≥ B), não gota branca (≤ 5% dos pixels dela quase brancos)', async () => {
+    // A chama isolada: o mesmo quadro com o nitro ligado, com e sem a malha da chama (laboratório, `flameDiff`). Era uma gota azul-branca, gorda e HDR (ganho 2,0–2,6):
+    // de trás, a ponta vem para a câmera e a gota vira um disco branco opaco (galeria main-f241703: Paraty, Fuji, Xingó).
+    const r = await lab((L, box) => {
+      const out: Record<string, ReturnType<Lab['flameDiff']>> = {};
+      for (const [name, track, ticks] of [['dia', 'copacabana', 1500], ['noite', 'sampa_noite', 1400]] as const) {
+        L.freeze(track, ticks, { x: 0 });
+        out[name] = L.flameDiff('high', 6, box as [number, number, number, number, number, number]);
+      }
+      return out;
+    }, FLAME_BOX);
+    for (const [name, f] of Object.entries(r)) {
+      const [R, G, B] = f.addRgb.map((v) => Math.round(v));
+      expect(f.changed, `${name}: a chama aparece na caixa ${f.x0},${f.y0}–${f.x1},${f.y1}`).toBeGreaterThan(0.01);
+      expect(f.whiteOfChanged, `${name}: fração quase branca da chama (soma rgb(${R},${G},${B}))`).toBeLessThanOrEqual(0.05);
+      expect(R >= G && G >= B, `${name}: cor somada rgb(${R},${G},${B}) — fogo é R ≥ G ≥ B`).toBe(true);
     }
     expect(errors).toEqual([]);
   });
