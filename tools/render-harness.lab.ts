@@ -1,6 +1,7 @@
 // Laboratório GL do renderizador (onda L, L2): as funções que tests/gl-render.test.ts chama pelo Playwright, no Chromium com swiftshader.
 // Nada aqui mede FPS (swiftshader não diz nada sobre GPU): só CONTAGENS (chamadas, triângulos, passes, pixels de alvo), a compilação dos
 // programas de shader e o que o renderizador conta de si (composers criados, redimensionamentos, escala dinâmica, mapas de sombra).
+import * as THREE from 'three';
 import type { CameraMode } from '../src/render/camera-base';
 import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type HumanEntry, type RaceState } from '../src/core';
 import type { CarLook, Track } from '../src/core/types';
@@ -9,6 +10,9 @@ import { paintsOfLooks, raceLooks } from '../src/game/paints';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
 import { resetRenderPrefs, setRenderPrefs } from '../src/render/prefs';
+import { ViewportPipeline } from '../src/render/postfx/pipeline';
+import { planFor } from '../src/render/postfx/plan';
+import { ROAD_HALF_WIDTH_M } from '../src/render/units';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLElement;
@@ -222,7 +226,103 @@ function liveScene(quality: Quality, trackId: string, fractions: number[], repea
   return { frames, report: programs() };
 }
 
+// ───────────── Cor e brilho (docs/ondas/cor-brilho.md): medir a IMAGEM ─────────────
+// A medida é feita no mesmo `evaluate` do desenho (o buffer da tela não sobrevive à composição do navegador): `shoot` desenha e lê os pixels.
+
+/** Uma caixa (canto mínimo e máximo, m, no referencial do carro do viewport 0: −z à frente) ou um ponto (m) com meia largura em px. */
+export type Probe = { box: [number, number, number, number, number, number] } | { point: [number, number, number]; r: number };
+export interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number] }
+
+/** Corrida parada no quadro: o mundo não anda (os carros ficam onde a corrida os deixou); `x` põe o jogador numa faixa, `parked` o para. */
+function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night' } = {}): void {
+  setup(trackId, 1, ticks, opts.tod);
+  if (!current) throw new Error('lab.setup primeiro');
+  const me = current.state.cars.find((c) => c.seat >= 0);
+  if (!me) throw new Error('sem humano');
+  if (opts.x !== undefined) me.x = opts.x;
+  me.steerPose = 0;
+  if (opts.parked) { me.speed = 0; me.nitroTicks = 0; me.skidTicks = 0; me.driftTicks = 0; }
+}
+
+/** Faróis do jogador (os SpotLights da cena) acesos ou apagados pela COR: o renderizador mexe na visibilidade e na intensidade, nunca nela. */
+function headlights(on: boolean): void {
+  scene.traverse((o) => { const s = o as THREE.SpotLight; if (s.isSpotLight) s.color.set(on ? '#fff3d0' : '#000000'); });
+}
+
+/** Desenha `frames` quadros sem andar a corrida e mede as sondas na imagem final (sRGB 0..255; `mean` = luma 0..1; `white` = fração estourada). */
+function shoot(quality: Quality, frames: number, probes: Probe[]): ProbeStat[] {
+  if (!current) throw new Error('lab.setup primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const me = current.state.cars.find((c) => c.seat >= 0);
+  const cx = (me?.x ?? 0) * ROAD_HALF_WIDTH_M;
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  const cam = cams[0];
+  cam.updateMatrixWorld();
+  const toPx = (x: number, y: number, z: number): [number, number] => {
+    const v = new THREE.Vector3(x, y, z).project(cam);
+    return [((v.x + 1) / 2) * W, ((1 - v.y) / 2) * H];
+  };
+  return probes.map((p) => {
+    let x0: number; let y0: number; let x1: number; let y1: number;
+    if ('box' in p) {
+      const [ax, ay, az, bx, by, bz] = p.box;
+      const pts = [[ax, ay, az], [bx, ay, az], [ax, by, az], [bx, by, az], [ax, ay, bz], [bx, ay, bz], [ax, by, bz], [bx, by, bz]].map(([x, y, z]) => toPx(x + cx, y, z));
+      x0 = Math.min(...pts.map((q) => q[0])); x1 = Math.max(...pts.map((q) => q[0])); y0 = Math.min(...pts.map((q) => q[1])); y1 = Math.max(...pts.map((q) => q[1]));
+    } else {
+      const [px, py] = toPx(p.point[0] + cx, p.point[1], p.point[2]);
+      x0 = px - p.r; x1 = px + p.r; y0 = py - p.r; y1 = py + p.r;
+    }
+    x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0)); x1 = Math.min(W - 1, Math.round(x1)); y1 = Math.min(H - 1, Math.round(y1));
+    let n = 0; let sum = 0; let white = 0; const rgb = [0, 0, 0];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4; // readPixels vem de baixo para cima
+      const r = buf[i]; const g = buf[i + 1]; const b = buf[i + 2];
+      sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; rgb[0] += r; rgb[1] += g; rgb[2] += b; n++;
+      if (r > 235 && g > 235 && b > 225) white++;
+    }
+    const k = Math.max(1, n);
+    return { x0, y0, x1, y1, mean: sum / k, white: white / k, rgb: [Math.round(rgb[0] / k), Math.round(rgb[1] / k), Math.round(rgb[2] / k)] };
+  });
+}
+
+/**
+ * O teto do bloom, isolado: um quadrado de `px` px com emissão HDR `hdr` no centro de uma cena preta, pelo MESMO pipeline da Alta com o bloom
+ * `bloom` (força, raio, limiar), e quanta luz vaza para FORA dele (soma da luma 0..1 dos pixels a 3 px da borda em diante).
+ */
+function bloomHalo(hdr: number, bloom: [number, number, number], px = 8): { halo: number; core: number } {
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const sc = new THREE.Scene();
+  sc.background = new THREE.Color(0, 0, 0);
+  const cam = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
+  const d = (H / 2) / Math.tan((30 * Math.PI) / 180); // a 1 px por unidade no plano z = −d
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(px, px), new THREE.MeshBasicMaterial({ color: new THREE.Color(hdr, hdr, hdr), toneMapped: false }));
+  quad.position.z = -d;
+  cam.far = d * 2;
+  cam.updateProjectionMatrix();
+  sc.add(quad);
+  const pipe = new ViewportPipeline(gl, sc, cam, planFor('high', 1), null, bloom);
+  pipe.setSize(W, H);
+  gl.setViewport(0, 0, W, H); gl.setScissor(0, 0, W, H);
+  pipe.render({ camera: cam, scale: 1, radial: 0 }, false);
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  pipe.dispose(); quad.geometry.dispose(); quad.material.dispose();
+  let halo = 0; let core = 0;
+  const inner = px / 2 + 3;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const l = (0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2]) / 255;
+    if (Math.max(Math.abs(x + 0.5 - W / 2), Math.abs(y + 0.5 - H / 2)) > inner) halo += l; else core += l;
+  }
+  return { halo, core };
+}
+
 const lab = {
+  freeze, headlights, shoot, bloomHalo,
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
