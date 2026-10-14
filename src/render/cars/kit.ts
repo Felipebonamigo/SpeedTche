@@ -138,16 +138,66 @@ export class MeshBuilder {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     const col = new Uint8Array(n * 3); const pnt = new Uint8Array(n * 4); const mat = new Uint8Array(n * 4);
+    const lens = lensRadius(this.pos, this.mat);
     for (let i = 0; i < n * 3; i++) col[i] = q8(this.col[i]);
     for (let i = 0; i < n * 4; i++) { pnt[i] = q8(this.pnt[i]); mat[i] = q8(this.mat[i]); }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
     g.setAttribute('aPaint', new THREE.BufferAttribute(pnt, 4, true));
     g.setAttribute('aMat', new THREE.BufferAttribute(mat, 4, true));
+    g.setAttribute('aLens', new THREE.BufferAttribute(Uint8Array.from(lens, q8), 1, true));
     if (this.hasUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     smoothNormals(g, crease);
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
   }
+}
+
+/** O emissivo na borda da lente, em fração do miolo (cor-brilho): a lanterna e o farol deixam de ser um disco chapado (cars/material.ts, `carLamp`). */
+export const LENS_RIM = 0.4;
+
+/**
+ * Lente com miolo e borda (cor-brilho, docs/ondas/cor-brilho.md): para cada vértice, a distância (0 no centro, 1 na borda) ao centro da tampa emissiva
+ * (farol `aMat.z` ou lanterna `aMat.w`) a que pertence, se a tampa é um LEQUE com vértice no centro (a tampa do cilindro e a da barra arredondada já são);
+ * 0 fora de lente e em tampa sem vértice central (a face plana de uma caixa, o casco simples): emissivo chapado, como antes. Vira o atributo `aLens` — o
+ * `aMat` (o pincel, que o glTF e o contrato do asset leem) não muda.
+ */
+export function lensRadius(pos: readonly number[], mat: readonly number[]): number[] {
+  const n = pos.length / 3;
+  const out = new Array<number>(n).fill(0);
+  const key = (v: number): string => `${Math.round(pos[v * 3] * 1e4)},${Math.round(pos[v * 3 + 1] * 1e4)},${Math.round(pos[v * 3 + 2] * 1e4)}`;
+  for (const ch of [2, 3]) {
+    // Triângulos da lente: os três vértices com o mesmo emissivo > 0 neste canal.
+    const tris: number[] = [];
+    for (let t = 0; t < n / 3; t++) {
+      const a = mat[t * 12 + ch]; const b = mat[t * 12 + 4 + ch]; const c = mat[t * 12 + 8 + ch];
+      if (a > 0 && a === b && b === c) tris.push(t);
+    }
+    if (tris.length === 0) continue;
+    // Peças: triângulos ligados por um vértice na mesma posição (união por chave de posição e valor do emissivo).
+    const parent = new Map<number, number>(tris.map((t) => [t, t]));
+    const find = (t: number): number => { let r = t; while (parent.get(r) !== r) r = parent.get(r) as number; parent.set(t, r); return r; };
+    const owner = new Map<string, number>();
+    for (const t of tris) for (let k = 0; k < 3; k++) {
+      const kk = `${mat[t * 12 + ch]}|${key(t * 3 + k)}`;
+      const o = owner.get(kk);
+      if (o === undefined) owner.set(kk, t); else parent.set(find(t), find(o));
+    }
+    const groups = new Map<number, number[]>();
+    for (const t of tris) { const r = find(t); const l = groups.get(r); if (l) l.push(t); else groups.set(r, [t]); }
+    for (const list of groups.values()) {
+      const seen = new Map<string, number>();
+      for (const t of list) for (let k = 0; k < 3; k++) seen.set(key(t * 3 + k), t * 3 + k);
+      let cx = 0; let cy = 0; let cz = 0;
+      for (const v of seen.values()) { cx += pos[v * 3]; cy += pos[v * 3 + 1]; cz += pos[v * 3 + 2]; }
+      cx /= seen.size; cy /= seen.size; cz /= seen.size;
+      const dist = (v: number): number => Math.hypot(pos[v * 3] - cx, pos[v * 3 + 1] - cy, pos[v * 3 + 2] - cz);
+      let r = 0; let near = Infinity;
+      for (const v of seen.values()) { const d = dist(v); r = Math.max(r, d); near = Math.min(near, d); }
+      if (r < 1e-4 || near > 0.15 * r) continue; // sem vértice no centro: não é um leque
+      for (const t of list) for (let k = 0; k < 3; k++) { const v = t * 3 + k; out[v] = Math.min(1, dist(v) / r); }
+    }
+  }
+  return out;
 }
 
 function dist2(a: P3, b: P3): number {

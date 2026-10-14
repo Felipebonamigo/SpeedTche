@@ -31,9 +31,10 @@ describe('shader dos carros: acabamentos', () => {
     expect(FINISH_IDS.length - 1).toBeLessThanOrEqual(FINISH_MASK);
   });
 
-  it('a chave do programa mudou (v3) e a estilização continua composta na chave', () => {
+  it('a chave do programa mudou (v4) e a estilização continua composta na chave', () => {
     const key = material.customProgramCacheKey();
-    expect(key).toContain('speed-tche-car-v3'); // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente (bit 6 de instExtra.w) mudou o shader
+    // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado.
+    expect(key).toContain('speed-tche-car-v4');
     expect(key).not.toContain('speed-tche-car-v1');
   });
 

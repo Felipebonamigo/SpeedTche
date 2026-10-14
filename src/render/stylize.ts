@@ -33,7 +33,7 @@ export const STYLIZE_FAMILIES: Readonly<Record<StylizeFamily, FamilyLook>> = {
 };
 
 /** Chave de programa: muda quando o texto do trecho muda (o three guarda o programa pela chave). */
-export const STYLIZE_KEY = 'speed-tche-stylize-v1';
+export const STYLIZE_KEY = 'speed-tche-stylize-v2'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`
 const GRADE_KEY = 'speed-tche-grade-v1';
 
 /**
@@ -57,6 +57,13 @@ export interface Grading {
   /** Tinta somada nas sombras e ganho nas luzes (RGB, deltas; 0 = nada). */
   shadows: [number, number, number];
   highlights: [number, number, number];
+  /**
+   * Quanto do pé do Neutral vale sobre a LUMINÂNCIA (0 = o pé do three, que subtrai o menor canal; 1 = o mesmo pé sem mudar o matiz). Cor-brilho: o pé do
+   * three tirava o cinza dos escuros tingidos e o asfalto do entardecer, cinza-arroxeado (49,44,56), saía roxo (23,13,37). 0 de dia (Copacabana intacta).
+   */
+  toe: number;
+  /** Saturação da luz difusa do céu (IBL do domo) nos materiais com luz: 1 = a do domo; menos = mais neutra. O reflexo do céu não muda. */
+  fill: number;
 }
 
 export interface LightLook {
@@ -79,6 +86,16 @@ const hue = (c: Rgb): Rgb => { const m = Math.max(c[0], c[1], c[2], 1e-6); retur
 const dayness = (p: Palette): number => clamp((p.light - 0.32) / 0.68, 0, 1);
 
 /**
+ * 0 de dia, 1 do entardecer em diante (cor-brilho): o que corrige o véu magenta só vale fora do dia, e anda contínuo na corrida que muda (M6) — a luz
+ * cai de 1 a 0,7 na última volta e isto sobe junto, por uniforme.
+ */
+export function lateness(light: number): number { const t = clamp((0.98 - light) / 0.18, 0, 1); return t * t * (3 - 2 * t); }
+
+/** Pé do Neutral sobre a luminância e saturação da IBL difusa no entardecer e na noite (provisórios, calibrados nas capturas da cor-brilho). */
+const LATE_TOE = 0.5;
+const LATE_FILL = 0.25;
+
+/**
  * A gradação sai da paleta, então já varia por bioma e por período sem tabela: a sombra é puxada para a cor do céu que a pinta
  * (`hemiSky`, azul na costa, roxo no entardecer) e a luz para a do sol (`sunLight`). A exposição parte da da paleta (calibrada
  * para o ACES) com um ajuste da curva nova: valor provisório, calibrado nas capturas de Copacabana (dia) e Sampa (noite).
@@ -87,7 +104,8 @@ export function gradingFor(p: Palette): Grading {
   const d = dayness(p);
   const hemi = linear(p.hemiSky); const sun = linear(p.sunLight);
   const sh = hemi.map((v) => (v - mean(hemi)) * (0.08 + 0.12 * d)) as Rgb;
-  const hi = sun.map((v) => (v - mean(sun)) * 0.22) as Rgb;
+  // Cor-brilho: fora do dia o ganho quente das luzes cai (o sol do entardecer já é quente; somado, o carro branco ao sol saía pêssego).
+  const hi = sun.map((v) => (v - mean(sun)) * 0.22 * (1 - 0.7 * lateness(p.light))) as Rgb;
   return {
     toneMapping: TONE_MAP,
     exposure: p.exposure * EXPOSURE_TRIM,
@@ -95,6 +113,8 @@ export function gradingFor(p: Palette): Grading {
     contrast: 0.02 + 0.06 * d,
     shadows: sh.map((v) => clamp(v, -0.1, 0.1)) as Rgb,
     highlights: hi.map((v) => clamp(v, -0.1, 0.1)) as Rgb,
+    toe: LATE_TOE * lateness(p.light),
+    fill: 1 - (1 - LATE_FILL) * lateness(p.light),
   };
 }
 
@@ -108,7 +128,7 @@ export function lightFor(p: Palette): LightLook {
   const rimBase = p.light < 0.8 ? lerp3(hemi, linear(p.skyGlow), 0.7) : lerp3(hemi, [1, 1, 1], 0.4);
   const rimK = p.light < 0.5 ? 0.3 : p.light < 0.8 ? 0.45 : 0.32;
   const termBase = p.light >= 0.8 ? lerp3(hemi, linear(p.groundLow), 0.5)
-    : p.light >= 0.5 ? lerp3(linear(p.sunLight), linear('#ff3a5a'), 0.5) : hemi;
+    : p.light >= 0.5 ? lerp3(linear(p.sunLight), linear('#ff8a5a'), 0.25) : hemi; // cor-brilho: era #ff3a5a a 0,5 (rosa) e tingia a lataria
   const termK = 0.22 + 0.18 * (1 - d) * (p.light >= 0.5 ? 1 : 0.3);
   return {
     rim: rimBase.map((v) => v * rimK) as Rgb,
@@ -120,10 +140,23 @@ export function lightFor(p: Palette): LightLook {
 
 const vec3 = (): { value: THREE.Vector3 } => ({ value: new THREE.Vector3() });
 
-/** Só a gradação (o que o `OutputPass`, os `ShaderMaterial` e os `MeshBasic` recebem). */
+/** Só a gradação (o que o `OutputPass`, os `ShaderMaterial` e os `MeshBasic` recebem). `uGradeAdjust` = (saturação, contraste, pé sobre a luminância). */
 export const gradeUniforms = { uGradeShadows: vec3(), uGradeHighlights: vec3(), uGradeAdjust: vec3() };
-/** Tudo o que um material com luz recebe: o mesmo objeto para todos (por referência). */
-export const stylizeUniforms = { uStylizeRim: vec3(), uStylizeTerm: vec3(), ...gradeUniforms };
+/**
+ * Tudo o que um material com luz recebe: o mesmo objeto para todos (por referência). `uStylizeFill`: saturação da IBL difusa. O céu e o chão do período
+ * (`uStylizeSky*`, `uStylizeGround`, lineares) são o reflexo do verniz dos carros (cor-brilho, cars/material.ts).
+ */
+export const stylizeUniforms = {
+  uStylizeRim: vec3(), uStylizeTerm: vec3(), uStylizeFill: { value: 1 },
+  uStylizeSkyTop: vec3(), uStylizeSkyHorizon: vec3(), uStylizeGround: vec3(),
+  ...gradeUniforms,
+};
+
+/** O que o verniz reflete (linear): o topo do céu, o horizonte (com um pouco do meio) e o chão escuro abaixo da linha do horizonte. */
+export function varnishSky(p: Palette): { top: Rgb; horizon: Rgb; ground: Rgb } {
+  const ground = lerp3(linear(p.hemiGround), linear(p.asphalt), 0.5).map((v) => v * 0.7) as Rgb;
+  return { top: linear(p.sky[0]), horizon: lerp3(linear(p.sky[2]), linear(p.sky[1]), 0.3), ground };
+}
 
 /** Escreve a paleta atual nos uniformes e devolve a gradação (o renderer usa a `exposure`). Chamar a cada troca de pista/período. */
 export function setStylizePalette(p: Palette): Grading {
@@ -132,7 +165,12 @@ export function setStylizePalette(p: Palette): Grading {
   stylizeUniforms.uStylizeTerm.value.set(...l.terminator);
   gradeUniforms.uGradeShadows.value.set(...g.shadows);
   gradeUniforms.uGradeHighlights.value.set(...g.highlights);
-  gradeUniforms.uGradeAdjust.value.set(g.saturation, g.contrast, 0);
+  gradeUniforms.uGradeAdjust.value.set(g.saturation, g.contrast, g.toe);
+  stylizeUniforms.uStylizeFill.value = g.fill;
+  const v = varnishSky(p);
+  stylizeUniforms.uStylizeSkyTop.value.set(...v.top);
+  stylizeUniforms.uStylizeSkyHorizon.value.set(...v.horizon);
+  stylizeUniforms.uStylizeGround.value.set(...v.ground);
   return g;
 }
 
@@ -156,12 +194,31 @@ vec3 stylizeGrade( vec3 c ) {
   g = clamp( g, 0.0, 1.0 );
   return g * g;
 }
+// O Khronos PBR Neutral do three, com o pé (escuros) aplicado à luminância na fração uGradeAdjust.z (cor-brilho): o pé do three subtrai o MENOR canal,
+// o que tira o cinza de um escuro tingido e o deixa saturado (o asfalto do entardecer saía roxo). 0 = idêntico ao NeutralToneMapping do three.
+vec3 stylizeNeutral( vec3 color ) {
+  const float StartCompression = 0.8 - 0.04;
+  const float Desaturation = 0.15;
+  color *= toneMappingExposure;
+  float x = min( color.r, min( color.g, color.b ) );
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  float lum = max( dot( color, vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-6 );
+  float lumOffset = lum < 0.08 ? lum - 6.25 * lum * lum : 0.04;
+  color = mix( color - offset, color * max( 0.0, ( lum - lumOffset ) / lum ), uGradeAdjust.z );
+  float peak = max( color.r, max( color.g, color.b ) );
+  if ( peak < StartCompression ) return color;
+  float d = 1. - StartCompression;
+  float newPeak = 1. - d * d / ( peak + d - StartCompression );
+  color *= newPeak / peak;
+  float g = 1. - 1. / ( Desaturation * ( peak - newPeak ) + 1. );
+  return mix( color, vec3( newPeak ), g );
+}
 `;
 
 /** O chunk do three com a `CustomToneMapping` trocada. Falha alto se o three mudar a linha (senão o remendo viraria no-op calado). */
 export function patchToneMapping(chunk: string, kind: 'neutral' | 'agx'): string {
   if (!chunk.includes(TONE_ANCHOR)) throw new Error('stylize: o three mudou a CustomToneMapping do tonemapping_pars_fragment (âncora não achada)');
-  const curve = kind === 'agx' ? 'AgXToneMapping' : 'NeutralToneMapping';
+  const curve = kind === 'agx' ? 'AgXToneMapping' : 'stylizeNeutral';
   return chunk.replace(TONE_ANCHOR, () => `${GRADE_GLSL}vec3 CustomToneMapping( vec3 color ) { return stylizeGrade( ${curve}( color ) ); }`);
 }
 
@@ -210,6 +267,16 @@ const RIM_GLSL = /* glsl */ `
 }
 `;
 
+/**
+ * A luz difusa do céu (IBL do domo) perde saturação por `uStylizeFill` (cor-brilho): no entardecer o domo é rosa e magenta, e era ele a maior parcela da
+ * luz na traseira do carro branco. Só o difuso: o reflexo (`radiance`) continua com a cor do céu.
+ */
+const FILL_GLSL = /* glsl */ `
+#if defined( RE_IndirectDiffuse )
+  iblIrradiance = mix( vec3( dot( iblIrradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ), iblIrradiance, uStylizeFill );
+#endif
+`;
+
 let patchedLights: string | null | undefined;
 let warned = false;
 
@@ -246,13 +313,14 @@ export function applyStylize(material: THREE.Material, family: StylizeFamily): v
   if (applied.has(material)) return;
   applied.add(material);
   const f = STYLIZE_FAMILIES[family];
-  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\n`;
+  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\nuniform float uStylizeFill;\n`;
   compose(material, (shader) => {
     Object.assign(shader.uniforms, stylizeUniforms);
     let frag = shader.fragmentShader.replace('#include <common>', () => `#include <common>\n${header}`);
     const chunk = lightsChunk();
     if (chunk) frag = frag.replace('#include <lights_physical_pars_fragment>', () => chunk);
     if (f.rim > 0) frag = frag.replace('#include <emissivemap_fragment>', () => `#include <emissivemap_fragment>\n${RIM_GLSL}`);
+    frag = frag.replace('#include <lights_fragment_maps>', () => `#include <lights_fragment_maps>\n${FILL_GLSL}`);
     shader.fragmentShader = frag;
   }, `${STYLIZE_KEY}:${family}`);
 }

@@ -13,6 +13,7 @@ import { getTrack } from '../src/core/track';
 import type { RenderFrame } from '../src/game/contracts';
 import { Cars } from '../src/render/cars';
 import * as M from '../src/render/cars/material';
+import * as K from '../src/render/cars/kit';
 import { buildModel } from '../src/render/cars/models';
 import { TAIL } from '../src/render/cars/paints';
 import { palette, SCENERIES, TIMES_OF_DAY, type Palette } from '../src/render/palette';
@@ -290,9 +291,12 @@ describe('3. lanternas: emissivas de verdade, com miolo e borda, fortes à noite
   it('a lente não é chapada: no modelo do GT o emissivo da lanterna vai do miolo (1) à borda (≤ 0,45 do miolo), sem tocar no farol', { timeout: 120_000 }, () => {
     const g = buildModel('gt').shell;
     const mat = g.getAttribute('aMat'); const col = g.getAttribute('color');
+    // O peso do emissivo que o shader usa: o do pincel (aMat.w) × o da lente (atributo aLens, 0 no centro e 1 na borda; sem ele, chapado).
+    const lens = g.getAttribute('aLens') as THREE.BufferAttribute | undefined;
+    const rim = (K as unknown as { LENS_RIM?: number }).LENS_RIM ?? 1;
     let hi = 0; let lo = Infinity;
     for (let i = 0; i < mat.count; i++) {
-      const w = mat.getW(i);
+      const w = mat.getW(i) * (1 - (1 - rim) * (lens ? lens.getX(i) : 0));
       // Só a lente vermelha acesa (a cor do pincel TAIL), não a lanterna apagada nem o escape.
       if (w > 0 && Math.abs(col.getX(i) - TAIL.rgb[0]) < 0.02 && Math.abs(col.getY(i) - TAIL.rgb[1]) < 0.02) { hi = Math.max(hi, w); lo = Math.min(lo, w); }
     }

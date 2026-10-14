@@ -246,6 +246,9 @@ const GRADE: Record<TimeOfDay, Grade> = {
   night: { tint: '#16204a', amount: 0.34, bright: 0.94 },
 };
 
+/** O tom para onde o asfalto vai no entardecer e na noite (cor-brilho): cinza levemente quente. */
+const ASPHALT_LATE = '#5a544e';
+
 function grade(c: string, time: TimeOfDay): string {
   const g = GRADE[time];
   return shade(mix(c, g.tint, g.amount), g.bright);
@@ -306,15 +309,18 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     cloudLit = '#ffffff'; cloudShade = mix(b.sky[1], '#c8d8f0', 0.55);
   } else if (time === 'dusk') {
     sky = DUSK_SKY[scenery].sky; glow = DUSK_SKY[scenery].glow; light = 0.7; sun = '#ffc46a';
-    sunLight = '#ffab62'; sunIntensity = 3.0;
-    hemiSky = '#8a6ad2'; hemiIntensity = 1.45; // sombras arroxeadas
+    // Cor-brilho: a luz que cai nos objetos é quase neutra — o sol quente, a sombra fria —, e a cor forte fica no céu, na névoa e no reflexo. Era sol
+    // #ffab62 e sombra #8a6ad2 (roxo saturado): o carro branco saía rosa e o asfalto roxo (tests/cor-brilho.test.ts).
+    sunLight = '#ffe8d0'; sunIntensity = 3.0;
+    hemiSky = '#b0b4c4'; hemiIntensity = 1.45;
     envIntensity = 0.35; exposure = 1.0; fogDensity = 0.9;
     bloom = [0.3, 0.4, 1.6];
     cloudLit = mix(glow, '#ffa07a', 0.3); cloudShade = mix(sky[1], sky[0], 0.3);
   } else {
     sky = nightSky(scenery); glow = scenery === 'city_night' ? '#ff9a6a' : '#b8c8ff'; light = 0.32; moon = '#f6f2dc';
-    sunLight = '#9db6ff'; sunIntensity = 0.95;
-    hemiSky = scenery === 'city_night' ? '#5a5aa8' : '#4a66b8'; hemiIntensity = 1.35;
+    // Cor-brilho: luar e céu da noite frios mas quase neutros (eram #9db6ff e #4a66b8/#5a5aa8, azul e roxo saturados); a cidade, um pouco mais quente.
+    sunLight = '#dcdee6'; sunIntensity = 0.95;
+    hemiSky = scenery === 'city_night' ? '#aaa6aa' : '#a4a6ae'; hemiIntensity = 1.35;
     envIntensity = 0.8; exposure = 1.12; fogDensity = 1.3;
     // Limiar entre as fachadas acesas do cenário (1,25: não brilham) e as luminárias (2,0: brilham) — com 1,0 a
     // cidade inteira virava um clarão (tests/render-ground.test.ts).
@@ -327,7 +333,8 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
   const groundLow = time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow);
   const groundHigh = time === 'night' ? liftTo(g(b.groundHigh), 0.12) : g(b.groundHigh);
-  const asphalt = time === 'night' ? shade(mix(b.asphalt, GRADE.night.tint, 0.17), 0.87) : g(b.asphalt);
+  // Cor-brilho: no entardecer e à noite o asfalto é neutro-quente (era o vinho e o marinho da gradação de hora: com a luz roxa, saía roxo).
+  const asphalt = time === 'day' ? b.asphalt : shade(mix(b.asphalt, ASPHALT_LATE, time === 'night' ? 0.8 : 0.6), time === 'night' ? 0.72 : 0.92);
   // Os planos do horizonte puxam para o céu do período (o rosa do entardecer, o azul da noite).
   const skyPull = time === 'day' ? 0 : time === 'dusk' ? 0.28 : 0.5;
   const layers = b.layers.map((c, i) => mix(g(c), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];

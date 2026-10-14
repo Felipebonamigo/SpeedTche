@@ -98,7 +98,11 @@ interface Slot {
   ring: THREE.Color; ringKey: string;
 }
 
-interface Saved { rim: THREE.Vector3; term: THREE.Vector3; shadows: THREE.Vector3; highlights: THREE.Vector3; adjust: THREE.Vector3; exposure: number; clear: THREE.Color; clearAlpha: number }
+interface Saved {
+  rim: THREE.Vector3; term: THREE.Vector3; shadows: THREE.Vector3; highlights: THREE.Vector3; adjust: THREE.Vector3; exposure: number; clear: THREE.Color; clearAlpha: number;
+  /** Cor-brilho: a IBL difusa e o céu/chão do verniz dos carros. */
+  fill: number; skyTop: THREE.Vector3; skyHorizon: THREE.Vector3; ground: THREE.Vector3;
+}
 interface Size { width: number; height: number; dpr: number }
 
 const wrapPi = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
@@ -256,6 +260,7 @@ export class Stage {
       rim: u.uStylizeRim.value.clone(), term: u.uStylizeTerm.value.clone(), shadows: u.uGradeShadows.value.clone(),
       highlights: u.uGradeHighlights.value.clone(), adjust: u.uGradeAdjust.value.clone(), exposure: this.gl.toneMappingExposure,
       clear: this.gl.getClearColor(new THREE.Color()), clearAlpha: this.gl.getClearAlpha(),
+      fill: u.uStylizeFill.value, skyTop: u.uStylizeSkyTop.value.clone(), skyHorizon: u.uStylizeSkyHorizon.value.clone(), ground: u.uStylizeGround.value.clone(),
     };
     this.gl.toneMappingExposure = setStylizePalette(STUDIO).exposure;
     this.scene.add(this.cars.group);
@@ -272,6 +277,7 @@ export class Stage {
       const u = stylizeUniforms;
       u.uStylizeRim.value.copy(s.rim); u.uStylizeTerm.value.copy(s.term); u.uGradeShadows.value.copy(s.shadows);
       u.uGradeHighlights.value.copy(s.highlights); u.uGradeAdjust.value.copy(s.adjust);
+      u.uStylizeFill.value = s.fill; u.uStylizeSkyTop.value.copy(s.skyTop); u.uStylizeSkyHorizon.value.copy(s.skyHorizon); u.uStylizeGround.value.copy(s.ground);
       this.gl.toneMappingExposure = s.exposure;
       this.gl.setClearColor(s.clear, s.clearAlpha);
     }

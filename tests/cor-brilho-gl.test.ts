@@ -29,8 +29,11 @@ interface Lab {
 const AHEAD: Probe = { box: [-6, 0, -45, 6, 1.6, -6] };
 /** Pixels estourados que os faróis podem ACRESCENTAR à região (fração): as "bolhas brancas". */
 const BLOWN = 0.0005;
-/** A traseira do Falcão GT entre as lanternas de dentro (x = 0, na altura delas): lataria branca. */
-const REAR: Probe = { point: [0, 0.66, 2.2], r: 2 };
+/**
+ * A traseira do Falcão GT logo acima das lanternas, dos dois lados (x = ±0,5): lataria branca. (Era x = 0 na altura das lanternas: em Sampa, com a
+ * câmera da subida, esse ponto cai 2 px abaixo da tela e a medida saía preta — falharia pelo motivo errado.)
+ */
+const REAR: Probe[] = [{ point: [0.5, 0.86, 2.18], r: 2 }, { point: [-0.5, 0.86, 2.18], r: 2 }];
 
 if (REQUIRED) it('o Chromium existe (NC_REQUIRE_GL=1)', () => { expect(available, `sem ${CHROME}`).toBe(true); });
 
@@ -98,7 +101,8 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
       for (const [name, track, ticks] of [['canion', 'canion', 1600], ['sampa', 'sampa_noite', 1400]] as const) {
         L.freeze(track, ticks, { x: 0, parked: true });
         L.headlights(true);
-        out[name] = L.shoot('high', 10, [rear as Probe])[0];
+        const [a, b] = L.shoot('high', 10, rear as Probe[]);
+        out[name] = { ...a, rgb: [0, 1, 2].map((i) => Math.round((a.rgb[i] + b.rgb[i]) / 2)) as [number, number, number] };
       }
       return out;
     }, REAR);

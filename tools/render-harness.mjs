@@ -62,7 +62,7 @@ for (const [name, query, size] of run) {
   const t0 = Date.now();
   try {
     await page.goto(`http://localhost:${port}/tools/render-harness.html?${query}`, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => window.ready, null, { timeout: 1500000 });
+    await page.waitForFunction(() => window.ready, null, { timeout: 3600000 });
     const debug = await page.evaluate(() => window.debug);
     await page.screenshot({ path: `scratch/render-${name}.png`, timeout: 600000 });
     const pageErrors = await page.evaluate(() => window.errors);

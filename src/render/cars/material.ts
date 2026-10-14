@@ -15,6 +15,7 @@ import type { Quality } from '../../game/contracts';
 import { atLeast } from '../../game/quality';
 import { applyStylize } from '../stylize';
 import { CUT_BIT, CUT_SHIFT } from './mount';
+import { LENS_RIM } from './kit';
 
 /** Bits de acabamento em `instExtra.w` (3 bits, a partir do bit 3): 0 brilho, 1 metálico, 2 perolado, 3 fosco, 4 cromado, 5 camaleão (a ordem de `FINISH_IDS`). */
 export const FINISH_SHIFT = 3;
@@ -27,11 +28,45 @@ export interface CarUniforms {
   uBrakeGlow: { value: number };
   uPopup: { value: number };
   uEnvBoost: { value: number };
+  /** Força do verniz estilizado (reflexo do céu e do horizonte na lataria; cor-brilho): 0 na Baixa. */
+  uVarnish: { value: number };
+}
+
+/**
+ * Lanterna (cor-brilho, docs/ondas/cor-brilho.md): o miolo esquenta para laranja-branco quando o brilho passa de `LAMP_HOT_FROM` (à noite e no freio),
+ * a borda continua vermelha. `w` é o peso do emissivo: o do pincel (`aMat.w`) × o da lente, que cai do centro (1) para a borda (`LENS_RIM`, atributo `aLens`).
+ */
+export const LAMP_HOT: readonly [number, number, number] = [1, 0.7, 0.18];
+const LAMP_HOT_FROM = 1.5;
+const LAMP_HOT_MAX = 0.6;
+
+/** O emissivo (linear) da lanterna de cor `rgb` no peso `w` com o brilho `glow`: a conta que o GLSL (`carLamp`) espelha. */
+export function lampEmission(rgb: readonly number[], w: number, glow: number): [number, number, number] {
+  const sm = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const hot = sm(0.55, 1, w) * Math.min(LAMP_HOT_MAX, Math.max(0, (glow - LAMP_HOT_FROM) / 3));
+  return [0, 1, 2].map((i) => (rgb[i] + (LAMP_HOT[i] - rgb[i]) * hot) * w * glow) as [number, number, number];
+}
+
+/**
+ * Brilho da lanterna e do freio por período (a `light` da paleta): de dia o miolo fica abaixo do limiar do bloom (discreto), à noite passa dele (halo, com o teto
+ * do bloom); o freio é sempre mais forte. Os três números são provisórios, calibrados nas capturas da cor-brilho.
+ */
+export function tailGlow(light: number): { tail: number; brake: number } {
+  if (light < 0.5) return { tail: 7, brake: 12 };
+  if (light < 0.8) return { tail: 3.5, brake: 7 };
+  return { tail: 1.6, brake: 4 };
+}
+
+/** Verniz estilizado por degrau: nada na Baixa; na Alta e no Ultra um pouco menos (o clearcoat de verdade já reflete o céu). */
+export function varnishFor(q: Quality): number {
+  return atLeast(q, 'high') ? 0.7 : atLeast(q, 'medium') ? 0.9 : 0;
 }
 
 const VERT_PARS = /* glsl */ `
 attribute vec4 aPaint;
 attribute vec4 aMat;
+attribute float aLens;
+varying float vLens;
 attribute vec4 instExtra;
 uniform float uPopup;
 varying vec4 vMat;
@@ -57,6 +92,7 @@ vColor = vec4( 1.0 );
   vColor.rgb = mix( base, instExtra.rgb, liv );
   vBrake = ( flags & 1 ) != 0 ? 1.0 : 0.0;
   vMat = aMat;
+  vLens = aLens;
   vPaintW = max( aPaint.x, liv );
   // Acabamento: só a carroceria pintada (não o acento nem a face que virou faixa) e só em quem tem o bit na instância.
   vFin = aPaint.x * ( 1.0 - aPaint.y ) * ( 1.0 - liv );
@@ -74,6 +110,27 @@ uniform float uHeadGlow;
 uniform float uTailGlow;
 uniform float uBrakeGlow;
 uniform float uEnvBoost;
+uniform float uVarnish;
+uniform vec3 uStylizeSkyTop;
+uniform vec3 uStylizeSkyHorizon;
+uniform vec3 uStylizeGround;
+varying float vLens;
+// Lanterna (lampEmission em material.ts): o miolo esquenta para LAMP_HOT acima de LAMP_HOT_FROM, a borda continua da cor da lente.
+vec3 carLamp( vec3 lens, float w, float glow ) {
+  float hot = smoothstep( 0.55, 1.0, w ) * clamp( ( glow - ${LAMP_HOT_FROM.toFixed(2)} ) / 3.0, 0.0, ${LAMP_HOT_MAX.toFixed(2)} );
+  return mix( lens, vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ), hot ) * w * glow;
+}
+// Verniz estilizado (cor-brilho): a lataria reflete o céu do período (topo → horizonte) e, abaixo da linha do horizonte, o chão escuro, por um Fresnel de
+// cartum (expoente 3). Analítico: nenhuma amostra de textura, nenhuma chamada; as cores vêm de setStylizePalette (uniformes compartilhados).
+vec3 carVarnish( vec3 col, vec3 n, vec3 viewPos, float k ) {
+  vec3 v = normalize( viewPos );
+  float ndv = clamp( dot( n, v ), 0.0, 1.0 );
+  vec3 r = inverseTransformDirection( reflect( -v, n ), viewMatrix );
+  vec3 sky = mix( uStylizeSkyHorizon, uStylizeSkyTop, smoothstep( 0.03, 0.65, r.y ) );
+  vec3 refl = mix( uStylizeGround, sky, smoothstep( -0.025, 0.025, r.y ) );
+  float f = 0.05 + 0.95 * pow( 1.0 - ndv, 3.0 );
+  return mix( col, refl, clamp( k * f, 0.0, 1.0 ) );
+}
 varying vec4 vMat;
 varying float vPaintW;
 varying float vBrake;
@@ -147,7 +204,7 @@ float fFlake = 0.0;
 export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uniforms: CarUniforms } {
   const uniforms: CarUniforms = {
     uSelfLight: { value: 0.2 }, uHeadGlow: { value: 0.4 }, uTailGlow: { value: 0.9 }, uBrakeGlow: { value: 3.2 },
-    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 },
+    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') },
   };
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true, roughness: 0.4, metalness: 0.2, // normal suave da malha (kit.ts), não sombreado plano
@@ -171,7 +228,9 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         // Menos nas cores claras: o branco já lê branco na sombra e, com mais, estoura no bloom.
         float selfLum = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
         totalEmissiveRadiance += diffuseColor.rgb * uSelfLight * ( 1.0 - fMetal * 0.6 ) * ( 1.0 - 0.65 * selfLum ) * ( 1.0 - wChrome );
-        totalEmissiveRadiance += diffuseColor.rgb * ( vMat.z * uHeadGlow + vMat.w * mix( uTailGlow, uBrakeGlow, vBrake ) );
+        // Lente com miolo e borda (aLens: 0 no centro da tampa, 1 na borda; kit.ts, lensRadius).
+        float lensW = mix( 1.0, ${LENS_RIM.toFixed(2)}, vLens );
+        totalEmissiveRadiance += diffuseColor.rgb * ( vMat.z * lensW * uHeadGlow ) + carLamp( diffuseColor.rgb, vMat.w * lensW, mix( uTailGlow, uBrakeGlow, vBrake ) );
         totalEmissiveRadiance += mix( vec3( 1.0 ), diffuseColor.rgb * 2.2, 0.5 ) * fFlake * 0.9;`)
       .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
         #ifdef USE_CLEARCOAT
@@ -188,16 +247,24 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
             // um brilho de Fresnel sobre a reflexão do céu que já foi amostrada: zero amostra a mais, zero chamada.
             radiance *= 1.0 + ( wMetallic + wPearl + wCham ) * 1.1 * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );
           #endif
-        #endif`);
+        #endif`)
+      // Verniz: só a lataria pintada (pintura e faixas), menos no fosco e no cromado (que já é espelho), depois de toda a luz e antes da saída.
+      .replace('#include <opaque_fragment>', `outgoingLight = carVarnish( outgoingLight, normal, vViewPosition, uVarnish * vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ) );
+        #include <opaque_fragment>`);
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
-  material.customProgramCacheKey = () => 'speed-tche-car-v3';
+  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado.
+  material.customProgramCacheKey = () => 'speed-tche-car-v4';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };
 }
 
-/** Verniz só na qualidade alta ou melhor (o programa troca uma vez, na troca de qualidade). */
-export function setCarQuality(material: THREE.MeshPhysicalMaterial, q: Quality): void {
+/**
+ * Verniz de verdade (clearcoat) só na qualidade alta ou melhor (o programa troca uma vez, na troca de qualidade); o estilizado (reflexo do céu) é um
+ * uniforme (`uVarnish`, 0 na Baixa), passado com os uniformes do material.
+ */
+export function setCarQuality(material: THREE.MeshPhysicalMaterial, q: Quality, uniforms?: CarUniforms): void {
   material.clearcoat = atLeast(q, 'high') ? 1 : 0;
+  if (uniforms) uniforms.uVarnish.value = varnishFor(q);
 }

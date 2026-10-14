@@ -22,7 +22,7 @@ import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
-import { createCarMaterial, FINISH_SHIFT, setCarQuality, type CarUniforms } from './cars/material';
+import { createCarMaterial, FINISH_SHIFT, setCarQuality, tailGlow, type CarUniforms } from './cars/material';
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
@@ -39,6 +39,14 @@ const VIP_LABEL = 4;
 /** Bit de freio em `instExtra.w` (os de pintura vêm de cars/paints.ts). */
 const BRAKE_BIT = 1;
 const SIDES = [-1, 1] as const;
+/**
+ * Faróis do carro do viewport (cor-brilho, docs/ondas/cor-brilho.md): a lâmpada e o ponto de mira no referencial do carro (−z à frente; x é o do
+ * farol da direita, o da esquerda é o espelho), o cone e o decaimento, e a força por período (cd). No entardecer o farol fica ABAIXO da luz do céu na
+ * traseira de um carro a 20 m (tests/cor-brilho.test.ts): com 110 cd ele era 4× o céu e, com o especular voltando à câmera, o bloom fazia um clarão.
+ */
+export const HEADLIGHT = { lamp: [0.55, 0.6, -2.0], aim: [1.0, -0.4, -40], angle: 0.42, distance: 90, decay: 1.3, night: 200, dusk: 20 } as const;
+const IDENTITY = new THREE.Matrix4();
+
 /** Carro mais que isto à frente do carro do viewport (a câmera fica 7,8 m atrás) usa a roda simples. */
 const FAR_WHEELS_M = 30;
 
@@ -229,15 +237,15 @@ export class Cars {
       this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, motion: newMotion() });
       this.looks.push(null); this.lookIds.push(''); this.lookCars.push('');
     }
-    // Faróis do carro do viewport (sempre na origem, olhando −Z): dois SpotLights fixos.
-    for (const sx of [-0.55, 0.55]) {
-      const spot = new THREE.SpotLight('#fff3d0', 230, 110, 0.48, 0.6, 1.3);
-      spot.position.set(sx, 0.6, -2.0);
-      spot.target.position.set(sx * 2.2, -0.6, -45);
+    // Faróis do carro do viewport: dois SpotLights que `pose` leva à frente do carro do viewport (cor-brilho: ficavam na linha central, e com o
+    // carro numa faixa a poça caía ao lado dele). Feixe de borda suave (penumbra 1).
+    for (let k = 0; k < 2; k++) {
+      const spot = new THREE.SpotLight('#fff3d0', HEADLIGHT.night, HEADLIGHT.distance, HEADLIGHT.angle, 1, HEADLIGHT.decay);
       spot.visible = false;
       scene.add(spot, spot.target);
       this.spots.push(spot);
     }
+    this.aimHeadlights(IDENTITY);
     scene.add(this.group);
   }
 
@@ -259,15 +267,27 @@ export class Cars {
     for (const { uniforms } of this.rigs) {
       uniforms.uSelfLight.value = 0.05 + 0.15 * light;
       uniforms.uHeadGlow.value = night ? 2.6 : light < 0.8 ? 0.9 : 0.35;
-      uniforms.uTailGlow.value = night ? 1.3 : 0.9;
+      const tg = tailGlow(light); // cor-brilho: a lanterna passa do limiar do bloom à noite e fica abaixo dele de dia
+      uniforms.uTailGlow.value = tg.tail;
+      uniforms.uBrakeGlow.value = tg.brake;
       uniforms.uPopup.value = light < 0.8 ? 1 : 0;
     }
-    for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? 230 : 110; }
+    for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? HEADLIGHT.night : HEADLIGHT.dusk; }
+  }
+
+  /** Os faróis saem da frente do carro de matriz `m` (o do viewport) e miram a pista adiante dele: posição, rumo, guinada e mergulho do carro. */
+  private aimHeadlights(m: THREE.Matrix4): void {
+    for (let k = 0; k < this.spots.length; k++) {
+      const s = this.spots[k];
+      const sx = k === 0 ? -1 : 1;
+      s.position.set(sx * HEADLIGHT.lamp[0], HEADLIGHT.lamp[1], HEADLIGHT.lamp[2]).applyMatrix4(m);
+      s.target.position.set(sx * HEADLIGHT.aim[0], HEADLIGHT.aim[1], HEADLIGHT.aim[2]).applyMatrix4(m);
+    }
   }
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
-    for (const { material } of this.rigs) setCarQuality(material, q); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
+    for (const { material, uniforms } of this.rigs) setCarQuality(material, q, uniforms); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
     this.lowQuality = q === 'low';
   }
 
@@ -388,6 +408,7 @@ export class Cars {
    */
   pose(rf: RoadFrame, state: RaceState, track: Track, ownIndex: number, viewportSeats: ReadonlyArray<{ seat: number; name: string; color: string; carIndex: number }>, time: number, camera: CameraMode = 'low'): void {
     this.ownEyeOn = false;
+    this.aimHeadlights(IDENTITY); // sem carro do viewport (fundo do menu), no lugar de sempre
     const cars = state.cars;
     const d = this.dummy;
     const w = this.wheelDummy;
@@ -415,6 +436,7 @@ export class Cars {
       d.updateMatrix();
       this.m.copy(d.matrix);
       let flags = look.body | (a.brake ? BRAKE_BIT : 0);
+      if (i === ownIndex) this.aimHeadlights(this.m);
       if (i === ownIndex && isMountedCamera(camera)) {
         const mp = this.mountOf(model);
         const pt = camera === 'hood' ? mp.hood : mp.bumper;
