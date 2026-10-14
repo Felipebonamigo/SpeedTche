@@ -36,14 +36,16 @@ export interface CarUniforms {
  * Lanterna (cor-brilho, docs/ondas/cor-brilho.md): o miolo esquenta para laranja-branco quando o brilho passa de `LAMP_HOT_FROM` (à noite e no freio),
  * a borda continua vermelha. `w` é o peso do emissivo: o do pincel (`aMat.w`) × o da lente, que cai do centro (1) para a borda (`LENS_RIM`, atributo `aLens`).
  */
-export const LAMP_HOT: readonly [number, number, number] = [1, 0.7, 0.18];
+export const LAMP_HOT: readonly [number, number, number] = [1, 0.6, 0.15];
+/** De que peso em diante a lente esquenta (o miolo; a coroa em volta fica vermelha). */
+const LAMP_CORE_FROM = 0.75;
 const LAMP_HOT_FROM = 1.5;
 const LAMP_HOT_MAX = 0.6;
 
 /** O emissivo (linear) da lanterna de cor `rgb` no peso `w` com o brilho `glow`: a conta que o GLSL (`carLamp`) espelha. */
 export function lampEmission(rgb: readonly number[], w: number, glow: number): [number, number, number] {
   const sm = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const hot = sm(0.55, 1, w) * Math.min(LAMP_HOT_MAX, Math.max(0, (glow - LAMP_HOT_FROM) / 3));
+  const hot = sm(LAMP_CORE_FROM, 1, w) * Math.min(LAMP_HOT_MAX, Math.max(0, (glow - LAMP_HOT_FROM) / 3));
   return [0, 1, 2].map((i) => (rgb[i] + (LAMP_HOT[i] - rgb[i]) * hot) * w * glow) as [number, number, number];
 }
 
@@ -117,7 +119,7 @@ uniform vec3 uStylizeGround;
 varying float vLens;
 // Lanterna (lampEmission em material.ts): o miolo esquenta para LAMP_HOT acima de LAMP_HOT_FROM, a borda continua da cor da lente.
 vec3 carLamp( vec3 lens, float w, float glow ) {
-  float hot = smoothstep( 0.55, 1.0, w ) * clamp( ( glow - ${LAMP_HOT_FROM.toFixed(2)} ) / 3.0, 0.0, ${LAMP_HOT_MAX.toFixed(2)} );
+  float hot = smoothstep( ${LAMP_CORE_FROM.toFixed(2)}, 1.0, w ) * clamp( ( glow - ${LAMP_HOT_FROM.toFixed(2)} ) / 3.0, 0.0, ${LAMP_HOT_MAX.toFixed(2)} );
   return mix( lens, vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ), hot ) * w * glow;
 }
 // Verniz estilizado (cor-brilho): a lataria reflete o céu do período (topo → horizonte) e, abaixo da linha do horizonte, o chão escuro, por um Fresnel de

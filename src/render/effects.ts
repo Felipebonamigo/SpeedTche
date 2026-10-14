@@ -206,7 +206,13 @@ export class Effects {
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
     this.dustColor.set(p.verge).lerp(new THREE.Color(p.shoulder), 0.4).multiplyScalar(p.light < 0.5 ? 0.7 : 0.92);
+    // Cor-brilho: as linhas brancas (velocidade e túnel do vácuo) são aditivas; com o mesmo brilho sobre a cena da noite, 10× mais escura, viravam
+    // barras de farol ao lado dos carros (Sampa). Caem com a luz do período: 1 de dia, ~0,76 no entardecer, 0,45 à noite.
+    this.lineGain = 0.45 + 0.55 * Math.min(1, Math.max(0, (p.light - 0.32) / 0.68));
   }
+
+  /** Brilho das linhas de velocidade e do túnel pelo período (`setPalette`). */
+  private lineGain = 1;
 
   private rnd(): number { this.seed++; return hash2(this.seed, 77); }
 
@@ -362,7 +368,7 @@ export class Effects {
     const hd = this.lineHead; const tl = this.lineTail;
     if (!locateOnFrame(rf, track, v.z + s.dz * 50, v.x + s.lat / 7, hd)) return;
     const ok = locateOnFrame(rf, track, v.z + s.tail * 50, v.x + s.lat / 7, tl);
-    st.add(hd.x, hd.y + s.h, hd.z, ok ? tl.x : hd.x, ok ? tl.y + s.h : hd.y + s.h, ok ? tl.z : hd.z - 1, s.width, s.r, s.g, s.b, s.a);
+    st.add(hd.x, hd.y + s.h, hd.z, ok ? tl.x : hd.x, ok ? tl.y + s.h : hd.y + s.h, ok ? tl.z : hd.z - 1, s.width, s.r, s.g, s.b, s.a * this.lineGain);
   }
 
   /** Deslocamento da câmera pelo chacoalho do assento (zero se desligado nas opções). */
