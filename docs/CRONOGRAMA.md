@@ -97,6 +97,7 @@ Se cada onda passar de uma semana, o W cai em abril e o Next Fest de junho conti
 | V5 | **HUD mais enxuto** | Painéis com moldura nos 4 cantos; a referência usa números grandes sem caixa. | A fazer, no estilo do menu escolhido (V3). |
 | V6 | **Câmera Alta e os marcos** | A Alta (FOV 36) deixa 103 colocações de marco abaixo do mínimo (a Baixa: 36). | Em andamento (`nc/cameras`): abrir o FOV o mínimo necessário. |
 | V7 | **Galeria fixa de referência** | Decisões visuais lentas e sem antes × depois comparável. | Feita em `nc/galeria` (14/10), falta mesclar: `node tools/galeria/gerar.mjs --raiz <worktree> --rotulo <nome>` renderiza 13 quadros fixos (6 paisagens, tela dividida 2 e 4, derrapagem, largada, os 14 carros de trás, menu e garagem; 1280×720, Alta) de qualquer worktree e monta `scratch/galeria/<rótulo>/folha.png` + `manifest.json`; `comparar.mjs <antes> <depois>` põe lado a lado e marca o que mudou e as contagens que subiram (`tools/galeria/README.md`). A do `main` f241703 levou ~100 min no swiftshader carregado. |
+| V8 | **Efeitos de cartum × diretriz realista** | A galeria de 14/10 mostra balões "POW!" e estrelinhas na batida (M4/M5): cartum puro, brigam com "mais realista que o Horizon Chase". | A fazer: trocar por faíscas, lascas e tranco de câmera (ou deixar como opção), com o antes × depois da galeria. |
 
 **Técnico**
 
@@ -111,6 +112,7 @@ Se cada onda passar de uma semana, o W cai em abril e o Next Fest de junho conti
 | T7 | **Online desligado** | Falta o relay num VPS. | Decisão do dono (nº 16). |
 | T8 | **Pontas soltas das frentes** | Garagem mostra só as cores (`DisplayCar.look` não ligado); pódio só lê `look.paint`; `div.lines` morto no `hud.ts`; `crestLift` não aplicado ao carro; `mountShowroom` não ligado ao lobby; dicas de frear/derrapar não disparam na Copacabana; recusa da oferta de assistência só em memória. | A fazer, em lote, depois da V1/V2. |
 | T9 | **Worktrees velhas** | 25 worktrees, 1,6 GB. | Limpeza feita em 14/10 (só as já mescladas). |
+| T10 | **Sobra do nome antigo** | Painel "CREW RACING" na pista (com o "NITRO" vizinho, o nome Nitro Crew). | ~~Feito em 14/10~~ (82ea7a5): vira "TCHÊ RACING", com teste. |
 
 **Cronograma que falta:** O1 (27 desenhos nas pistas), O2 (recalibrar e congelar), O5 (progresso), e as ondas P a W.
 
