@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import type { Quality } from '../../game/contracts';
 import { atLeast } from '../../game/quality';
 import { applyStylize } from '../stylize';
+import { CUT_BIT, CUT_SHIFT } from './mount';
 
 /** Bits de acabamento em `instExtra.w` (3 bits, a partir do bit 3): 0 brilho, 1 metálico, 2 perolado, 3 fosco, 4 cromado, 5 camaleão (a ordem de `FINISH_IDS`). */
 export const FINISH_SHIFT = 3;
@@ -40,6 +41,7 @@ varying float vFin;
 varying float vFinish;
 varying vec3 vLocal;
 varying vec3 vAccent;
+varying float vCut;
 `;
 
 const VERT_COLOR = /* glsl */ `
@@ -61,6 +63,8 @@ vColor = vec4( 1.0 );
   vFinish = float( ( flags >> ${FINISH_SHIFT} ) & ${FINISH_MASK} );
   vLocal = position;
   vAccent = instExtra.rgb;
+  // Câmera de Capô/Frente (nc/cameras): o bit 64 liga o corte e a altura dele (cm) vem acima dele; fora do corte vale 'infinito'.
+  vCut = ( flags & ${CUT_BIT} ) != 0 ? float( ( flags >> ${CUT_SHIFT} ) & 255 ) * 0.01 : 1.0e4;
 }
 `;
 
@@ -77,6 +81,7 @@ varying float vFin;
 varying float vFinish;
 varying vec3 vLocal;
 varying vec3 vAccent;
+varying float vCut;
 // Gira a cor em volta do eixo cinza (o matiz anda, a luminosidade fica): o "outro tom" do camaleão quando o detalhe não tem cor.
 vec3 carHueRot( vec3 c, float a ) {
   const vec3 k = vec3( 0.57735 );
@@ -156,6 +161,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y += aPaint.w * uPopup * 0.11;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_PARS}`)
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif ( vLocal.y > vCut ) discard;')
       .replace('#include <roughnessmap_fragment>', FRAG_FINISH_MATERIAL)
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = fMetal;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${FRAG_FINISH_COLOR}`)
@@ -185,7 +191,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         #endif`);
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
-  material.customProgramCacheKey = () => 'speed-tche-car-v2';
+  material.customProgramCacheKey = () => 'speed-tche-car-v3';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };

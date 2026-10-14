@@ -18,8 +18,13 @@ gamepads vibram em batidas, nitro, grama e largada, com opção para desligar.
 | **Olhar para trás** | **B** | **R** | **R3 (11)** |
 | **Buzina** | **H** | **G** | **L3 (10)** |
 | Pausar | Esc | Esc | Start (9) |
+| **Câmera** | **C** | **V** | **Select/Back (8)** |
 
-- **11 ações** desde a N6 (a M1 levou de 8 a 10 com `drift` e `lookBack`; a N6 acrescentou `horn`, antes de `pause`, que segue a última).
+- **12 ações** desde a frente das câmeras (`nc/cameras`): `camera` entra **depois** de `pause` (a última fila da grade): quem chega primeiro fica com o código, então um mapa antigo nunca perde um botão para ela. Cicla **Alta → Baixa → Capô → Frente → Alta**
+  por assento e mostra o aviso "Câmera: Capô" na tela; é borda local (não entra no `PlayerInput`, não vai à rede, não toca `hashRace`) e a escolha fica
+  lembrada em `Settings.seatCameras` (Opções › Acessibilidade, "Câmera J1..J4"; padrão Alta). C, V e o botão 8 (Select/Back) estavam livres; mapa salvo
+  de antes só ganha o padrão (quem já usava C/V/8 em outra ação mantém, e a câmera recebe outra tecla livre). Em corrida o Retrô ignora a escolha.
+- 11 ações desde a N6 (a M1 levou de 8 a 10 com `drift` e `lookBack`; a N6 acrescentou `horn`, antes de `pause`, que segue a última).
   A buzina é nível e vai na rede no bit 64 (`docs/ONLINE.md`). Segurar 0,35 s abre a roda de 8 frases: a marcha ▲▼ escolhe
   e deixa de chegar à física enquanto ela está aberta; soltar a buzina com frase marcada fala. Mapas salvos da M1 só ganham o
   padrão da buzina; quem já usava H/G/L3 em outra ação mantém. O `playtest-controls` tem 52 conferências.

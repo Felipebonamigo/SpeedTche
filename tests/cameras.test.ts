@@ -83,8 +83,8 @@ describe('a escolha é por assento e é campo aditivo das opções', () => {
 });
 
 describe('a ação remapeável camera', () => {
-  it('é a 12ª, antes da pausa, e os padrões são C (teclado 1), V (teclado 2) e Select/Back (botão 8)', () => {
-    expect([...BIND_ACTIONS]).toEqual(['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'camera', 'pause']);
+  it('é a 12ª e última (depois da pausa: nenhum mapa antigo perde um botão para ela), e os padrões são C (teclado 1), V (teclado 2) e Select/Back (botão 8)', () => {
+    expect([...BIND_ACTIONS]).toEqual(['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'pause', 'camera']);
     expect(DEFAULT_BINDINGS.kb1.camera).toEqual(['KeyC']);
     expect(DEFAULT_BINDINGS.kb2.camera).toEqual(['KeyV']);
     expect(DEFAULT_BINDINGS.gamepad.camera).toEqual([8]);
@@ -235,5 +235,75 @@ describe('a régua de visão dos marcos conhece a câmera ativa', () => {
       expect(Number.isFinite(s), m).toBe(true);
       expect(s, m).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+// ───────────────────────────── Entrada e troca em corrida ─────────────────────────────
+import { setLanguage, t } from '../src/i18n';
+import { cameraName, switchCamera } from '../src/game/camera-switch';
+import { createInput } from '../src/ui/input';
+import { actionLabel } from '../src/ui/remap/labels';
+import '../src/game/strings';
+
+function fakeWindow() {
+  const listeners = new Map<string, Array<(e: unknown) => void>>();
+  const target = {
+    addEventListener: (type: string, fn: (e: unknown) => void) => { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+    removeEventListener: (type: string, fn: (e: unknown) => void) => { listeners.set(type, (listeners.get(type) ?? []).filter((f) => f !== fn)); },
+    navigator: { getGamepads: () => [] },
+  };
+  const key = (type: 'keydown' | 'keyup', code: string) => {
+    const e = { code, repeat: false, ctrlKey: false, metaKey: false, altKey: false, target: null, preventDefault: () => undefined };
+    for (const fn of listeners.get(type) ?? []) fn(e);
+  };
+  return { target: target as unknown as Window, down: (code: string) => key('keydown', code), up: (code: string) => key('keyup', code) };
+}
+
+describe('a tecla de câmera pelo provedor de entrada', () => {
+  it('C no teclado 1 é uma borda (um quadro por aperto), V no teclado 2, e nada disto chega ao PlayerInput', () => {
+    const w = fakeWindow();
+    const input = createInput(w.target);
+    input.bindSeat(0, 'kb1');
+    input.bindSeat(1, 'kb2');
+    w.down('KeyC');
+    input.poll();
+    expect(input.cameraPressed?.(0)).toBe(true);
+    expect(input.cameraPressed?.(1)).toBe(false);
+    input.poll(); // segurada: não repete
+    expect(input.cameraPressed?.(0)).toBe(false);
+    w.up('KeyC');
+    w.down('KeyV');
+    input.poll();
+    expect(input.cameraPressed?.(1)).toBe(true);
+    expect(input.cameraPressed?.(0)).toBe(false);
+    expect('camera' in input.readSeat(0)).toBe(false);
+    expect(input.cameraPressed?.(3)).toBe(false); // assento sem dispositivo
+    input.dispose();
+  });
+});
+
+describe('trocar a câmera em corrida', () => {
+  it('cicla Alta → Baixa → Capô → Frente → Alta, só no assento que apertou, e devolve o aviso', () => {
+    setLanguage('pt');
+    const seatCameras: Array<'high' | 'low' | 'hood' | 'bumper'> = ['high', 'high', 'bumper', 'high'];
+    const a = switchCamera(seatCameras, 0);
+    expect(a).toEqual({ mode: 'low', text: 'Câmera: Baixa' });
+    expect(seatCameras).toEqual(['low', 'high', 'bumper', 'high']);
+    expect(switchCamera(seatCameras, 0)?.text).toBe('Câmera: Capô');
+    expect(switchCamera(seatCameras, 0)?.text).toBe('Câmera: Frente');
+    expect(switchCamera(seatCameras, 0)?.text).toBe('Câmera: Alta');
+    expect(switchCamera(seatCameras, 2)?.mode).toBe('high'); // Frente → Alta, no assento 2
+    expect(seatCameras).toEqual(['high', 'high', 'high', 'high']);
+    expect(switchCamera(seatCameras, 9)).toBeNull(); // assento que não existe
+  });
+
+  it('o aviso e o nome da ação existem em PT e EN', () => {
+    setLanguage('en');
+    expect(cameraName('hood')).toBe('Hood');
+    expect(t('session.camera', { name: cameraName('bumper') })).toBe('Camera: Front');
+    expect(actionLabel('camera')).toBe('Camera');
+    setLanguage('pt');
+    expect(cameraName('high')).toBe('Alta');
+    expect(actionLabel('camera')).toBe('Câmera');
   });
 });

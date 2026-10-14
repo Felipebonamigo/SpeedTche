@@ -271,6 +271,8 @@ export interface ViewportSpec {
   color: string;
   name: string;
   messages: HudMessage[];
+  /** A câmera deste assento (Settings.seatCameras); ausente = Alta. O Retrô ignora. */
+  camera?: CameraMode;
 }
 
 /** Pose do fantasma do contra-relógio num instante (src/game/ghost.ts: ghostPoseAt). */

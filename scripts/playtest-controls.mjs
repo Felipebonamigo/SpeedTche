@@ -64,12 +64,12 @@ await key('ArrowDown', await mainIndex(page, '^controles$'));
 await key('Enter');
 check((await menu()) === 'controls', `Controles abre pelo menu (${await menu()})`);
 const grid = await page.evaluate(() => ({ cells: document.querySelectorAll('.bind-cell').length, restore: document.querySelectorAll('.btn-restore').length, first: document.querySelector('.bind-cell')?.textContent }));
-// 11 ações (derrapar e olhar para trás entraram na M1, a buzina na N6) × 3 dispositivos = 33 células, mais um "Padrão" por coluna.
-const ROWS = 11;
-check(grid.cells === ROWS * 3 && grid.restore === 3 && grid.first === '↑', `grade 11×3 com restaurar (${JSON.stringify(grid)})`);
+// 12 ações (derrapar e olhar para trás entraram na M1, a buzina na N6, a câmera na frente nc/cameras) × 3 dispositivos = 36 células, mais um "Padrão" por coluna.
+const ROWS = 12;
+check(grid.cells === ROWS * 3 && grid.restore === 3 && grid.first === '↑', `grade 12×3 com restaurar (${JSON.stringify(grid)})`);
 // A grade inteira cabe na tela (a 1280×720 do roteiro): a última linha e o "Padrão" ficam dentro da janela, sem rolar a página.
 const fit = await page.evaluate(() => { const r = document.querySelector('.btn-restore')?.getBoundingClientRect(); return r ? { bottom: Math.round(r.bottom), height: innerHeight } : null; });
-check(fit !== null && fit.bottom <= fit.height, `a grade de 11 linhas cabe na janela (${JSON.stringify(fit)})`);
+check(fit !== null && fit.bottom <= fit.height, `a grade de 12 linhas cabe na janela (${JSON.stringify(fit)})`);
 check((await focused()) === 'throttle:kb1', `foco começa em Acelerar/Teclado 1 (${await focused()})`);
 await frames(2);
 await shot('01-tela');
@@ -172,13 +172,17 @@ await key('ArrowDown');
 check((await focused()) === 'lookBack:gamepad', `e até Olhar para trás/Controles (${await focused()})`);
 await key('ArrowDown');
 check((await focused()) === 'horn:gamepad', `e até Buzina/Controles (${await focused()})`);
-// ── Restaurar padrão do controle (teclado segue remapeado): da Buzina ainda faltam Pausa e a linha do Padrão ──
-await key('ArrowDown', 2);
+await key('ArrowDown');
+check((await focused()) === 'pause:gamepad', `e até Pausar/Controles (${await focused()})`);
+await key('ArrowDown');
+check((await focused()) === 'camera:gamepad', `e até Câmera/Controles (${await focused()})`);
+// ── Restaurar padrão do controle (teclado segue remapeado): da Câmera (a última fila) falta só a linha do Padrão ──
+await key('ArrowDown', 1);
 check((await page.evaluate(() => document.querySelector('.scr-controls .focus')?.dataset.restore)) === 'gamepad', `foco no Padrão dos controles (${await focused()})`);
 await key('Enter');
 c = await controls();
 // Nitro volta a LB e Y ([4,3]) — não ao RB, que agora é o derrapar —, o freio recupera o LT, e derrapar, olhar para trás e a buzina seguem no padrão.
-check(JSON.stringify(c.gamepad.nitro) === '[4,3]' && JSON.stringify(c.gamepad.brake) === '[2,1,6]' && JSON.stringify(c.gamepad.drift) === '[5]' && JSON.stringify(c.gamepad.lookBack) === '[11]' && JSON.stringify(c.gamepad.horn) === '[10]' && JSON.stringify(c.kb1.throttle) === '["KeyR"]', `Padrão restaura só os controles (${JSON.stringify(c.gamepad)})`);
+check(JSON.stringify(c.gamepad.nitro) === '[4,3]' && JSON.stringify(c.gamepad.brake) === '[2,1,6]' && JSON.stringify(c.gamepad.drift) === '[5]' && JSON.stringify(c.gamepad.lookBack) === '[11]' && JSON.stringify(c.gamepad.horn) === '[10]' && JSON.stringify(c.gamepad.camera) === '[8]' && JSON.stringify(c.kb1.throttle) === '["KeyR"]', `Padrão restaura só os controles (${JSON.stringify(c.gamepad)})`);
 
 // ── Mouse: clicar numa célula captura; clicar fora cancela ──
 await page.click('.bind-cell[data-action="gearUp"][data-device="kb2"]');

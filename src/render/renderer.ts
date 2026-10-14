@@ -16,6 +16,7 @@ import { TICK_RATE } from '../core/constants';
 import { segmentAt } from '../core/track/builder';
 import type { TimeOfDay, Track } from '../core/types';
 import type { Quality, RenderFrame, Renderer } from '../game/contracts';
+import { DEFAULT_CAMERA_MODE, pickCameraMode } from './camera-base';
 import { cameraExtraFor, ChaseCamera, IdleCamera, newCameraExtra } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
 import { Cars } from './cars';
@@ -343,20 +344,21 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       const rf = buildRoadFrame(track, car.z, BEHIND, AHEAD[q], frames[i]);
       frames[i] = rf;
       poseWorld(rf, track, car.z, frame.time);
-      cars.pose(rf, frame.state, track, vp.carIndex, frame.viewports, frame.time);
+      const camMode = pickCameraMode(vp.camera, DEFAULT_CAMERA_MODE); // a escolha do assento (nada no núcleo nem na rede)
+      cars.pose(rf, frame.state, track, vp.carIndex, frame.viewports, frame.time, camMode);
       cars.poseGhost(rf, track, frame.ghost);
       const cam = cameras[i];
       const rect = rects[i];
       cam.setAspect(rect.w / Math.max(1, rect.h));
       const seg = segmentAt(track, car.z);
       effects.shake(vp.seat, frame.time, frame.options.screenShake && !frame.options.reduceEffects, shake);
-      cam.update(rf, car.x, car.speed / car.stats.topSpeed, seg.curve, car.nitroTicks > 0, frame.time, shake, cameraExtraFor(frame, vp.carIndex, cameraExtras[i]));
+      cam.update(rf, car.x, car.speed / car.stats.topSpeed, seg.curve, car.nitroTicks > 0, frame.time, shake, cameraExtraFor(frame, vp.carIndex, cameraExtras[i]), camMode, cars.eyeOfOwn());
       effects.pose(rf, track, (rect.h * dpr) / (2 * Math.tan((cam.camera.fov * Math.PI / 180) / 2)), i);
       // Legenda dos marcos: só correndo (nem na contagem, nem depois da chegada); desligada nas opções, sem cena (nada
       // montado, e a que estava na tela some). O relógio é o da corrida: parado na pausa (o HUD esconde a legenda), e
       // volta a zero numa corrida nova.
       const captionsOn = frame.options.landmarkCaptions !== false;
-      captionView.z = car.z; captionView.x = car.x; captionView.fov = cam.camera.fov;
+      captionView.z = car.z; captionView.x = car.x; captionView.fov = cam.camera.fov; captionView.mode = camMode;
       captionView.aspect = rect.w / Math.max(1, rect.h); captionView.ahead = AHEAD[q];
       captions[i].update(captionsOn ? captionSceneFor(track) : null, captionView, Math.max(1, car.lap), frame.state.tick / TICK_RATE,
         frame.state.phase === 'racing' && !car.finished);

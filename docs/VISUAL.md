@@ -758,3 +758,26 @@ O sol do entardecer tem azimute e elevação por bioma (`palette.ts`), conferido
 ## A corrida que muda (M6)
 
 `racePeriodPlan` (dia → entardecer na última volta, entardecer → noite nas duas últimas) e `blendPalette` interpolam a `PALETTE_TABLE` campo a campo. As duas pontas de cada pista são montadas uma vez e cada passo é só uniforme, a cada 1/512 do `t`. O env map é refeito no máximo 8× por transição. Traçado 3D = mapa: escala por pista `2π/|Σcurve|` (0,69 a 26,9; 17 pistas ≥ 10×); 28 pistas cruzam a si mesmas, em cruzamento plano.
+
+## Câmeras selecionáveis (frente `nc/cameras`)
+
+Quatro câmeras por jogador, trocadas em corrida pela ação `camera` (C / V / Select, ver `docs/CONTROLES.md`) ou escolhidas em Opções › Acessibilidade
+("Câmera J1..J4"); a escolha vale por assento (cada jogador do sofá a sua), fica em `Settings.seatCameras` (campo aditivo; save de antes abre na Alta) e
+**nunca** entra no núcleo nem na rede (`hashRace`/`sim-golden` intactos). O Retrô ignora.
+
+| Câmera | Pose (`CAMERA_POSES`, `camera-base.ts`) | O que é |
+|---|---|---|
+| **Alta** (padrão) | h 2,5 · 7,8 m atrás · FOV 36 (+8 em velocidade, +5 no nitro) · mira 0,7 | a pose B do quadro-alvo: pista livre à frente, traseira ainda legível |
+| **Baixa** | a `CHASE_CAMERA` de sempre: h 2,05 · 7,8 · FOV 62 (+13/+8) · mira 0,85 | a câmera da 0.1.4 |
+| **Capô** | olho 0,55 m acima do capô do modelo, no meio do carro, FOV 72 (+9/+6) | o próprio carro com a cabine e o teto escondidos: ficam o capô e os para-lamas na base da tela |
+| **Frente** | olho a 0,4 m do chão na borda dianteira do carro, FOV 78 (+11/+7) | visão de bico: a carroceria some (o bico atrás do olho cortaria no plano próximo) |
+
+- **Capô sem chamada nova:** o corte é um bit por instância em `instExtra.w` (bit 6 e a altura do corte em cm acima dele), descartado no fragmento
+  (`cars/material.ts`, `cars/mount.ts`); só o carro do viewport que usa Capô/Frente é cortado (o `pose` é por viewport), no mesmo lote e no mesmo material.
+  O ponto de montagem sai da malha de cada modelo (`carMount`: topo do capô nos 26% da frente, teto, bico) — vale para os 13 estilos e para um `.glb`.
+- **Segurança de cena (M5):** `CAMERA_RIGS` em `scenery/sight.ts` dá o limite de cada câmera (descida, cresta, órbita, inclinação, tranco, tremor e o
+  FOV com "reduzir efeitos"). Alta e Baixa baixam até 0,32 m (o piso fica acima de 1,6 m); Capô e Frente não baixam, não têm cresta nem órbita, têm
+  40% da inclinação e 50% do tranco/tremor, e com "reduzir efeitos" sobra 20% do FOV dinâmico. O olho presa ao carro fica dentro da caixa de colisão
+  dele (±2 m): nenhum carro nem cenário sólido do núcleo chega lá. Na comemoração da vitória (órbita) a câmera presa ao carro vira a Alta.
+- **Régua de visão dos marcos:** `sightSeconds(..., mode)` e a legenda dos marcos (`CaptionView.mode`) usam a pose da câmera ativa; o layout dos marcos
+  continua posto com a Baixa (a medição por câmera está em `tests/landmarks-enquadramento-cameras.test.ts`).

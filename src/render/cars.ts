@@ -16,6 +16,8 @@ import type { CarDef, CarLook, RaceState, Track } from '../core/types';
 import type { CarColors, GhostFrame, Quality, RenderFrame } from '../game/contracts';
 import { FINISH_IDS, lookColors, lookKey, RIM_COLORS } from '../game/cosmetics';
 import { hash2 } from './noise';
+import { isMountedCamera, type CameraMode } from './camera-base';
+import { carMount, cutFlags, type CarMount } from './cars/mount';
 import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
@@ -361,8 +363,31 @@ export class Cars {
     b.extra.setXYZW(idx, extra.r, extra.g, extra.b, flags);
   }
 
-  /** Posiciona os carros no referencial do viewport (`ownIndex` = carro do viewport). */
-  pose(rf: RoadFrame, state: RaceState, track: Track, ownIndex: number, viewportSeats: ReadonlyArray<{ seat: number; name: string; color: string; carIndex: number }>, time: number): void {
+  /** Ponto de montagem por modelo (cars/mount.ts), medido uma vez da malha. */
+  private readonly mounts = new WeakMap<CarModel, CarMount>();
+  /** O olho da câmera presa ao carro neste viewport (Capô ou Frente), no referencial do `pose`; `ownEyeOn` falso nas outras câmeras. */
+  private readonly ownEye = { x: 0, y: 0, z: 0 };
+  private ownEyeOn = false;
+  private readonly eyeVec = new THREE.Vector3();
+
+  /** O olho da câmera presa ao carro, calculado pelo último `pose`; null se a câmera do viewport não é presa ao carro. */
+  eyeOfOwn(): { x: number; y: number; z: number } | null {
+    return this.ownEyeOn ? this.ownEye : null;
+  }
+
+  private mountOf(model: CarModel): CarMount {
+    let m = this.mounts.get(model);
+    if (!m) { m = carMount(model.shell.getAttribute('position').array as ArrayLike<number>); this.mounts.set(model, m); }
+    return m;
+  }
+
+  /**
+   * Posiciona os carros no referencial do viewport (`ownIndex` = carro do viewport). `camera`: a câmera deste viewport; Capô e Frente escondem a
+   * cabine (ou a carroceria toda) do PRÓPRIO carro por um bit na instância (cars/mount.ts: sem lote nem chamada de desenho a mais) e deixam o
+   * olho em `eyeOfOwn()`.
+   */
+  pose(rf: RoadFrame, state: RaceState, track: Track, ownIndex: number, viewportSeats: ReadonlyArray<{ seat: number; name: string; color: string; carIndex: number }>, time: number, camera: CameraMode = 'low'): void {
+    this.ownEyeOn = false;
     const cars = state.cars;
     const d = this.dummy;
     const w = this.wheelDummy;
@@ -389,7 +414,15 @@ export class Cars {
       d.scale.set(mo.sx, mo.sy, mo.sz);
       d.updateMatrix();
       this.m.copy(d.matrix);
-      const flags = look.body | (a.brake ? BRAKE_BIT : 0);
+      let flags = look.body | (a.brake ? BRAKE_BIT : 0);
+      if (i === ownIndex && isMountedCamera(camera)) {
+        const mp = this.mountOf(model);
+        const pt = camera === 'hood' ? mp.hood : mp.bumper;
+        flags = cutFlags(flags, pt.cutY);
+        this.eyeVec.set(pt.x, pt.y, pt.z).applyMatrix4(this.m);
+        this.ownEye.x = this.eyeVec.x; this.ownEye.y = this.eyeVec.y; this.ownEye.z = this.eyeVec.z;
+        this.ownEyeOn = true;
+      }
       // Longe (e na Baixa) o casco simplificado do LOD1, se o modelo tem; o mesmo critério da roda simples.
       const far = this.lowQuality || this.pt.z < -FAR_WHEELS_M;
       this.put(far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);

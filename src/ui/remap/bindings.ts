@@ -6,11 +6,11 @@
 /**
  * As 12 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
  * `lookBack` é só de câmera — nada no núcleo o lê, só a ação existe para o jogador ter o botão. `horn` (buzina) entrou na
- * onda N (N6): só som e balão, o núcleo também não a lê; segurá-la abre a roda de frases. `camera` (trocar a câmera: Alta → Baixa → Capô → Frente) entrou na frente das câmeras, também só visual e local: C (teclado 1), V (teclado 2), Select/Back (controle), todos livres; mapa salvo de antes só ganha o padrão. `pause` continua a última — a ordem
+ * onda N (N6): só som e balão, o núcleo também não a lê; segurá-la abre a roda de frases. `camera` (trocar a câmera: Alta → Baixa → Capô → Frente) entrou na frente das câmeras, também só visual e local: C (teclado 1), V (teclado 2), Select/Back (controle), todos livres; mapa salvo de antes só ganha o padrão. Ela vem DEPOIS da pausa (a última fila da grade): como quem chega primeiro fica com o código, um mapa antigo que usava C, V ou o botão 8 em qualquer ação, inclusive na pausa, não perde nada para a câmera. Antes `pause` era a última — a ordem
  * decide quem fica com um código em conflito, então um mapa antigo nunca perde um botão para a buzina.
  */
-export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'horn' | 'camera' | 'pause';
-export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'camera', 'pause'];
+export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'horn' | 'pause' | 'camera';
+export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'pause', 'camera'];
 
 /** Colunas da tela de controles: os dois teclados e um mapeamento único para todos os gamepads. */
 export type BindDevice = 'kb1' | 'kb2' | 'gamepad';
@@ -167,6 +167,14 @@ function sanitizeDevice<C extends BindCode>(raw: unknown, rules: DeviceRules<C>)
     }
     taken.push(...codes);
     lists[a] = codes;
+  }
+  // 3) Nenhuma ação termina vazia, nem no mapa adulterado que gasta todos os códigos livres (a câmera, a última fila, é quem ficaria sem):
+  //    ela leva o último código de quem tem mais de um. Com 15 botões e 12 ações sempre há quem tenha dois.
+  for (const a of BIND_ACTIONS) {
+    if (lists[a].length > 0) continue;
+    const donor = BIND_ACTIONS.filter((o) => lists[o].length > 1).sort((x, y) => lists[y].length - lists[x].length)[0];
+    const code = donor === undefined ? undefined : lists[donor].find((c, i) => i === lists[donor].length - 1 && rules.valid(c, a));
+    if (donor !== undefined && code !== undefined) { lists[donor] = lists[donor].slice(0, -1); lists[a] = [code]; }
   }
   return lists;
 }

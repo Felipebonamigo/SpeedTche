@@ -12,7 +12,7 @@
 // (`captionScene`): nada alocado por quadro. Puro: sem Three nem DOM (o HUD desenha, hud.ts).
 import { SEGMENT_LENGTH } from '../../core/constants';
 import type { Track } from '../../core/types';
-import { CHASE_CAMERA } from '../camera';
+import { CAMERA_POSES, CHASE_CAMERA, type CameraMode } from '../camera-base';
 import { LANDMARK_PREFIX, landmarkOf, modelBounds } from '../scenery/catalog';
 import type { Layout } from '../scenery/layout';
 import { blocked, roadY, SCENERY_BEHIND_DRAW, SIGHT_ASPECT, SIGHT_FOG, SIGHT_FRAME_X, SIGHT_SPEED_FRAC, type SightBounds, type SightRoad } from '../scenery/sight';
@@ -164,6 +164,8 @@ export interface CaptionView {
   aspect: number;
   /** Segmentos à frente em que o renderizador desenha o cenário na qualidade atual (FRAME_AHEAD): além disso não há marco. */
   ahead: number;
+  /** A câmera do jogador (nc/cameras): a altura, o recuo e a mira da conta vêm dela; ausente = a Baixa, a de antes. */
+  mode?: CameraMode;
 }
 
 /** A câmera de referência do sight.ts (centro da pista, 0,8 da máxima, 16:9) com o carro em `z`. */
@@ -198,11 +200,12 @@ export function spotShare(scene: CaptionScene, i: number, view: CaptionView, fog
   const cx = px[j] + (px[j + 1] - px[j]) * u + xm * ch;
   const cz = pz[j] + (pz[j + 1] - pz[j]) * u + xm * sh;
   const ry = roadY(py, s);
-  const backS = CHASE_CAMERA.back / SEGMENT_M; const lookS = CHASE_CAMERA.lookAhead / SEGMENT_M;
-  const camY = roadY(py, s - backS) + CHASE_CAMERA.height;
-  const lookY = ry + CHASE_CAMERA.lookY + Math.max(-4, Math.min(4, (roadY(py, s + lookS) - ry) * 0.6));
-  const camX = cx - CHASE_CAMERA.back * sh; const camZ = cz + CHASE_CAMERA.back * ch;
-  const lookDist = CHASE_CAMERA.back + CHASE_CAMERA.lookAhead;
+  const cam = CAMERA_POSES[view.mode ?? 'low']; // a câmera ativa do jogador (nc/cameras); sem o campo, a Baixa de sempre
+  const backS = cam.back / SEGMENT_M; const lookS = cam.lookAhead / SEGMENT_M;
+  const camY = roadY(py, s - backS) + cam.height;
+  const lookY = ry + cam.lookY + Math.max(-4, Math.min(4, (roadY(py, s + lookS) - ry) * 0.6));
+  const camX = cx - cam.back * sh; const camZ = cz + cam.back * ch;
+  const lookDist = cam.back + cam.lookAhead;
   const dyLook = lookY - camY;
   const inv = 1 / Math.hypot(lookDist, dyLook);
   const Dx = sh * lookDist * inv; const Dy = dyLook * inv; const Dz = -ch * lookDist * inv;
