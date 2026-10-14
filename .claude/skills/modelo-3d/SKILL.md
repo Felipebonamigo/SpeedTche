@@ -4,7 +4,7 @@ description: Procurar, registrar e reaproveitar modelos 3D entre os jogos do est
 ---
 # Modelo 3D: procurar antes, registrar depois
 
-Os quatro jogos do Felipe dividem um acervo de modelos. Esta rotina evita baixar duas vezes, gastar crédito do Meshy à toa e perder a licença de um arquivo.
+Os jogos do Felipe dividem um acervo de modelos. Esta rotina evita baixar duas vezes, gastar crédito do Meshy à toa e perder a licença de um arquivo.
 
 ## Antes de baixar ou gerar
 

@@ -1,6 +1,6 @@
 ---
 name: verificar
-description: Roda a verificação do Speed Tchê antes de dizer "pronto", "corrigido" ou "os testes passam": typecheck, suíte completa com o relay (e com o GL quando mexer em render), sim-golden e impressões digitais, balanceamento, teste visto falhar e o fecho DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED. Use quando pedirem "verifica", "roda os testes", "tá verde?", "pode mesclar", "pode subir", e antes de todo commit, mescla ou push.
+description: 'Roda a verificação do Speed Tchê antes de dizer "pronto", "corrigido" ou "os testes passam": typecheck, suíte completa com o relay (e com o GL quando mexer em render), sim-golden e impressões digitais, balanceamento, teste visto falhar e o fecho DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED. Use quando pedirem "verifica", "roda os testes", "tá verde?", "pode mesclar", "pode subir", e antes de todo commit, mescla ou push.'
 ---
 # Verificar antes de dizer "pronto"
 
