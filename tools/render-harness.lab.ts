@@ -344,15 +344,19 @@ function flameDiff(quality: Quality, frames: number, box: [number, number, numbe
   changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number;
 } {
   const read = (): { buf: Uint8Array; W: number; H: number } => {
-    for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
     const ctx = gl.getContext();
     const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
     const buf = new Uint8Array(W * H * 4);
     ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
     return { buf, W, H };
   };
-  nitro(false); const off = read();
-  nitro(true); const on = read();
+  // Os dois quadros no MESMO instante (o tremor da câmera no nitro, o da chama e as suavizações andam com o tempo): aquece sem a chama, lê, e desenha
+  // de novo o mesmo `tick` com ela (passo de tempo 0) — a diferença é só a chama.
+  nitro(false);
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const off = read();
+  nitro(true); renderer.render(frameFor(quality));
+  const on = read();
   const [st] = shoot(quality, 0, [{ box }]); // só a caixa em px (sem desenhar de novo)
   const { W, H } = on;
   let changed = 0; let white = 0; const add = [0, 0, 0]; let luma = 0; let n = 0;

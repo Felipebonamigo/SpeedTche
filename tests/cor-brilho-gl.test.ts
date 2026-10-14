@@ -28,8 +28,8 @@ interface Lab {
 
 /** A pista à frente do carro do jogador, de 6 a 45 m, 6 m para cada lado, do chão a 1,6 m: onde ficam os carros que ele persegue. */
 const AHEAD: Probe = { box: [-6, 0, -45, 6, 1.6, -6] };
-/** Atrás do carro do jogador (+z é para trás), do escape até 6,5 m: onde a chama do nitro aparece na câmera de corrida. */
-const FLAME_BOX = [-1.6, 0, 2.0, 1.6, 1.6, 6.5];
+/** Atrás do carro do jogador (+z é para trás), do escape até 5,5 m, do chão a 1 m: onde a chama do nitro aparece na câmera de corrida. */
+const FLAME_BOX = [-1.2, 0, 2.0, 1.2, 1.0, 5.5];
 /** Pixels estourados que os faróis podem ACRESCENTAR à região (fração): as "bolhas brancas". */
 const BLOWN = 0.0005;
 /**
@@ -124,8 +124,10 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     // de trás, a ponta vem para a câmera e a gota vira um disco branco opaco (galeria main-f241703: Paraty, Fuji, Xingó).
     const r = await lab((L, box) => {
       const out: Record<string, ReturnType<Lab['flameDiff']>> = {};
-      for (const [name, track, ticks] of [['dia', 'copacabana', 1500], ['noite', 'sampa_noite', 1400]] as const) {
-        L.freeze(track, ticks, { x: 0 });
+      // A mesma corrida e o mesmo enquadramento de dia e à noite (o período forçado): em sampa_noite 1400 a chama fica abaixo do quadro e a "diferença"
+      // medida lá era só o tempo andando entre os dois quadros (agora o mesmo instante, `flameDiff`).
+      for (const [name, tod] of [['dia', 'day'], ['noite', 'night']] as const) {
+        L.freeze('copacabana', 1500, { x: 0, tod });
         out[name] = L.flameDiff('high', 6, box as [number, number, number, number, number, number]);
       }
       return out;

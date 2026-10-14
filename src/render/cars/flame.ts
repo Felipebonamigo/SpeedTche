@@ -11,8 +11,24 @@ export const FLAME_BASE = '#58b6ff';
 const FLAME_TINT = 0.35;
 
 const RADIAL = 12;
-/** Posição ao longo da chama e raio de cada anel: bico estreito, barriga a ~25%, ponta fechada. */
-const RINGS: ReadonlyArray<readonly [number, number]> = [[0, 0.2], [0.1, 0.42], [0.25, 0.5], [0.45, 0.4], [0.7, 0.24], [0.9, 0.09], [1, 0]];
+/**
+ * Posição ao longo da chama e raio de cada anel: língua que abre na boca do escape e só afina até a ponta fechada (cor-brilho: era uma gota de barriga a
+ * 25%, que de trás virava um disco branco).
+ */
+const RINGS: ReadonlyArray<readonly [number, number]> = [[0, 0.24], [0.08, 0.32], [0.22, 0.29], [0.42, 0.21], [0.65, 0.12], [0.85, 0.05], [1, 0]];
+
+/**
+ * O tamanho da chama no carro (m): largura (escala x/y da malha) e comprimento (escala z) com o nitro cheio; `cars.ts` a pulsa e encurta com a força.
+ * Comprimento ≥ 5× o diâmetro (tests/cor-brilho.test.ts): língua, não gota. Era 0,5 × 2,3 com a barriga de 0,5 (diâmetro 0,5 m).
+ */
+export const FLAME_SIZE = { width: 0.4, length: 2.2 } as const;
+/** "Reduzir efeitos": a chama mais curta e mais fraca. */
+export const FLAME_REDUCED = { length: 0.6, level: 0.5 } as const;
+
+/** Força da chama pela luz do período (`light` da paleta): cheia de dia (legível no claro), mais fraca no entardecer e à noite (sem estourar no escuro). */
+export function flameGain(light: number): number {
+  return light >= 0.8 ? 1 : light >= 0.5 ? 0.85 : 0.7;
+}
 
 /** A gota: anéis de `RADIAL` lados ao longo de +Z, tampa no bico e ponta fechada. `uv` = (volta, posição ao longo da chama). */
 export function buildFlameGeometry(): THREE.BufferGeometry {
@@ -76,48 +92,58 @@ export function flameChosenColor(id: string | undefined, out: THREE.Color = new 
 }
 
 /**
- * Vértice: tremor (a chama balança e a barriga pulsa, mais perto da ponta) e as saídas para o fragmento — posição ao longo,
- * o quanto a face encara a câmera (núcleo) e o quanto o EIXO encara (de trás a chama é um brilho curto, para não engolir as lanternas).
- * `aFlame` = (fase, força 0..1, brancura do núcleo 0..1) por instância; a cor é `instanceColor`. A brancura é 1 no azul-branco de sempre e menor na cor
- * ESCOLHIDA (N3): com o núcleo e o ganho de antes, qualquer cor sairia branca vista de trás.
+ * Vértice: tremor (a língua balança e ondula, mais perto da ponta) e as saídas para o fragmento — posição ao longo, o quanto a face encara a câmera e o
+ * quanto o EIXO encara (de trás a chama vem para a câmera; um pouco mais fraca, para não engolir as lanternas).
+ * A normal vai ao mundo pela inversa da escala (`normal / escala²` antes da matriz): a malha é esticada 6× ao longo, e a matriz direta deitava as normais
+ * para trás — de trás, a chama inteira "encarava" a câmera e o núcleo branco cobria tudo (a gota branca, cor-brilho).
+ * `aFlame` = (fase, força 0..1, brancura do núcleo 0..1) por instância; a cor é `instanceColor`. A brancura é 1 na chama de sempre e menor na cor
+ * ESCOLHIDA (N3), que tinge o corpo inteiro.
  */
 export const FLAME_VERT = /* glsl */ `
 attribute vec3 aFlame;
 uniform float uTime;
-varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel; varying float vWhite;
+varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel; varying float vWhite; varying float vPh;
 void main() {
   float t = uv.y;
   float ph = aFlame.x;
   vec3 p = position;
-  float wob = 1.0 + 0.16 * t * sin(t * 13.0 - uTime * 41.0 + ph) + 0.08 * sin(uTime * 63.0 + ph * 2.3);
+  float wob = 1.0 + 0.14 * t * sin(t * 13.0 - uTime * 41.0 + ph) + 0.07 * sin(uTime * 63.0 + ph * 2.3);
   p.xy *= wob;
-  p.x += 0.14 * t * t * sin(uTime * 29.0 + ph * 2.1 + t * 5.0);
-  p.y += 0.10 * t * t * sin(uTime * 23.0 + ph * 3.3 + t * 4.0);
+  p.x += 0.16 * t * t * sin(uTime * 29.0 + ph * 2.1 + t * 5.0);
+  p.y += 0.12 * t * t * sin(uTime * 23.0 + ph * 3.3 + t * 4.0);
   mat4 m = modelMatrix * instanceMatrix;
   vec4 wp = m * vec4(p, 1.0);
   vec3 toCam = normalize(cameraPosition - wp.xyz);
-  vec3 n = normalize(mat3(m) * normal + 1e-5); // com o z: de trás, a parte que afina para a ponta encara a câmera (o núcleo aparece)
+  vec3 sc = vec3(dot(m[0].xyz, m[0].xyz), dot(m[1].xyz, m[1].xyz), dot(m[2].xyz, m[2].xyz));
+  vec3 n = normalize(mat3(m) * (normal / max(sc, vec3(1e-6))) + 1e-5);
   vec3 axis = normalize(mat3(m) * vec3(0.0, 0.0, 1.0));
-  vT = t; vFacing = abs(dot(n, toCam)); vAxis = abs(dot(axis, toCam)); vCol = instanceColor; vLevel = aFlame.y; vWhite = aFlame.z;
+  vT = t; vFacing = abs(dot(n, toCam)); vAxis = abs(dot(axis, toCam)); vCol = instanceColor; vLevel = aFlame.y; vWhite = aFlame.z; vPh = ph;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
 /**
- * Fragmento: núcleo branco onde a face encara a câmera, azul saturado (a cor do carro) nas bordas e um toque quente na ponta; a borda
- * da silhueta some (esconde as facetas da malha) e a ponta apaga. Aditivo: a cor sai SEM multiplicar pelo alfa (o blend já o faz).
+ * Fragmento (cor-brilho: "o nitro mais parecido com fogo"). Núcleo azul-branco CURTO: a boca do escape (a tampa, t = 0, e os primeiros 6%), mais fraca
+ * que o corpo — de trás é o escape aceso, não um disco; corpo amarelo-laranja → laranja → vermelho que apaga até a ponta e tremula em línguas (a chama de
+ * sempre); a cor ESCOLHIDA (N3) tinge o corpo, com um núcleo claro dela. A borda da silhueta some (esconde as facetas). Sem ganho HDR: a gota antiga saía a
+ * 2,0–2,6× com o miolo puxado ao branco e estourava; aqui o máximo é 1,25× (no núcleo), e `uFlameGain` cai com a luz do período (`flameGain`). Cores
+ * saturadas (pouco verde e azul): somadas ao asfalto e passadas pelo Neutral, as claras saíam pêssego. Aditivo: a cor sai sem multiplicar pelo alfa.
  */
 export const FLAME_FRAG = /* glsl */ `
-varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel; varying float vWhite;
+uniform float uTime; uniform float uFlameGain;
+varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel; varying float vWhite; varying float vPh;
 void main() {
-  float rim = smoothstep(0.0, 0.55, vFacing);
-  float body = 1.0 - smoothstep(0.5, 1.0, vT);
-  float core = pow(vFacing, 2.2) * (1.0 - vT * 0.8) * vWhite;
   vec3 hue = vCol * vec3(0.55, 0.85, 1.45);
-  vec3 c = mix(hue, vec3(1.0), clamp(core * 1.25, 0.0, 1.0));
-  c = mix(c, vCol * vec3(1.4, 0.8, 0.55), smoothstep(0.4, 0.95, vT) * 0.5);
-  float a = body * rim * (0.75 + 0.25 * vLevel) * mix(1.0, 0.8, vAxis);
-  float gain = mix(2.6, 2.0, vAxis) * mix(0.5, 1.0, vWhite);
-  gl_FragColor = vec4(c * gain, a);
+  vec3 fire = mix(vec3(1.0, 0.5, 0.1), vec3(1.0, 0.28, 0.04), smoothstep(0.08, 0.4, vT));
+  fire = mix(fire, vec3(0.85, 0.1, 0.02), smoothstep(0.4, 0.95, vT));
+  vec3 body = mix(hue, fire, vWhite);
+  vec3 coreCol = mix(hue, vec3(0.75, 0.87, 1.0), 0.2 + 0.5 * vWhite);
+  float core = 1.0 - smoothstep(0.0, 0.06, vT);
+  vec3 c = mix(body, coreCol, core);
+  float tongues = 0.7 + 0.3 * sin(vT * 19.0 - uTime * 47.0 + vPh * 3.0);
+  float edge = smoothstep(0.0, 0.3, vFacing);
+  float along = mix(0.45, 1.0, smoothstep(0.0, 0.06, vT)) * (1.0 - smoothstep(0.02, 1.0, vT)); // a boca (e a tampa, t = 0) mais fraca: de trás era o disco
+  float a = edge * along * mix(1.0, tongues, smoothstep(0.1, 0.4, vT)) * (0.45 + 0.55 * vLevel) * mix(1.0, 0.75, smoothstep(0.7, 1.0, vAxis));
+  gl_FragColor = vec4(c * uFlameGain * mix(1.15, 1.25, core), a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

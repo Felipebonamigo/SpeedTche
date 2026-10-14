@@ -28,7 +28,7 @@ import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
-import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor } from './cars/flame';
+import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameGain } from './cars/flame';
 import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
@@ -208,7 +208,7 @@ export class Cars {
     // Chama em malha: a cor vem de `instanceColor` (a do visual do carro) e a fase do tremor de `aFlame`, por instância.
     this.flameMaterial = new THREE.ShaderMaterial({
       vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uFlameGain: { value: 1 } },
     });
     const flameGeometry = buildFlameGeometry();
     this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 3), 3);
@@ -272,6 +272,7 @@ export class Cars {
       uniforms.uBrakeGlow.value = tg.brake;
       uniforms.uPopup.value = light < 0.8 ? 1 : 0;
     }
+    this.flameMaterial.uniforms.uFlameGain.value = flameGain(light); // cor-brilho: legível de dia, sem estourar à noite
     for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? HEADLIGHT.night : HEADLIGHT.dusk; }
   }
 
@@ -373,7 +374,11 @@ export class Cars {
       stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;
+    this.reduceFx = frame.options.reduceEffects;
   }
+
+  /** "Reduzir efeitos" do último `update` (a chama fica mais curta e mais fraca). */
+  private reduceFx = false;
 
   /** Uma instância: a matriz, a cor da carroceria e `instExtra` = (cor do detalhe — no lote de roda, a do aro —, bits). */
   private put(b: Batch, m: THREE.Matrix4, look: CarDraw, flags: number, extra: THREE.Color = look.accent): void {
@@ -481,12 +486,12 @@ export class Cars {
           if (nFlames >= MAX_CARS * 2) break;
           w.position.set(ex[0], ex[1], ex[2]);
           w.rotation.set(0, 0, 0);
-          w.scale.set(0.5, 0.5, 2.3 * pulse * (0.55 + 0.45 * a.nitro));
+          w.scale.set(FLAME_SIZE.width, FLAME_SIZE.width, FLAME_SIZE.length * (this.reduceFx ? FLAME_REDUCED.length : 1) * pulse * (0.55 + 0.45 * a.nitro));
           w.updateMatrix();
           this.mw.multiplyMatrices(this.m, w.matrix);
           this.flames.setMatrixAt(nFlames, this.mw);
           this.flames.setColorAt(nFlames, look.flame);
-          this.flameExtra.setXYZ(nFlames, i * 1.7 + e * 3.1, a.nitro, look.flameWhite);
+          this.flameExtra.setXYZ(nFlames, i * 1.7 + e * 3.1, a.nitro * (this.reduceFx ? FLAME_REDUCED.level : 1), look.flameWhite);
           nFlames++; e++;
         }
       }
