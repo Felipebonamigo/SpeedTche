@@ -2,7 +2,8 @@
    Cartões gordos com contorno azul-marinho e sombra deslocada, cor própria por cartão (verde, azul, amarelo, laranja, rosa), texto com
    contorno (Lilita One), selos/etiquetas inclinados, faixas diagonais verde-amarelo-azul na abertura, azulejo no rodapé, ícones coloridos
    e grandes nos cinco cartões. Contorno e sombra são box-shadow (não mudam tamanho nem posição de nada). */
-:root[data-tema="c"] {
+/* Os tokens ficam no #ui, não na raiz: o HUD de corrida (#hud, irmão do #ui) também lê --accent e --font-display e não pode mudar com o tema. */
+:root[data-tema="c"] #ui {
   --acc-rgb: 255 212 0;
   --accent: #ffd400;
   --accent-2: #ffe55c;
@@ -21,13 +22,16 @@
   --glass: rgba(8, 40, 78, 0.84);
   --glass-solid: #082848;
   --line: rgba(255, 255, 255, 0.3);
-  --font: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: "Lilita One", "Fredoka", ui-rounded, Arial, sans-serif;
   --r: calc(20 * var(--u));
   --r-sm: calc(14 * var(--u));
   --c-ring: 0 0 0 calc(3 * var(--u)) var(--c-navy), 0 calc(5 * var(--u)) 0 calc(3 * var(--u)) var(--c-navy);
 }
-:root[data-tema="c"] body, :root[data-tema="c"] #ui { font-family: var(--font); font-weight: 600; }
+/* A fonte é do menu, não do HUD: as variáveis ficam no #ui (o #hud é irmão dele e não herda). */
+:root[data-tema="c"] #ui {
+  --font: "Fredoka Tema", "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Lilita One", "Fredoka Tema", "Fredoka", ui-rounded, Arial, sans-serif;
+  font-family: var(--font);
+}
 :root[data-tema="c"] .logo text { font-family: "Fredoka", sans-serif !important; }
 
 /* ── Fundo: véu tropical + azulejo no rodapé (atrás do conteúdo; nunca nas telas com palco 3D) ── */
@@ -62,7 +66,7 @@
   color: #fff; -webkit-text-stroke: calc(5 * var(--u)) var(--c-navy); paint-order: stroke fill; text-shadow: 0 calc(5 * var(--u)) 0 var(--c-navy);
 }
 :root[data-tema="c"] .screen-title::after, :root[data-tema="c"] .main-hero-title::after {
-  width: calc(110 * var(--u)); height: calc(8 * var(--u)); border-radius: 999px; background: linear-gradient(90deg, #00b25f 0 34%, #ffd400 34% 67%, #1c5be0 67%); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy);
+  width: calc(110 * var(--u)); height: calc(4 * var(--u)); border-radius: 999px; background: linear-gradient(90deg, #00b25f 0 34%, #ffd400 34% 67%, #1c5be0 67%); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy);
   -webkit-text-stroke: 0;
 }
 :root[data-tema="c"] .title-sub { -webkit-text-stroke-width: calc(3 * var(--u)); color: var(--c-cream); letter-spacing: 0.22em; text-shadow: 0 calc(3 * var(--u)) 0 var(--c-navy); }
@@ -122,8 +126,8 @@
 :root[data-tema="c"] .goal-row .goal-tag { color: var(--c-blue); }
 :root[data-tema="c"] .goal-bar { height: calc(10 * var(--u)); border-radius: 999px; background: #d7dff0; box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); }
 :root[data-tema="c"] .goal-bar > i { background: linear-gradient(90deg, #00b25f, #ffd400); }
-:root[data-tema="c"] .recap-chip { background: #fff; border: 2px solid var(--c-navy); color: var(--c-navy); font-weight: 800; border-radius: calc(10 * var(--u)); }
-:root[data-tema="c"] .chip { color: var(--c-navy); background: var(--accent); border: 2px solid var(--c-navy); font-weight: 800; }
+:root[data-tema="c"] .recap-chip { background: #fff; box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); color: var(--c-navy); font-weight: 800; border-radius: calc(10 * var(--u)); }
+:root[data-tema="c"] .chip { color: var(--c-navy); background: var(--accent); border-color: var(--c-navy); box-shadow: 0 0 0 calc(1 * var(--u)) var(--c-navy); font-weight: 800; }
 :root[data-tema="c"] .car-bar-track, :root[data-tema="c"] .ach-bar { background: #0b1f4a; box-shadow: 0 0 0 calc(1.5 * var(--u)) var(--c-navy); }
 :root[data-tema="c"] .car-bar-fill { background: linear-gradient(90deg, #00b25f, #ffd400); }
 
@@ -145,7 +149,7 @@
 :root[data-tema="c"] .scr-cups .cup-chip.open { background: var(--c-green); color: #fff; }
 :root[data-tema="c"] .scr-cups .cup-race, :root[data-tema="c"] .scr-tracks .track-card { border-radius: var(--r-sm); }
 :root[data-tema="c"] .scr-tracks .track-card.focus, :root[data-tema="c"] .track-card.focus { background: rgba(255, 212, 0, 0.28); border-color: var(--accent); box-shadow: 0 0 0 calc(3 * var(--u)) var(--accent), 0 calc(8 * var(--u)) calc(20 * var(--u)) rgba(0, 0, 0, 0.4); }
-:root[data-tema="c"] .scr-cups .cup-race-n { color: var(--accent); font-family: var(--font-display); font-weight: 400; font-size: calc(24 * var(--u)); }
+:root[data-tema="c"] .scr-cups .cup-race-n { color: var(--accent); }
 :root[data-tema="c"] .dots i.on { background: var(--accent); }
 :root[data-tema="c"] .scr-tracks .track-group-head { color: #fff; font-weight: 800; }
 
@@ -153,7 +157,7 @@
 :root[data-tema="c"] .gp { border-radius: var(--r); box-shadow: var(--c-ring); }
 :root[data-tema="c"] .gp-money b { font-family: var(--font-display); font-weight: 400; color: var(--accent); -webkit-text-stroke: calc(3 * var(--u)) var(--c-navy); paint-order: stroke fill; }
 :root[data-tema="c"] .gp-name, :root[data-tema="c"] .gp-car-name { font-weight: 800; }
-:root[data-tema="c"] .seat-badge { border: 2px solid var(--c-navy); border-radius: calc(8 * var(--u)); }
+:root[data-tema="c"] .seat-badge { box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); border-radius: calc(8 * var(--u)); }
 :root[data-tema="c"] .gp-part { border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.1); }
 :root[data-tema="c"] .gp-part.focus { background: var(--accent); color: var(--c-navy); }
 :root[data-tema="c"] .gp-part.focus .gp-part-name { color: var(--c-navy); }
@@ -171,6 +175,6 @@
 :root[data-tema="c"] .payout-col, :root[data-tema="c"] .payout-vault { border-radius: var(--r); }
 :root[data-tema="c"] .pc-prize-val, :root[data-tema="c"] .pv-val { font-family: var(--font-display); font-weight: 400; }
 :root[data-tema="c"] .pc-prize-val { color: #46f09a; -webkit-text-stroke: calc(3 * var(--u)) var(--c-navy); paint-order: stroke fill; }
-:root[data-tema="c"] .payout-buy { background: var(--accent); color: var(--c-navy); border: 2px solid var(--c-navy); border-radius: 999px; }
+:root[data-tema="c"] .payout-buy { background: var(--accent); color: var(--c-navy); border-color: var(--c-navy); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); border-radius: 999px; }
 :root[data-tema="c"] .slot { border-radius: var(--r); }
 :root[data-tema="c"] .screen > .hint { background: var(--c-navy); color: #fff; font-weight: 700; border-radius: 999px; box-shadow: 0 0 0 calc(5 * var(--u)) var(--c-navy); }

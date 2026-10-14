@@ -22,7 +22,17 @@
 /* O painel do palco 3D é só uma máscara com buraco (garage.css): nenhum tema pinta fundo nem borra o painel inteiro, senão a janela do carro some. */
 :root[data-tema] .stage3d .gp.glass { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 :root[data-tema] .screen.stage3d { background: none; }
-/* Fredoka (a fonte dos três temas) tem a caixa de texto ~1px mais alta que a fonte do sistema: nas duas grades mais apertadas (atributos
-   dos carros e cartão-postal do Passaporte) o espaço entre linhas ganha o pixel, senão o teste de layout vê as caixas se tocando. */
-:root[data-tema] .garage-panels .gs, :root[data-tema] .gs { row-gap: calc(2 * var(--u)); }
-:root[data-tema] .postcard .pc-title { gap: calc(3 * var(--u)); }
+/* Fredoka com as métricas de linha trocadas (mesmo arquivo woff2 embutido, nenhum recurso novo): a Fredoka declara ascendente 0,97 e descendente
+   0,24 (caixa de texto de 1,21 em), mais alta que as `line-height` de 1,05 a 1,2 que as telas apertadas já usam, e o teste de layout vê as caixas
+   de linhas vizinhas se tocando (barras de atributos do lobby, grade da garagem, abas de copa). Com 0,88/0,20 a caixa tem 1,08 em e cabe em qualquer
+   uma delas; o desenho das letras não muda (o texto sobe ~0,5 px). */
+@font-face {
+  font-family: "Fredoka Tema";
+  src: url("../../assets/fonts/Fredoka-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  ascent-override: 88%;
+  descent-override: 20%;
+  line-gap-override: 0%;
+}

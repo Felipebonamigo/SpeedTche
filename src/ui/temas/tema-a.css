@@ -2,7 +2,8 @@
    Itálico forte (Fredoka Bold inclinado), faixas diagonais laranja/rosa/azul, cartões que viram gradiente no foco, números grandes
    (01–05) nos cartões do menu, sombra dura deslocada nos títulos. Só repinta: nenhum tamanho, posição ou navegação muda. O 3D segue
    à mostra: nenhuma camada daqui cobre o canvas além do véu de pôr do sol do próprio .screen (e nada cobre as janelas do palco). */
-:root[data-tema="a"] {
+/* Os tokens ficam no #ui, não na raiz: o HUD de corrida (#hud, irmão do #ui) também lê --accent e --font-display e não pode mudar com o tema. */
+:root[data-tema="a"] #ui {
   --acc-rgb: 255 122 26;
   --accent: #ff7a1a;
   --accent-2: #ff9a3d;
@@ -21,12 +22,15 @@
   --glass: rgba(28, 11, 50, 0.6);
   --glass-solid: #1c0b32;
   --line: rgba(255, 168, 120, 0.3);
-  --font: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: "Fredoka", ui-rounded, "Arial Rounded MT Bold", Arial, sans-serif;
   --r: calc(8 * var(--u));
   --r-sm: calc(6 * var(--u));
 }
-:root[data-tema="a"] body, :root[data-tema="a"] #ui { font-family: var(--font); }
+/* A fonte é do menu, não do HUD: as variáveis ficam no #ui (o #hud é irmão dele e não herda). */
+:root[data-tema="a"] #ui {
+  --font: "Fredoka Tema", "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Fredoka Tema", "Fredoka", ui-rounded, "Arial Rounded MT Bold", Arial, sans-serif;
+  font-family: var(--font);
+}
 
 /* ── Fundo: véu de pôr do sol + faixas diagonais (atrás do conteúdo; nunca nas telas com palco 3D) ── */
 :root[data-tema="a"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(70, 18, 100, 0.42) 0%, rgba(255, 70, 100, 0.1) 46%, rgba(10, 8, 38, 0.74) 100%); }
@@ -52,7 +56,7 @@
   text-shadow: calc(3 * var(--u)) calc(3 * var(--u)) 0 var(--a-pink), calc(6 * var(--u)) calc(6 * var(--u)) 0 rgba(47, 123, 255, 0.85);
 }
 :root[data-tema="a"] .screen-title::after, :root[data-tema="a"] .main-hero-title::after {
-  width: calc(96 * var(--u)); height: calc(6 * var(--u)); border-radius: 0; background: var(--a-bars); transform: skewX(var(--a-skew));
+  width: calc(96 * var(--u)); height: calc(4 * var(--u)); border-radius: 0; background: var(--a-bars); transform: skewX(var(--a-skew));
 }
 :root[data-tema="a"] .main-hero-title::after { margin-top: calc(16 * var(--u)); }
 :root[data-tema="a"] .sub-title, :root[data-tema="a"] .home-box-title { font-style: italic; color: #ffb27a; letter-spacing: 0.12em; }
@@ -129,7 +133,7 @@
 :root[data-tema="a"] .scr-tracks .track-card.focus, :root[data-tema="a"] .track-card.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.38), rgba(28, 11, 50, 0.7)); border-color: rgba(255, 255, 255, 0.75); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 14px 38px rgba(255, 61, 127, 0.4); }
 :root[data-tema="a"] .scr-tracks .track-name { font-style: italic; }
 :root[data-tema="a"] .scr-tracks .track-group-head { font-style: italic; }
-:root[data-tema="a"] .scr-cups .cup-race-n { font-size: calc(26 * var(--u)); font-style: italic; color: #ffb27a; }
+:root[data-tema="a"] .scr-cups .cup-race-n { font-style: italic; color: #ffb27a; }
 :root[data-tema="a"] .dots i.on { background: var(--accent); }
 
 /* ── Garagem e palco 3D: a janela do palco continua inteira à mostra; só o anel e as etiquetas mudam ── */

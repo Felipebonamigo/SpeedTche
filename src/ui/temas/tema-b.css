@@ -2,7 +2,8 @@
    Painéis translúcidos escuros com blur e quinas em "L", tipografia fina e espaçada (Fredoka 400, caixa alta, tracking largo), UM acento
    neon por contexto (ciano no menu e no lobby, âmbar na garagem, magenta na seleção de pista, esmeralda no pagamento), linhas de 1px,
    varredura de luz lenta no item em foco, muito espaço. O véu da tela só escurece as bordas: o carro e a pista seguem em destaque. */
-:root[data-tema="b"] {
+/* Os tokens ficam no #ui, não na raiz: o HUD de corrida (#hud, irmão do #ui) também lê --accent e --font-display e não pode mudar com o tema. */
+:root[data-tema="b"] #ui {
   --acc-rgb: 76 214 255;
   --accent: #4cd6ff;
   --accent-2: #8fe6ff;
@@ -15,17 +16,20 @@
   --glass: rgba(7, 10, 16, 0.58);
   --glass-solid: #0a0e15;
   --line: rgba(255, 255, 255, 0.1);
-  --font: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
   --r: calc(5 * var(--u));
   --r-sm: calc(3 * var(--u));
   --ease: 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* A fonte é do menu, não do HUD: as variáveis ficam no #ui (o #hud é irmão dele e não herda). */
+:root[data-tema="b"] #ui {
+  --font: "Fredoka Tema", "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Fredoka Tema", "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font);
 }
 /* Um acento por contexto (a tela decide): o resto do tema só lê --accent / --acc-rgb. */
 :root[data-tema="b"] .scr-garage, :root[data-tema="b"] .scr-dealership, :root[data-tema="b"] .scr-career { --accent: #ffb454; --accent-2: #ffd08a; --accent-soft: rgba(255, 180, 84, 0.14); --acc-rgb: 255 180 84; }
 :root[data-tema="b"] .scr-cups, :root[data-tema="b"] .scr-tracks, :root[data-tema="b"] .scr-passport { --accent: #ff5fd2; --accent-2: #ff9be5; --accent-soft: rgba(255, 95, 210, 0.14); --acc-rgb: 255 95 210; }
 :root[data-tema="b"] .scr-payout, :root[data-tema="b"] .scr-results, :root[data-tema="b"] .scr-records { --accent: #42f5a4; --accent-2: #8bffcb; --accent-soft: rgba(66, 245, 164, 0.14); --acc-rgb: 66 245 164; }
-:root[data-tema="b"] body, :root[data-tema="b"] #ui { font-family: var(--font); }
 
 /* ── Fundo: só escurece as bordas ── */
 :root[data-tema="b"] .screen { background: linear-gradient(90deg, rgba(3, 5, 10, 0.6) 0%, rgba(3, 5, 10, 0.18) 52%, rgba(3, 5, 10, 0.5) 100%), radial-gradient(ellipse at 60% 45%, rgba(0, 0, 0, 0) 38%, rgba(2, 4, 9, 0.62) 100%); }
@@ -54,7 +58,7 @@
   width: calc(150 * var(--u)); height: 1px; border-radius: 0; background: linear-gradient(90deg, var(--accent), transparent);
 }
 :root[data-tema="b"] .screen-title::after { background: linear-gradient(90deg, transparent, var(--accent), transparent); }
-:root[data-tema="b"] .sub-title, :root[data-tema="b"] .home-box-title { font-weight: 500; letter-spacing: 0.24em; color: var(--accent); }
+:root[data-tema="b"] .sub-title, :root[data-tema="b"] .home-box-title { font-weight: 500; letter-spacing: 0.18em; color: var(--accent); }
 :root[data-tema="b"] .title-sub { font-weight: 400; letter-spacing: 0.5em; color: #fff; text-shadow: 0 0 calc(10 * var(--u)) rgba(2, 4, 9, 0.95), 0 calc(1 * var(--u)) calc(3 * var(--u)) rgba(2, 4, 9, 0.9); }
 :root[data-tema="b"] .scr-title { background: linear-gradient(180deg, rgba(3, 5, 10, 0.1) 0%, rgba(3, 5, 10, 0.5) 52%, rgba(3, 5, 10, 0.78) 100%), radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0) 40%, rgba(2, 4, 9, 0.6) 100%); }
 :root[data-tema="b"] .title-press { font-weight: 400; letter-spacing: 0.3em; border-radius: calc(2 * var(--u)); background: rgba(7, 10, 16, 0.4); border-color: rgb(var(--acc-rgb) / 0.55); color: var(--text); box-shadow: 0 0 calc(24 * var(--u)) rgb(var(--acc-rgb) / 0.18); }
@@ -65,8 +69,9 @@
 
 /* ── Botões: contorno de 1px, caixa alta, varredura de luz no foco ── */
 @keyframes b-varre { from { background-position: 160% 0, 0 0; } to { background-position: -60% 0, 0 0; } }
-:root[data-tema="b"] .btn { font-weight: 500; letter-spacing: 0.14em; border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.16); }
+:root[data-tema="b"] .btn { font-weight: 500; letter-spacing: 0.1em; border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.16); }
 :root[data-tema="b"] .btn:hover { background: rgba(255, 255, 255, 0.07); }
+:root[data-tema="b"] .btn-ready, :root[data-tema="b"] .gp-go .btn { letter-spacing: 0.04em; }
 :root[data-tema="b"] .btn.focus, :root[data-tema="b"] .btn.focusable.focus {
   color: #fff; border-color: var(--accent); transform: none;
   background: linear-gradient(100deg, rgb(var(--acc-rgb) / 0.04) 20%, rgb(var(--acc-rgb) / 0.3) 50%, rgb(var(--acc-rgb) / 0.04) 80%) 160% 0 / 220% 100% no-repeat, linear-gradient(rgb(var(--acc-rgb) / 0.1), rgb(var(--acc-rgb) / 0.1));
