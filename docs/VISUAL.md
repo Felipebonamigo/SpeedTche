@@ -767,7 +767,7 @@ Quatro câmeras por jogador, trocadas em corrida pela ação `camera` (C / V / S
 
 | Câmera | Pose (`CAMERA_POSES`, `camera-base.ts`) | O que é |
 |---|---|---|
-| **Alta** (padrão) | h 2,5 · 7,8 m atrás · FOV 36 (+8 em velocidade, +5 no nitro) · mira 0,7 | a pose B do quadro-alvo: pista livre à frente, traseira ainda legível |
+| **Alta** (padrão) | h 2,5 · 5,8 m atrás · FOV 54 (+8 em velocidade, +5 no nitro) · mira 0,7 | a pose B do quadro-alvo (altura e mira aprovadas); FOV aberto de 36 para 54 e recuo de 7,8 para 5,8 m (carro do mesmo tamanho na tela) para os marcos de lado não saírem do quadro |
 | **Baixa** | a `CHASE_CAMERA` de sempre: h 2,05 · 7,8 · FOV 62 (+13/+8) · mira 0,85 | a câmera da 0.1.4 |
 | **Capô** | olho 0,55 m acima do capô do modelo, no meio do carro, FOV 72 (+9/+6) | o próprio carro com a cabine e o teto escondidos: ficam o capô e os para-lamas na base da tela |
 | **Frente** | olho a 0,4 m do chão na borda dianteira do carro, FOV 78 (+11/+7) | visão de bico: a carroceria some (o bico atrás do olho cortaria no plano próximo) |
@@ -780,4 +780,4 @@ Quatro câmeras por jogador, trocadas em corrida pela ação `camera` (C / V / S
   40% da inclinação e 50% do tranco/tremor, e com "reduzir efeitos" sobra 20% do FOV dinâmico. O olho presa ao carro fica dentro da caixa de colisão
   dele (±2 m): nenhum carro nem cenário sólido do núcleo chega lá. Na comemoração da vitória (órbita) a câmera presa ao carro vira a Alta.
 - **Régua de visão dos marcos:** `sightSeconds(..., mode)` e a legenda dos marcos (`CaptionView.mode`) usam a pose da câmera ativa; o layout dos marcos
-  continua posto com a Baixa (a medição por câmera está em `tests/landmarks-enquadramento-cameras.test.ts`).
+  continua posto com a Baixa (a medição por câmera está em `tests/landmarks-enquadramento-cameras.test.ts`). Só o FOV mexe nessa conta (recuo e mira não): com FOV 36 a Alta tinha 103 marcos abaixo do mínimo e 9 nunca vistos; por FOV 40/44/46/50/54/58: 83/70/66/52/46/41 abaixo e 7/5/4/3/3/3 nunca vistos (Baixa: 36 e 3). A Alta ficou em 54° (46 abaixo, 3 nunca vistos, ≤ 1,3× a Baixa). A órbita da vitória parte do recuo da pose ativa (`orbitCamera(…, base)`).

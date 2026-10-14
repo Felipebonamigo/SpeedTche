@@ -24,8 +24,9 @@ export const DEFAULT_CAMERA_MODE: CameraMode = 'high';
 export interface CameraPose { readonly baseFov: number; readonly speedFov: number; readonly nitroFov: number; readonly height: number; readonly back: number; readonly lookAhead: number; readonly lookY: number }
 
 export const CAMERA_POSES: Readonly<Record<CameraMode, CameraPose>> = {
-  // Alta: h 2,5 · back 7,8 · FOV 36 · lookY 0,7. A parcela de velocidade e a do nitro são as da Baixa escaladas pelo FOV (36/62).
-  high: { baseFov: 36, speedFov: 8, nitroFov: 5, height: 2.5, back: 7.8, lookAhead: 18, lookY: 0.7 },
+  // Alta: h 2,5 · mira 0,7 (a pose B aprovada). O FOV foi de 36 para 54 e o recuo de 7,8 para 5,8 m: com 36° os marcos de lado saíam do quadro (103 instâncias
+  // abaixo do mínimo; com 54°, 46, perto das 36 da Baixa: tests/landmarks-enquadramento-cameras.test.ts), e o recuo menor mantém o carro do tamanho que o dono aprovou.
+  high: { baseFov: 54, speedFov: 8, nitroFov: 5, height: 2.5, back: 5.8, lookAhead: 18, lookY: 0.7 },
   low: CHASE_CAMERA,
   // Capô: olho ~0,55 m acima do capô (cars/mount.ts), a ~1,3 m do chão; Frente: na ponta do bico, ~0,4 m do chão.
   hood: { baseFov: 72, speedFov: 9, nitroFov: 6, height: 1.35, back: 0, lookAhead: 30, lookY: 1.0 },
