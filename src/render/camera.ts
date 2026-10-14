@@ -89,6 +89,8 @@ export class ChaseCamera {
   /** Fração da órbita da vitória que vale agora (já cortada pela folga contra os vizinhos). */
   private orbit = 0;
   private lastTime = -1;
+  /** A câmera do quadro anterior (começa na Baixa, a pose da construção). */
+  private lastMode: CameraMode = 'low';
   private readonly target = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly tremor: Tremor = { x: 0, y: 0, roll: 0 };
@@ -105,6 +107,13 @@ export class ChaseCamera {
     const rig = CAMERA_RIGS[mode];
     const pose = CAMERA_POSES[mode];
     const mountedEye = rig.mounted ? eye : null;
+    // Trocou de câmera em movimento: as parcelas de velocidade e de nitro do FOV passam à escala da pose nova (senão o quadro "assenta" por um segundo).
+    if (this.lastMode !== mode) {
+      const was = CAMERA_POSES[this.lastMode];
+      this.speedFov *= pose.speedFov / was.speedFov;
+      this.nitroFov.x *= pose.nitroFov / was.nitroFov; this.nitroFov.v *= pose.nitroFov / was.nitroFov;
+      this.lastMode = mode;
+    }
     const xm = carX * ROAD_HALF_WIDTH_M;
     if (first) { this.lagX = xm; this.nitroPrev = nitroOn; this.nitroFov.x = nitroOn ? pose.nitroFov : 0; this.nitroFov.v = 0; } // sem "deslizar" no primeiro quadro
     const k = 1 - Math.exp(-dt * 5.5);
@@ -154,6 +163,7 @@ export class ChaseCamera {
   }
 
   reset(): void {
+    this.lastMode = 'low';
     this.lagX = 0; this.speedFov = 0; this.roll = 0; this.lastTime = -1; this.orbit = 0;
     this.nitroFov.x = 0; this.nitroFov.v = 0; this.nitroPrev = false;
   }

@@ -1,6 +1,7 @@
 // Laboratório GL do renderizador (onda L, L2): as funções que tests/gl-render.test.ts chama pelo Playwright, no Chromium com swiftshader.
 // Nada aqui mede FPS (swiftshader não diz nada sobre GPU): só CONTAGENS (chamadas, triângulos, passes, pixels de alvo), a compilação dos
 // programas de shader e o que o renderizador conta de si (composers criados, redimensionamentos, escala dinâmica, mapas de sombra).
+import type { CameraMode } from '../src/render/camera-base';
 import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type HumanEntry, type RaceState } from '../src/core';
 import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
@@ -26,6 +27,8 @@ renderer.resize(Number(q.get('w') ?? window.innerWidth), Number(q.get('h') ?? wi
 interface Setup { state: RaceState; track: Track; humans: HumanEntry[]; n: number }
 let current: Setup | null = null;
 let tick = 0;
+/** A câmera de cada assento no quadro (nc/cameras); sem ela, o padrão do jogo (a Alta). */
+let seatCameras: CameraMode[] | undefined;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[]): void {
@@ -47,7 +50,7 @@ function frameFor(quality: Quality): RenderFrame {
   const looks = raceLooks(state.cars, humans);
   return {
     state, track,
-    viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [] })),
+    viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [], ...(seatCameras?.[h.seat] ? { camera: seatCameras[h.seat] } : {}) })),
     options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false },
     time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
@@ -222,6 +225,7 @@ function liveScene(quality: Quality, trackId: string, fractions: number[], repea
 const lab = {
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
+  cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
   renderer, setup, render, idle, programs, collect, blob, fxScene, liveScene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),

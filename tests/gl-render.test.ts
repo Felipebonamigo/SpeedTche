@@ -40,6 +40,7 @@ interface LabApi {
   blob(): { found: boolean; count: number };
   prefs(p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null): void;
   idle(quality: Quality, frames: number): DebugInfo[];
+  cameras(list: Array<'high' | 'low' | 'hood' | 'bumper'> | null): void;
 }
 declare global { interface Window { lab: LabApi; labReady: boolean } }
 
@@ -125,6 +126,41 @@ describe.skipIf(!available)('renderizador em GL (swiftshader)', { timeout: 1_500
       expect(x.bad, `${x.quality}: programas com log`).toEqual([]);
       expect(x.semRoda, `${x.quality}: acabamento, faixa, aro, cor e chama não criam chamada`).toBe(x.base);
       expect(x.comRoda, `${x.quality}: a roda escolhida custa no máximo uma chamada por desenho diferente (3 aqui)`).toBeLessThanOrEqual(x.base + 3);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it('as 4 câmeras (nc/cameras): o corte do capô e da frente compila em toda qualidade e não cria chamada de desenho por carro', async () => {
+    // O corte do próprio carro é um bit de instância descartado no fragmento: o mesmo programa, o mesmo lote. Cada câmera vê um pedaço diferente do
+    // cenário (o frustum muda), então a contagem não é idêntica; o que se trava é "nenhuma chamada por carro": a pior tela com Capô/Frente fica a
+    // poucas chamadas da mesma cena com a Alta, e nunca perto de uma chamada a mais por carro (4 carros do jogador + 16 da IA = 20).
+    const r = await page.evaluate(() => {
+      const L = window.lab;
+      const out: Array<{ quality: Quality; alta: number; capo: number; frente: number; misto: number; bad: string[]; shaderErrors: string[] }> = [];
+      const worst = (d: ReturnType<typeof L.render>) => Math.max(...d.slice(-2).flatMap((x) => x.viewports.map((v) => v.calls)));
+      for (const quality of ['low', 'medium', 'high', 'ultra'] as const) {
+        L.setup('copacabana', 4, 300);
+        L.cameras(['high', 'high', 'high', 'high']);
+        const alta = worst(L.render(quality, 4));
+        L.cameras(['hood', 'hood', 'hood', 'hood']);
+        const capo = worst(L.render(quality, 4));
+        L.cameras(['bumper', 'bumper', 'bumper', 'bumper']);
+        const frente = worst(L.render(quality, 4));
+        L.cameras(['hood', 'bumper', 'low', 'high']);
+        const misto = worst(L.render(quality, 4));
+        L.cameras(null);
+        const p = L.programs();
+        out.push({ quality, alta, capo, frente, misto, bad: p.bad, shaderErrors: p.shaderErrors });
+      }
+      return out;
+    });
+    expect(r.map((x) => x.quality)).toEqual([...LEVELS]);
+    for (const x of r) {
+      expect(x.shaderErrors, `${x.quality}: onShaderError`).toEqual([]);
+      expect(x.bad, `${x.quality}: programas com log`).toEqual([]);
+      for (const [nome, calls] of [['Capô', x.capo], ['Frente', x.frente], ['mistas', x.misto]] as const) {
+        expect(calls, `${x.quality}: ${nome} (${calls}) × Alta (${x.alta})`).toBeLessThanOrEqual(x.alta + 6);
+      }
     }
     expect(errors).toEqual([]);
   });
