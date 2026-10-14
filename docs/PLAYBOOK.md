@@ -203,3 +203,8 @@ Formato de cada frente:
 7. **Capturas / evidência para o dono** — com o comando exato.
 8. **Armadilhas** — do §5 e do que o código mostrar.
 9. **Instrução pronta para o agente** — o modelo do §4 preenchido (branch `nc/<onda>-<frente>`, porta própria).
+
+## Galeria antes e depois (V7, 14/10/2026)
+
+Toda frente visual roda a galeria antes e depois e anexa a comparação ao relatório. Antes de mexer, gere a do ponto de partida: `node tools/galeria/gerar.mjs --raiz <worktree-do-main> --rotulo main-<sha7>` (ou reaproveite a de `scratch/galeria/` se for do mesmo commit). Ao terminar, gere a da frente: `node tools/galeria/gerar.mjs --raiz <seu-worktree> --rotulo <frente>`. Depois `node tools/galeria/comparar.mjs main-<sha7> <frente>` e anexe `scratch/galeria/comparar-main-<sha7>-vs-<frente>.png` ao relatório, com a linha de resumo que o comando imprime (cenas que mudaram e contagens que subiram). Cena que mudou sem ser da sua frente, ou chamadas e triângulos que subiram, precisam de explicação. A geração leva de 1 a 2 h no swiftshader carregado: rode em segundo plano, uma galeria por vez; `--so <id>` refaz só uma cena. As 13 cenas estão em `tools/galeria/nucleo.ts`; mudar a lista quebra a comparação com as galerias antigas.
+

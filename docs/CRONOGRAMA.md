@@ -78,6 +78,49 @@ Se cada onda passar de uma semana, o W cai em abril e o Next Fest de junho conti
 | **Mais bonito, menos quadrado, última geração cartunesca** | PBR comum com ACES, sem rampa de luz, luz de borda, oclusão de ambiente nem gradação. Carros com proporção realista (roda de ~16,7% do comprimento). Chão chapado. Marcos e prédios extrudados sem bisel. HUD com fonte do sistema. | K4 (bíblia, quadro de referências, banco de prova, decisão WebGL × WebGPU), L (fatia vertical e pipeline de arte), M (escala, cenário e marcos redondos, efeitos, carros), N2 (palco 3D), Q4 e Q5 (paisagem e heróis), R1 (postal), U (arte final) |
 | **Reconhecer as artes e os locais** | 161 marcos com régua de leitura e legenda. As 81 pistas do Brasil usam uma receita só (`br`). Desenhos do minimapa reprovados. Postal em CSS. Carimbo só com a sigla. | Trilha D (27 desenhos: K5 e O1), L4 (Copacabana no padrão final, com a paisagem do Rio), M3 (flora do Brasil, marcos redondos), Q (ícone, carimbo, álbum, minimapa, sub-regiões, horizonte, heróis), R (postal, sobrevoo, som e música regionais), U2 e U5 (heróis da leva 2, festa e clima) |
 
+### Auditoria de 14/10/2026: o que melhorar e fazer (lista viva)
+
+> Pedido do dono (14/10/2026): "anote os pontos que temos a melhorar e fazer, e siga". Feita sobre o `main` 150dd01 (versão
+> 0.1.4 + câmeras), com capturas do jogo real na câmera Alta. **Diretriz visual nova do dono (13–14/10):** os carros e o
+> jogo têm de ser "um pouco mais realistas que o Horizon Chase Turbo, e mais bonitos que ele" — substitui o "cartunesco
+> estilo Mario Kart" da bíblia (ver o aviso no topo de `docs/DIRECAO-DE-ARTE.md`). Atualize a coluna "Situação" a cada
+> mescla; item resolvido fica riscado com a data e o commit.
+
+**Visual (prioridade: é o que o dono mais cobra)**
+
+| # | O que melhorar | O que a auditoria viu | Situação |
+|---|---|---|---|
+| V1 | **Cor e brilho** | Clarão branco no meio da pista no Cânion e bolhas de farol em Sampa escondem os carros; véu rosa/roxo no entardecer e na noite (o carro branco vira rosa, asfalto roxo, pouco contraste); lanternas são círculos vermelhos chapados; verniz sem reflexo. | Em andamento (`nc/cor-brilho`), antes × depois para o dono antes de mesclar. |
+| V2 | **Carro do jogador (e os 13 estilos)** no estilo HCT "rodada 2", mais realista | Com a câmera Alta o carro é o maior objeto da tela e é a caixa mais fraca do quadro: traseira lisa, lanterna chapada. Protótipo aprovado como direção em `nc/estilo-carros` (`tools/estilo-carros/hct2/`, `docs/ondas/estilo-carros-hct.md`). | A fazer depois da V1 (mesmos arquivos de material): primeiro o GT dentro do jogo para o dono dirigir; depois os outros 12 (~9 sessões). |
+| V3 | **Menu moderno e bonito** | "Ainda é muito feio visualmente" (dono). | Em andamento: 3 direções (`nc/menu-estilos`), o dono escolhe. |
+| V4 | **Pistas com acabamento** | Asfalto de cor lisa, zebras e faixas pouco nítidas, o mesmo prédio repetido em Copacabana, poucas nuvens, água pouco saturada. O quadro-alvo mostrou que **horizonte aberto** (baía, morros) pesa mais que o carro. | A fazer depois da V1 (céu e paleta). |
+| V5 | **HUD mais enxuto** | Painéis com moldura nos 4 cantos; a referência usa números grandes sem caixa. | A fazer, no estilo do menu escolhido (V3). |
+| V6 | **Câmera Alta e os marcos** | A Alta (FOV 36) deixa 103 colocações de marco abaixo do mínimo (a Baixa: 36). | Em andamento (`nc/cameras`): abrir o FOV o mínimo necessário. |
+| V7 | **Galeria fixa de referência** | Decisões visuais lentas e sem antes × depois comparável. | Feita em `nc/galeria` (14/10), falta mesclar: `node tools/galeria/gerar.mjs --raiz <worktree> --rotulo <nome>` renderiza 13 quadros fixos (6 paisagens, tela dividida 2 e 4, derrapagem, largada, os 14 carros de trás, menu e garagem; 1280×720, Alta) de qualquer worktree e monta `scratch/galeria/<rótulo>/folha.png` + `manifest.json`; `comparar.mjs <antes> <depois>` põe lado a lado e marca o que mudou e as contagens que subiram (`tools/galeria/README.md`). A do `main` f241703 levou ~100 min no swiftshader carregado. |
+| V8 | **Efeitos de cartum × diretriz realista** | A galeria de 14/10 mostra balões "POW!" e estrelinhas na batida (M4/M5): cartum puro, brigam com "mais realista que o Horizon Chase". | A fazer: trocar por faíscas, lascas e tranco de câmera (ou deixar como opção), com o antes × depois da galeria. |
+
+**Técnico**
+
+| # | O que fazer | Por quê | Situação |
+|---|---|---|---|
+| T1 | **Medir desempenho em máquina real** | Nenhum FPS medido; os limites provisórios do gate subiram 7× na semana (Copa até 85 chamadas; Sampa 4p de 323 para 380 mil △). | Depende do dono: `--bench` no PC e no Deck. |
+| T2 | **Vazamento de texturas** | `playtest-memoria`: +8 texturas por corrida (95 → 103), já na 0.1.3. | A fazer. |
+| T3 | **Playtests não reexecutados desde a N5** | records, paint, ghost, ghost-version, online, retro, pistas-ui. | A fazer. |
+| T4 | **Marcos mal enquadrados pelo traçado novo (M6)** | 32 colocações; as praças do núcleo foram abertas com o giro antigo (`core/track/sightline.ts`). | Decisão do dono: mexer no `sightline.ts` invalida recorde e fantasma dessas pistas (recomendado: sim). |
+| T5 | **Sentir o traçado novo (M6)** | 36 pistas curvam ≥ 5× mais forte, 28 se cruzam no mesmo plano; câmera e rolagem foram afinadas para a escala antiga. | Depende de alguém jogar (dono). |
+| T6 | **Suíte frágil sob carga** | `cars.test` e `ghost.test` estouram tempo com a máquina carregada (passam sozinhos). | A fazer. |
+| T7 | **Online desligado** | Falta o relay num VPS. | Decisão do dono (nº 16). |
+| T8 | **Pontas soltas das frentes** | Garagem mostra só as cores (`DisplayCar.look` não ligado); pódio só lê `look.paint`; `div.lines` morto no `hud.ts`; `crestLift` não aplicado ao carro; `mountShowroom` não ligado ao lobby; dicas de frear/derrapar não disparam na Copacabana; recusa da oferta de assistência só em memória. | A fazer, em lote, depois da V1/V2. |
+| T9 | **Worktrees velhas** | 25 worktrees, 1,6 GB. | Limpeza feita em 14/10 (só as já mescladas). |
+| T10 | **Sobra do nome antigo** | Painel "CREW RACING" na pista (com o "NITRO" vizinho, o nome Nitro Crew). | ~~Feito em 14/10~~ (82ea7a5): vira "TCHÊ RACING", com teste. |
+
+**Cronograma que falta:** O1 (27 desenhos nas pistas), O2 (recalibrar e congelar), O5 (progresso), e as ondas P a W.
+
+**Decisões abertas do dono:** jogar a 0.1.4 e rodar o `--bench` (T1, T5); conta Steamworks (nº 3); `sightline.ts` dos
+marcos (T4); limiares do troféu (bronze 1/3, prata 2/3, ouro todas as estrelas); logos da Atomatiza e da Galeria Atomo
+(nº 26); câmera "na frente" olhando para trás (a feita é a do para-choque); saldo inicial de $ 2.500 para quem só tinha
+campeonato (N5); folha A/B/C de contorno (`tools/folha-contorno.mjs`); fonte do HUD; lugar do "Abrir pasta"; VPS (nº 16).
+
 ### Ajustes anotados pelo dono (09/10/2026) → onde entram
 
 Os 13 cabem no cronograma: 5 entram já na K (frente nova **K6**), 5 nas frentes novas **M6** (traçado = mapa, corrida que muda) e **N6** (motor, buzina, provocação) e 3 em frentes que já existiam (L3/N2, N2, Q). A coluna do meio foi conferida no código em 09/10/2026; os dois defeitos (6 e 11) foram achados lendo o código, e o teste visto falhar vem na K6.

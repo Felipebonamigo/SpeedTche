@@ -4,7 +4,9 @@
 // Tela própria porque a de Opções já ocupa 1280×720 inteira: uma terceira coluna lá cortava os rótulos.
 import { COLOR_PALETTES, seatColor } from '../core/data/drivers';
 import { ASSIST_LEVELS } from '../core/sim/assist';
+import { cameraName } from '../game/camera-switch';
 import { HUD_SCALE_MAX, HUD_SCALE_MIN } from '../game/settings';
+import { CAMERA_MODES, DEFAULT_CAMERA_MODE, pickCameraMode } from '../render/camera-base';
 import { t } from '../i18n';
 import { button, createFocusList, h, listNav, onOff, screenFrame, selector, type FocusItem, type ScreenApi, type ScreenInstance, type Selector } from '../ui/screens/common';
 import { commitSettings, fps30Selector, percent } from '../ui/screens/options';
@@ -57,13 +59,24 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     seatRows.push(item);
     return { item, desc: () => `${t(`access.desc.level.${levelOf(seat)}`)} ${levelOf(seat) === 'none' ? '' : t('access.desc.override')}`.trim() };
   });
+  // A câmera de cada assento (nc/cameras): a padrão de quem joga, a mesma que a tecla de câmera troca em corrida (ação `camera`).
+  const cameraOf = (seat: number) => pickCameraMode(s.seatCameras?.[seat], DEFAULT_CAMERA_MODE);
+  const cameras = Array.from({ length: SEATS }, (_, seat) => {
+    const item = selector(t('access.options.seatCamera', { n: seat + 1 }), () => cameraName(cameraOf(seat)), (d) => {
+      if (!Array.isArray(s.seatCameras)) s.seatCameras = [DEFAULT_CAMERA_MODE, DEFAULT_CAMERA_MODE, DEFAULT_CAMERA_MODE, DEFAULT_CAMERA_MODE];
+      s.seatCameras[seat] = cycle(CAMERA_MODES, cameraOf(seat), d);
+      commit();
+    }, { sfx, cls: 'sel-seat' });
+    seatRows.push(item);
+    return { item, desc: () => t(`access.desc.camera.${cameraOf(seat)}`) };
+  });
   paint();
 
   const back = button(t('ui.common.back'), () => api.back());
   // 30 fps travados na Média com 3-4 jogadores (L2b): as colunas das Opções já têm as dez linhas que cabem (docs/TELAS.md); aqui a coluna de
   // direção é a mais curta, então a linha entra nela sem crescer a tela.
   const perf = { item: fps30Selector(api, commit), desc: () => t('ui.options.fps30.hint') };
-  const entries = [...vision, ...driving, perf];
+  const entries = [...vision, ...driving, ...cameras, perf];
   const list = createFocusList([...entries.map((e) => e.item), back], { sfx });
   const desc = h('p', { class: 'access-desc glass', attrs: { 'aria-live': 'polite' } });
   let shown = '';
@@ -76,7 +89,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
   const el = screenFrame('access', t('access.options.title'),
     h('div', { class: 'options-columns access-columns' },
       h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.vision') }), vision[0].item.el, swatches, vision.slice(1).map((v) => v.item.el)),
-      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), perf.item.el),
+      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), perf.item.el),
     ),
     desc,
     h('div', { class: 'access-actions' }, back.el),

@@ -37,6 +37,7 @@ import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
 import { rollSession } from './expedition';
 import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menus, RaceDriver, RaceMode, RenderFrame, Renderer, RenderStyle, SaveData, Settings, ViewportSpec } from './contracts';
+import { DEFAULT_SETTINGS } from './contracts';
 import { getDesktop, isDesktop, setFullscreen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
@@ -54,6 +55,8 @@ import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
 import { isCupUnlocked, loadSave, saveSave } from './save';
 import { loadSettings, saveSettings } from './settings';
+import { switchCamera } from './camera-switch';
+import { DEFAULT_CAMERA_MODE, pickCameraMode } from '../render/camera-base';
 import { applyAssistChoice, markOffered, newAssistOffer, offerDue, recordRaceEnd } from './assist-offer';
 import { createTutorialSession, type TutorialSession } from './tutorial-session';
 
@@ -583,6 +586,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
         return {
           seat: h.seat, carIndex: carIndexOfSeat(r.state, h.seat), color: seatColor(h.seat, settings.colorPalette), name: h.name,
           messages: fixed.length ? [...fixed, ...own] : own,
+          camera: pickCameraMode(settings.seatCameras?.[h.seat], DEFAULT_CAMERA_MODE),
         };
       });
     return {
@@ -644,6 +648,18 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       if (seat >= 0 && r.state.phase !== 'finished') {
         if (r.driver) r.driver.pauseKey(); // online não pausa: pergunta se quer sair
         else { session.paused = true; menus.show('pause'); }
+      }
+    }
+    // Trocar a câmera (ação `camera`): só entrada local e visual — nada vai ao núcleo nem à rede, e vale também online e no sofá.
+    // O Retrô (pseudo-3D) ignora a escolha: a tecla não troca nada ali (e não mostra aviso que não vale).
+    if (r && !menuOpen && !session.paused && input.cameraPressed && settings.renderStyle !== 'retro') {
+      for (const seat of r.localSeats) {
+        if (!input.cameraPressed(seat)) continue;
+        if (!Array.isArray(settings.seatCameras)) settings.seatCameras = [...DEFAULT_SETTINGS.seatCameras];
+        const sw = switchCamera(settings.seatCameras, seat);
+        if (!sw) continue;
+        saveSettings(settings);
+        pushMessage(seat, sw.text, 'info', 1.4);
       }
     }
     if (r) stepVoice(r, dtRaw); // a roda de frases anda uma vez por quadro, antes de qualquer leitura das entradas

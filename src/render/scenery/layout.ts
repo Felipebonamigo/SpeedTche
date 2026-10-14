@@ -16,6 +16,7 @@ import { setClearings, type Clearing } from './clearings';
 import { groundOffset, isSeaSide, seaLevelOffset } from './ground';
 import type { LandmarkDef } from './landmarks/types';
 import { cullCrossings } from './overlap';
+import type { CameraMode } from '../camera-base';
 import { LANDMARK_SIGHT_MIN, SIGHT_TAN_H, sightRoad, sightSeconds, type SightRoad } from './sight';
 import { sways, windPhase } from './wind';
 
@@ -780,9 +781,10 @@ export interface LandmarkSight {
 /**
  * Quanto tempo (s) cada marco turístico do layout fica à vista da câmera de perseguição (sight.ts) — o número que
  * `placeLandmarks` maximiza, medido de novo a partir das posições prontas (os testes conferem com ele): na aproximação
- * inteira, e o primeiro de cada marco a partir da largada (ele existe para ser visto logo, já na primeira volta).
+ * inteira, e o primeiro de cada marco a partir da largada (ele existe para ser visto logo, já na primeira volta). `mode`: a câmera ativa
+ * (nc/cameras; a omitida é a Baixa, com que o layout é posto e que os testes de antes medem).
  */
-export function landmarkSight(track: Track, layout: Layout): LandmarkSight[] {
+export function landmarkSight(track: Track, layout: Layout, mode: CameraMode = 'low'): LandmarkSight[] {
   const n = track.segments.length;
   const road = landmarkSightRoad(track);
   const plazas = landmarkPlazas(track);
@@ -807,7 +809,7 @@ export function landmarkSight(track: Track, layout: Layout): LandmarkSight[] {
       const first = ahead === firstSeg.get(id);
       const side = p.x < 0 ? -1 : 1;
       const plaza = def.place !== 'skyline' && plazas.some((q) => q.landmark === id && q.side === side && Math.abs(((seg - q.at + n + n / 2) % n) - n / 2) <= PLAZA_SLACK);
-      const seen = sightSeconds(road, seg + n, p.f, p.x, p.y, p.yaw, modelBounds(modelId), def.place === 'skyline', first ? seg + n - ahead : -Infinity);
+      const seen = sightSeconds(road, seg + n, p.f, p.x, p.y, p.yaw, modelBounds(modelId), def.place === 'skyline', first ? seg + n - ahead : -Infinity, 0, mode);
       out.push({ id, seg, x: p.x, place: def.place, first, plaza, seen });
     }
   });

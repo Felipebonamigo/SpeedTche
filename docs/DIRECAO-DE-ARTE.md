@@ -1,5 +1,13 @@
 # Direção de arte — "jogo de última geração, cartunesco"
 
+> **Diretriz atualizada pelo dono (13–14/10/2026), vale sobre o resto desta bíblia onde houver conflito:** depois de ver
+> os carros da 0.1.4 ("muito cartoonados, não gostei") e comparar com o Horizon Chase Turbo, o dono pediu carros e cena
+> **"um pouco mais realistas que o Horizon Chase Turbo", e o jogo mais bonito que ele**. Câmera de corrida padrão: a
+> **Alta** (altura 2,5, distância 7,8, FOV 36; ver `docs/VISUAL.md`, "Câmeras selecionáveis"). Protótipos e o caminho
+> aprovado: `docs/ondas/estilo-carros-hct.md` e `docs/ondas/quadro-alvo.md` (branch `nc/estilo-carros`). A lista viva do
+> que melhorar está em `docs/CRONOGRAMA.md`, "Auditoria de 14/10/2026".
+
+
 Esta é a **bíblia de estilo** do Speed Tchê. Ela diz o que o jogador tem de ver, com critérios que se verificam numa
 captura, e não depende do motor: vale igual para o Three.js (WebGL) de hoje e para um eventual Unity 6 URP, porque descreve
 o resultado (forma, luz, números, câmeras) e não a API que o produz. O motor é decidido por um duelo antes da onda L

@@ -8,6 +8,7 @@ registerStrings('session', {
     pitEnter: 'BOX: abastecendo…', pitExit: 'BOX: pronto!', recordLap: 'RECORDE DA PISTA!',
     teamQualified: 'EQUIPE CLASSIFICADA', qualified: 'CLASSIFICADO', eliminated: 'ELIMINADO',
     achievement: 'CONQUISTA: {name}',
+    camera: 'Câmera: {name}', 'camera.high': 'Alta', 'camera.low': 'Baixa', 'camera.hood': 'Capô', 'camera.bumper': 'Frente',
   },
   en: {
     go: 'GO!', lap: 'LAP {n}/{total}', lastLap: 'FINAL LAP', bestLap: 'BEST LAP {time}',
@@ -16,5 +17,6 @@ registerStrings('session', {
     pitEnter: 'PIT: refuelling…', pitExit: 'PIT: done!', recordLap: 'TRACK RECORD!',
     teamQualified: 'TEAM QUALIFIED', qualified: 'QUALIFIED', eliminated: 'ELIMINATED',
     achievement: 'ACHIEVEMENT: {name}',
+    camera: 'Camera: {name}', 'camera.high': 'High', 'camera.low': 'Low', 'camera.hood': 'Hood', 'camera.bumper': 'Front',
   },
 });

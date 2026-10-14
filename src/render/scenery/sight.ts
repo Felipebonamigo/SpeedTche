@@ -10,7 +10,7 @@
 // Puro: só contas sobre a linha central desenrolada.
 import { REFERENCE_SPEED, SEGMENT_LENGTH } from '../../core/constants';
 import type { Track } from '../../core/types';
-import { CHASE_CAMERA } from '../camera-base';
+import { CAMERA_POSES, CHASE_CAMERA, type CameraMode } from '../camera-base';
 import { palette } from '../palette';
 import { FRAME_AHEAD } from '../roadframe';
 import { FOG_DENSITY } from '../sky';
@@ -118,7 +118,10 @@ export interface SightBounds { minX: number; maxX: number; minZ: number; maxZ: n
 const TAN_V = Math.tan(((CHASE_CAMERA.baseFov + CHASE_CAMERA.speedFov * Math.min(1.2, SIGHT_SPEED_FRAC)) * Math.PI) / 360);
 /** Tangente da meia largura do quadro que conta (os 80% do meio): a `lat` m de lado, o marco sai dele a `lat / SIGHT_TAN_H` m. */
 export const SIGHT_TAN_H = TAN_V * SIGHT_ASPECT * SIGHT_FRAME_X;
-const TAN_H = SIGHT_TAN_H;
+/** Meia abertura vertical (tangente) e horizontal dos 80% do meio de cada câmera, na velocidade da conta (a Baixa é a de `TAN_V`). */
+const TAN_V_BY: Readonly<Record<CameraMode, number>> = Object.fromEntries(
+  (['high', 'low', 'hood', 'bumper'] as const).map((m) => [m, Math.tan(((CAMERA_POSES[m].baseFov + CAMERA_POSES[m].speedFov * Math.min(1.2, SIGHT_SPEED_FRAC)) * Math.PI) / 360)]),
+) as Record<CameraMode, number>;
 const SAMPLES = 7;
 const SAMPLE_X = new Float64Array(SAMPLES); const SAMPLE_Y = new Float64Array(SAMPLES); const SAMPLE_Z = new Float64Array(SAMPLES);
 
@@ -127,8 +130,12 @@ const SAMPLE_X = new Float64Array(SAMPLES); const SAMPLE_Y = new Float64Array(SA
  * (+ = direita), com a base a `y` m do início do segmento e girado `yaw` (Placement do layout) fica à vista da câmera de
  * perseguição na aproximação: da entrada dele na janela do runtime até o carro passar. `haze`: a névoa do horizonte.
  * `lower`: quanto a câmera está abaixo da base (m; 0 = a base, `CAMERA_DYNAMICS.lower.max` = a mais baixa em velocidade).
+ * `mode`: a câmera ativa (nc/cameras) — o corredor de visão muda com a altura, o recuo e o FOV; a omitida é a Baixa, a de antes (o layout dos marcos usa a Baixa).
  */
-export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y: number, yaw: number, b: SightBounds, haze: boolean, from = -Infinity, lower = 0): number {
+export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y: number, yaw: number, b: SightBounds, haze: boolean, from = -Infinity, lower = 0, mode: CameraMode = 'low'): number {
+  const cam = CAMERA_POSES[mode];
+  const tanV = TAN_V_BY[mode];
+  const tanH = tanV * SIGHT_ASPECT * SIGHT_FRAME_X;
   const { px, pz, hd, hs, hc, py } = road;
   // Centro e giro como em runtime.place: lateral somada nas duas pontas do segmento e interpolada.
   const ax = px[k] + x * hc[k]; const az = pz[k] + x * hs[k];
@@ -156,8 +163,8 @@ export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y
   const fog2 = fogM * fogM;
   const step = (SIGHT_SPEED_MS * SIGHT_DT) / SEGMENT_M;
   const anchor = k + f;
-  const backS = CHASE_CAMERA.back / SEGMENT_M; const lookS = CHASE_CAMERA.lookAhead / SEGMENT_M;
-  const lookDist = CHASE_CAMERA.back + CHASE_CAMERA.lookAhead;
+  const backS = cam.back / SEGMENT_M; const lookS = cam.lookAhead / SEGMENT_M;
+  const lookDist = cam.back + cam.lookAhead;
   let seen = 0;
   // O runtime desenha o marco enquanto o segmento dele está entre SCENERY_BEHIND_DRAW atrás e `ahead` à frente do carro.
   for (let s = Math.max(k - road.ahead, from); s < k + SCENERY_BEHIND_DRAW + 1; s += step) {
@@ -166,10 +173,10 @@ export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y
     const h = hd[j] + (hd[j + 1] - hd[j]) * u;
     const sh = Math.sin(h); const ch = Math.cos(h);
     const ry = roadY(py, s);
-    const camY = roadY(py, s - backS) + CHASE_CAMERA.height - lower;
-    const lookY = ry + CHASE_CAMERA.lookY + Math.max(-4, Math.min(4, (roadY(py, s + lookS) - ry) * 0.6));
+    const camY = roadY(py, s - backS) + cam.height - lower;
+    const lookY = ry + cam.lookY + Math.max(-4, Math.min(4, (roadY(py, s + lookS) - ry) * 0.6));
     // Câmera atrás do carro no rumo dele; olha o ponto à frente. Base: D (eixo), R (direita), U = R × D.
-    const camX = cx - CHASE_CAMERA.back * sh; const camZ = cz + CHASE_CAMERA.back * ch;
+    const camX = cx - cam.back * sh; const camZ = cz + cam.back * ch;
     const dyLook = lookY - camY;
     const inv = 1 / Math.hypot(lookDist, dyLook);
     const Dx = sh * lookDist * inv; const Dy = dyLook * inv; const Dz = -ch * lookDist * inv;
@@ -182,9 +189,9 @@ export function sightSeconds(road: SightRoad, k: number, f: number, x: number, y
       const zc = dx * Dx + dy * Dy + dz * Dz;
       if (zc < 0.3 || zc * zc > fog2) continue;
       const xc = dx * Rx + dz * Rz;
-      if (Math.abs(xc) > zc * TAN_H) continue;
+      if (Math.abs(xc) > zc * tanH) continue;
       const yc = dx * Ux + dy * Uy + dz * Uz;
-      if (Math.abs(yc) > zc * TAN_V) continue;
+      if (Math.abs(yc) > zc * tanV) continue;
       if (blocked(road, camX, camY, camZ, SAMPLE_X[m], SAMPLE_Y[m], SAMPLE_Z[m], camSeg, Math.ceil(anchor) + reach)) continue;
       ok++;
     }
@@ -267,6 +274,40 @@ export function cameraLowering(speedFrac: number): number {
   return max * smooth((speedFrac - from) / (to - from));
 }
 
+/**
+ * Os deslocamentos de cada uma das 4 câmeras (nc/cameras), todos com limite e todos testados (tests/cameras.test.ts):
+ *   - `lowerMax`: quanto desce em velocidade (m); as presas ao carro não descem (o olho é fixo no carro);
+ *   - `crest`: fração da flutuação de cresta (as presas andam com o carro: 0, senão o olho sairia de dentro dele);
+ *   - `orbit`: faz a órbita da vitória. Presa ao carro, a câmera passa à Alta enquanto dura a comemoração (a órbita sai da caixa do carro);
+ *   - `rollScale` / `shakeScale` / `tremor`: parcelas da inclinação nas curvas, do tranco da batida e do tremor fino (Capô e Frente: bem menos);
+ *   - `reduceFov`: parcela do FOV dinâmico (velocidade e nitro) que sobra com "reduzir efeitos" — nas presas ao carro quase nada.
+ * A câmera presa ao carro fica dentro da caixa de colisão dele (cars/mount.ts): nenhum cenário sólido nem carro do núcleo chega lá.
+ */
+export interface CameraRig { readonly mounted: boolean; readonly lowerMax: number; readonly crest: number; readonly orbit: boolean; readonly rollScale: number; readonly shakeScale: number; readonly tremor: number; readonly reduceFov: number }
+
+export const CAMERA_RIGS: Readonly<Record<CameraMode, CameraRig>> = {
+  high: { mounted: false, lowerMax: CAMERA_DYNAMICS.lower.max, crest: 1, orbit: true, rollScale: 1, shakeScale: 1, tremor: 1, reduceFov: 1 },
+  low: { mounted: false, lowerMax: CAMERA_DYNAMICS.lower.max, crest: 1, orbit: true, rollScale: 1, shakeScale: 1, tremor: 1, reduceFov: 1 },
+  hood: { mounted: true, lowerMax: 0, crest: 0, orbit: false, rollScale: 0.4, shakeScale: 0.5, tremor: 0.5, reduceFov: 0.2 },
+  bumper: { mounted: true, lowerMax: 0, crest: 0, orbit: false, rollScale: 0.4, shakeScale: 0.5, tremor: 0.5, reduceFov: 0.2 },
+};
+
+/** Quanto a câmera `mode` desce (m) na fração `speedFrac` da velocidade máxima. */
+export function cameraLoweringFor(mode: CameraMode, speedFrac: number): number {
+  return CAMERA_RIGS[mode].lowerMax === 0 ? 0 : (CAMERA_RIGS[mode].lowerMax / CAMERA_DYNAMICS.lower.max) * cameraLowering(speedFrac);
+}
+
+/** FOV (°) da câmera: a base mais a parcela da velocidade e a da mola do nitro, nunca passando de `fov.hardMax` e nunca abaixo da base. */
+export function cameraFovFor(mode: CameraMode, speedFov: number, nitroX: number, reduce: boolean): number {
+  const k = reduce ? CAMERA_RIGS[mode].reduceFov : 1;
+  return Math.min(CAMERA_DYNAMICS.fov.hardMax, Math.max(CAMERA_POSES[mode].baseFov, CAMERA_POSES[mode].baseFov + (speedFov + nitroX) * k));
+}
+
+/** Parcela do tremor fino da câmera (0 com "reduzir efeitos"). */
+export function tremorScaleFor(mode: CameraMode, reduce: boolean): number {
+  return reduce ? 0 : CAMERA_RIGS[mode].tremor;
+}
+
 /** Intensidade do tremor fino, 0..1: nada até 90% da máxima, cheio na máxima. */
 export function tremorAmount(speedFrac: number): number {
   const { from } = CAMERA_DYNAMICS.tremor;
@@ -296,11 +337,11 @@ export interface NitroFov { x: number; v: number }
  * a mola subamortecida passa do alvo e assenta. Sem nitro o alvo é 0. `reduce` (reduzir efeitos): amortecimento crítico e sem tranco, ou seja,
  * chega ao alvo sem sobrepasso. A parcela fica em [0, nitroFov + springMax]. Passos de no máximo 1/120 s (estável com quadro lento).
  */
-export function stepNitroFov(s: NitroFov, engaged: boolean, justEngaged: boolean, dt: number, reduce: boolean): NitroFov {
+export function stepNitroFov(s: NitroFov, engaged: boolean, justEngaged: boolean, dt: number, reduce: boolean, nitroFov: number = CHASE_CAMERA.nitroFov): NitroFov {
   const { springMax, kick, omega, zeta } = CAMERA_DYNAMICS.fov;
-  const target = engaged ? CHASE_CAMERA.nitroFov : 0;
+  const target = engaged ? nitroFov : 0;
   const w = reduce ? 10 : omega; const z = reduce ? 1 : zeta;
-  const hi = CHASE_CAMERA.nitroFov + springMax;
+  const hi = nitroFov + springMax;
   if (justEngaged && !reduce) s.v += kick;
   const steps = Math.max(1, Math.ceil(dt * 120));
   const h = dt / steps;
@@ -337,10 +378,9 @@ export function insideCarBox(relLat: number, back: number, n: Neighbor): boolean
  * centro da pista, chega mais perto e mais alto. A lateral fica em `max(lateralFree, |camLat|)`. Se a pose cair na caixa de um dos `count` primeiros
  * vizinhos, ou do próprio carro, recua a fração em 16 passos até sair (0 = a base, sempre aceita). `out.alpha` é a fração que valeu.
  */
-export function orbitCamera(alpha: number, carLat: number, camLat: number, neighbors: readonly Neighbor[], count: number, out: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 }): OrbitOut {
+export function orbitCamera(alpha: number, carLat: number, camLat: number, neighbors: readonly Neighbor[], count: number, out: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 }, base: number = CHASE_CAMERA.back): OrbitOut {
   const o = CAMERA_DYNAMICS.orbit;
   const side = carLat >= 0 ? -1 : 1;
-  const base = CHASE_CAMERA.back;
   const limit = Math.max(o.lateralFree, Math.abs(camLat));
   const target = clamp01(alpha);
   const rel0 = camLat - carLat;

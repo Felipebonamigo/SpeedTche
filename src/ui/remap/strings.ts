@@ -13,6 +13,7 @@ registerStrings('remap', {
     'action.drift': 'Derrapar',
     'action.lookBack': 'Olhar para trás',
     'action.horn': 'Buzina',
+    'action.camera': 'Câmera',
     'action.pause': 'Pausar',
 
     'key.space': 'Espaço',
@@ -70,6 +71,7 @@ registerStrings('remap', {
     'action.drift': 'Drift',
     'action.lookBack': 'Look back',
     'action.horn': 'Horn',
+    'action.camera': 'Camera',
     'action.pause': 'Pause',
 
     'key.space': 'Space',

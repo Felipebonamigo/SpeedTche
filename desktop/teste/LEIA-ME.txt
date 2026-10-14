@@ -20,6 +20,8 @@ CONTROLES (dá para trocar em Opções › Controles)
   Derrapar    Shift direito         Shift esquerdo        RB
   Olhar trás  B                     R                     R3
   Buzina      H                     G                     L3
+  Câmera      C                     V                     Select/Back
+  Câmeras: Alta (padrão) → Baixa → Capô → Frente; cada jogador troca a sua e o jogo lembra (também em Opções › Acessibilidade).
   Menus: setas + Enter, Esc volta.
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 

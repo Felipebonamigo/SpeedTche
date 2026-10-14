@@ -2,6 +2,7 @@
 // (src/game/session.ts) liga as implementações. Cada camada mora numa pasta própria:
 //   src/render  → Renderer            src/ui     → Menus + InputProvider
 //   src/audio   → AudioEngine         src/game   → settings.ts, save.ts, desktop.ts, session.ts
+import type { CameraMode } from '../render/camera-base';
 import type { ColorPalette } from '../core/data/drivers';
 import type {
   AssistLevel, CarDef, CarLook, ChampionshipState, CoopAssists, CupDef, Difficulty, HumanEntry, PlayerInput, RaceResultRow, RaceState,
@@ -52,6 +53,8 @@ export interface InputProvider {
   /** Dispositivo ligado a um assento cujo botão de voltar foi apertado neste quadro (sair do lobby). */
   leavePressed(): DeviceId | null;
   menuNav(): MenuNav;
+  /** O botão de trocar a câmera do assento foi apertado neste quadro (borda). Só visual e local: nunca vai ao núcleo nem à rede. */
+  cameraPressed?(seat: number): boolean;
   /** Assento cujo botão de pausa (Esc/Start) foi apertado neste quadro; -1 se nenhum. Esc sem assento vale como assento 0. */
   pausePressed(): number;
   /** Estado segurado de um dispositivo com o mapeamento atual (teste de entrada e captura da tela de controles); null se desconhecido. */
@@ -123,6 +126,8 @@ export interface Settings {
   landmarkCaptions: boolean;
   /** 30 fps travados na Média com 3 e 4 jogadores (Opções › Visual; onda L, L2b). Desligado por padrão. */
   lockFps30: boolean;
+  /** A câmera de cada assento (P1..P4): Alta, Baixa, Capô ou Frente. Só renderização e entrada local (nada no núcleo, nada na rede). Campo aditivo: save sem ele abre na Alta. */
+  seatCameras: CameraMode[];
   /** A qualidade que a escolha automática da 1ª abertura gravou (L2b). Ausente = não rodou (save de antes, ou automação): é campo aditivo, sem padrão. */
   autoQuality?: Quality;
 }
@@ -137,6 +142,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   ghost: true,
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
   landmarkCaptions: true, lockFps30: false,
+  seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[],
 });
 
 export interface BestLap {
@@ -265,6 +271,8 @@ export interface ViewportSpec {
   color: string;
   name: string;
   messages: HudMessage[];
+  /** A câmera deste assento (Settings.seatCameras); ausente = Alta. O Retrô ignora. */
+  camera?: CameraMode;
 }
 
 /** Pose do fantasma do contra-relógio num instante (src/game/ghost.ts: ghostPoseAt). */

@@ -4,23 +4,22 @@
 // M5: além da base (`CHASE_CAMERA`, que não muda) a câmera de perseguição ganha deslocamentos DINÂMICOS, todos com limite e modelados em
 // `scenery/sight.ts` (`CAMERA_DYNAMICS`, com teste): mais baixa em velocidade, mola de FOV no engate do nitro, tremor fino acima de 90%,
 // cresta de morro e a órbita ao cruzar a linha em 1º. "Reduzir efeitos" tira o tranco da mola, o tremor e a órbita.
+// nc/cameras: quatro câmeras por assento — Alta (padrão) e Baixa são de perseguição; Capô e Frente andam presas ao carro (o ponto de montagem vem do
+// `Cars`, cars/mount.ts). Os limites de cada uma moram em `CAMERA_RIGS` (scenery/sight.ts, com teste).
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import type { RenderFrame } from '../game/contracts';
-import { CHASE_CAMERA } from './camera-base';
+import { CAMERA_POSES, CHASE_CAMERA, type CameraMode } from './camera-base';
 import type { Shake } from './effects';
 import { frameYAt, type RoadFrame } from './roadframe';
 import {
-  CAMERA_DYNAMICS, cameraLowering, crestLift, findCrests, orbitAmount, orbitCamera, stepNitroFov, tremorAmount, tremorOffset,
+  CAMERA_RIGS, cameraFovFor, cameraLoweringFor, crestLift, findCrests, orbitAmount, orbitCamera, stepNitroFov, tremorAmount, tremorOffset,
   type Neighbor, type NitroFov, type OrbitOut, type Tremor,
 } from './scenery/sight';
 import { ROAD_HALF_WIDTH_M, SEGMENT_M } from './units';
 
 export { CHASE_CAMERA };
-const BASE_FOV = CHASE_CAMERA.baseFov;
-const SPEED_FOV = CHASE_CAMERA.speedFov;
-const NITRO_FOV = CHASE_CAMERA.nitroFov;
 /** Metros por unidade de pista (200 unidades = 1 segmento de 4 m). */
 const Z_TO_M = SEGMENT_M / 200;
 /** Vizinhos mais longe que isto (m, ao longo e de lado) não entram na conta da órbita: ela chega a ~8 m do carro. */
@@ -75,8 +74,12 @@ export function cameraExtraFor(frame: RenderFrame, carIndex: number, out: Camera
 
 const smooth01 = (v: number): number => { const t = Math.max(0, Math.min(1, v)); return t * t * (3 - 2 * t); };
 
+/** Onde o olho da câmera presa ao carro está (referencial da pista, o mesmo do `pose` dos carros). */
+export interface MountEye { x: number; y: number; z: number }
+
+/** Sem o modo escolhido vale a Baixa, a câmera de sempre. O jogo passa o do assento (padrão Alta, vindo das opções). */
 export class ChaseCamera {
-  readonly camera = new THREE.PerspectiveCamera(BASE_FOV, 16 / 9, 0.3, 3000);
+  readonly camera = new THREE.PerspectiveCamera(CAMERA_POSES.low.baseFov, 16 / 9, 0.3, 3000);
   private lagX = 0;
   /** A parcela do FOV que vem da velocidade (°), suavizada; a do nitro é a mola. */
   private speedFov = 0;
@@ -86,48 +89,69 @@ export class ChaseCamera {
   /** Fração da órbita da vitória que vale agora (já cortada pela folga contra os vizinhos). */
   private orbit = 0;
   private lastTime = -1;
+  /** A câmera do quadro anterior (começa na Baixa, a pose da construção). */
+  private lastMode: CameraMode = 'low';
   private readonly target = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly tremor: Tremor = { x: 0, y: 0, roll: 0 };
   private readonly orbitOut: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 };
 
   /** `carX` em meias larguras, `speedFrac` 0..1,2, `curve` do segmento atual. */
-  update(rf: RoadFrame, carX: number, speedFrac: number, curve: number, nitroOn: boolean, time: number, shake: Shake, extra: CameraExtra = DEFAULT_EXTRA): void {
+  update(rf: RoadFrame, carX: number, speedFrac: number, curve: number, nitroOn: boolean, time: number, shake: Shake, extra: CameraExtra = DEFAULT_EXTRA, chosen: CameraMode = 'low', eye: MountEye | null = null): void {
     const first = this.lastTime < 0;
     const dt = first ? 1 / 60 : Math.min(0.1, Math.max(0, time - this.lastTime));
     this.lastTime = time;
+    // Presa ao carro só com o olho conhecido; na comemoração da vitória (órbita, que sai da caixa do carro) a câmera vira a Alta.
+    const winning = extra.finishSeconds >= 0 && !extra.reduce;
+    const mode: CameraMode = CAMERA_RIGS[chosen].mounted && (eye === null || winning) ? 'high' : chosen;
+    const rig = CAMERA_RIGS[mode];
+    const pose = CAMERA_POSES[mode];
+    const mountedEye = rig.mounted ? eye : null;
+    // Trocou de câmera em movimento: as parcelas de velocidade e de nitro do FOV passam à escala da pose nova (senão o quadro "assenta" por um segundo).
+    if (this.lastMode !== mode) {
+      const was = CAMERA_POSES[this.lastMode];
+      this.speedFov *= pose.speedFov / was.speedFov;
+      this.nitroFov.x *= pose.nitroFov / was.nitroFov; this.nitroFov.v *= pose.nitroFov / was.nitroFov;
+      this.lastMode = mode;
+    }
     const xm = carX * ROAD_HALF_WIDTH_M;
-    if (first) { this.lagX = xm; this.nitroPrev = nitroOn; this.nitroFov.x = nitroOn ? NITRO_FOV : 0; this.nitroFov.v = 0; } // sem "deslizar" no primeiro quadro
+    if (first) { this.lagX = xm; this.nitroPrev = nitroOn; this.nitroFov.x = nitroOn ? pose.nitroFov : 0; this.nitroFov.v = 0; } // sem "deslizar" no primeiro quadro
     const k = 1 - Math.exp(-dt * 5.5);
     this.lagX += (xm - this.lagX) * k; // segue o x do carro por inteiro (com atraso): o carro nunca sai do centro
     // FOV: a parcela da velocidade suaviza; a do nitro é uma mola com tranco no engate (sight.ts: stepNitroFov, com teto).
-    stepNitroFov(this.nitroFov, nitroOn, nitroOn && !this.nitroPrev && !first, dt, extra.reduce);
+    stepNitroFov(this.nitroFov, nitroOn, nitroOn && !this.nitroPrev && !first, dt, extra.reduce, pose.nitroFov);
     this.nitroPrev = nitroOn;
-    this.speedFov += (SPEED_FOV * Math.min(1.2, speedFrac) - this.speedFov) * (1 - Math.exp(-dt * 3));
-    const fov = Math.min(CAMERA_DYNAMICS.fov.hardMax, Math.max(BASE_FOV, BASE_FOV + this.speedFov + this.nitroFov.x));
-    const rollTarget = -curve * 0.012 * Math.min(1, speedFrac);
+    this.speedFov += (pose.speedFov * Math.min(1.2, speedFrac) - this.speedFov) * (1 - Math.exp(-dt * 3));
+    const fov = cameraFovFor(mode, this.speedFov, this.nitroFov.x, extra.reduce);
+    const rollTarget = -curve * 0.012 * Math.min(1, speedFrac) * rig.rollScale;
     this.roll += (rollTarget - this.roll) * (1 - Math.exp(-dt * 3));
     // Altura: a base, menos o que a velocidade abaixa, mais a cresta; sempre sobre a pista sob a câmera (piso em CAMERA_DYNAMICS).
-    const camY = CHASE_CAMERA.height - cameraLowering(speedFrac) + frameYAt(rf, -CHASE_CAMERA.back) + extra.crest;
+    const camY = pose.height - cameraLoweringFor(mode, speedFrac) + frameYAt(rf, -pose.back) + extra.crest * rig.crest;
     // Pitch limitado: em rampa forte o alvo sobe/desce no máximo 4 m (o carro fica no quadro).
-    const aheadY = CHASE_CAMERA.lookY + Math.max(-4, Math.min(4, frameYAt(rf, CHASE_CAMERA.lookAhead) * 0.6));
+    const aheadY = pose.lookY + Math.max(-4, Math.min(4, frameYAt(rf, pose.lookAhead) * 0.6));
     const tr = this.tremor;
     if (extra.tremor && !extra.reduce) tremorOffset(time, tremorAmount(speedFrac), tr); else { tr.x = 0; tr.y = 0; tr.roll = 0; }
     // Órbita da vitória (só em 1º, só sem reduzir efeitos): sobe com o tempo desde a linha, cortada pelos vizinhos.
-    let px = this.lagX; let py = camY; let pz: number = CHASE_CAMERA.back;
-    let tx = this.lagX * 0.7 + xm * 0.3; let ty = aheadY; let tz = -CHASE_CAMERA.lookAhead;
-    if (extra.finishSeconds >= 0 && !extra.reduce) {
+    let px = this.lagX; let py = camY; let pz: number = pose.back;
+    let tx = this.lagX * 0.7 + xm * 0.3; let ty = aheadY; let tz = -pose.lookAhead;
+    if (mountedEye) {
+      // Presa ao carro: o olho é o do modelo (sem atraso lateral); olha reto à frente, um pouco abaixo do olho (o capô na base do quadro).
+      px = mountedEye.x; py = mountedEye.y; pz = mountedEye.z;
+      tx = mountedEye.x; ty = mountedEye.y + (pose.lookY - pose.height) + Math.max(-4, Math.min(4, frameYAt(rf, pose.lookAhead) * 0.6)); tz = -pose.lookAhead;
+      this.orbit = 0;
+    } else if (rig.orbit && winning) {
       this.orbit += (orbitAmount(extra.finishSeconds) - this.orbit) * (1 - Math.exp(-dt * 8));
-      const o = orbitCamera(this.orbit, xm, this.lagX, extra.neighbors, extra.count, this.orbitOut);
+      const o = orbitCamera(this.orbit, xm, this.lagX, extra.neighbors, extra.count, this.orbitOut, pose.back);
       this.orbit = Math.min(this.orbit, o.alpha); // um carro no caminho recua a órbita de uma vez; ela volta devagar
       px = o.lat; py = camY + o.lift; pz = o.back;
       const w = smooth01(o.alpha);
       tx += (xm - tx) * w; ty += (0.7 - ty) * w; tz += (0 - tz) * w; // olha para o carro
     } else this.orbit = 0;
     const c = this.camera;
-    c.position.set(px + shake.x + tr.x, py + shake.y + tr.y, pz);
+    const sk = rig.shakeScale;
+    c.position.set(px + shake.x * sk + tr.x * rig.tremor, py + shake.y * sk + tr.y * rig.tremor, pz);
     this.target.set(tx, ty, tz);
-    const r = this.roll + shake.roll + tr.roll;
+    const r = this.roll + shake.roll * sk + tr.roll * rig.tremor;
     this.up.set(Math.sin(r), Math.cos(r), 0);
     c.up.copy(this.up);
     c.lookAt(this.target);
@@ -139,6 +163,7 @@ export class ChaseCamera {
   }
 
   reset(): void {
+    this.lastMode = 'low';
     this.lagX = 0; this.speedFov = 0; this.roll = 0; this.lastTime = -1; this.orbit = 0;
     this.nitroFov.x = 0; this.nitroFov.v = 0; this.nitroPrev = false;
   }

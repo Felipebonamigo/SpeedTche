@@ -30,6 +30,8 @@ export interface DeviceRaw {
   drift: boolean;
   /** Buzina (N6): o botão SEGURADO. Nível, como derrapar: fora de `EDGE_KEYS`. */
   horn: boolean;
+  /** Trocar a câmera (nc/cameras): borda. Não entra no `PlayerInput` (nada de câmera vai ao núcleo nem à rede). */
+  camera: boolean;
   up: boolean;
   down: boolean;
   left: boolean;
@@ -41,18 +43,18 @@ export interface DeviceRaw {
 }
 
 export const NEUTRAL_RAW: Readonly<DeviceRaw> = Object.freeze({
-  steer: 0, throttle: false, brake: false, nitro: false, gearUp: false, gearDown: false, drift: false, horn: false,
+  steer: 0, throttle: false, brake: false, nitro: false, gearUp: false, gearDown: false, drift: false, horn: false, camera: false,
   up: false, down: false, left: false, right: false, confirm: false, back: false, start: false, pause: false,
 });
 
-export type EdgeKey = 'nitro' | 'gearUp' | 'gearDown' | 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'start' | 'pause';
-export const EDGE_KEYS: readonly EdgeKey[] = ['nitro', 'gearUp', 'gearDown', 'up', 'down', 'left', 'right', 'confirm', 'back', 'start', 'pause'];
+export type EdgeKey = 'nitro' | 'gearUp' | 'gearDown' | 'camera' | 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'start' | 'pause';
+export const EDGE_KEYS: readonly EdgeKey[] = ['nitro', 'gearUp', 'gearDown', 'camera', 'up', 'down', 'left', 'right', 'confirm', 'back', 'start', 'pause'];
 export type NavKey = 'up' | 'down' | 'left' | 'right';
 export const NAV_KEYS: readonly NavKey[] = ['up', 'down', 'left', 'right'];
 export type DeviceEdges = Record<EdgeKey, boolean>;
 
 export const NO_EDGES: Readonly<DeviceEdges> = Object.freeze({
-  nitro: false, gearUp: false, gearDown: false, up: false, down: false, left: false, right: false,
+  nitro: false, gearUp: false, gearDown: false, camera: false, up: false, down: false, left: false, right: false,
   confirm: false, back: false, start: false, pause: false,
 });
 
@@ -90,6 +92,7 @@ export function mapGamepad(buttons: readonly boolean[], axes: readonly number[],
     gearDown: any(g.gearDown),
     drift: any(g.drift),
     horn: any(g.horn),
+    camera: any(g.camera),
     up: b(12) || y < -0.5,
     down: b(13) || y > 0.5,
     left: b(14) || x < -0.5,
@@ -148,6 +151,7 @@ export function mapKeyboard(keys: ReadonlySet<string>, layout: KeyboardId, bindi
     gearDown: any(B.gearDown),
     drift: any(B.drift),
     horn: any(B.horn),
+    camera: any(B.camera),
     up: any(N.up), down: any(N.down), left: any(N.left), right: any(N.right),
     confirm: any(N.confirm),
     back: any(N.back),
@@ -452,6 +456,12 @@ export function createInput(target: Window = window, opts: InputOptions = {}): I
         if (nav.device === null) nav.device = d.id;
       }
       return nav;
+    },
+
+    cameraPressed(seat) {
+      const id = seats[seat];
+      const d = id ? devices.get(id) : undefined;
+      return !!d && d.connected && d.edges.camera;
     },
 
     pausePressed() {
