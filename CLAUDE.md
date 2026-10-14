@@ -88,6 +88,7 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
   resolve? 6) cabe numa linha? 7) só então o mínimo de código novo. Ela encurta a solução, nunca a leitura do fluxo.
 
 ## Memória do projeto (ler primeiro em toda sessão)
+- **Estúdio** (os 4 jogos do Felipe, ferramentas, pré-configurações e pendências em comum): https://claude.ai/artifact/72KXW2Tve5gB65BHD1CDp6 (documento do Claude Docs, lido pelo conector).
 - **Roteiro e cronograma**: `docs/ROADMAP.md` (fases 0–6, passos numerados, V/A/T, marcos, custos, riscos). Documento vivo.
 - **Design e arquitetura**: `docs/DESIGN.md` · **Steam**: `docs/STEAM.md` e `desktop/README.md`.
 - **Estado atual** (30/09/2026): Fase 0 e as ondas A–F das Fases 1/3/4/5 concluídas e mescladas — 109 pistas em 34 copas (onda G: Expedição Brasil, 27 estados × 3 com passaporte e carimbos, e o Mundial, 7 países × 4; `docs/PISTAS.md`),
