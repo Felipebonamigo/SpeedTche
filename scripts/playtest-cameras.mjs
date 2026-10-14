@@ -19,7 +19,10 @@ const frames = (n = 2) => page.evaluate((k) => new Promise((resolve) => { let i 
 const cams = () => page.evaluate(() => [...window.nc.session.settings.seatCameras]);
 const saved = () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('speed-tche.settings') ?? '{}').seatCameras ?? null; } catch { return null; } });
 const msgs = (seat) => page.evaluate((s) => (window.nc.session.race?.messages.get(s) ?? []).map((m) => m.text), seat);
-const press = async (k) => { await page.keyboard.down(k); await frames(2); await page.keyboard.up(k); await frames(2); };
+// Aperta, espera 2 quadros e lê o estado NA MESMA chamada (o aviso dura 1,4 s e o 3D por software é lento: lido depois, já teria sumido).
+const snap = () => page.evaluate(() => { const s = window.nc.session; const r = s.race; return { cams: [...s.settings.seatCameras], msgs: [0, 1].map((i) => (r?.messages.get(i) ?? []).map((m) => m.text)) }; });
+let last = { cams: [], msgs: [[], []] };
+const press = async (k) => { await page.keyboard.down(k); await frames(2); last = await snap(); await page.keyboard.up(k); await frames(2); return last; };
 
 await page.goto(url, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.nc?.session);
@@ -32,10 +35,10 @@ await frames(3);
 const order = ['low', 'hood', 'bumper', 'high'];
 const names = { low: 'Baixa', hood: 'Capô', bumper: 'Frente', high: 'Alta' };
 for (const mode of order) {
-  await press('KeyC');
-  const c = await cams();
+  const got = await press('KeyC');
+  const c = got.cams;
   check(c[0] === mode, `C leva o assento 1 à ${names[mode]} (${c[0]})`);
-  check((await msgs(0)).includes(`Câmera: ${names[mode]}`), `aviso "Câmera: ${names[mode]}" na tela (${JSON.stringify(await msgs(0))})`);
+  check(got.msgs[0].includes(`Câmera: ${names[mode]}`), `aviso "Câmera: ${names[mode]}" na tela (${JSON.stringify(got.msgs[0])})`);
   check((await saved())?.[0] === mode, `a escolha fica gravada nas opções (${JSON.stringify(await saved())})`);
 }
 // V não é a tecla do teclado 1; só o teclado 2 (sem assento aqui) a usa.
@@ -69,9 +72,10 @@ await page.evaluate(() => window.nc.session.debugStep(260));
 await frames(3);
 await press('KeyC');
 check(JSON.stringify((await cams()).slice(0, 2)) === '["low","high"]', `C troca só o jogador 1 (${JSON.stringify(await cams())})`);
-await press('KeyV'); await press('KeyV');
-check(JSON.stringify((await cams()).slice(0, 2)) === '["low","hood"]', `V (2 vezes) leva o jogador 2 ao Capô (${JSON.stringify(await cams())})`);
-check((await msgs(1)).includes('Câmera: Capô') && !(await msgs(0)).includes('Câmera: Capô'), 'o aviso aparece só na tela de quem trocou');
+await press('KeyV');
+const two = await press('KeyV');
+check(JSON.stringify(two.cams.slice(0, 2)) === '["low","hood"]', `V (2 vezes) leva o jogador 2 ao Capô (${JSON.stringify(two.cams)})`);
+check(two.msgs[1].includes('Câmera: Capô') && !two.msgs[0].includes('Câmera: Capô'), `o aviso aparece só na tela de quem trocou (${JSON.stringify(two.msgs)})`);
 for (const [a, b] of [['high', 'low'], ['hood', 'bumper'], ['bumper', 'hood']]) {
   await page.evaluate(([x, y]) => { const c = window.nc.session.settings.seatCameras; c[0] = x; c[1] = y; }, [a, b]);
   await frames(4);

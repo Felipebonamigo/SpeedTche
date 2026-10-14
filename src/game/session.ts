@@ -651,7 +651,8 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       }
     }
     // Trocar a câmera (ação `camera`): só entrada local e visual — nada vai ao núcleo nem à rede, e vale também online e no sofá.
-    if (r && !menuOpen && !session.paused && input.cameraPressed) {
+    // O Retrô (pseudo-3D) ignora a escolha: a tecla não troca nada ali (e não mostra aviso que não vale).
+    if (r && !menuOpen && !session.paused && input.cameraPressed && settings.renderStyle !== 'retro') {
       for (const seat of r.localSeats) {
         if (!input.cameraPressed(seat)) continue;
         if (!Array.isArray(settings.seatCameras)) settings.seatCameras = [...DEFAULT_SETTINGS.seatCameras];
