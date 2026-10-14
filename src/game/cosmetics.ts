@@ -297,11 +297,17 @@ export function lookOptions(field: LookField, carId: string): string[] {
   }
 }
 
-/** ←/→ num campo do look: a opção seguinte (ou anterior) em círculo, já na forma canônica. Valor atual que não é do seletor conta como o padrão. */
-export function stepLook(look: CarLook | null | undefined, field: LookField, dir: -1 | 1, carId: string): CarLook | null {
-  const options = lookOptions(field, carId);
+/**
+ * ←/→ num campo do look: a opção seguinte (ou anterior) em círculo, já na forma canônica. Valor atual que não é do seletor conta como o padrão.
+ * `allowed` (O5, o cadeado dos prêmios de maestria, src/game/progression.ts): a opção recusada é pulada — menos o padrão e o valor atual, que
+ * nunca saem do círculo (quem já usava um prêmio continua com ele até trocar). Sem `allowed`, o catálogo inteiro (a rede e o save não filtram).
+ */
+export function stepLook(look: CarLook | null | undefined, field: LookField, dir: -1 | 1, carId: string, allowed?: (field: LookField, value: string) => boolean): CarLook | null {
+  const all = lookOptions(field, carId);
+  const now = look?.[field] ?? '';
+  const options = allowed ? all.filter((v, i) => i === 0 || v === now || allowed(field, v)) : all;
   if (options.length === 0) return normalizeLook(look, carId);
-  const cur = look?.[field] ?? '';
+  const cur = now;
   const i = Math.max(0, options.indexOf(cur === '' ? options[0] : cur));
   const next = options[(i + dir + options.length) % options.length];
   return normalizeLook({ ...look, [field]: next }, carId);

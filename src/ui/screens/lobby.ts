@@ -23,12 +23,23 @@ import { arrowButton, button, carCard, createFocusList, h, listNav, screenFrame,
 import { icon } from './icons';
 import { commitSettings, raceOptionSelectors } from './options';
 import { lookButton, lookEditor, lookSummary, paintSelector } from './paint';
+import { carLocked, lockRow } from './progress';
+import { cosmeticUnlocked } from '../../game/progression';
 
 export const LOBBY_SEATS = 4;
 
 /** Carros escolhíveis no lobby: os livres e os comprados em alguma carreira (a mesma regra do online). */
 export function availableCars(ctx: Pick<MenuContext, 'cars' | 'save'>): CarDef[] {
   return ctx.cars.filter((c) => carAvailable(ctx.save, c));
+}
+
+/**
+ * O carro da corrida de um assento (O5): o que ele tem à mostra, se liberado; senão o primeiro livre. O lobby percorre os 14 (o trancado
+ * aparece com o cadeado em vez de sumir), mas nenhum HumanEntry sai com carro trancado. `carIndex` é o índice em `ctx.cars`.
+ */
+function raceCarOf(ctx: Pick<MenuContext, 'cars' | 'save'>, carIndex: number): CarDef {
+  const shown = ctx.cars[carIndex];
+  return shown && carAvailable(ctx.save, shown) ? shown : availableCars(ctx)[0] ?? ctx.cars[0];
 }
 
 /** Pilotos do jogo salvo que o lobby de "Continuar" religa (nome, carro e pintura, na ordem dos assentos). */
@@ -65,13 +76,12 @@ export function canStart(lobby: LobbyState, save?: SaveData): boolean {
  * pintura que cada assento escolheu para o carro dele (a Original não entra no objeto).
  */
 export function lobbyHumans(api: ScreenApi): HumanEntry[] {
-  const cars = availableCars(api.ctx);
   const { settings, save } = api.ctx;
   const seats = occupiedSeats(api.lobby);
   // Modo que não admite versus (escolta; revezamento com uma dupla) corre em equipe mesmo com o seletor esquecido.
   const versus = api.lobby.versus && versusAllowed(api.lobby.mode, seats.length);
   return assistedHumans(seats.map((s) => {
-    const carId = (cars[s.carIndex] ?? cars[0]).id;
+    const carId = raceCarOf(api.ctx, s.carIndex).id;
     return withLook({
       seat: s.seat,
       name: s.name.trim() || `P${s.seat + 1}`,
@@ -84,9 +94,11 @@ export function lobbyHumans(api: ScreenApi): HumanEntry[] {
 
 function newSeat(api: ScreenApi, seat: number, device: DeviceId): LobbySeat {
   const { save } = api.ctx;
-  const cars = availableCars(api.ctx);
+  const cars = api.ctx.cars;
   const saved = resumeRoster(api.lobby, save)[seat];
-  const carId = saved?.carId ?? save.seatCars[seat];
+  // O carro guardado do assento só se estiver liberado (O5: o lobby mostra o trancado, mas não começa nele); o da copa salva, sempre.
+  const wanted = saved?.carId ?? save.seatCars[seat];
+  const carId = saved?.carId || cars.some((c) => c.id === wanted && carAvailable(save, c)) ? wanted : raceCarOf(api.ctx, -1).id;
   const carIndex = Math.max(0, cars.findIndex((c) => c.id === carId));
   return { seat, device, name: saved?.name ?? save.seatNames[seat] ?? `P${seat + 1}`, carIndex, ready: false, cursor: startCursor(api.lobby) };
 }
@@ -119,7 +131,7 @@ function syncWithInput(api: ScreenApi): void {
   if (lobby.resume) {
     // Quem já estava sentado (voltou de outra tela) mostra o nome e o carro do jogo salvo.
     const roster = resumeRoster(lobby, api.ctx.save);
-    const cars = availableCars(api.ctx);
+    const cars = api.ctx.cars;
     lobby.seats.forEach((s, i) => {
       const r = roster[i];
       if (!s || !r) return;
@@ -135,7 +147,8 @@ function syncWithInput(api: ScreenApi): void {
 export function lobbyScreen(api: ScreenApi): ScreenInstance {
   const { ctx, lobby } = api;
   const { input, save } = ctx;
-  const cars = availableCars(ctx);
+  // O5: os 14 carros; o trancado aparece com o cadeado e "Compre na Expedição por $ X" (não pode ser escolhido: PRONTO e INICIAR recusam).
+  const cars = ctx.cars;
   const career = lobby.mode === 'career';
   const resume = lobby.resume === true;
   syncWithInput(api);
@@ -161,6 +174,8 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   let cursorBefore = 0;
   /** O P1 acabou de ficar PRONTO: o próximo render põe o cursor dele em INICIAR (o render reconstrói as listas). */
   let focusStartNext = false;
+  /** Assentos com um carro trancado à mostra, onde o carro se escolhe aqui (refeito a cada render): esses não ficam PRONTOS. */
+  const lockedSeats = new Set<number>();
 
   const saveCursors = () => {
     lobby.seats.forEach((s, i) => { const l = lists[i]; if (s && l && l.index >= 0) s.cursor = l.index; });
@@ -188,8 +203,10 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   const stepField = (s: LobbySeat, field: LookField, dir: -1 | 1) => {
     if (s.ready) return;
     const carId = (cars[s.carIndex] ?? cars[0]).id;
+    // O5: os prêmios da maestria (aro dourado, cromado, camaleão) só aparecem para o perfil do assento com a maestria daquele carro.
+    const name = s.name.trim() || `P${s.seat + 1}`;
     if (field === 'paint') stepSeatPaint(save, s.seat, carId, dir);
-    else setSeatLook(save, s.seat, carId, stepLook(seatLook(save, s.seat, carId), field, dir, carId));
+    else setSeatLook(save, s.seat, carId, stepLook(seatLook(save, s.seat, carId), field, dir, carId, (f, v) => cosmeticUnlocked(ctx.progress, name, carId, f, v)));
     saveSave(save);
   };
 
@@ -213,6 +230,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   };
 
   const toggleReady = (s: LobbySeat) => {
+    if (!s.ready && lockedSeats.has(s.seat)) { api.sfx('back'); return; }
     if (editingSeat === s.seat) editingSeat = null;
     s.ready = !s.ready;
     api.sfx(s.ready ? 'confirm' : 'back');
@@ -223,6 +241,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   /** Confirmar no carro, na pintura ou na direção: só dá PRONTO, nunca tira (tirar é o botão PRONTO). */
   const markReady = (s: LobbySeat) => {
     if (s.ready) return;
+    if (lockedSeats.has(s.seat)) { api.sfx('back'); return; }
     if (editingSeat === s.seat) editingSeat = null;
     s.ready = true;
     api.sfx('confirm');
@@ -231,7 +250,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   };
 
   const start = () => {
-    if (!canStart(lobby, save)) { api.sfx('back'); return; }
+    if (!canStart(lobby, save) || occupiedSeats(lobby).some((s) => lockedSeats.has(s.seat))) { api.sfx('back'); return; }
     api.sfx('confirm');
     if (career) api.emit({ type: 'startCareer', humans: lobbyHumans(api), resume });
     else if (resume) api.emit({ type: 'continueCup' });
@@ -264,15 +283,22 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     const heroBody = h('div', { class: 'car-hero-body' }, carCard(carNow(), cars, lookNow()));
     const showCar = () => heroBody.replaceChildren(carCard(carNow(), cars, lookNow()));
     let paintItem: Selector | null = null;
+    const lockedNow = () => carLocked(save, carNow());
     const changeCar = (dir: -1 | 1) => {
       if (s.ready) return;
+      const was = lockedNow();
       s.carIndex = (s.carIndex + dir + cars.length) % cars.length;
+      // Entrou ou saiu de um trancado: a linha da pintura vira a do cadeado (ou volta), então o cartão é refeito.
+      if (was !== lockedNow()) { render(); return; }
       showCar();
       paintItem?.refresh();
     };
     // Carreira: carro e melhorias ficam na garagem. Copa retomada: o carro é o da copa salva.
-    const carItem: FocusItem | null = career || resume || hidesDriver || partner ? null : {
-      el: h('div', { class: `car-hero${s.ready ? ' locked' : ''}` },
+    const choosesCar = !(career || resume || hidesDriver || partner);
+    const isLocked = choosesCar && lockedNow();
+    if (isLocked) lockedSeats.add(s.seat);
+    const carItem: FocusItem | null = !choosesCar ? null : {
+      el: h('div', { class: `car-hero${s.ready ? ' locked' : ''}${isLocked ? ' is-locked' : ''}`, attrs: isLocked ? { 'data-locked': '1' } : {} },
         arrowButton(-1, () => { changeCar(-1); api.sfx('move'); }),
         heroBody,
         arrowButton(1, () => { changeCar(1); api.sfx('move'); }),
@@ -280,8 +306,10 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       adjust: changeCar,
       activate: () => markReady(s),
     };
-    // A pintura só onde o carro se escolhe aqui (carreira: na garagem; copa retomada: a da copa salva).
-    paintItem = carItem ? paintSelector({
+    // A pintura só onde o carro se escolhe aqui (carreira: na garagem; copa retomada: a da copa salva). Carro trancado (O5): no lugar dela, a
+    // linha do cadeado (o mesmo item de foco: ←→ troca o carro, confirmar recusa).
+    const lockItem: FocusItem | null = carItem && isLocked ? lockRow(carNow(), changeCar, () => api.sfx('back')) : null;
+    paintItem = carItem && !isLocked ? paintSelector({
       current: paintNow,
       car: carNow,
       onAdjust: (dir) => {
@@ -296,7 +324,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     }) : null;
     // O visual inteiro: um botão (só o ícone: a altura e a largura do cartão 2×2 não comportam texto) que abre o editor por cima do lobby. Só onde o carro
     // se escolhe aqui, como a pintura; mora no rodapé, ao lado do PRONTO. O resumo do que mudou fica na dica do mouse e em `data-summary`.
-    const lookItem: FocusItem | null = carItem ? lookButton(lookSummary(lookNow()), () => { if (!s.ready) openEditor(s); }, s.ready ? 'locked' : '') : null;
+    const lookItem: FocusItem | null = carItem ? lookButton(lookSummary(lookNow()), () => { if (!s.ready && !isLocked) openEditor(s); else if (isLocked) api.sfx('back'); }, s.ready || isLocked ? 'locked' : '') : null;
     const carEl = carItem ? carItem.el
       : career ? h('div', { class: 'car-hero locked lobby-note' }, icon('flag'), h('span', { text: t('career.lobby.carNote') }))
       : hidesDriver ? h('div', { class: 'car-hero locked lobby-note' }, icon('users'), h('span', { text: t('party.lobby.tournamentNote') }))
@@ -324,6 +352,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       ),
       carEl,
       paintItem?.el,
+      lockItem?.el,
       assistItem.el,
       h('div', { class: 'slot-foot' },
         h('span', { class: 'slot-team' }, icon('users'), h('span', { text: team })),
@@ -331,7 +360,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
         ready.el,
       ),
     );
-    return { el: slot, items: [nameRow, carItem, paintItem, assistItem, lookItem, ready].filter((x): x is FocusItem => x !== null) };
+    return { el: slot, items: [nameRow, carItem, paintItem ?? lockItem, assistItem, lookItem, ready].filter((x): x is FocusItem => x !== null) };
   }
 
   function emptySlot(seat: number): HTMLElement {
@@ -380,6 +409,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   function render(): void {
     saveCursors();
     lists = [null, null, null, null];
+    lockedSeats.clear();
     const limit = maxSeats(lobby, save);
     const slotsEl = h('div', { class: `lobby-slots seats-${limit}` });
     const slotItems: Array<FocusItem[]> = [];

@@ -197,7 +197,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
 
   // Online: a sessão empresta a corrida (beginRace com um driver de lockstep) e os menus.
   const online = createOnlineController({
-    settings, save, input,
+    settings, save, input, progress,
     startRace: (config, localSeats, driver, state, humans) => beginRace(config, 'quick', humans ?? config.humans, { driver, localSeats, state }),
     raceState: () => session.race?.state ?? null,
     clearRace: () => { if (session.race) logRace(session.race); session.race = null; session.paused = false; },

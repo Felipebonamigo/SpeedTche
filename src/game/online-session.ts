@@ -26,6 +26,7 @@ import { onlineFingerprint } from './content-version';
 import type { DeviceId, InputProvider, RaceDriver, ResultsScreenData, SaveData, Settings } from './contracts';
 import { ORIGINAL_PAINT, seatLook, setSeatLook, stepSeatPaint, withoutLook } from './paints';
 import { stepLook, type LookField } from './cosmetics';
+import { cosmeticUnlocked, type ProgressData } from './progression';
 
 // A impressão do conteúdo mora em content-version.ts (o fantasma e os recordes também a usam); daqui só reexportada.
 export { contentFingerprint, fingerprintContent, onlineFingerprint } from './content-version';
@@ -48,6 +49,11 @@ export interface LocalPlayer {
   car: string;
   /** Visual do carro: o que o assento local guardou para ele (save.seatLooks); null = o de fábrica. */
   look: CarLook | null;
+  /**
+   * O5: o carro TRANCADO à mostra neste computador (o seletor percorre os 14, com o cadeado), ou undefined. Só a tela o vê: a sala recebe
+   * sempre `car`, o último liberado, e "Pronto"/"Largar" recusam enquanto houver um trancado à mostra.
+   */
+  view?: string;
 }
 
 export interface WaitingSeat { seat: number; name: string; color: string; lost: boolean }
@@ -89,6 +95,8 @@ export interface OnlineHost {
   persistSettings(): void;
   /** Grava o save (a pintura escolhida na sala fica guardada para o assento local e o carro). Opcional. */
   persistSave?(): void;
+  /** O5: a maestria por perfil e carro (o cadeado dos prêmios no editor do visual); ausente = prêmios trancados. */
+  readonly progress?: ProgressData;
   /**
    * A janela está escondida (aba em segundo plano, janela minimizada): o navegador para o
    * requestAnimationFrame e o quadro deixa de chamar o `advance`. Opcional (sem DOM, nunca).
@@ -251,6 +259,7 @@ export class OnlineController implements RaceDriver {
   startBlocker(): string | null {
     const room = this.room;
     if (!room || !this.isHost) return 'online.lobby.waitHost';
+    if (this.anyLocked()) return 'progress.lock.online';
     if (room.clients.length < 2) return 'online.lobby.needPeer';
     if (room.clients.some((c) => !c.connected || !c.info)) return 'online.lobby.waitPeers';
     if (room.clients.some((c) => c.id !== room.host && !c.info?.ready)) return 'online.lobby.waitReady';
@@ -298,6 +307,22 @@ export class OnlineController implements RaceDriver {
     return CARS.filter((c) => carAvailable(this.host.save, c)).map((c) => c.id);
   }
 
+  /** O carro à mostra do jogador local `index` (o trancado, se ele está num; senão o da sala). */
+  viewCarOf(index: number): string {
+    const p = this.locals[index];
+    return p ? p.view ?? p.car : '';
+  }
+
+  /** O jogador local `index` está com um carro trancado à mostra (O5)? */
+  viewLocked(index: number): boolean {
+    return this.locals[index]?.view !== undefined;
+  }
+
+  /** Algum jogador deste computador com carro trancado à mostra. */
+  private anyLocked(): boolean {
+    return this.locals.some((p) => p.view !== undefined);
+  }
+
   private defaultPlayer(index: number, device: DeviceId): LocalPlayer {
     const { save } = this.host;
     const choices = this.carChoices();
@@ -340,8 +365,12 @@ export class OnlineController implements RaceDriver {
   cycleCar(index: number, dir: -1 | 1): void {
     const p = this.locals[index];
     if (!p || this.ready) return;
-    const ids = this.carChoices();
-    p.car = ids[(ids.indexOf(p.car) + dir + ids.length) % ids.length];
+    // O5: os 14 carros, como o lobby local; o trancado fica só na tela (p.view), com o cadeado, e a sala segue com o último liberado.
+    const ids = CARS.map((c) => c.id);
+    const next = ids[(ids.indexOf(p.view ?? p.car) + dir + ids.length) % ids.length];
+    if (!this.carChoices().includes(next)) { p.view = next; this.changed(); return; }
+    p.view = undefined;
+    p.car = next;
     // Cada carro volta com o visual que este assento guardou para ele.
     p.look = seatLook(this.host.save, index, p.car);
     this.publishInfo();
@@ -377,7 +406,9 @@ export class OnlineController implements RaceDriver {
   stepLookField(index: number, field: LookField, dir: -1 | 1): void {
     const p = this.locals[index];
     if (!p || this.ready || this.phase !== 'lobby') return;
-    p.look = stepLook(p.look, field, dir, p.car);
+    // O5: os prêmios da maestria só para o perfil deste jogador com a maestria daquele carro (progression.ts).
+    const name = p.name.trim() || `P${index + 1}`;
+    p.look = stepLook(p.look, field, dir, p.car, (f, v) => cosmeticUnlocked(this.host.progress, name, p.car, f, v));
     setSeatLook(this.host.save, index, p.car, p.look);
     this.host.persistSave?.();
     this.publishInfo();
@@ -400,10 +431,13 @@ export class OnlineController implements RaceDriver {
     this.publishInfo();
   }
 
-  toggleReady(): void {
-    if (this.phase !== 'lobby') return;
+  /** Pronto/não pronto; devolve se mudou (O5: não fica pronto com um carro trancado à mostra). */
+  toggleReady(): boolean {
+    if (this.phase !== 'lobby') return false;
+    if (!this.ready && this.anyLocked()) return false;
     this.ready = !this.ready;
     this.publishInfo();
+    return true;
   }
 
   private info(): ClientInfo {

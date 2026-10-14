@@ -1,0 +1,9 @@
+/* Progresso que fica (O5, src/ui/screens/progress.ts). SÓ ESTRUTURA: o estilo visual (cor do cadeado, silhueta acinzentada do carro trancado,
+   moldura do nível) é do tema da interface (nc/menu-estilos). Aqui fica o mínimo para o texto quebrar a linha em vez de estourar o cartão. */
+
+/* Linha do cadeado no lugar da pintura: o texto ("Compre na Expedição por $ 12.000") ocupa a largura e quebra se precisar. */
+.sel-lock .sel-label.lock-icon { flex: none; display: inline-flex; align-items: center; }
+.sel-lock .sel-box.lock-box { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+.sel-lock .lock-value { min-width: 0; white-space: normal; text-align: right; line-height: 1.15; }
+.lock-note { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; }
+.lock-note .lock-value { min-width: 0; }
