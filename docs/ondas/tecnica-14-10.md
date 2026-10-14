@@ -32,8 +32,21 @@
   passa por uma de noite e volta) e confere que os uniformes compilados leem as texturas do período seguinte da pista atual.
 
 ### T3 — playtests não reexecutados desde a N5
-- Em andamento: records, paint, ghost, ghost-version, online, retro e `pistas-ui`, um por vez (build de f241703 em `vite preview`; o
-  records no vite de desenvolvimento).
+- Rodados um por vez (build de f241703 em `vite preview`; o records no vite de desenvolvimento), com a máquina em carga 30–50.
+- `playtest-paint` — **falhou** (rc 1, 745 s): `✗ lobby da corrida rápida com P1 e P2` e as que dependem dele. **Causa: o roteiro.**
+  `press` esperava 90 ms fixos por tecla (`scripts/playtest-paint.mjs:18`), mas o lobby e a garagem leem a entrada uma vez por quadro e
+  duas batidas da mesma tecla no mesmo quadro viram uma borda (`tapped` em `src/ui/input.ts:290`); com o 3D por software um quadro leva
+  segundos e o P2 entrou depois da conferência (os cartões mostraram 2 assentos logo depois). **Correção:** cada tecla espera 2 quadros
+  (`settle`), como o `pistas-ui` já faz com `held`. Nenhuma conferência muda.
+- `playtest-ghost-version` — **falhou** (rc 1, 928 s): `✗ fantasma aparece (pose z=undefined, …, 1 malhas translúcidas)` e
+  `✗ impressão de outra versão: sem fantasma (0 quadros com pose, 1 malhas translúcidas, …)`. **Causa: o roteiro, duas vezes.**
+  (1) o passo 2 dirige até a diferença passar de 0,12 s, mas pilota igual à volta gravada: a diferença só passa disso por ruído do teclado
+  (sonda: máximo 0,1206 s numa volta), e quando não passa a corrida acaba e o fantasma some (`pose` nula); (2) a contagem de "malhas
+  translúcidas" (`scripts/playtest-ghost-version.mjs:52`) pegava também a mancha do cenário (`scenery:blob`, `MeshBasicMaterial`
+  0,32) e esperava ≥ 2 malhas do fantasma, que é **uma** malha desde a onda F (`src/render/cars.ts:225`). O jogo está certo: a sonda
+  mostra o fantasma com pose e diferença na segunda corrida. **Correção:** a 2ª corrida larga 1,5 s atrasada (diferença garantida, sem
+  depender de ruído) e a contagem é só das malhas do fantasma (material padrão translúcido, não a mancha do cenário), ≥ 1.
+- `playtest-ghost` — ok (rc 0, 1106 s). `playtest-retro` — ok (rc 0, 652 s). `pistas-ui`, `online`, `records`: rodando.
 
 ### T6 — suíte frágil sob carga
 - **Causa (medida, CPU com `process.cpuUsage`, 14/10):**
