@@ -39,7 +39,18 @@
   bloco 9 e 47 no 16): oscilação dos ouvintes de áudio no instante da medida, não vazamento — fica anotado, o roteiro não foi afrouxado.
 
 ### T3 — playtests não reexecutados desde a N5
-- Rodados um por vez (build de f241703 em `vite preview`; o records no vite de desenvolvimento), com a máquina em carga 30–50.
+
+| Playtest | 1ª execução (build de f241703) | Depois (build com as correções do T2 e os roteiros corrigidos) |
+|---|---|---|
+| `playtest-records.mjs` (vite dev) | — | rc 0, `playtest dos recordes OK`, 20 ✓, 2138 s |
+| `playtest-paint.mjs` | rc 1, 745 s (roteiro) | rc 0, `playtest da pintura OK`, 3167 s |
+| `playtest-ghost.mjs` | rc 0, `OK`, 1106 s | (não reexecutado: nada do que mudou passa por ele além do desenho) |
+| `playtest-ghost-version.mjs` | rc 1, 928 s (roteiro) | rc 0, `OK`, 23 ✓, 919 s (2 execuções antes caíram no `filechooser` sob carga, o aviso do cabeçalho) |
+| `playtest-online.mjs` (relay próprio) | — | rc 0, `playtest online OK`, 40 ✓, 2536 s |
+| `playtest-retro.mjs` | rc 0, `playtest retrô OK`, 652 s | (não reexecutado) |
+| `pistas-ui.mjs` | 192 ✓ 2 ✗, cortado no 1600×900 | rc 1: 220 ✓, 2 ✗ = defeito real do detalhe da copa em 1280×800 e 1024×600 (abaixo) |
+
+- Rodados com a máquina em carga 20–55 (outras sessões rodando suíte e capturas).
 - `playtest-paint` — **falhou** (rc 1, 745 s): `✗ lobby da corrida rápida com P1 e P2` e as que dependem dele. **Causa: o roteiro.**
   `press` esperava 90 ms fixos por tecla (`scripts/playtest-paint.mjs:18`), mas o lobby e a garagem leem a entrada uma vez por quadro e
   duas batidas da mesma tecla no mesmo quadro viram uma borda (`tapped` em `src/ui/input.ts:290`); com o 3D por software um quadro leva
