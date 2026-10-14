@@ -294,3 +294,12 @@
 
 /* Texto grande: o painel das copas não tem altura para o título "Cidade · trecho" em duas linhas; fica o trecho. */
 #ui.large-text .scr-cups .cup-race-city { display: none; }
+
+/* Telas mais altas que 16:9 (Steam Deck 1280×800, 1024×640, 1024×600): a unidade --u cresce com a altura e a largura não, então os nomes
+   "Cidade · trecho" das copas de 4 pistas quebravam em duas linhas e a 4ª corrida da Copa África do Sul passava por cima da dica de teclas
+   (scripts/pistas-ui.mjs e a cena `cups-africa` do playtest-layout, V3 14/10/2026). Fica o trecho, como já era com texto grande; com texto
+   grande, sai também o estilo do rival (que quebrava para uma 2ª linha; ele continua na garagem e no resultado). */
+@media (max-aspect-ratio: 7/4) {
+  .scr-cups .cup-race-city { display: none; }
+  #ui.large-text .scr-cups .cup-rival .rival-pers { display: none; }
+}

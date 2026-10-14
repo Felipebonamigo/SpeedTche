@@ -121,6 +121,9 @@ function seedStars({ tracks, rivals }, names = [], lastTrack = null) {
   };
 }
 const STARS_ARG = { tracks: ALL_TRACKS, rivals: RIVAL_KEYS, seed: seedStars.toString() };
+/** Copas feitas para a cena `cups-africa`: os 27 estados e três copas do Mundial (como no scripts/pistas-ui.mjs). */
+const AFRICA_DONE = ['br_rj', 'br_sp', 'br_mg', 'br_es', 'br_pr', 'br_sc', 'br_rs', 'br_df', 'br_go', 'br_ms', 'br_mt', 'br_ba', 'br_se', 'br_al',
+  'br_pe', 'br_pb', 'br_rn', 'br_ce', 'br_pi', 'br_ma', 'br_pa', 'br_am', 'br_ap', 'br_rr', 'br_ro', 'br_ac', 'br_to', 'eua', 'japao', 'europa'];
 const ACH = ['PRIMEIRA_VITORIA', 'EQUIPE_COMPLETA', 'SEM_ARRANHAO', 'NITRO_TRIPLO', 'EMPURRAO', 'VOLTA_PERFEITA', 'MESTRE_DO_VACUO', 'NITRO_NA_BANDEIRA', 'MADRUGADA', 'SEM_BOX', 'PODIO_DE_EQUIPE', 'DO_ULTIMO_AO_PRIMEIRO', 'COPA_BR_RJ', 'CAMPEAO'];
 
 /** Cada tela: como montá-la dentro da página (roda a cada resolução/tamanho de texto, depois do redimensionamento). */
@@ -142,6 +145,9 @@ const SCREENS = [
   }],
   // Uma região de 3 estados (Sul): a lista mais curta, todos carimbados.
   ['cups-sul', () => { window.nc.session.menus.show('cups'); document.querySelector('.cup-tab[data-tab="sul"]')?.click(); }],
+  // A Expedição inteira e três copas do Mundial (o save do scripts/pistas-ui.mjs): o cursor abre na Copa África do Sul, a de 4 pistas com os
+  // nomes "Cidade · trecho" mais longos. Em 1280×800 e 1024×600 a 4ª corrida passava por cima da dica de teclas (V3, 14/10/2026).
+  ['cups-africa', (done) => { window.nc.session.debugSave().cupsCompleted = done; window.nc.session.menus.show('cups'); }, AFRICA_DONE],
   // O4: o detalhe da copa com o perfil cheio (estrelas, troféu de ouro, placar de 3 dígitos, contador): a lista mais longa e o Mundial de 4 pistas.
   ['cups-stars', (a) => { new Function(`return (${a.seed})`)()(a); window.nc.session.menus.show('cups'); }, STARS_ARG],
   ['cups-last-stars', (a) => {
@@ -402,8 +408,14 @@ function measure({ ALLOWED_SCROLL, CONTAINED }) {
 }
 
 async function mount(id, fn, arg) {
-  // O4: as estrelas semeadas por uma cena (`seedStars`) ficam no save; as outras cenas medem o save sem elas.
-  await page.evaluate(() => { window.nc.session.debugSave().stars = { profiles: [], last: [] }; });
+  // O4: as estrelas semeadas por uma cena (`seedStars`) ficam no save; as outras cenas medem o save sem elas. Idem as copas feitas que a
+  // `cups-africa` troca: cada cena começa com as do save inicial.
+  await page.evaluate(() => {
+    const sv = window.nc.session.debugSave();
+    sv.stars = { profiles: [], last: [] };
+    window.__cupsBase ??= [...sv.cupsCompleted];
+    sv.cupsCompleted = [...window.__cupsBase];
+  });
   await page.evaluate(({ src, arg }) => {
     // eslint-disable-next-line no-new-func
     const f = new Function(`return (${src})`)();
