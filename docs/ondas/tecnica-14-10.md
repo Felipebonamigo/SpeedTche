@@ -100,3 +100,8 @@
 |---|---|---|
 | `ghost.test.ts` | carga 31: `1 failed \| 20 passed`, `Test timed out in 30000ms`, 43,87 s | carga 44: `129 passed`, 43,63 s (CPU 10,0 s) |
 | `cars.test.ts` | carga ~45: `Hook timed out in 600000ms`, 786 s (CPU 160 s) | carga 30–50: `14 passed`, 809,5 s (CPU 157 s) |
+
+Na suíte inteira (`NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 npx vitest run --testTimeout=300000 --hookTimeout=900000 --reporter=dot`, mais
+`--reporter=json` para os tempos por arquivo; carga 15–27): `Test Files 205 passed (205)`, `Tests 3766 passed | 1 skipped (3767)`,
+2627 s. `cars.test.ts` 511,9 s (o hook antigo de 600 s já ficava a 85% do limite com a máquina só meio carregada); `ghost.test.ts` 20,4 s,
+o teste mais longo 1,2 s; `texturas-gl.test.ts` 106,7 s; `gl-render.test.ts` 1949,8 s.
