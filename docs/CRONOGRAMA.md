@@ -96,7 +96,7 @@ Se cada onda passar de uma semana, o W cai em abril e o Next Fest de junho conti
 | V4 | **Pistas com acabamento** | Asfalto de cor lisa, zebras e faixas pouco nítidas, o mesmo prédio repetido em Copacabana, poucas nuvens, água pouco saturada. O quadro-alvo mostrou que **horizonte aberto** (baía, morros) pesa mais que o carro. | A fazer depois da V1 (céu e paleta). |
 | V5 | **HUD mais enxuto** | Painéis com moldura nos 4 cantos; a referência usa números grandes sem caixa. | A fazer, no estilo do menu escolhido (V3). |
 | V6 | **Câmera Alta e os marcos** | A Alta (FOV 36) deixa 103 colocações de marco abaixo do mínimo (a Baixa: 36). | Em andamento (`nc/cameras`): abrir o FOV o mínimo necessário. |
-| V7 | **Galeria fixa de referência** | Decisões visuais lentas e sem antes × depois comparável. | A fazer: ~12 quadros fixos, refeitos a cada mescla, numa folha para o dono ver no celular. |
+| V7 | **Galeria fixa de referência** | Decisões visuais lentas e sem antes × depois comparável. | Feita em `nc/galeria` (14/10), falta mesclar: `node tools/galeria/gerar.mjs --raiz <worktree> --rotulo <nome>` renderiza 13 quadros fixos (6 paisagens, tela dividida 2 e 4, derrapagem, largada, os 14 carros de trás, menu e garagem; 1280×720, Alta) de qualquer worktree e monta `scratch/galeria/<rótulo>/folha.png` + `manifest.json`; `comparar.mjs <antes> <depois>` põe lado a lado e marca o que mudou e as contagens que subiram (`tools/galeria/README.md`). A do `main` f241703 levou ~100 min no swiftshader carregado. |
 
 **Técnico**
 
