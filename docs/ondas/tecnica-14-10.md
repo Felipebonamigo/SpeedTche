@@ -68,6 +68,10 @@
     de teclas. Em 1280×720 e 1366×768 cabe (os nomes ficam numa linha). O `playtest-layout` mede `cups` em 1280×800, mas com outra copa em
     foco. **Não corrigido aqui:** o conserto é CSS do menu (`src/ui/screens/select.css`, detalhe da copa), arquivo da frente
     `nc/menu-estilos`; fica para ela (ou para depois da escolha do estilo), com esta conferência do `pistas-ui` como teste que falha.
+  - **Reexecução inteira** (build com as correções, script do `settle` novo, 2413 s): `220 ✓`, `FALHOU: 2 conferências, 0 erros` — o
+    "subindo" passa (`{"card":true,"head":true}`); as duas que falham são o mesmo defeito real: `✗ 1280x800 copas: a tela em si não rola` e
+    `✗ 1024x600 copas: a tela em si não rola` (captura `scratch/tecnica/t3/pu2-tamanho-copas-1024x600.png`: a 4ª corrida da África do Sul
+    passa da borda de baixo). 1600×900 e 1366×768 cabem.
 
 ### T6 — suíte frágil sob carga
 - **Causa (medida, CPU com `process.cpuUsage`, 14/10):**
