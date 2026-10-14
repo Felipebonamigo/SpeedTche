@@ -7,7 +7,9 @@ import type { Lang } from '../i18n';
 import { pickCameraMode, type CameraMode } from '../render/camera-base';
 import { sanitizeBindings } from '../ui/remap/bindings';
 import { normalizeServerUrl } from '../net/protocol';
+import { applyAutoQuality, shouldAutoQuality } from './auto-quality';
 import { DEFAULT_SETTINGS, type Quality, type RenderStyle, type Settings } from './contracts';
+import type { DesktopApi } from './desktop';
 import { readJson, writeJson } from './storage';
 
 // Onde gravar (localStorage, arquivo do Electron, memória da sessão) é com storage.ts; save e fantasmas importam daqui.
@@ -121,4 +123,72 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings): void {
   writeJson(SETTINGS_KEY, sanitizeSettings(s));
+}
+
+// ───────────────────────────── Idioma da 1ª abertura (O5) ─────────────────────────────
+
+/** Os idiomas da Steam (`apps.currentGameLanguage()`, nomes da API) que o jogo tem. */
+const STEAM_LANGS: Readonly<Record<string, Lang>> = { brazilian: 'pt', portuguese: 'pt', english: 'en' };
+
+/** 'brazilian' (Steam), 'pt-BR', 'en_US', 'pt'… → o idioma do jogo; o que o jogo não tem → null. */
+export function langOf(tag: unknown): Lang | null {
+  if (typeof tag !== 'string') return null;
+  const v = tag.trim().toLowerCase();
+  if (Object.hasOwn(STEAM_LANGS, v)) return STEAM_LANGS[v];
+  const m = /^([a-z]{2})(?:[-_]|$)/.exec(v);
+  return m && (LANGUAGES as readonly string[]).includes(m[1]) ? (m[1] as Lang) : null;
+}
+
+/** O primeiro candidato que o jogo reconhece; nenhum → null (fica o padrão de hoje, `DEFAULT_SETTINGS.language`). */
+export function pickLanguage(candidates: readonly unknown[]): Lang | null {
+  for (const c of candidates) { const l = langOf(c); if (l) return l; }
+  return null;
+}
+
+/**
+ * Os candidatos, na ordem do pedido: o idioma do jogo na Steam, o do sistema (`app.getLocale`) e os do navegador (`navigator.languages`,
+ * depois `navigator.language`). A ponte é opcional (preload antigo) e o IPC pode falhar ou não responder: segue para o navegador.
+ */
+export async function languageCandidates(
+  desktop: Pick<DesktopApi, 'locale'> | null, nav: { language?: string; languages?: readonly string[] } | null, timeoutMs = 1500,
+): Promise<string[]> {
+  const out: string[] = [];
+  if (desktop && typeof desktop.locale === 'function') {
+    try {
+      const l = await new Promise<{ steam: string | null; app: string | null } | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), timeoutMs);
+        desktop.locale?.().then((v) => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(null); });
+      });
+      if (l && typeof l.steam === 'string' && l.steam) out.push(l.steam);
+      if (l && typeof l.app === 'string' && l.app) out.push(l.app);
+    } catch { /* segue sem a ponte */ }
+  }
+  if (nav) {
+    for (const x of Array.isArray(nav.languages) ? nav.languages : []) if (typeof x === 'string' && x) out.push(x);
+    if (typeof nav.language === 'string' && nav.language) out.push(nav.language);
+  }
+  return out;
+}
+
+/** Só na 1ª abertura de verdade (nem opções nem save gravados) e nunca sob automação: escolha salva nunca é sobrescrita. */
+export function shouldDetectLanguage(savedSettings: unknown, savedSave: unknown, env: { webdriver: boolean }): boolean {
+  if (env.webdriver) return false;
+  return (savedSettings === null || savedSettings === undefined) && (savedSave === null || savedSave === undefined);
+}
+
+/**
+ * O que gravar nas opções na 1ª abertura (main.ts, antes de a sessão lê-las): a qualidade automática (L2b) e o idioma detectado (O5), numa
+ * gravação só; null quando não há nada a gravar (já abriu antes, automação). As sondas só rodam quando valem.
+ */
+export async function firstOpenSettings(
+  saved: { settings: unknown; save: unknown }, env: { webdriver: boolean; search: string },
+  probes: { quality: () => Promise<Quality>; candidates: () => Promise<string[]> },
+): Promise<Record<string, unknown> | null> {
+  let out: Record<string, unknown> | null = null;
+  if (shouldAutoQuality(saved.settings ?? saved.save, env)) out = applyAutoQuality(saved.settings, await probes.quality());
+  if (shouldDetectLanguage(saved.settings, saved.save, env)) {
+    const lang = pickLanguage(await probes.candidates());
+    if (lang) out = { ...(out ?? {}), language: lang };
+  }
+  return out;
 }
