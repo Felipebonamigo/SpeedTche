@@ -97,7 +97,7 @@ const LATE_FILL = 0.25;
 
 /**
  * A gradação sai da paleta, então já varia por bioma e por período sem tabela: a sombra é puxada para a cor do céu que a pinta
- * (`hemiSky`, azul na costa, roxo no entardecer) e a luz para a do sol (`sunLight`). A exposição parte da da paleta (calibrada
+ * (`hemiSky`: azul na costa de dia; quase neutra no entardecer e na noite desde a cor-brilho) e a luz para a do sol (`sunLight`). A exposição parte da da paleta (calibrada
  * para o ACES) com um ajuste da curva nova: valor provisório, calibrado nas capturas de Copacabana (dia) e Sampa (noite).
  */
 export function gradingFor(p: Palette): Grading {

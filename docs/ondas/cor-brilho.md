@@ -43,6 +43,38 @@ degraus (`atLeast`) e "Reduzir efeitos" (sem clarões); faixas da M2 (`tests/pal
 Antes × depois, mesma câmera, `tools/render-harness.mjs` (copacabana, canion, paraty, sampa_noite, split4) e a folha de `tools/folha-copas.ts … ambos`; montagem em
 `scratch/cor-brilho/antes-depois.png`. O "antes" sai de uma cópia congelada do 150dd01 (`git archive`) servida por outro vite, para o código novo não vazar nela.
 
-## 5. Registro
+## 5. Registro (14/10/2026)
 
-(preenchido no fim)
+**Causas confirmadas na medida** (harness 640×360, região da pista à frente; interruptores na própria cena):
+- **Cânion:** com faróis 0,62 de luma × 0,21 sem eles; sem o reflexo de lente 0,62 (não é a lente); sem bloom 0,27; com o teto do bloom 0,36; com o farol a 30 cd
+  (sem teto) ainda havia bolha branca no carro à frente — o teto é a correção da nuvem, a força do entardecer é a da luz demais.
+- **Sampa:** com faróis 0,311 × 0,20 sem (estourados 0,6% → 0%): as bolhas nos carros à frente são o farol + bloom. As **barras brancas** ao lado dos carros
+  NÃO são farol: somem com o grupo `fx-*` escondido (com os faróis ligados) — são as linhas aditivas da M5 (velocidade e túnel do vácuo), com o brilho do dia
+  sobre a cena da noite. Correção a mais (fora da lista do pedido, dentro do defeito 1): as linhas caem com a luz do período (`effects.ts`, `lineGain`: 1 · ~0,76 · 0,45),
+  com teste visto falhar (razão noite/dia = 1).
+- **Paraty:** a poça e o clarão no carro à frente-direita (antes-paraty: amarelo estourado) somem sem os faróis (poça 0,268 × 0,214; carro 0,472 × 0,238).
+
+**Testes vistos falhar antes do código.** `npx vitest run tests/cor-brilho.test.ts` (antes de tocar em `src`): `Tests  9 failed | 5 passed (14)`; os 5 que passaram
+são **travas** (o vermelho segue vermelho, o dia não muda, o céu do entardecer segue quente, de dia os faróis não acendem, a borda da lente segue vermelha). Motivos:
+farol em x = 0,00 m com o carro em 4,20 m; farol a 20 m no entardecer 2,23 contra o céu 0,46–0,64; branco 36/36 fora (ex.: `desert:dusk shadow rgb(164,103,139)`);
+asfalto 12/12 (ex.: `desert:dusk rgb(40,0,46)`); lente borda = miolo (1,00); lanterna à noite 0,30 < 1,92; verniz: uniformes e trecho inexistentes.
+`tests/cor-brilho-gl.test.ts` rodado numa cópia congelada do 150dd01 (`git archive`, outro vite): teto do bloom `vazamento HDR 200 48450,4 × HDR 6 1552,3` (31×);
+Cânion `luma com 0,329 × sem 0,197` (1,67×; caixa a partir de 6 m); Sampa `estourados com 0,0011 × sem 0,0000`; carro branco no Cânion `rgb(255,158,135)` croma 0,47.
+O teste das linhas do vácuo: `expected 1 to be less than or equal to 0.55`.
+
+**Ajustes de teste, de propósito:** (1) a âncora do verniz no shader passou a ser o USO (`outgoingLight = carVarnish(`), não a 1ª ocorrência (a declaração);
+(2) o ponto da traseira no teste GL: em Sampa (0; 0,66; 2,2) caía 2 px fora da tela e media preto — passou a (±0,5; 0,86; 2,18), a lataria acima das lanternas;
+(3) a lente com miolo passou de `aMat.w` para o atributo novo `aLens` (mudar o `aMat` quebrava o contrato do asset: glTF ida e volta, "mesmos pincéis", área das
+lanternas) — o critério (borda ≤ 0,45 do miolo) não mudou; (4) `tests/stylize.test.ts`: a curva é `stylizeNeutral` (o Neutral do three com o pé que pode valer
+sobre a luminância); (5) `tests/car-material.test.ts`: chave do programa `speed-tche-car-v4`. Nenhuma faixa da M2 mudou: `paleta-m2` e `lente-m2` verdes como estão
+(o asfalto novo do entardecer/noite foi escurecido até respeitar estrada × chão ≥ 1,6, a borda da pista e o carro escuro × asfalto).
+
+**Depois** (mesmas medidas): teto do bloom 753 × 753 (1,0×); Cânion 1,07× (estourados +0,004%); Sampa 1,08× (+0,013%); carro branco no entardecer
+(Cânion) `rgb(243,207,185)`/`rgb(244,208,186)` (croma 0,24, quente, não rosa) e à noite (Sampa) `rgb(143,139,147)` (cinza; era `rgb(107,108,179)`, azul-roxo).
+Na captura 1280×720 do Cânion: carro `255,150,135` → `250,201,177`; asfalto `89,57,83` → `80,70,72`; sombra no asfalto `37,1,48` → `22,7,12`.
+
+**Contagens, sem FPS** (harness 1280×720, Alta): chamadas e triângulos **iguais** antes e depois nas 5 cenas — copacabana 73 / 274.172, canion 62 / 224.656,
+paraty 76 / 301.728, sampa_noite 71 / 301.953, split4 285 / 917.986. O verniz e a lente com miolo não criam chamada (aritmética no shader + 1 atributo de 1 byte por
+vértice); nenhum passe novo (o teto é dentro do filtro de brilho do bloom). Programas: a chave do carro (v4) e a da estilização (v2) mudaram (compilados na carga).
+`NC_REQUIRE_GL=1 npx vitest run tests/cor-brilho-gl.test.ts tests/corrida-que-muda-gl.test.ts tests/gl-render.test.ts`: `Test Files  3 passed (3)` ·
+`Tests  23 passed (23)` (5172 s, com a máquina a ~45 de carga; código do commit d10177b).

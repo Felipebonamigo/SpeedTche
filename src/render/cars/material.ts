@@ -42,11 +42,18 @@ const LAMP_CORE_FROM = 0.75;
 const LAMP_HOT_FROM = 1.5;
 const LAMP_HOT_MAX = 0.6;
 
+/**
+ * Teto da parte vermelha da lente (linear): abaixo do joelho do Neutral (0,76 a 1), onde o vermelho puro ainda não desbota para o rosa. Só o miolo quente
+ * passa daí (e é ele que acende o bloom).
+ */
+const LAMP_RED_MAX = 0.9;
+
 /** O emissivo (linear) da lanterna de cor `rgb` no peso `w` com o brilho `glow`: a conta que o GLSL (`carLamp`) espelha. */
 export function lampEmission(rgb: readonly number[], w: number, glow: number): [number, number, number] {
   const sm = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const hot = sm(LAMP_CORE_FROM, 1, w) * Math.min(LAMP_HOT_MAX, Math.max(0, (glow - LAMP_HOT_FROM) / 3));
-  return [0, 1, 2].map((i) => (rgb[i] + (LAMP_HOT[i] - rgb[i]) * hot) * w * glow) as [number, number, number];
+  const red = Math.min(w * glow, LAMP_RED_MAX);
+  return [0, 1, 2].map((i) => rgb[i] * red + (LAMP_HOT[i] * w * glow - rgb[i] * red) * hot) as [number, number, number];
 }
 
 /**
@@ -117,10 +124,10 @@ uniform vec3 uStylizeSkyTop;
 uniform vec3 uStylizeSkyHorizon;
 uniform vec3 uStylizeGround;
 varying float vLens;
-// Lanterna (lampEmission em material.ts): o miolo esquenta para LAMP_HOT acima de LAMP_HOT_FROM, a borda continua da cor da lente.
+// Lanterna (lampEmission em material.ts): a parte vermelha fica abaixo do joelho do Neutral (LAMP_RED_MAX); o miolo esquenta para LAMP_HOT acima de LAMP_HOT_FROM.
 vec3 carLamp( vec3 lens, float w, float glow ) {
   float hot = smoothstep( ${LAMP_CORE_FROM.toFixed(2)}, 1.0, w ) * clamp( ( glow - ${LAMP_HOT_FROM.toFixed(2)} ) / 3.0, 0.0, ${LAMP_HOT_MAX.toFixed(2)} );
-  return mix( lens, vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ), hot ) * w * glow;
+  return mix( lens * min( w * glow, ${LAMP_RED_MAX.toFixed(2)} ), vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ) * ( w * glow ), hot );
 }
 // Verniz estilizado (cor-brilho): a lataria reflete o céu do período (topo → horizonte) e, abaixo da linha do horizonte, o chão escuro, por um Fresnel de
 // cartum (expoente 3). Analítico: nenhuma amostra de textura, nenhuma chamada; as cores vêm de setStylizePalette (uniformes compartilhados).
