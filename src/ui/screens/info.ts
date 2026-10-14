@@ -14,14 +14,16 @@ import '../../stats/strings';
 import { arrowButton, blurActive, button, lapsText, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type FocusList, type ScreenApi, type ScreenInstance } from './common';
 import { ghostRecordsView } from './ghost-records';
 import { icon, medal } from './icons';
+import { levelTab } from './progress';
 import './records.css';
 
 
 
 // ───────────────────────────── Recordes ─────────────────────────────
 
-type RecordsTab = 'tracks' | 'players' | 'achievements';
-const RECORD_TABS: readonly RecordsTab[] = ['tracks', 'players', 'achievements'];
+type RecordsTab = 'tracks' | 'players' | 'achievements' | 'level';
+/** O5: a 4ª aba é o nível do piloto e a maestria por carro (src/ui/screens/progress.ts). */
+const RECORD_TABS: readonly RecordsTab[] = ['tracks', 'players', 'achievements', 'level'];
 
 /** Uma aba: conteúdo rolável, a lista de foco (linhas + Voltar) e o que refazer a cada quadro. */
 interface TabView {
@@ -219,9 +221,18 @@ function achievementsTab(api: ScreenApi): TabView {
   return tabView(api, [...onCards, ...offCards], content);
 }
 
+/**
+ * O5: nível e maestria por perfil. Como a de jogadores: a lista de perfis e o detalhe, com as 14 linhas de maestria focáveis (o controle rola
+ * até elas); o detalhe fica no último perfil focado.
+ */
+function levelTabView(api: ScreenApi): TabView {
+  const v = levelTab(api);
+  return tabView(api, [...v.rows, ...v.detailRows], v.el, (list) => { if (list.index >= 0 && list.index < v.rows.length) v.show(list.index); });
+}
+
 /** `rebuild` refaz a aba atual (a de pistas, depois de importar um fantasma). */
 const TAB_BUILDERS: Readonly<Record<RecordsTab, (api: ScreenApi, rebuild: () => void) => TabView>> = {
-  tracks: tracksTab, players: playersTab, achievements: achievementsTab,
+  tracks: tracksTab, players: playersTab, achievements: achievementsTab, level: levelTabView,
 };
 
 export function recordsScreen(api: ScreenApi): ScreenInstance {

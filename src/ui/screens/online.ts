@@ -21,7 +21,7 @@ import { button, createFocusList, dayIcon, flagFor, h, listNav, screenFrame, sel
 import { icon, medal } from './icons';
 import './online.css';
 import { lookEditor, lookSummary, paintSelector, paintSwatch } from './paint';
-import { lockNote } from './progress';
+import { lockNote, progressStrip } from './progress';
 import { assistMark } from './results';
 import { createMuteModel } from '../../voice/mute';
 
@@ -462,6 +462,8 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
     );
     const body = h('div', { class: 'online-results' },
       h('div', { class: 'screen-title-row' }, h('h1', { class: 'screen-title', text: t('online.results.title') }), h('span', { class: 'chip', text: trackName(d.trackDef.id, d.trackDef.name) }), h('span', { class: 'chip online-code-chip-small mono', text: online!.code })),
+      // O5: o nível e a maestria que a corrida rendeu aos jogadores deste computador.
+      progressStrip(d.progress, colorOf),
       h('div', { class: 'table-wrap glass' }, table),
       h('div', { class: 'actions' }, back.el, leave.el),
     );

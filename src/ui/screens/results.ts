@@ -20,6 +20,7 @@ import './passport.css';
 import './payout.css';
 import { button, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { isVipRow, partyResultsParts } from './party';
+import { progressStrip } from './progress';
 import { VIP_COLOR } from '../../core/modes';
 import { BRAZIL_REGIONS } from '../../core/data/cups';
 import '../passport/strings';
@@ -194,6 +195,8 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
   if (toggle) items.push(toggle);
   const list = createFocusList(items, { sfx: api.sfx });
   const unlocked = achievementsPanel(d, ctx.settings.colorPalette);
+  // O5: o que a corrida rendeu em nível e maestria a cada humano local (sem item de foco: a navegação não muda).
+  const progress = progressStrip(d.progress, (seat) => humanColor(d.humans, seat, ctx.settings.colorPalette));
   const wrap = h('div', { class: 'table-wrap glass' }, table);
 
   // A janela do pódio 3D e a cortina que a esconde na chegada (o palco é uma tela atrás da interface: a cortina é opaca).
@@ -206,6 +209,7 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
     titleRow(t('ui.results.title'), trackName(d.trackDef.id, d.trackDef.name)),
     h('div', { class: 'results-head' }, extras),
     unlocked,
+    progress,
     podiumEl,
     wrap,
     sequenced ? hint : null,
