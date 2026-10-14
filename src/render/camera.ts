@@ -141,7 +141,7 @@ export class ChaseCamera {
       this.orbit = 0;
     } else if (rig.orbit && winning) {
       this.orbit += (orbitAmount(extra.finishSeconds) - this.orbit) * (1 - Math.exp(-dt * 8));
-      const o = orbitCamera(this.orbit, xm, this.lagX, extra.neighbors, extra.count, this.orbitOut);
+      const o = orbitCamera(this.orbit, xm, this.lagX, extra.neighbors, extra.count, this.orbitOut, pose.back);
       this.orbit = Math.min(this.orbit, o.alpha); // um carro no caminho recua a órbita de uma vez; ela volta devagar
       px = o.lat; py = camY + o.lift; pz = o.back;
       const w = smooth01(o.alpha);

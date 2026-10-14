@@ -39,7 +39,7 @@ describe('os quatro modos', () => {
   it('a Alta é a pose B do quadro-alvo; a Baixa é a CHASE_CAMERA de sempre (não mudou)', () => {
     expect(CHASE_CAMERA).toEqual({ baseFov: 62, speedFov: 13, nitroFov: 8, height: 2.05, back: 7.8, lookAhead: 18, lookY: 0.85 });
     expect(CAMERA_POSES.low).toEqual(CHASE_CAMERA);
-    expect(CAMERA_POSES.high).toMatchObject({ baseFov: 36, height: 2.5, back: 7.8, lookY: 0.7 });
+    expect(CAMERA_POSES.high).toMatchObject({ baseFov: 54, height: 2.5, back: 5.8, lookY: 0.7 }); // altura e mira são as aprovadas; FOV 54 e recuo 5,8 (carro do mesmo tamanho) vieram da medição dos marcos
   });
 
   it('só Capô e Frente são presas ao carro', () => {
@@ -313,6 +313,20 @@ describe('trocar a câmera em corrida', () => {
 import { ChaseCamera, newCameraExtra, type CameraExtra } from '../src/render/camera';
 import { buildRoadFrame } from '../src/render/roadframe';
 
+describe('órbita da vitória parte da câmera de cada pose', () => {
+  it('na Alta (recuo 5,8) o primeiro quadro da órbita não salta para os 7,8 m da Baixa', () => {
+    const road = syntheticTrack([{ op: 'straight', length: 800 }]);
+    const rf = buildRoadFrame(road, 4000, 30, 200);
+    for (const mode of ['high', 'low'] as const) {
+      const c = new ChaseCamera();
+      const e = { ...newCameraExtra(), finishSeconds: 0 };
+      c.update(rf, 0, 0.5, 0, false, 0, { x: 0, y: 0, roll: 0 }, e, mode, null);
+      c.update(rf, 0, 0.5, 0, false, 1 / 60, { x: 0, y: 0, roll: 0 }, { ...e, finishSeconds: 1 / 60 }, mode, null);
+      expect(Math.abs(c.camera.position.z - CAMERA_POSES[mode].back), mode).toBeLessThan(0.15);
+    }
+  });
+});
+
 describe('ChaseCamera com as 4 câmeras', () => {
   const road = syntheticTrack([{ op: 'straight', length: 800 }]);
   const rf = buildRoadFrame(road, 4000, 30, 200);
@@ -324,17 +338,17 @@ describe('ChaseCamera com as 4 câmeras', () => {
     return { x: cam.camera.position.x, y: cam.camera.position.y, z: cam.camera.position.z, fov: cam.camera.fov };
   };
 
-  it('Alta parada: h 2,5 · 7,8 m atrás · FOV 36; Baixa parada: a de sempre (2,05 · 7,8 · 62)', () => {
+  it('Alta parada: h 2,5 · 5,8 m atrás · FOV 54; Baixa parada: a de sempre (2,05 · 7,8 · 62)', () => {
     const a = run(new ChaseCamera(), 'high', 2, 0);
-    expect(a.y).toBeCloseTo(2.5, 3); expect(a.z).toBeCloseTo(7.8, 6); expect(a.fov).toBeCloseTo(36, 1);
+    expect(a.y).toBeCloseTo(2.5, 3); expect(a.z).toBeCloseTo(5.8, 6); expect(a.fov).toBeCloseTo(54, 1);
     const b = run(new ChaseCamera(), 'low', 2, 0);
     expect(b.y).toBeCloseTo(2.05, 3); expect(b.z).toBeCloseTo(7.8, 6); expect(b.fov).toBeCloseTo(62, 1);
   });
 
-  it('na máxima a Alta baixa 0,32 m e abre o FOV só o que a pose dela diz (36 + 8)', () => {
+  it('na máxima a Alta baixa 0,32 m e abre o FOV só o que a pose dela diz (54 + 8)', () => {
     const a = run(new ChaseCamera(), 'high', 3, 1);
     expect(a.y).toBeCloseTo(2.5 - CAMERA_DYNAMICS.lower.max, 3);
-    expect(a.fov).toBeCloseTo(36 + 8, 0);
+    expect(a.fov).toBeCloseTo(54 + 8, 0);
   });
 
   it('Capô e Frente: a câmera fica exatamente no olho do carro, sem atraso lateral, sem baixar e sem cresta', () => {
@@ -381,7 +395,7 @@ describe('ChaseCamera com as 4 câmeras', () => {
     const before = c.camera.fov;
     expect(before).toBeGreaterThan(80);
     c.update(rf, 0, 1, 0, true, 3.02, NO_SHAKE, ex(), 'high', null);
-    // Escala da pose nova (36 + 8·1 + 5 = 49) e não o resíduo da Baixa (62 + 13 + 8): sem "assentar" por um segundo depois do corte.
+    // Escala da pose nova (54 + 8·1 + 5 = 67) e não o resíduo da Baixa (62 + 13 + 8): sem "assentar" por um segundo depois do corte.
     expect(c.camera.fov).toBeLessThanOrEqual(CAMERA_POSES.high.baseFov + CAMERA_POSES.high.speedFov + CAMERA_POSES.high.nitroFov + 2.5);
     c.update(rf, 0, 1, 0, true, 3.04, NO_SHAKE, ex(), 'hood', EYE);
     expect(c.camera.fov).toBeLessThanOrEqual(CAMERA_DYNAMICS.fov.hardMax);
@@ -390,7 +404,7 @@ describe('ChaseCamera com as 4 câmeras', () => {
   it('presa ao carro sem olho conhecido (ou na comemoração da vitória) a câmera vira a de perseguição Alta', () => {
     const sem = new ChaseCamera();
     sem.update(rf, 0, 0, 0, false, 0, NO_SHAKE, ex(), 'hood', null);
-    expect(sem.camera.position.z).toBeCloseTo(7.8, 6);
+    expect(sem.camera.position.z).toBeCloseTo(5.8, 6);
     const venceu = new ChaseCamera();
     for (let i = 0; i < 300; i++) venceu.update(rf, 0, 0.5, 0, false, i / 60, NO_SHAKE, ex({ finishSeconds: i / 60 }), 'bumper', EYE);
     // Órbita da vitória: a câmera sai do carro (a pose presa ficaria dentro dele).

@@ -378,10 +378,9 @@ export function insideCarBox(relLat: number, back: number, n: Neighbor): boolean
  * centro da pista, chega mais perto e mais alto. A lateral fica em `max(lateralFree, |camLat|)`. Se a pose cair na caixa de um dos `count` primeiros
  * vizinhos, ou do próprio carro, recua a fração em 16 passos até sair (0 = a base, sempre aceita). `out.alpha` é a fração que valeu.
  */
-export function orbitCamera(alpha: number, carLat: number, camLat: number, neighbors: readonly Neighbor[], count: number, out: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 }): OrbitOut {
+export function orbitCamera(alpha: number, carLat: number, camLat: number, neighbors: readonly Neighbor[], count: number, out: OrbitOut = { lat: 0, back: 0, lift: 0, alpha: 0, yaw: 0 }, base: number = CHASE_CAMERA.back): OrbitOut {
   const o = CAMERA_DYNAMICS.orbit;
   const side = carLat >= 0 ? -1 : 1;
-  const base = CHASE_CAMERA.back;
   const limit = Math.max(o.lateralFree, Math.abs(camLat));
   const target = clamp01(alpha);
   const rel0 = camLat - carLat;
