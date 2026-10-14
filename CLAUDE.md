@@ -89,6 +89,7 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
 
 ## Memória do projeto (ler primeiro em toda sessão)
 - **Estúdio** (os 4 jogos do Felipe, ferramentas, pré-configurações e pendências em comum): https://claude.ai/artifact/72KXW2Tve5gB65BHD1CDp6 (documento do Claude Docs, lido pelo conector).
+- **Modelos 3D em comum aos 4 jogos**: antes de baixar ou gerar, procure na aba "Modelos 3D" do doc do estúdio e no repositório privado `Felipebonamigo/acervo-3d`. Modelo novo entra nos dois no mesmo dia, além da tabela de licenças de `docs/ARTE.md`.
 - **Roteiro e cronograma**: `docs/ROADMAP.md` (fases 0–6, passos numerados, V/A/T, marcos, custos, riscos). Documento vivo.
 - **Design e arquitetura**: `docs/DESIGN.md` · **Steam**: `docs/STEAM.md` e `desktop/README.md`.
 - **Estado atual** (30/09/2026): Fase 0 e as ondas A–F das Fases 1/3/4/5 concluídas e mescladas — 109 pistas em 34 copas (onda G: Expedição Brasil, 27 estados × 3 com passaporte e carimbos, e o Mundial, 7 países × 4; `docs/PISTAS.md`),
