@@ -4,13 +4,13 @@
 // passa por aqui: é fixa em src/ui/input.ts e src/ui/menus.ts, para ninguém se trancar fora.
 
 /**
- * As 11 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
+ * As 12 ações de pilotagem. `drift` (derrapar) e `lookBack` (olhar para trás) entraram na onda M (M1, decisão nº 9 do dono);
  * `lookBack` é só de câmera — nada no núcleo o lê, só a ação existe para o jogador ter o botão. `horn` (buzina) entrou na
- * onda N (N6): só som e balão, o núcleo também não a lê; segurá-la abre a roda de frases. `pause` continua a última — a ordem
+ * onda N (N6): só som e balão, o núcleo também não a lê; segurá-la abre a roda de frases. `camera` (trocar a câmera: Alta → Baixa → Capô → Frente) entrou na frente das câmeras, também só visual e local: C (teclado 1), V (teclado 2), Select/Back (controle), todos livres; mapa salvo de antes só ganha o padrão. `pause` continua a última — a ordem
  * decide quem fica com um código em conflito, então um mapa antigo nunca perde um botão para a buzina.
  */
-export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'horn' | 'pause';
-export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'pause'];
+export type BindAction = 'throttle' | 'brake' | 'left' | 'right' | 'nitro' | 'gearUp' | 'gearDown' | 'drift' | 'lookBack' | 'horn' | 'camera' | 'pause';
+export const BIND_ACTIONS: readonly BindAction[] = ['throttle', 'brake', 'left', 'right', 'nitro', 'gearUp', 'gearDown', 'drift', 'lookBack', 'horn', 'camera', 'pause'];
 
 /** Colunas da tela de controles: os dois teclados e um mapeamento único para todos os gamepads. */
 export type BindDevice = 'kb1' | 'kb2' | 'gamepad';
@@ -77,15 +77,15 @@ function deepFreeze<T>(value: T): T {
 export const DEFAULT_BINDINGS: ControlBindings = deepFreeze({
   kb1: {
     throttle: ['ArrowUp'], brake: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
-    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], drift: ['ShiftRight'], lookBack: ['KeyB'], horn: ['KeyH'], pause: ['Escape'],
+    nitro: ['Space'], gearUp: ['KeyM'], gearDown: ['KeyN'], drift: ['ShiftRight'], lookBack: ['KeyB'], horn: ['KeyH'], camera: ['KeyC'], pause: ['Escape'],
   },
   kb2: {
     throttle: ['KeyW'], brake: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
-    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], drift: ['ShiftLeft'], lookBack: ['KeyR'], horn: ['KeyG'], pause: ['Escape'],
+    nitro: ['KeyF'], gearUp: ['KeyE'], gearDown: ['KeyQ'], drift: ['ShiftLeft'], lookBack: ['KeyR'], horn: ['KeyG'], camera: ['KeyV'], pause: ['Escape'],
   },
   gamepad: {
     throttle: [0, 7], brake: [2, 1, 6], left: [14], right: [15],
-    nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], horn: [10], pause: [9],
+    nitro: [4, 3], gearUp: [12], gearDown: [13], drift: [5], lookBack: [11], horn: [10], camera: [8], pause: [9],
   },
 });
 

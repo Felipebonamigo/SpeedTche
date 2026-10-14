@@ -4,6 +4,7 @@ import { COLOR_PALETTES } from '../core/data/drivers';
 import { ASSIST_LEVELS } from '../core/sim/assist';
 import type { AssistLevel, CoopAssists, Difficulty } from '../core/types';
 import type { Lang } from '../i18n';
+import { pickCameraMode, type CameraMode } from '../render/camera-base';
 import { sanitizeBindings } from '../ui/remap/bindings';
 import { normalizeServerUrl } from '../net/protocol';
 import { DEFAULT_SETTINGS, type Quality, type RenderStyle, type Settings } from './contracts';
@@ -67,6 +68,12 @@ function pickSeatAssists(v: unknown): AssistLevel[] {
   return DEFAULT_SETTINGS.seatAssists.map((d, i) => pickEnum(r[i], ASSIST_LEVELS, d));
 }
 
+/** Uma câmera por assento (4), cada uma válida; o que faltar ou vier errado vira a Alta (save de antes da frente das câmeras). */
+function pickSeatCameras(v: unknown): CameraMode[] {
+  const r = Array.isArray(v) ? v : [];
+  return DEFAULT_SETTINGS.seatCameras.map((d, i) => pickCameraMode(r[i], d));
+}
+
 /** Funde `raw` com os padrões, validando faixas e enumerações. Nunca lança. */
 export function sanitizeSettings(raw: unknown): Settings {
   const r = isRecord(raw) ? raw : {};
@@ -102,6 +109,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     // Config de antes da legenda (sem o campo) liga: ela é o padrão.
     landmarkCaptions: pickBool(r.landmarkCaptions, d.landmarkCaptions),
     lockFps30: pickBool(r.lockFps30, d.lockFps30),
+    seatCameras: pickSeatCameras(r.seatCameras),
     // Sem o campo (save de antes da L2b) fica ausente de propósito: só a 1ª abertura de verdade o grava.
     ...(QUALITIES.includes(r.autoQuality as Quality) ? { autoQuality: r.autoQuality as Quality } : {}),
   };

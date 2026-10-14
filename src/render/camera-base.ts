@@ -9,3 +9,38 @@
  * mola de FOV, tremor, órbita, cresta) saem DESTA pose e têm limite em `CAMERA_DYNAMICS` (scenery/sight.ts).
  */
 export const CHASE_CAMERA = { baseFov: 62, speedFov: 13, nitroFov: 8, height: 2.05, back: 7.8, lookAhead: 18, lookY: 0.85 } as const;
+
+// ───────────────────────────── Câmeras selecionáveis (nc/cameras) ─────────────────────────────
+// Quatro câmeras, escolhidas por assento (Settings.seatCameras) e trocadas em corrida pela ação `camera`. É só renderização e entrada local:
+// a escolha nunca viaja pelo lockstep nem toca o núcleo. A Baixa é a `CHASE_CAMERA` de sempre; a Alta é a pose B do quadro-alvo
+// (docs/ondas/quadro-alvo.md, rodada 5); Capô e Frente são presas ao carro (ponto de montagem em cars/mount.ts).
+
+export type CameraMode = 'high' | 'low' | 'hood' | 'bumper';
+/** Ordem do ciclo da ação `camera` e das opções. */
+export const CAMERA_MODES: readonly CameraMode[] = ['high', 'low', 'hood', 'bumper'];
+export const DEFAULT_CAMERA_MODE: CameraMode = 'high';
+
+/** A pose de uma câmera: os mesmos campos da `CHASE_CAMERA`. Nas presas ao carro `height`/`back` valem só como olho aproximado (régua de visão dos marcos). */
+export interface CameraPose { readonly baseFov: number; readonly speedFov: number; readonly nitroFov: number; readonly height: number; readonly back: number; readonly lookAhead: number; readonly lookY: number }
+
+export const CAMERA_POSES: Readonly<Record<CameraMode, CameraPose>> = {
+  // Alta: h 2,5 · back 7,8 · FOV 36 · lookY 0,7. A parcela de velocidade e a do nitro são as da Baixa escaladas pelo FOV (36/62).
+  high: { baseFov: 36, speedFov: 8, nitroFov: 5, height: 2.5, back: 7.8, lookAhead: 18, lookY: 0.7 },
+  low: CHASE_CAMERA,
+  // Capô: olho ~0,55 m acima do capô (cars/mount.ts), a ~1,3 m do chão; Frente: na ponta do bico, ~0,4 m do chão.
+  hood: { baseFov: 72, speedFov: 9, nitroFov: 6, height: 1.35, back: 0, lookAhead: 30, lookY: 1.0 },
+  bumper: { baseFov: 78, speedFov: 11, nitroFov: 7, height: 0.42, back: -1.9, lookAhead: 30, lookY: 0.55 },
+};
+
+/** Capô e Frente: a câmera anda com o carro (sem atraso lateral, sem cresta, sem órbita). */
+export function isMountedCamera(m: CameraMode): boolean {
+  return m === 'hood' || m === 'bumper';
+}
+
+export function nextCameraMode(m: CameraMode): CameraMode {
+  return CAMERA_MODES[(CAMERA_MODES.indexOf(m) + 1) % CAMERA_MODES.length];
+}
+
+export function pickCameraMode(v: unknown, fallback: CameraMode): CameraMode {
+  return typeof v === 'string' && (CAMERA_MODES as readonly string[]).includes(v) ? (v as CameraMode) : fallback;
+}
