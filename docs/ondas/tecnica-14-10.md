@@ -29,7 +29,14 @@
   box e largada misturam para a textura errada.
 - **Correção 2:** os uniformes da mistura nascem uma vez por material (objetos fixos), entram sempre no shader, e o `setPalette` só troca
   o `.value`. **Teste 2 (antes):** `tests/corrida-que-muda-estrada.test.ts`, caso novo que imita o three (compila uma vez, troca de pista,
-  passa por uma de noite e volta) e confere que os uniformes compilados leem as texturas do período seguinte da pista atual.
+  passa por uma de noite e volta) e confere que os uniformes compilados leem as texturas do período seguinte da pista atual. Visto falhar
+  (`uMapB é da pista atual (não uma já liberada)`); passa com a correção (6d9b847). Sonda GL depois: os 5 materiais leem a textura certa
+  depois de trocar de pista e depois de uma pista de noite.
+- **`playtest-memoria` depois** (36 blocos, build com as duas correções, `vite preview`, carga ~50, 5579 s): `⚠ textures: degrau isolado,
+  não contínuo (72 → 72 no fim do ciclo; cresceu em 1 de 12 posições, no máximo +2)` — antes, `textures 95 → 103` crescendo nas 12
+  posições (L2b). Programas, materiais, objetos, DOM, HUD e heap (+348 KB em 24 corridas) ✓. O veredito do roteiro saiu `1 falha(s)` por
+  `✗ listeners: 45 → 45 no fim do ciclo; cresceu em 1 de 12 posições, no máximo +4` (bloco 25: 49 contra 45 no 13; já tinha dado 51 no
+  bloco 9 e 47 no 16): oscilação dos ouvintes de áudio no instante da medida, não vazamento — fica anotado, o roteiro não foi afrouxado.
 
 ### T3 — playtests não reexecutados desde a N5
 - Rodados um por vez (build de f241703 em `vite preview`; o records no vite de desenvolvimento), com a máquina em carga 30–50.
@@ -37,7 +44,8 @@
   `press` esperava 90 ms fixos por tecla (`scripts/playtest-paint.mjs:18`), mas o lobby e a garagem leem a entrada uma vez por quadro e
   duas batidas da mesma tecla no mesmo quadro viram uma borda (`tapped` em `src/ui/input.ts:290`); com o 3D por software um quadro leva
   segundos e o P2 entrou depois da conferência (os cartões mostraram 2 assentos logo depois). **Correção:** cada tecla espera 2 quadros
-  (`settle`), como o `pistas-ui` já faz com `held`. Nenhuma conferência muda.
+  (`settle`), como o `pistas-ui` já faz com `held`. Nenhuma conferência muda. **Depois** (build com as correções do T2, `vite preview`,
+  carga ~50): rc 0, `playtest da pintura OK` (3167 s).
 - `playtest-ghost-version` — **falhou** (rc 1, 928 s): `✗ fantasma aparece (pose z=undefined, …, 1 malhas translúcidas)` e
   `✗ impressão de outra versão: sem fantasma (0 quadros com pose, 1 malhas translúcidas, …)`. **Causa: o roteiro, duas vezes.**
   (1) o passo 2 dirige até a diferença passar de 0,12 s, mas pilota igual à volta gravada: a diferença só passa disso por ruído do teclado
@@ -69,4 +77,9 @@
     arquivo, carga ~45: `Hook timed out in 600000ms`, 786 s de duração, 160 s de CPU (`time`: real 13m14s, user 2m40s).
 - **Correção:** ghost — um teste por pista (`it.for`), 30 s cada (~85× o custo da pista mais cara); cars — tempo-limite do hook
   proporcional ao número de corridas, com o custo medido no comentário. Nenhuma asserção muda.
-- **Teste:** os próprios arquivos, sozinhos e na suíte inteira (tempos antes × depois abaixo).
+- **Teste:** os próprios arquivos, sozinhos e na suíte inteira.
+
+| Arquivo (sozinho) | Antes | Depois |
+|---|---|---|
+| `ghost.test.ts` | carga 31: `1 failed \| 20 passed`, `Test timed out in 30000ms`, 43,87 s | carga 44: `129 passed`, 43,63 s (CPU 10,0 s) |
+| `cars.test.ts` | carga ~45: `Hook timed out in 600000ms`, 786 s (CPU 160 s) | carga 30–50: `14 passed`, 809,5 s (CPU 157 s) |
