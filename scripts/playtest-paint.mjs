@@ -15,7 +15,10 @@ page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 const fails = [];
 const check = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails.push(msg); };
-const press = async (key, n = 1) => { for (let i = 0; i < n; i++) { await page.keyboard.press(key); await page.waitForTimeout(90); } };
+// Cada tecla espera o jogo desenhar 2 quadros (`settle`): o lobby e a garagem leem a entrada uma vez por quadro, e duas batidas da mesma
+// tecla dentro de um quadro viram UMA borda (o conjunto `tapped` de src/ui/input.ts). Com o 3D por software e a máquina carregada um quadro
+// leva segundos: com espera fixa de 90 ms o P2 entrava no lobby depois da conferência (T3, 14/10/2026, carga ~45).
+const press = async (key, n = 1) => { for (let i = 0; i < n; i++) { await page.keyboard.press(key); await settle(); } };
 const menu = () => page.evaluate(() => window.nc.session.menus.current());
 const mainIndex = (pattern) => page.evaluate((src) => {
   const re = new RegExp(src, 'i');
