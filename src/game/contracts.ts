@@ -11,6 +11,7 @@ import type {
 import type { CareerState } from '../core/career';
 import type { Lang } from '../i18n';
 import type { AchievementUnlock } from './achievements';
+import type { ProgressData, ProgressNews } from './progression';
 import type { StarsData } from './stars';
 import { EMPTY_STATS, type StatsData } from './stats';
 import { DEFAULT_BINDINGS, type ControlBindings } from '../ui/remap/bindings';
@@ -452,6 +453,8 @@ export interface ResultsScreenData {
   party?: PartyResultsInfo;
   /** Expedição Brasil: sigla do estado carimbado no passaporte nesta corrida (o resultado anuncia). */
   newStamp?: string | null;
+  /** O5: o que a corrida rendeu em nível e maestria a cada humano local (src/game/progression.ts); ausente = nada a mostrar. */
+  progress?: ProgressNews[];
 }
 
 /** O que a oferta de assistência traz (src/game/assist-offer.ts): cada opção só existe se ainda ajuda. */
@@ -491,6 +494,8 @@ export interface MenuContext {
   online?: OnlineController;
   /** Modos de festa (torneio em andamento, inscrição); ausente onde não há sessão completa. */
   party?: PartyController;
+  /** O5: a maestria por perfil e carro (src/game/progression.ts; o nível sai de `save.stats`); ausente = sem progresso (prêmios trancados). */
+  progress?: ProgressData;
   onEvent(event: MenuEvent): void;
 }
 

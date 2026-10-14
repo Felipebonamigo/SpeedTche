@@ -32,13 +32,13 @@ import { isMuted } from '../voice/prefs';
 import { createTutorialPanel } from '../ui/screens/tutorial';
 import { createTipsHud, describeTip, newTipMemory, observeTips, tipOf, tipsEnabled, type TipMemory, type TipsHud } from '../render/hud-tips';
 import { systemLayout } from '../ui/remap/labels';
-import { newTelemetry, type RaceTelemetry } from './achievements';
+import { newTelemetry, openAchievements, type RaceTelemetry } from './achievements';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
 import { rollSession } from './expedition';
 import type { AudioEngine, CarColors, HudMessage, InputProvider, MenuEvent, Menus, RaceDriver, RaceMode, RenderFrame, Renderer, RenderStyle, SaveData, Settings, ViewportSpec } from './contracts';
 import { DEFAULT_SETTINGS } from './contracts';
-import { getDesktop, isDesktop, setFullscreen } from './desktop';
+import { getDesktop, isDesktop, setFullscreen, syncSteamOnOpen } from './desktop';
 import { reportError } from './errors';
 import { startGhost, type GhostHooks } from './ghost-session';
 import { cupDuels, gridRival, rivalFaceOf, rivalSpeech, type Rival, type RivalScore } from './rivals';
@@ -51,6 +51,7 @@ import { carIndexOfSeat } from '../core/modes';
 import { createFeelTracker, createScrapeMemory, observeFeel, observeScrapes, type FeelTracker, type ScrapeCue, type ScrapeMemory } from './race-feel';
 import { countdownCue } from '../render/hud-model';
 import { getActivePlaylog, playlogRace } from './playlog';
+import { loadProgress, saveProgress, type ProgressData } from './progression';
 import { settleRace, stepObserved, type RaceOutcome } from './raceEnd';
 import { newRumbleMemory, rumbleCues } from './rumble';
 import { isCupUnlocked, loadSave, saveSave } from './save';
@@ -136,6 +137,8 @@ export interface Session {
   debugBind(seat: number, device: 'kb1' | 'kb2'): void;
   /** O save em memória (playtest-layout monta o pior caso do menu principal sem recarregar a página). */
   debugSave(): SaveData;
+  /** A maestria em memória (O5; o playtest-layout monta o pior caso da aba Nível). */
+  debugProgress(): ProgressData;
   /** Só para o playtest: avança N ticks da corrida agora, com a entrada atual, sem esperar quadros. */
   debugStep(ticks: number): void;
 }
@@ -156,6 +159,12 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   rollSession(save, new Date().toISOString());
   saveSave(save);
   setLanguage(settings.language);
+  // O5: a maestria (chave própria; o nível sai das estatísticas do save), as conquistas de estado que o save já merece (quem comprou ou
+  // subiu de nível na 0.1.4) e, no Electron, o reenvio de TODA conquista guardada e o nome da Steam no P1 (src/game/desktop.ts).
+  const progress = loadProgress();
+  const opened = openAchievements(save, progress);
+  if (opened.length > 0) { save.achievements.push(...opened); saveSave(save); }
+  void syncSteamOnOpen(getDesktop(), save, () => saveSave(save));
 
   let renderer: Renderer = makeRenderer(settings.renderStyle, canvas, hudRoot);
   /**
@@ -212,6 +221,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     start, stop, frame, handleMenuEvent, startQuick, startCup,
     debugBind(seat, device) { input.bindSeat(seat, device); },
     debugSave: () => save,
+    debugProgress: () => progress,
     debugStep(ticks) {
       const r = session.race;
       if (!r || session.paused) return;
@@ -235,7 +245,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   const menus = createMenus({
     root: uiRoot, input, settings, save, cups: CUPS, tracks: TRACKS, cars: CARS,
     isCupUnlocked: (cupId) => isCupUnlocked(save, cupId, CUPS),
-    trackOutline, audio, isDesktop: isDesktop(), online, party,
+    trackOutline, audio, isDesktop: isDesktop(), online, party, progress,
     onEvent: handleMenuEvent,
   });
   session.menus = menus;
@@ -465,7 +475,9 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
         achievement: (id) => { getDesktop()?.achievement(id).catch(() => undefined); },
         hud: (seat, m) => pushMessage(seat, m.text, m.kind, m.ttl),
         persist: () => saveSave(save),
+        persistProgress: () => saveProgress(progress),
       },
+      progress,
       localSeats: r.driver ? r.localSeats : null,
       afterCup: (c) => saveCupProgress(save, c, cupSeed, r.humans),
       careerChamp: () => champ,
@@ -485,10 +497,10 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   }
 
   function finishRace(r: ActiveRace): void {
-    const { newRecords, achievements, newStamp } = settle(r);
+    const { newRecords, achievements, newStamp, progress: news } = settle(r);
     recordRaceEnd(assistOffer, r.mode, champ?.eliminated === true);
     logRace(r);
-    const data = { mode: r.mode, trackDef: r.track.def, results: r.state.results ?? [], humans: withRaceAssists(r.humans, r.state.config.humans), champ, newRecords, achievements, party: party.raceFinished(r.mode, r.state), newStamp: newStamp ?? null };
+    const data = { mode: r.mode, trackDef: r.track.def, results: r.state.results ?? [], humans: withRaceAssists(r.humans, r.state.config.humans), champ, newRecords, achievements, party: party.raceFinished(r.mode, r.state), newStamp: newStamp ?? null, progress: news ?? [] };
     if (r.driver) r.driver.finished(data);
     else menus.show('results', data);
     audio.update(null, 0);
