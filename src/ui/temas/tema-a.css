@@ -1,0 +1,153 @@
+/* TEMA A — "Velocidade": arcade moderno em pôr do sol (Horizon Chase Turbo, Forza Horizon). Ligado por ?tema=a.
+   Itálico forte (Fredoka Bold inclinado), faixas diagonais laranja/rosa/azul, cartões que viram gradiente no foco, números grandes
+   (01–05) nos cartões do menu, sombra dura deslocada nos títulos. Só repinta: nenhum tamanho, posição ou navegação muda. O 3D segue
+   à mostra: nenhuma camada daqui cobre o canvas além do véu de pôr do sol do próprio .screen (e nada cobre as janelas do palco). */
+:root[data-tema="a"] {
+  --acc-rgb: 255 122 26;
+  --accent: #ff7a1a;
+  --accent-2: #ff9a3d;
+  --accent-soft: rgba(255, 122, 26, 0.22);
+  --a-pink: #ff3d7f;
+  --a-blue: #2f7bff;
+  --a-sun: #ffd23f;
+  --a-grad: linear-gradient(100deg, #ff8a1f 0%, #ff3d7f 100%);
+  --a-bars: linear-gradient(90deg, #ff8a1f 0 34%, #ff3d7f 34% 67%, #2f7bff 67%);
+  --a-skew: -9deg;
+  --ok: #4be39a;
+  --bad: #ff5470;
+  --text: #ffffff;
+  --muted: #d9c4e8;
+  --dim: #9a86b8;
+  --glass: rgba(28, 11, 50, 0.6);
+  --glass-solid: #1c0b32;
+  --line: rgba(255, 168, 120, 0.3);
+  --font: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Fredoka", ui-rounded, "Arial Rounded MT Bold", Arial, sans-serif;
+  --r: calc(8 * var(--u));
+  --r-sm: calc(6 * var(--u));
+}
+:root[data-tema="a"] body, :root[data-tema="a"] #ui { font-family: var(--font); }
+
+/* ── Fundo: véu de pôr do sol + faixas diagonais (atrás do conteúdo; nunca nas telas com palco 3D) ── */
+:root[data-tema="a"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(70, 18, 100, 0.42) 0%, rgba(255, 70, 100, 0.1) 46%, rgba(10, 8, 38, 0.74) 100%); }
+:root[data-tema="a"] .screen.stage3d { background: none; }
+:root[data-tema="a"] .screen:not(.stage3d)::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 0 74%, rgba(255, 138, 31, 0.2) 74% 76%, transparent 76% 79%, rgba(255, 61, 127, 0.2) 79% 80.5%, transparent 80.5% 83%, rgba(47, 123, 255, 0.22) 83% 84%, transparent 84%);
+}
+:root[data-tema="a"] .screen.scr-title::before {
+  background: linear-gradient(115deg, transparent 0 34%, rgba(255, 138, 31, 0.26) 34% 46%, rgba(255, 61, 127, 0.24) 46% 54%, rgba(47, 123, 255, 0.22) 54% 59%, transparent 59%);
+}
+
+/* ── Painéis de vidro: índigo escuro com fio de pôr do sol no topo ── */
+:root[data-tema="a"] .glass {
+  background: linear-gradient(90deg, #ff8a1f, #ff3d7f 55%, #2f7bff) top left / 100% calc(4 * var(--u)) no-repeat, var(--glass);
+  border-color: rgba(255, 168, 120, 0.32);
+  box-shadow: 0 22px 64px rgba(20, 0, 50, 0.55);
+}
+
+/* ── Títulos ── */
+:root[data-tema="a"] .screen-title, :root[data-tema="a"] .main-hero-title {
+  font-weight: 800; font-style: italic; letter-spacing: 0.02em;
+  text-shadow: calc(3 * var(--u)) calc(3 * var(--u)) 0 var(--a-pink), calc(6 * var(--u)) calc(6 * var(--u)) 0 rgba(47, 123, 255, 0.85);
+}
+:root[data-tema="a"] .screen-title::after, :root[data-tema="a"] .main-hero-title::after {
+  width: calc(96 * var(--u)); height: calc(6 * var(--u)); border-radius: 0; background: var(--a-bars); transform: skewX(var(--a-skew));
+}
+:root[data-tema="a"] .main-hero-title::after { margin-top: calc(16 * var(--u)); }
+:root[data-tema="a"] .sub-title, :root[data-tema="a"] .home-box-title { font-style: italic; color: #ffb27a; letter-spacing: 0.12em; }
+:root[data-tema="a"] .title-sub { font-style: italic; font-weight: 700; color: #ffe3c2; text-shadow: 0 2px 14px rgba(70, 10, 90, 0.8); }
+:root[data-tema="a"] .title-press {
+  font-style: italic; font-weight: 800; color: #fff; border: 0; border-radius: 0; transform: skewX(var(--a-skew));
+  background: var(--a-grad); box-shadow: 0 10px 34px rgba(255, 61, 127, 0.5);
+}
+:root[data-tema="a"] .title-foot { color: #cfb8e6; font-style: italic; }
+:root[data-tema="a"] .main-hint { color: #f1dcf6; }
+
+/* ── Botões (todos): inclinados, retos, gradiente no foco ── */
+:root[data-tema="a"] .btn {
+  font-style: italic; font-weight: 800; border-radius: calc(5 * var(--u)); transform: skewX(var(--a-skew));
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)); border-color: rgba(255, 170, 120, 0.4);
+}
+:root[data-tema="a"] .btn:hover, :root[data-tema="a"] .btn.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.4)); border-color: #ffb27a; }
+:root[data-tema="a"] .btn.focusable.focus { transform: skewX(var(--a-skew)) translateX(calc(3 * var(--u))) scale(1.04); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 12px 34px rgba(255, 61, 127, 0.42); }
+:root[data-tema="a"] .btn-primary { background: var(--a-grad); border-color: transparent; color: #fff; box-shadow: 0 8px 24px rgba(255, 61, 127, 0.35); }
+:root[data-tema="a"] .btn-primary:hover, :root[data-tema="a"] .btn-primary.focus { background: linear-gradient(100deg, #ffa13d, #ff5a97); }
+:root[data-tema="a"] .btn-primary.disabled { background: rgba(255, 255, 255, 0.07); box-shadow: none; }
+:root[data-tema="a"] .btn.btn-main { background: none; border-color: transparent; box-shadow: none; }
+:root[data-tema="a"] .btn.btn-main.focusable.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.4)); box-shadow: none; }
+:root[data-tema="a"] .focusable::before { background: #fff; border-radius: 0; width: calc(5 * var(--u)); }
+
+/* ── Menu principal: cinco cartões com número grande ── */
+:root[data-tema="a"] .menu-list { counter-reset: carta; }
+:root[data-tema="a"] .menu-list .btn.btn-main.btn-card {
+  counter-increment: carta; position: relative; overflow: hidden; border-radius: calc(6 * var(--u)); font-weight: 800; letter-spacing: 0.03em;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.025) 100%); border: 1px solid rgba(255, 170, 120, 0.22);
+}
+:root[data-tema="a"] .menu-list .btn.btn-main.btn-card::after {
+  content: counter(carta, decimal-leading-zero); margin-left: auto; padding-left: calc(10 * var(--u));
+  font-size: calc(34 * var(--u)); font-weight: 800; font-style: italic; line-height: 1; letter-spacing: 0;
+  color: transparent; -webkit-text-stroke: calc(1.5 * var(--u)) rgba(255, 190, 140, 0.55);
+}
+:root[data-tema="a"] .menu-list .btn.btn-main.btn-card.focus { background: var(--a-grad); border-color: rgba(255, 255, 255, 0.8); }
+:root[data-tema="a"] .menu-list .btn.btn-main.btn-card.focus::after { -webkit-text-stroke-color: rgba(255, 255, 255, 0.95); }
+:root[data-tema="a"] .menu-list .btn.btn-main.btn-card:has(.card-badge)::after { display: none; }
+:root[data-tema="a"] .btn-card .card-badge { white-space: nowrap; margin-left: calc(10 * var(--u)); background: var(--a-sun); color: #3a1450; font-style: italic; border-radius: calc(3 * var(--u)); }
+:root[data-tema="a"] .btn.btn-main.btn-corner { color: #f1dcf6; font-size: calc(15 * var(--u)); }
+:root[data-tema="a"] .btn.btn-main.btn-corner, :root[data-tema="a"] .btn.btn-main.btn-corner.focusable.focus { transform: none; }
+:root[data-tema="a"] .btn.btn-main.btn-corner.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.55), rgba(255, 61, 127, 0.45)); color: #fff; }
+:root[data-tema="a"] .main-corner { border-top: 2px solid; border-image: var(--a-bars) 1; }
+
+/* ── Quadros "Próximo objetivo" / "Desde a última vez" ── */
+:root[data-tema="a"] .home-box {
+  border-radius: calc(8 * var(--u)); border-color: rgba(255, 168, 120, 0.3); box-shadow: inset calc(5 * var(--u)) 0 0 var(--accent), 0 14px 40px rgba(20, 0, 50, 0.4);
+  background: linear-gradient(100deg, rgba(60, 20, 90, 0.7), rgba(28, 11, 50, 0.6));
+}
+:root[data-tema="a"] .goal-row .goal-tag { color: var(--a-sun); font-style: italic; }
+:root[data-tema="a"] .goal-bar { height: calc(7 * var(--u)); border-radius: 0; background: rgba(255, 255, 255, 0.14); transform: skewX(var(--a-skew)); }
+:root[data-tema="a"] .goal-bar > i { background: var(--a-grad); }
+:root[data-tema="a"] .recap-chip { border-radius: calc(3 * var(--u)); background: rgba(255, 138, 31, 0.22); border: 1px solid rgba(255, 170, 120, 0.4); font-style: italic; }
+:root[data-tema="a"] .chip { font-style: italic; border-radius: calc(3 * var(--u)); background: rgba(255, 122, 26, 0.14); color: #ffc58f; }
+
+/* ── Seletor, barras, tabelas ── */
+:root[data-tema="a"] .sel { border-radius: calc(5 * var(--u)); background: rgba(255, 255, 255, 0.05); }
+:root[data-tema="a"] .sel.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.4), rgba(255, 61, 127, 0.3)); border-color: rgba(255, 190, 140, 0.6); }
+:root[data-tema="a"] .sel-arrow { color: #ffb27a; }
+:root[data-tema="a"] .car-bar-track, :root[data-tema="a"] .ach-bar { border-radius: 0; }
+:root[data-tema="a"] .car-bar-fill { border-radius: 0; background: var(--a-grad); }
+:root[data-tema="a"] .table th { color: #ffb27a; font-style: italic; }
+:root[data-tema="a"] .table tr.human td { background: rgba(255, 138, 31, 0.16); }
+:root[data-tema="a"] .verdict.big { font-style: italic; border-radius: calc(4 * var(--u)); transform: skewX(var(--a-skew)); }
+
+/* ── Copas e pistas ── */
+:root[data-tema="a"] .scr-cups .cup-row.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.5), rgba(255, 61, 127, 0.38)); border-color: rgba(255, 255, 255, 0.7); }
+:root[data-tema="a"] .scr-cups .cup-tab { font-style: italic; border-radius: calc(5 * var(--u)); }
+:root[data-tema="a"] .scr-cups .cup-tab.active { background: var(--a-grad); color: #fff; box-shadow: inset 0 calc(-3 * var(--u)) 0 #fff; border-color: transparent; }
+:root[data-tema="a"] .scr-cups .cup-tab.active .cup-tab-count { color: #fff; }
+:root[data-tema="a"] .scr-cups .cup-detail-title strong, :root[data-tema="a"] .scr-cups .cup-race-name { font-style: italic; }
+:root[data-tema="a"] .scr-cups .cup-race, :root[data-tema="a"] .scr-tracks .track-card { border-radius: calc(7 * var(--u)); }
+:root[data-tema="a"] .scr-tracks .track-card.focus, :root[data-tema="a"] .track-card.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.38), rgba(28, 11, 50, 0.7)); border-color: rgba(255, 255, 255, 0.75); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 14px 38px rgba(255, 61, 127, 0.4); }
+:root[data-tema="a"] .scr-tracks .track-name { font-style: italic; }
+:root[data-tema="a"] .scr-tracks .track-group-head { font-style: italic; }
+:root[data-tema="a"] .scr-cups .cup-race-n { font-size: calc(26 * var(--u)); font-style: italic; color: #ffb27a; }
+:root[data-tema="a"] .dots i.on { background: var(--accent); }
+
+/* ── Garagem e palco 3D: a janela do palco continua inteira à mostra; só o anel e as etiquetas mudam ── */
+:root[data-tema="a"] .gp-money b { font-style: italic; color: var(--a-sun); }
+:root[data-tema="a"] .gp-name, :root[data-tema="a"] .gp-car-name { font-style: italic; }
+:root[data-tema="a"] .seat-badge { border-radius: calc(3 * var(--u)); font-style: italic; }
+:root[data-tema="a"] .gp-part { border-radius: calc(5 * var(--u)); }
+:root[data-tema="a"] .gp-part.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.4), rgba(255, 61, 127, 0.28)); }
+:root[data-tema="a"] .gp-tag.sale { background: rgba(255, 138, 31, 0.3); color: #ffd9b3; border-radius: calc(4 * var(--u)); }
+:root[data-tema="a"] .gp-tag.ok { border-radius: calc(4 * var(--u)); }
+:root[data-tema="a"] .stage3d .gp-car-name { background: linear-gradient(180deg, rgba(40, 10, 70, 0.8), rgba(40, 10, 70, 0)); }
+:root[data-tema="a"] .stage3d .gp-car.focus .gp-stage { box-shadow: inset 0 0 0 2px #ff9a3d, inset 0 0 calc(26 * var(--u)) rgba(255, 61, 127, 0.4); }
+:root[data-tema="a"] .stage3d .gp-tag { background: rgba(40, 10, 70, 0.8); }
+:root[data-tema="a"] .stage3d .gp::before { background: var(--glass); }
+:root[data-tema="a"] .stage3d .gp-car > .sel-arrow { background: rgba(40, 10, 70, 0.65); color: #ffb27a; }
+
+/* ── Pagamento, lobby ── */
+:root[data-tema="a"] .payout-col, :root[data-tema="a"] .payout-vault { border-radius: calc(8 * var(--u)); }
+:root[data-tema="a"] .pc-prize-val, :root[data-tema="a"] .pv-val { font-style: italic; }
+:root[data-tema="a"] .payout-buy { font-style: italic; }
+:root[data-tema="a"] .slot { border-radius: calc(8 * var(--u)); }

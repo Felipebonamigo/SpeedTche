@@ -21,6 +21,7 @@ import { surveyScreen } from './screens/survey';
 import { assistOfferScreen, tutorialDoneScreen, tutorialScreen } from './screens/tutorial';
 import { getActivePlaylog } from '../game/playlog';
 import './strings';
+import './temas/tema';
 
 /** Tecla física → borda de navegação e o "dispositivo" de teclado a que pertence. */
 export const KEY_NAV: Readonly<Record<string, { key: keyof Omit<MenuNav, 'device'>; device: DeviceId }>> = {

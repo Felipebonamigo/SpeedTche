@@ -1,0 +1,28 @@
+/* Parte comum dos três temas de menu (docs/ondas/menu-estilos.md): troca para a cor do tema os poucos pontos em que as folhas atuais
+   cravaram o laranja #ff5a36 em rgba() em vez de usar --accent. Cada tema define `--acc-rgb` (R G B, sem vírgulas) e o resto sai daqui.
+   Só repinta (cor, borda, sombra): nada aqui muda tamanho, posição, navegação ou estado. */
+:root[data-tema] .chip { border-color: rgb(var(--acc-rgb) / 0.6); }
+:root[data-tema] .focusable.focus { border-color: rgb(var(--acc-rgb) / 0.65); box-shadow: 0 0 0 1px rgb(var(--acc-rgb) / 0.35), 0 12px 40px rgb(var(--acc-rgb) / 0.2); }
+:root[data-tema] .btn-primary.focus { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 12px 40px rgb(var(--acc-rgb) / 0.45); }
+:root[data-tema] .device-seat.bound, :root[data-tema] .remap-device .device-seat.bound { border-color: rgb(var(--acc-rgb) / 0.5); }
+:root[data-tema] .scr-cups .cup-row.focus { border-color: rgb(var(--acc-rgb) / 0.45); }
+:root[data-tema] .scr-cups .cup-tab.active { border-color: rgb(var(--acc-rgb) / 0.7); }
+:root[data-tema] .rec-tab.on { box-shadow: 0 8px 24px rgb(var(--acc-rgb) / 0.35); }
+:root[data-tema] .party-card.focus { box-shadow: 0 0 0 1px rgb(var(--acc-rgb) / 0.4), 0 20px 60px rgb(var(--acc-rgb) / 0.22); }
+:root[data-tema] .cup-pip.now { box-shadow: 0 0 0 1px rgb(var(--acc-rgb) / 0.4), 0 6px 20px rgb(var(--acc-rgb) / 0.25); }
+:root[data-tema] .scr-passport .pp-stamp.focus { border-color: rgb(var(--acc-rgb) / 0.7); }
+:root[data-tema] .tag.host { border-color: rgb(var(--acc-rgb) / 0.7); }
+/* Palco 3D (Garagem e Concessionária): o anel de foco da janela segue o tema; a janela em si nunca é coberta. */
+:root[data-tema] .stage3d .gp-car.focus .gp-stage { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 calc(24 * var(--u)) rgb(var(--acc-rgb) / 0.3); }
+/* Movimento: nenhum tema anima com "Reduzir efeitos" nem com prefers-reduced-motion (as animações de entrada viram instantâneas). */
+:root[data-tema] #ui.reduce-fx *, :root[data-tema] #ui.reduce-fx *::before, :root[data-tema] #ui.reduce-fx *::after { animation: none !important; transition-duration: 0.01ms !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-tema] #ui *, :root[data-tema] #ui *::before, :root[data-tema] #ui *::after { animation: none !important; transition-duration: 0.01ms !important; }
+}
+/* O painel do palco 3D é só uma máscara com buraco (garage.css): nenhum tema pinta fundo nem borra o painel inteiro, senão a janela do carro some. */
+:root[data-tema] .stage3d .gp.glass { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-tema] .screen.stage3d { background: none; }
+/* Fredoka (a fonte dos três temas) tem a caixa de texto ~1px mais alta que a fonte do sistema: nas duas grades mais apertadas (atributos
+   dos carros e cartão-postal do Passaporte) o espaço entre linhas ganha o pixel, senão o teste de layout vê as caixas se tocando. */
+:root[data-tema] .garage-panels .gs, :root[data-tema] .gs { row-gap: calc(2 * var(--u)); }
+:root[data-tema] .postcard .pc-title { gap: calc(3 * var(--u)); }

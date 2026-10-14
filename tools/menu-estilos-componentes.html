@@ -1,0 +1,126 @@
+<!doctype html>
+<!-- Folha de componentes dos temas de menu (docs/ondas/menu-estilos.md): botão, cartões do menu (um em foco), selo, chips, barras,
+     seletor, abas, tabela, ícones, tipografia e paleta, com as classes REAIS do jogo. Serve com `npx vite` e abre em
+     /tools/menu-estilos-componentes.html?tema=a|b|c (sem o parâmetro: o visual atual). tools/menu-estilos-componentes.mjs fotografa. -->
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Componentes dos temas de menu</title>
+  <link rel="stylesheet" href="/src/ui/styles.css" />
+  <style>
+    /* Só o palco da folha: um fundo colorido atrás (para o vidro e o desfoque terem o que mostrar) e a grade das três colunas. */
+    html, body { background: #1a1d33; }
+    body { background: radial-gradient(circle at 18% 28%, #ff9a5a, transparent 38%), radial-gradient(circle at 82% 18%, #4f8bff, transparent 42%), radial-gradient(circle at 62% 92%, #1fb86a, transparent 42%), #1a1d33; }
+    #ui { position: fixed; inset: 0; }
+    .screen.scr-comp { display: grid; grid-template-columns: 1.05fr 1fr 1fr; grid-template-rows: auto; align-content: start; gap: calc(14 * var(--u)) calc(22 * var(--u)); padding: 2vh 2.4vw; justify-items: stretch; overflow: hidden; }
+    .col { display: flex; flex-direction: column; gap: calc(8 * var(--u)); min-width: 0; align-items: stretch; }
+    .row { display: flex; flex-wrap: wrap; gap: calc(8 * var(--u)); align-items: center; }
+    .col .sub-title { margin: calc(2 * var(--u)) 0 0; text-align: left; }
+    .swatches { display: flex; gap: calc(6 * var(--u)); flex-wrap: wrap; }
+    .sw { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: calc(11 * var(--u)); color: var(--muted); }
+    .sw i { display: block; width: calc(40 * var(--u)); height: calc(26 * var(--u)); border-radius: calc(6 * var(--u)); border: 1px solid rgba(255, 255, 255, 0.3); }
+    .glass.pad { padding: calc(10 * var(--u)) calc(12 * var(--u)); }
+    .scr-comp .screen-title { font-size: calc(34 * var(--u)); margin: 0; text-align: left; }
+    .scr-comp .screen-title::after { margin-left: 0; }
+    .scr-comp .main-hero-title { font-size: calc(30 * var(--u)); }
+    .scr-comp .btn { font-size: calc(17 * var(--u)); padding: calc(7 * var(--u)) calc(16 * var(--u)); }
+    .scr-comp .menu-list .btn.btn-main.btn-card { font-size: calc(19 * var(--u)); padding-top: calc(5 * var(--u)); padding-bottom: calc(5 * var(--u)); }
+    .scr-comp .glass.pad .main-corner { margin-top: calc(6 * var(--u)); padding-top: calc(6 * var(--u)); }
+    .scr-comp .table { font-size: calc(14 * var(--u)); }
+    .tema-nome { font-size: calc(12 * var(--u)); color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div id="ui" class="open">
+    <section class="screen scr-comp" data-screen="componentes">
+      <div class="col">
+        <div class="tema-nome" id="tema-nome"></div>
+        <h1 class="screen-title">Componentes</h1>
+        <div class="sub-title">Botões</div>
+        <div class="row">
+          <span class="btn focusable">Voltar</span>
+          <span class="btn focusable focus">Em foco</span>
+          <span class="btn btn-primary focusable">Correr</span>
+          <span class="btn btn-primary focusable focus">Correr</span>
+          <span class="btn btn-primary disabled focusable">Bloqueado</span>
+        </div>
+        <div class="sub-title">Cartões do menu (o 2º em foco)</div>
+        <div class="glass pad">
+          <div class="menu-list">
+            <span class="btn btn-main btn-card focusable">Expedição</span>
+            <span class="btn btn-main btn-card focusable focus">Jogar junto</span>
+            <span class="btn btn-main btn-card focusable">Jogar livre<span class="card-badge">Em curso</span></span>
+            <span class="btn btn-main btn-card focusable">Garagem</span>
+            <span class="btn btn-main btn-card focusable">Passaporte</span>
+          </div>
+          <div class="main-corner">
+            <span class="btn btn-main btn-corner focusable">Recordes</span>
+            <span class="btn btn-main btn-corner focusable focus">Opções</span>
+            <span class="btn btn-main btn-corner focusable">Créditos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="sub-title">Quadro, selo, chips, barras</div>
+        <div class="home-box">
+          <h3 class="home-box-title">Próximo objetivo</h3>
+          <ul class="goal-list">
+            <li class="goal-row ready"><span class="goal-tag">★</span><span class="goal-text">Já dá para: Tanque!</span></li>
+            <li class="goal-row"><span class="goal-text">Passaporte: 9 de 27 estados</span><span class="goal-bar"><i style="width: 38%"></i></span></li>
+          </ul>
+        </div>
+        <div class="row"><span class="chip">Aberta</span><span class="recap-chip">Corridas 30</span><span class="recap-chip">Vitórias 11</span></div>
+        <div class="glass pad">
+          <div class="car-bars">
+            <div class="car-bar"><span class="car-bar-label">Velocidade</span><span class="car-bar-track"><span class="car-bar-fill" style="width: 82%; animation: none"></span></span></div>
+            <div class="car-bar"><span class="car-bar-label">Curvas</span><span class="car-bar-track"><span class="car-bar-fill" style="width: 48%; animation: none"></span></span></div>
+            <div class="car-bar"><span class="car-bar-label">Freios</span><span class="car-bar-track"><span class="car-bar-fill" style="width: 28%; animation: none"></span></span></div>
+          </div>
+        </div>
+        <div class="sub-title">Seletor e abas</div>
+        <div class="sel focusable"><span class="sel-label">Qualidade</span><span class="sel-box"><span class="sel-arrow">‹</span><span class="sel-value">Média</span><span class="sel-arrow">›</span></span></div>
+        <div class="sel focusable focus"><span class="sel-label">Voltas</span><span class="sel-box"><span class="sel-arrow">‹</span><span class="sel-value">3</span><span class="sel-arrow">›</span></span></div>
+        <div class="scr-cups"><div class="row">
+          <span class="cup-tab"><span class="cup-tab-name">Sudeste</span><span class="cup-tab-count">4/4</span></span>
+          <span class="cup-tab active"><span class="cup-tab-name">Sul</span><span class="cup-tab-count">2/3</span></span>
+          <span class="cup-tab"><span class="cup-tab-name">Norte</span><span class="cup-tab-count">0/7</span></span>
+        </div></div>
+      </div>
+
+      <div class="col">
+        <div class="sub-title">Tipografia, paleta, ícones</div>
+        <h2 class="main-hero-title">Expedição</h2>
+        <p class="main-hint">Continuar: Copa Rio de Janeiro, corrida 1 de 3</p>
+        <div class="swatches" id="sw"></div>
+        <div class="row" id="icons" style="font-size: calc(26 * var(--u))"></div>
+        <div class="glass pad">
+          <table class="table" style="width: 100%">
+            <thead><tr><th>#</th><th>Piloto</th><th>Tempo</th></tr></thead>
+            <tbody>
+              <tr><td class="pos">1</td><td>Lars Berg</td><td>3:18.23</td></tr>
+              <tr class="human"><td class="pos">2</td><td class="strong">Marina</td><td>3:20.36</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script type="module">
+    import '/src/ui/fonts.css';
+    import '/src/ui/screens/select.css';
+    import '/src/ui/screens/passport.css';
+    import '/src/ui/temas/tema';
+    import { icon } from '/src/ui/screens/icons.ts';
+    const tema = new URLSearchParams(location.search).get('tema');
+    document.getElementById('tema-nome').textContent = tema ? `Tema ${tema.toUpperCase()}` : 'Tema atual';
+    const sw = document.getElementById('sw');
+    for (const [nome, v] of [['accent', '--accent'], ['accent-2', '--accent-2'], ['ok', '--ok'], ['bad', '--bad'], ['text', '--text'], ['muted', '--muted'], ['glass', '--glass']]) {
+      const el = document.createElement('div'); el.className = 'sw'; el.innerHTML = `<i style="background:var(${v})"></i>${nome}`; sw.appendChild(el);
+    }
+    const ic = document.getElementById('icons');
+    for (const n of ['trophy', 'flag', 'users', 'timer', 'lock', 'check', 'clock', 'swords', 'gamepad', 'keyboard']) ic.appendChild(icon(n));
+  </script>
+</body>
+</html>

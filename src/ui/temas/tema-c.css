@@ -1,0 +1,176 @@
+/* TEMA C — "Cartum": cartum brasileiro vibrante (Mario Kart 8, Hot Wheels Unleashed, com sabor de Brasil). Ligado por ?tema=c.
+   Cartões gordos com contorno azul-marinho e sombra deslocada, cor própria por cartão (verde, azul, amarelo, laranja, rosa), texto com
+   contorno (Lilita One), selos/etiquetas inclinados, faixas diagonais verde-amarelo-azul na abertura, azulejo no rodapé, ícones coloridos
+   e grandes nos cinco cartões. Contorno e sombra são box-shadow (não mudam tamanho nem posição de nada). */
+:root[data-tema="c"] {
+  --acc-rgb: 255 212 0;
+  --accent: #ffd400;
+  --accent-2: #ffe55c;
+  --accent-soft: rgba(255, 212, 0, 0.24);
+  --c-navy: #0d2250;
+  --c-green: #00b25f;
+  --c-blue: #1c5be0;
+  --c-orange: #ff8a2b;
+  --c-pink: #ff4f9a;
+  --c-cream: #fff6dc;
+  --ok: #46f09a;
+  --bad: #ff6070;
+  --text: #ffffff;
+  --muted: #cfe3ff;
+  --dim: #8fa8d6;
+  --glass: rgba(8, 40, 78, 0.84);
+  --glass-solid: #082848;
+  --line: rgba(255, 255, 255, 0.3);
+  --font: "Fredoka", ui-rounded, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Lilita One", "Fredoka", ui-rounded, Arial, sans-serif;
+  --r: calc(20 * var(--u));
+  --r-sm: calc(14 * var(--u));
+  --c-ring: 0 0 0 calc(3 * var(--u)) var(--c-navy), 0 calc(5 * var(--u)) 0 calc(3 * var(--u)) var(--c-navy);
+}
+:root[data-tema="c"] body, :root[data-tema="c"] #ui { font-family: var(--font); font-weight: 600; }
+:root[data-tema="c"] .logo text { font-family: "Fredoka", sans-serif !important; }
+
+/* ── Fundo: véu tropical + azulejo no rodapé (atrás do conteúdo; nunca nas telas com palco 3D) ── */
+:root[data-tema="c"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(0, 90, 70, 0.28) 0%, rgba(10, 40, 100, 0.2) 50%, rgba(6, 24, 70, 0.66) 100%); }
+:root[data-tema="c"] .screen.stage3d { background: none; }
+:root[data-tema="c"] .screen:not(.stage3d)::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: calc(34 * var(--u)); z-index: -1; pointer-events: none; opacity: 0.55;
+  border-top: calc(4 * var(--u)) solid var(--c-navy); box-sizing: border-box;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%231747b8'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.6'%3E%3Ccircle cx='20' cy='20' r='13'/%3E%3Cpath d='M20 7v26M7 20h26'/%3E%3Cpath d='M0 0l8 8M40 0l-8 8M0 40l8-8M40 40l-8-8'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='5' fill='%23ffd400'/%3E%3C/svg%3E") 0 0 / calc(34 * var(--u)) calc(34 * var(--u));
+}
+:root[data-tema="c"] .screen.scr-title::before {
+  height: auto; top: 0; opacity: 1; border-top: 0;
+  background: linear-gradient(120deg, transparent 0 30%, rgba(0, 178, 95, 0.4) 30% 44%, rgba(255, 212, 0, 0.42) 44% 56%, rgba(28, 91, 224, 0.4) 56% 68%, transparent 68%);
+}
+
+/* ── Painéis: azul profundo, contorno marinho grosso e sombra deslocada ── */
+:root[data-tema="c"] .glass {
+  background: linear-gradient(90deg, #00b25f 0 34%, #ffd400 34% 67%, #1c5be0 67%) top left / 100% calc(6 * var(--u)) no-repeat, var(--glass);
+  border-color: rgba(255, 255, 255, 0.28); border-radius: var(--r);
+  box-shadow: var(--c-ring);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+:root[data-tema="c"] .home-box {
+  color: var(--c-navy); --text: var(--c-navy); --muted: #3d548a; --ok: #07853f; --accent: #d94a00;
+  background: var(--c-cream); border: 1px solid var(--c-navy); border-radius: var(--r); box-shadow: var(--c-ring); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+:root[data-tema="c"] .home-box-title { color: var(--c-blue); font-weight: 800; }
+
+/* ── Títulos: Lilita One com contorno ── */
+:root[data-tema="c"] .screen-title, :root[data-tema="c"] .main-hero-title, :root[data-tema="c"] .title-press, :root[data-tema="c"] .title-sub {
+  font-weight: 400; font-synthesis: none; letter-spacing: 0.04em;
+  color: #fff; -webkit-text-stroke: calc(5 * var(--u)) var(--c-navy); paint-order: stroke fill; text-shadow: 0 calc(5 * var(--u)) 0 var(--c-navy);
+}
+:root[data-tema="c"] .screen-title::after, :root[data-tema="c"] .main-hero-title::after {
+  width: calc(110 * var(--u)); height: calc(8 * var(--u)); border-radius: 999px; background: linear-gradient(90deg, #00b25f 0 34%, #ffd400 34% 67%, #1c5be0 67%); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy);
+  -webkit-text-stroke: 0;
+}
+:root[data-tema="c"] .title-sub { -webkit-text-stroke-width: calc(3 * var(--u)); color: var(--c-cream); letter-spacing: 0.22em; text-shadow: 0 calc(3 * var(--u)) 0 var(--c-navy); }
+:root[data-tema="c"] .title-press { -webkit-text-stroke-width: calc(4 * var(--u)); letter-spacing: 0.1em; color: var(--c-navy); -webkit-text-stroke-color: transparent; text-shadow: none; background: var(--accent); border: 0; box-shadow: var(--c-ring); transform: rotate(-1.5deg); }
+:root[data-tema="c"] .title-foot { color: var(--c-cream); font-weight: 700; text-shadow: 0 2px 0 var(--c-navy); }
+:root[data-tema="c"] .sub-title { color: var(--accent); font-weight: 800; text-shadow: 0 calc(2 * var(--u)) 0 var(--c-navy); }
+:root[data-tema="c"] .main-hint { color: #fff; font-weight: 700; text-shadow: 0 calc(2 * var(--u)) 0 var(--c-navy); }
+
+/* ── Botões: pastilhas gordas, contorno e sombra; foco amarelo ── */
+:root[data-tema="c"] .btn {
+  font-weight: 800; letter-spacing: 0.05em; color: var(--c-navy); background: #fff; border-color: transparent; border-radius: calc(16 * var(--u)); box-shadow: var(--c-ring);
+}
+:root[data-tema="c"] .btn:hover, :root[data-tema="c"] .btn.focus { background: var(--accent); color: var(--c-navy); }
+:root[data-tema="c"] .btn.focusable.focus { transform: translateY(calc(-2 * var(--u))) scale(1.05); border-color: transparent; box-shadow: var(--c-ring), 0 calc(14 * var(--u)) calc(26 * var(--u)) rgba(0, 0, 0, 0.35); }
+:root[data-tema="c"] .btn-primary { background: var(--c-green); color: #fff; -webkit-text-stroke: calc(3 * var(--u)) var(--c-navy); paint-order: stroke fill; }
+:root[data-tema="c"] .btn-primary:hover, :root[data-tema="c"] .btn-primary.focus { background: #1fd77f; color: #fff; }
+:root[data-tema="c"] .btn-primary.disabled { background: #7a8aab; color: #dfe8f8; -webkit-text-stroke: 0; box-shadow: var(--c-ring); }
+:root[data-tema="c"] .btn-danger { background: var(--bad); color: #fff; }
+:root[data-tema="c"] .focusable::before { background: var(--c-navy); box-shadow: 0 0 0 calc(2 * var(--u)) #fff; width: calc(5 * var(--u)); }
+
+/* ── Menu principal: cinco cartões coloridos com ícone grande e selo ── */
+:root[data-tema="c"] .menu-list { gap: calc(4 * var(--u)); }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card {
+  --cc: var(--c-green); position: relative; white-space: nowrap; border-radius: var(--r-sm); color: #fff; font-weight: 400; font-family: var(--font-display); letter-spacing: 0.05em;
+  -webkit-text-stroke: calc(4 * var(--u)) var(--c-navy); paint-order: stroke fill; text-shadow: 0 calc(3 * var(--u)) 0 var(--c-navy);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 82%, #fff) 0%, var(--cc) 100%); border: 0;
+  box-shadow: 0 0 0 calc(2.5 * var(--u)) var(--c-navy), 0 calc(4 * var(--u)) 0 calc(2.5 * var(--u)) var(--c-navy);
+}
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(1) { --cc: #00b25f; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(2) { --cc: #1c5be0; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(3) { --cc: #f2b800; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(4) { --cc: #ff7a1f; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(5) { --cc: #e63a8c; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card.focus {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 60%, #fff) 0%, color-mix(in srgb, var(--cc) 92%, #fff) 100%); color: #fff;
+  box-shadow: 0 0 0 calc(2.5 * var(--u)) var(--c-navy), 0 calc(4 * var(--u)) 0 calc(2.5 * var(--u)) var(--c-navy), 0 0 0 calc(6 * var(--u)) #fff, 0 calc(10 * var(--u)) calc(24 * var(--u)) rgba(0, 0, 0, 0.45);
+  transform: scale(1.04) translateX(calc(4 * var(--u)));
+}
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card::after {
+  content: ''; flex: none; margin-left: auto; width: calc(34 * var(--u)); height: calc(34 * var(--u)); -webkit-text-stroke: 0; background: var(--ico-c1) center / contain no-repeat; filter: drop-shadow(0 calc(2 * var(--u)) 0 rgba(13, 34, 80, 0.55));
+}
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(2)::after { background-image: var(--ico-c2); }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(3)::after { background-image: var(--ico-c3); }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(4)::after { background-image: var(--ico-c4); }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:nth-child(5)::after { background-image: var(--ico-c5); }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card::before { display: none; }
+:root[data-tema="c"] .menu-list .btn.btn-main.btn-card:has(.card-badge)::after { display: none; }
+:root[data-tema="c"] .btn-card .card-badge { white-space: nowrap;
+  margin-left: calc(10 * var(--u)); background: var(--accent); color: var(--c-navy); -webkit-text-stroke: 0; text-shadow: none; font-family: var(--font); font-weight: 800;
+  border: 2px solid var(--c-navy); border-radius: calc(6 * var(--u)); transform: rotate(-6deg); box-shadow: 0 calc(2 * var(--u)) 0 var(--c-navy);
+}
+:root[data-tema="c"] .btn.btn-main.btn-corner { background: rgba(255, 255, 255, 0.14); color: #fff; box-shadow: none; border-radius: 999px; font-size: calc(15 * var(--u)); font-weight: 800; }
+:root[data-tema="c"] .btn.btn-main.btn-corner.focus { background: var(--accent); color: var(--c-navy); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); transform: none; }
+:root[data-tema="c"] .main-corner { border-top: calc(3 * var(--u)) dotted rgba(255, 255, 255, 0.5); }
+
+/* ── Quadros claros (creme) e barras ── */
+:root[data-tema="c"] .goal-row .goal-tag { color: var(--c-blue); }
+:root[data-tema="c"] .goal-bar { height: calc(10 * var(--u)); border-radius: 999px; background: #d7dff0; box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); }
+:root[data-tema="c"] .goal-bar > i { background: linear-gradient(90deg, #00b25f, #ffd400); }
+:root[data-tema="c"] .recap-chip { background: #fff; border: 2px solid var(--c-navy); color: var(--c-navy); font-weight: 800; border-radius: calc(10 * var(--u)); }
+:root[data-tema="c"] .chip { color: var(--c-navy); background: var(--accent); border: 2px solid var(--c-navy); font-weight: 800; }
+:root[data-tema="c"] .car-bar-track, :root[data-tema="c"] .ach-bar { background: #0b1f4a; box-shadow: 0 0 0 calc(1.5 * var(--u)) var(--c-navy); }
+:root[data-tema="c"] .car-bar-fill { background: linear-gradient(90deg, #00b25f, #ffd400); }
+
+/* ── Seletor e tabelas ── */
+:root[data-tema="c"] .sel { background: rgba(255, 255, 255, 0.12); border-radius: var(--r-sm); }
+:root[data-tema="c"] .sel.focus { background: var(--accent); border-color: var(--c-navy); }
+:root[data-tema="c"] .sel.focus .sel-label, :root[data-tema="c"] .sel.focus .sel-box { color: var(--c-navy); }
+:root[data-tema="c"] .sel.focus .sel-arrow { color: var(--c-navy); background: rgba(13, 34, 80, 0.18); }
+:root[data-tema="c"] .table th { color: var(--accent); background: var(--c-navy); font-weight: 800; }
+:root[data-tema="c"] .table tr.human td { background: rgba(255, 212, 0, 0.22); }
+:root[data-tema="c"] .verdict.big { font-family: var(--font-display); font-weight: 400; border-radius: 999px; box-shadow: var(--c-ring); }
+
+/* ── Copas e pistas ── */
+:root[data-tema="c"] .scr-cups .cup-row.focus { background: var(--accent); color: var(--c-navy); border-color: var(--c-navy); transform: translateX(calc(4 * var(--u))) scale(1.02); }
+:root[data-tema="c"] .scr-cups .cup-row.focus .cup-row-name { color: var(--c-navy); }
+:root[data-tema="c"] .scr-cups .cup-tab { border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.3); }
+:root[data-tema="c"] .scr-cups .cup-tab.active { background: var(--c-green); color: #fff; border-color: var(--c-navy); box-shadow: inset 0 calc(-4 * var(--u)) 0 var(--accent), 0 calc(3 * var(--u)) 0 var(--c-navy); }
+:root[data-tema="c"] .scr-cups .cup-tab.active .cup-tab-count { color: #fff; }
+:root[data-tema="c"] .scr-cups .cup-chip.open { background: var(--c-green); color: #fff; }
+:root[data-tema="c"] .scr-cups .cup-race, :root[data-tema="c"] .scr-tracks .track-card { border-radius: var(--r-sm); }
+:root[data-tema="c"] .scr-tracks .track-card.focus, :root[data-tema="c"] .track-card.focus { background: rgba(255, 212, 0, 0.28); border-color: var(--accent); box-shadow: 0 0 0 calc(3 * var(--u)) var(--accent), 0 calc(8 * var(--u)) calc(20 * var(--u)) rgba(0, 0, 0, 0.4); }
+:root[data-tema="c"] .scr-cups .cup-race-n { color: var(--accent); font-family: var(--font-display); font-weight: 400; font-size: calc(24 * var(--u)); }
+:root[data-tema="c"] .dots i.on { background: var(--accent); }
+:root[data-tema="c"] .scr-tracks .track-group-head { color: #fff; font-weight: 800; }
+
+/* ── Garagem e palco 3D (a janela do carro nunca é coberta) ── */
+:root[data-tema="c"] .gp { border-radius: var(--r); box-shadow: var(--c-ring); }
+:root[data-tema="c"] .gp-money b { font-family: var(--font-display); font-weight: 400; color: var(--accent); -webkit-text-stroke: calc(3 * var(--u)) var(--c-navy); paint-order: stroke fill; }
+:root[data-tema="c"] .gp-name, :root[data-tema="c"] .gp-car-name { font-weight: 800; }
+:root[data-tema="c"] .seat-badge { border: 2px solid var(--c-navy); border-radius: calc(8 * var(--u)); }
+:root[data-tema="c"] .gp-part { border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.1); }
+:root[data-tema="c"] .gp-part.focus { background: var(--accent); color: var(--c-navy); }
+:root[data-tema="c"] .gp-part.focus .gp-part-name { color: var(--c-navy); }
+:root[data-tema="c"] .gp-tag { border-radius: calc(8 * var(--u)); }
+:root[data-tema="c"] .gp-tag.sale { background: var(--accent); color: var(--c-navy); }
+:root[data-tema="c"] .gp-tag.sale b { color: var(--c-navy); }
+:root[data-tema="c"] .stage3d .gp-stage { box-shadow: inset 0 0 0 calc(3 * var(--u)) var(--c-navy), inset 0 0 0 calc(5 * var(--u)) rgba(255, 255, 255, 0.5); }
+:root[data-tema="c"] .stage3d .gp-car.focus .gp-stage { box-shadow: inset 0 0 0 calc(3 * var(--u)) var(--c-navy), inset 0 0 0 calc(7 * var(--u)) var(--accent); }
+:root[data-tema="c"] .stage3d .gp-car-name { background: linear-gradient(180deg, rgba(8, 40, 78, 0.85), rgba(8, 40, 78, 0)); }
+:root[data-tema="c"] .stage3d .gp-tag { background: var(--c-navy); }
+:root[data-tema="c"] .stage3d .gp-tag.sale { background: var(--accent); }
+:root[data-tema="c"] .stage3d .gp-car > .sel-arrow { background: var(--accent); color: var(--c-navy); box-shadow: 0 0 0 calc(2 * var(--u)) var(--c-navy); }
+
+/* ── Pagamento e lobby ── */
+:root[data-tema="c"] .payout-col, :root[data-tema="c"] .payout-vault { border-radius: var(--r); }
+:root[data-tema="c"] .pc-prize-val, :root[data-tema="c"] .pv-val { font-family: var(--font-display); font-weight: 400; }
+:root[data-tema="c"] .pc-prize-val { color: #46f09a; -webkit-text-stroke: calc(3 * var(--u)) var(--c-navy); paint-order: stroke fill; }
+:root[data-tema="c"] .payout-buy { background: var(--accent); color: var(--c-navy); border: 2px solid var(--c-navy); border-radius: 999px; }
+:root[data-tema="c"] .slot { border-radius: var(--r); }
+:root[data-tema="c"] .screen > .hint { background: var(--c-navy); color: #fff; font-weight: 700; border-radius: 999px; box-shadow: 0 0 0 calc(5 * var(--u)) var(--c-navy); }
