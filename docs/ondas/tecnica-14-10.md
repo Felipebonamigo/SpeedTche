@@ -18,7 +18,18 @@
 - **Correção:** o aquecimento passa a desenhar depois do `beginViewport` (dentro da contabilidade da sombra por viewport): o mapa que o
   three cria nele é o do assento, e o `endViewport` o guarda. Só `renderer.ts` (o `postfx/*` é da frente `nc/cor-brilho`).
 - **Teste (antes):** `tests/texturas-gl.test.ts` — no laboratório GL, ciclos de largada (3 jogadores, Média, duas pistas de dia) com o
-  fundo do menu entre elas: `renderer.info.memory.textures` igual entre o 2º e o 3º ciclo.
+  fundo do menu entre elas: `renderer.info.memory.textures` igual entre o 2º e o 3º ciclo. Visto falhar: `91 → 95 → 99: expected 99 to
+  be 95`; passa com a correção (commit 7d9443b).
+- **Causa 2 (achada na mesma investigação, também da M6):** `src/render/road.ts:299–304` (`link`) cria objetos de uniforme novos a cada
+  `setPalette`, mas o three só chama o `onBeforeCompile` (`installLiveBlend`, road.ts:159) quando compila um programa novo; ao reusar o
+  programa (mesma chave `road-live:1`) ele usa os uniformes da última compilação. Sonda no laboratório: depois de trocar de uma pista de dia
+  para outra, os 5 materiais da pista leem as texturas do período seguinte da pista **anterior** (já liberadas: o three as reenvia à GPU e
+  elas ficam lá sem dono — as texturas `paintAsphalt/Kerb/Shoulder/Pit/StartDecal` de blocos antigos no diagnóstico); depois de uma pista
+  de noite, o programa com mistura nem tem `uMapB`/`uEmissiveMapB` nos uniformes. Na tela: no fim da corrida asfalto, zebra, acostamento,
+  box e largada misturam para a textura errada.
+- **Correção 2:** os uniformes da mistura nascem uma vez por material (objetos fixos), entram sempre no shader, e o `setPalette` só troca
+  o `.value`. **Teste 2 (antes):** `tests/corrida-que-muda-estrada.test.ts`, caso novo que imita o three (compila uma vez, troca de pista,
+  passa por uma de noite e volta) e confere que os uniformes compilados leem as texturas do período seguinte da pista atual.
 
 ### T3 — playtests não reexecutados desde a N5
 - Em andamento: records, paint, ghost, ghost-version, online, retro e `pistas-ui`, um por vez (build de f241703 em `vite preview`; o
