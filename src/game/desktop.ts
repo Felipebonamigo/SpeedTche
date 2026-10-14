@@ -147,6 +147,17 @@ export const ACHIEVEMENTS = [
   { id: 'REGIAO_NORDESTE', pt: 'Nordeste carimbado', en: 'Northeast Stamped' },
   { id: 'REGIAO_NORTE', pt: 'Norte carimbado', en: 'North Stamped' },
   { id: 'PASSAPORTE_COMPLETO', pt: 'Passaporte completo', en: 'Full Passport' },
+  // ── O5: as que caem nos primeiros 15 minutos, as de economia e coleção (docs/ondas/O/O5.md §4.4; nomes a confirmar pelo dono).
+  { id: 'PRIMEIRA_CORRIDA', pt: 'Primeira corrida', en: 'First Race' },
+  { id: 'LARGADA_FOGUETE', pt: 'Largada-foguete', en: 'Rocket Start' },
+  { id: 'MINI_TURBO', pt: 'Mini-turbo', en: 'Mini-Turbo' },
+  { id: 'SUBIU_DE_NIVEL', pt: 'Subiu de nível', en: 'Level Up' },
+  { id: 'PRIMEIRA_PECA', pt: 'Primeira peça', en: 'First Upgrade' },
+  { id: 'CARRO_NOVO', pt: 'Carro novo', en: 'New Ride' },
+  { id: 'OFICINA_COMPLETA', pt: 'Oficina completa', en: 'Fully Tuned' },
+  { id: 'COLECIONADOR', pt: 'Garagem completa', en: 'Collector' },
+  { id: 'MAESTRIA_MAXIMA', pt: 'Mestre do carro', en: 'Car Master' },
+  { id: 'NIVEL_MAXIMO', pt: 'Todos os títulos', en: 'All Titles' },
 ] as const satisfies ReadonlyArray<AchievementDef>;
 
 export type AchievementId = (typeof ACHIEVEMENTS)[number]['id'];

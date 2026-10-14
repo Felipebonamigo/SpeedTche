@@ -14,7 +14,7 @@ import { human } from './helpers';
 
 const seatTel = (o: Partial<SeatTelemetry> = {}): SeatTelemetry => ({
   nitros: 0, towsGiven: 0, towsReceived: 0, collisions: 0, crashes: 0, pitStops: 0, draftTicks: 0, startProgress: 0,
-  nitroAtFinish: false, lastAfterFirstLap: false, ...o,
+  nitroAtFinish: false, lastAfterFirstLap: false, perfectLaunch: false, miniTurbos: 0, maxCharges: 0, nitroEmptyAtFinish: false, ...o,
 });
 
 function tel(seat: number, o: Partial<SeatTelemetry> = {}, extra: (t: RaceTelemetry) => void = () => undefined): RaceTelemetry {

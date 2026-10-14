@@ -371,7 +371,7 @@ function evaluate(sc: Scenario) {
   for (const h of humans) {
     tel.seats.set(h.seat, {
       nitros: 0, towsGiven: 0, towsReceived: 0, collisions: 0, crashes: 0, pitStops: 0, draftTicks: 0, startProgress: 0,
-      nitroAtFinish: false, lastAfterFirstLap: false, ...(sc.seats?.[h.seat] ?? {}),
+      nitroAtFinish: false, lastAfterFirstLap: false, perfectLaunch: false, miniTurbos: 0, maxCharges: 0, nitroEmptyAtFinish: false, ...(sc.seats?.[h.seat] ?? {}),
     });
     tel.pitted.add(h.seat); // fora do caminho de SEM_BOX
   }
@@ -422,9 +422,11 @@ describe('conquistas novas: disparam e não disparam', () => {
     expect(evaluate({ positions: { 0: 5 }, seats: { 0: { draftTicks: DRAFT_MASTER_TICKS - 1 } } }).ids).not.toContain('MESTRE_DO_VACUO');
   });
 
-  it('NITRO_NA_BANDEIRA: cruzar a chegada com nitro ligado (vale no contra-relógio também)', () => {
-    expect(evaluate({ positions: { 0: 4 }, seats: { 0: { nitroAtFinish: true } } }).ids).toContain('NITRO_NA_BANDEIRA');
-    expect(evaluate({ mode: 'timetrial', withAi: false, seats: { 0: { nitroAtFinish: true } } }).ids).toContain('NITRO_NA_BANDEIRA');
+  // O5: reescrita para a barra da N1 — nitro ligado E a barra sem carga na chegada (só o nitro ligado não basta: tests/achievements-o5.test.ts).
+  it('NITRO_NA_BANDEIRA: cruzar a chegada com nitro ligado e a barra vazia (vale no contra-relógio também)', () => {
+    expect(evaluate({ positions: { 0: 4 }, seats: { 0: { nitroAtFinish: true, nitroEmptyAtFinish: true } } }).ids).toContain('NITRO_NA_BANDEIRA');
+    expect(evaluate({ mode: 'timetrial', withAi: false, seats: { 0: { nitroAtFinish: true, nitroEmptyAtFinish: true } } }).ids).toContain('NITRO_NA_BANDEIRA');
+    expect(evaluate({ positions: { 0: 4 }, seats: { 0: { nitroAtFinish: true } } }).ids).not.toContain('NITRO_NA_BANDEIRA');
     expect(evaluate({ positions: { 0: 4 } }).ids).not.toContain('NITRO_NA_BANDEIRA');
   });
 

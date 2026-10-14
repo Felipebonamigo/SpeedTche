@@ -23,8 +23,8 @@ describe('ponte com o Electron', () => {
   it('ids de conquista são nomes de API aceitos pela Steam (A–Z, 0–9, _)', () => {
     for (const a of ACHIEVEMENTS) expect(a.id).toMatch(/^[A-Z][A-Z0-9_]*$/);
   });
-  it('57 conquistas (24 de antes da onda G + 27 copas de estado + 5 regiões + passaporte completo), cada uma com descrição PT e EN e linha no desktop/README.md', () => {
-    expect(ACHIEVEMENTS).toHaveLength(57);
+  it('67 conquistas (24 de antes da onda G + 27 copas de estado + 5 regiões + passaporte completo + 10 da O5), cada uma com descrição PT e EN e linha no desktop/README.md', () => {
+    expect(ACHIEVEMENTS).toHaveLength(67);
     // A Copa Brasil deixou de existir (save antigo: COPA_BRASIL → COPA_BR_RJ, tests/migration-brasil.test.ts).
     expect(ACHIEVEMENTS.map((a) => a.id)).not.toContain('COPA_BRASIL');
     for (const r of BRAZIL_REGIONS) expect(ACHIEVEMENTS.map((a) => a.id)).toContain(`REGIAO_${r.id.toUpperCase()}`);
@@ -66,7 +66,9 @@ describe('regras das conquistas', () => {
     run(state, track, 60 * 30);
     expect(state.phase).toBe('finished');
     const tel = newTelemetry();
-    tel.maxNitrosInLap.set(0, 3); tel.gaveTow.add(1); tel.perfectLap.add(2);
+    // O5: o NITRO_TRIPLO é pela barra (3 cargas juntas), não mais por 3 nitros numa volta.
+    tel.seats.set(0, { nitros: 3, towsGiven: 0, towsReceived: 0, collisions: 1, crashes: 0, pitStops: 0, draftTicks: 0, startProgress: 0, nitroAtFinish: false, lastAfterFirstLap: false, perfectLaunch: false, miniTurbos: 0, maxCharges: 3, nitroEmptyAtFinish: false });
+    tel.gaveTow.add(1); tel.perfectLap.add(2);
     const save = { ...DEFAULT_SAVE, achievements: [] as string[] };
     const got = evaluateAchievements(save, 'cup', state, state.results!, humans, tel, true, 'br_rj', 'campeao');
     for (const id of ['PRIMEIRA_VITORIA', 'MADRUGADA', 'EQUIPE_COMPLETA', 'SEM_BOX', 'NITRO_TRIPLO', 'EMPURRAO', 'VOLTA_PERFEITA', 'COPA_BR_RJ', 'CAMPEAO']) expect(got, id).toContain(id);
@@ -98,6 +100,9 @@ describe('regras das conquistas', () => {
     const { state, track } = quickRace({ track: syntheticTrack([{ op: 'straight', length: 300 }]), totalCars: 1, laps: 1, humans, timeTrial: true });
     run(state, track, 60 * 30);
     const got = evaluateAchievements({ ...DEFAULT_SAVE, achievements: [] }, 'timetrial', state, state.results!, humans, newTelemetry(), false, null, 'amador');
-    expect(got).toEqual([]);
+    expect(got).not.toContain('PRIMEIRA_VITORIA');
+    expect(got).not.toContain('SEM_BOX');
+    // O5: a primeira corrida conta em qualquer modo (o contra-relógio também).
+    expect(got).toEqual(['PRIMEIRA_CORRIDA']);
   });
 });
