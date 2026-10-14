@@ -46,7 +46,18 @@
   0,32) e esperava ≥ 2 malhas do fantasma, que é **uma** malha desde a onda F (`src/render/cars.ts:225`). O jogo está certo: a sonda
   mostra o fantasma com pose e diferença na segunda corrida. **Correção:** a 2ª corrida larga 1,5 s atrasada (diferença garantida, sem
   depender de ruído) e a contagem é só das malhas do fantasma (material padrão translúcido, não a mancha do cenário), ≥ 1.
-- `playtest-ghost` — ok (rc 0, 1106 s). `playtest-retro` — ok (rc 0, 652 s). `pistas-ui`, `online`, `records`: rodando.
+- `playtest-ghost` — ok (rc 0, 1106 s). `playtest-retro` — ok (rc 0, 652 s).
+- `pistas-ui` — 192 ✓ e 2 ✗ até ser cortado no 1600×900 (o executor bateu no teto de 2 h da sessão; rodado de novo inteiro):
+  - `✗ 1920x1080: subindo, o cartão e o cabeçalho da copa ficam visíveis ({"card":false,"head":false})` — **causa: o roteiro.** O `settle`
+    (`scripts/pistas-ui.mjs:98`) sai com 3 leituras iguais de `scrollTop` (300 ms); com a máquina carregada a rolagem suave demorou ~2,5 s
+    para **começar** (sonda em 1920×1080: `scrollTop` 7646 parado por 2,5 s, depois 6363 e `{"card":true,"head":true}`). **Correção:** o
+    `settle` espera o cartão em foco dentro da área e a posição parada por 5 leituras (até ~20 s); a conferência do cabeçalho não muda.
+  - `✗ 1280x800 copas: a tela em si não rola (só a área da lista)` — **defeito real do jogo** (captura
+    `scratch/tecnica/t3/pu-tamanho-copas-1280x800.png`): no Steam Deck (1280×800, 16:10) o detalhe da Copa África do Sul — 4 corridas, duas
+    com nome em 2 linhas, mais o cartão do rival e o objetivo (O4) — passa da altura da tela: a 4ª corrida fica cortada e por cima da dica
+    de teclas. Em 1280×720 e 1366×768 cabe (os nomes ficam numa linha). O `playtest-layout` mede `cups` em 1280×800, mas com outra copa em
+    foco. **Não corrigido aqui:** o conserto é CSS do menu (`src/ui/screens/select.css`, detalhe da copa), arquivo da frente
+    `nc/menu-estilos`; fica para ela (ou para depois da escolha do estilo), com esta conferência do `pistas-ui` como teste que falha.
 
 ### T6 — suíte frágil sob carga
 - **Causa (medida, CPU com `process.cpuUsage`, 14/10):**
