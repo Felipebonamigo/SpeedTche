@@ -99,9 +99,10 @@ export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'hous
 
 interface BillboardDesign { brand: string; tag: string; bg: string; fg: string; accent: string; motif: 'stripes' | 'sun' | 'bubbles' | 'bolt' | 'tire' | 'wave' | 'check' | 'rings' }
 
-const DESIGNS: BillboardDesign[] = [
+/** Os painéis da pista (exportado para o teste do nome antigo: `tests/nome-legado-paineis.test.ts`). */
+export const DESIGNS: readonly BillboardDesign[] = [
   { brand: 'NITRO', tag: '', bg: '#e8262c', fg: '#ffffff', accent: '#ffd23f', motif: 'stripes' },
-  { brand: 'CREW', tag: 'RACING', bg: '#1b5fc4', fg: '#ffffff', accent: '#9fd4ff', motif: 'check' },
+  { brand: 'TCHÊ', tag: 'RACING', bg: '#1b5fc4', fg: '#ffffff', accent: '#9fd4ff', motif: 'check' },
   { brand: 'PADELIZOU', tag: '', bg: '#0f8b5f', fg: '#ffffff', accent: '#b8f06a', motif: 'rings' },
   // Marcas do dono (09/10/2026). Cores provisórias: troca por textura quando chegar o logo (docs/CRONOGRAMA.md, decisão nº 26).
   { brand: 'ATOMATIZA', tag: '', bg: '#0b2a4a', fg: '#ffffff', accent: '#3fe0c5', motif: 'rings' },
