@@ -52,8 +52,10 @@
   (sonda: máximo 0,1206 s numa volta), e quando não passa a corrida acaba e o fantasma some (`pose` nula); (2) a contagem de "malhas
   translúcidas" (`scripts/playtest-ghost-version.mjs:52`) pegava também a mancha do cenário (`scenery:blob`, `MeshBasicMaterial`
   0,32) e esperava ≥ 2 malhas do fantasma, que é **uma** malha desde a onda F (`src/render/cars.ts:225`). O jogo está certo: a sonda
-  mostra o fantasma com pose e diferença na segunda corrida. **Correção:** a 2ª corrida larga 1,5 s atrasada (diferença garantida, sem
-  depender de ruído) e a contagem é só das malhas do fantasma (material padrão translúcido, não a mancha do cenário), ≥ 1.
+  mostra o fantasma com pose e diferença na segunda corrida. **Correção:** na 2ª corrida o carro freia 1 s logo depois da linha
+  (diferença garantida, ~0,58 s na sonda, sem depender de ruído) e a contagem é só das malhas do fantasma (material padrão translúcido, não a
+  mancha do cenário), ≥ 1. (A primeira tentativa — esperar 1,5 s parado no grid — não servia: o relógio da volta e o do fantasma começam
+  na linha, e a reexecução só passou por sorte, com diferença 0,12; a sonda mostrou isso e a correção foi refeita.)
 - `playtest-ghost` — ok (rc 0, 1106 s). `playtest-retro` — ok (rc 0, 652 s).
 - `pistas-ui` — 192 ✓ e 2 ✗ até ser cortado no 1600×900 (o executor bateu no teto de 2 h da sessão; rodado de novo inteiro):
   - `✗ 1920x1080: subindo, o cartão e o cabeçalho da copa ficam visíveis ({"card":false,"head":false})` — **causa: o roteiro.** O `settle`
