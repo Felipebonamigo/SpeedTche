@@ -33,7 +33,7 @@
 }
 
 /* ── Fundo: véu de pôr do sol + faixas diagonais (atrás do conteúdo; nunca nas telas com palco 3D) ── */
-:root[data-tema="a"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(70, 18, 100, 0.42) 0%, rgba(255, 70, 100, 0.1) 46%, rgba(10, 8, 38, 0.74) 100%); }
+:root[data-tema="a"] .screen { isolation: isolate; background: linear-gradient(180deg, rgba(70, 18, 100, 0.46) 0%, rgba(110, 28, 100, 0.3) 46%, rgba(10, 8, 38, 0.78) 100%); }
 :root[data-tema="a"] .screen.stage3d { background: none; }
 :root[data-tema="a"] .screen:not(.stage3d)::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
@@ -114,7 +114,7 @@
 :root[data-tema="a"] .chip { font-style: italic; border-radius: calc(3 * var(--u)); background: rgba(255, 122, 26, 0.14); color: #ffc58f; }
 
 /* ── Seletor, barras, tabelas ── */
-:root[data-tema="a"] .sel { border-radius: calc(5 * var(--u)); background: rgba(255, 255, 255, 0.05); }
+:root[data-tema="a"] .sel { border-radius: calc(5 * var(--u)); background: rgba(28, 11, 50, 0.72); }
 :root[data-tema="a"] .sel.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.4), rgba(255, 61, 127, 0.3)); border-color: rgba(255, 190, 140, 0.6); }
 :root[data-tema="a"] .sel-arrow { color: #ffb27a; }
 :root[data-tema="a"] .car-bar-track, :root[data-tema="a"] .ach-bar { border-radius: 0; }

@@ -50,6 +50,7 @@ async function race(label, setup, arg) {
   for (let i = 0; i < 80 && (await page.evaluate(() => window.nc.session.menus.current())) !== 'results'; i++) await page.waitForTimeout(500);
 }
 let LIVE_RESULTS = false;
+// O cache do resultado/Pagamento é JSON: perde os protótipos e o pódio 3D não desenha. Serve para iterar o resto; a captura final roda a corrida (apague o arquivo).
 const CACHE = `${out}/../race-cache.json`;
 if (!SKIP_RACE && fs.existsSync(CACHE)) {
   console.log('resultados do cache', CACHE);
@@ -57,12 +58,12 @@ if (!SKIP_RACE && fs.existsSync(CACHE)) {
 } else if (!SKIP_RACE) {
   await race('copa', (h) => { const s = window.nc.session; s.menus.hide(); s.debugBind(0, 'kb1'); s.debugBind(1, 'kb2'); s.startCup('br_rj', h); }, humans(2));
   await page.evaluate(() => { window.__shown.cupResults = window.__shown.results; });
-  // O resultado ao vivo (com o pódio 3D, que só desenha com a corrida ainda na sessão): uma foto por tema, antes de seguir.
-  if (!process.env.NC_ME_TELAS || process.env.NC_ME_TELAS.split(',').includes('results')) {
-    await page.evaluate(() => document.querySelector('.results-skip')?.click());
+  // NC_ME_LIVE=1: fotografa o resultado logo ao sair da corrida (uma foto por tema), antes das outras telas.
+  if (process.env.NC_ME_LIVE) {
+    if (!process.env.NC_ME_NOSKIP) await page.evaluate(() => document.querySelector('.results-skip')?.click());
     for (const tema of TEMAS) {
       await page.evaluate((tm) => { for (const el of [document.documentElement, document.getElementById('ui')]) { if (tm === 'atual') el.removeAttribute('data-tema'); else el.setAttribute('data-tema', tm); } }, tema);
-      await page.waitForTimeout(3500);
+      await page.waitForTimeout(Number(process.env.NC_ME_RESULTS_WAIT ?? 3500));
       await page.screenshot({ path: `${out}/${tema}-results.png` });
       console.log('ok', tema, 'results (ao vivo)');
     }

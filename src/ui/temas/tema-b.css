@@ -32,7 +32,7 @@
 :root[data-tema="b"] .scr-payout, :root[data-tema="b"] .scr-results, :root[data-tema="b"] .scr-records { --accent: #42f5a4; --accent-2: #8bffcb; --accent-soft: rgba(66, 245, 164, 0.14); --acc-rgb: 66 245 164; }
 
 /* ── Fundo: só escurece as bordas ── */
-:root[data-tema="b"] .screen { background: linear-gradient(90deg, rgba(3, 5, 10, 0.6) 0%, rgba(3, 5, 10, 0.18) 52%, rgba(3, 5, 10, 0.5) 100%), radial-gradient(ellipse at 60% 45%, rgba(0, 0, 0, 0) 38%, rgba(2, 4, 9, 0.62) 100%); }
+:root[data-tema="b"] .screen { background: linear-gradient(90deg, rgba(3, 5, 10, 0.6) 0%, rgba(3, 5, 10, 0.3) 52%, rgba(3, 5, 10, 0.5) 100%), radial-gradient(ellipse at 60% 45%, rgba(0, 0, 0, 0) 38%, rgba(2, 4, 9, 0.62) 100%); }
 :root[data-tema="b"] .screen.stage3d { background: none; }
 
 /* ── Vidro: blur forte, fio de 1px, brilho no topo e quinas em L na cor do contexto ── */
@@ -117,7 +117,7 @@
 :root[data-tema="b"] .car-bar-track { height: calc(3 * var(--u)); }
 
 /* ── Seletor e tabelas ── */
-:root[data-tema="b"] .sel { border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.08); }
+:root[data-tema="b"] .sel { border-radius: var(--r-sm); background: rgba(7, 10, 16, 0.68); border-color: rgba(255, 255, 255, 0.08); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 :root[data-tema="b"] .sel.focus { background: rgb(var(--acc-rgb) / 0.1); border-color: var(--accent); }
 :root[data-tema="b"] .sel-arrow { color: var(--dim); }
 :root[data-tema="b"] .table th { color: var(--accent); font-weight: 500; letter-spacing: 0.18em; }
