@@ -64,19 +64,21 @@ const draw = (n: number, rnd: () => number): number => Math.floor(n + rnd());
 export function emitImpact(at: Contact, speed: number, drop: number, factor: number, rnd: () => number, spark: (s: SparkSpec) => void, chip: (p: PuffSpec) => void): void {
   if (factor <= 0) return;
   const strong = drop >= STRONG_DROP;
-  // Faíscas: metal raspando em metal — saem do contato para os lados, um pouco para cima e para trás, a 3–9 m/s, finas e curtas, e caem.
-  // Branco-amareladas a laranja (o metal esfria): sempre R ≥ G ≥ B, HDR no vermelho (o bloom, com teto, pega o miolo).
+  // Faíscas: metal raspando em metal — saem do contato para os lados e para cima, um pouco para trás, a 6–12 m/s, finas e curtas, e caem. Rápidas o
+  // bastante para sair da silhueta do carro em ~0,15 s: o contato de uma batida de frente fica atrás da lataria vista pela câmera de perseguição (na
+  // galeria do 2P, a 3–9 m/s elas apagavam escondidas). Branco-amareladas a laranja (o metal esfria): sempre R ≥ G ≥ B, HDR no vermelho (o bloom, com
+  // teto, pega o miolo).
   const n = draw((strong ? SPARKS.strong : SPARKS.light) * factor, rnd);
   for (let k = 0; k < n; k++) {
     const side = rnd() < 0.5 ? -1 : 1;
-    const lat = side * (0.35 + 0.65 * rnd()); const up = 0.15 + 0.6 * rnd(); const back = -(0.2 + 0.6 * rnd());
-    const v = (3 + 6 * rnd()) / Math.hypot(lat, up, back);
+    const lat = side * (0.55 + 0.45 * rnd()); const up = 0.3 + 0.7 * rnd(); const back = -(0.1 + 0.4 * rnd());
+    const v = (6 + 6 * rnd()) / Math.hypot(lat, up, back);
     const ax = lat * v; const ay = up * v; const az = back * v; // m/s, relativas ao carro
     const hot = rnd();
     spark({
       z: at.z + (rnd() - 0.5) * 20, x: at.x + (rnd() - 0.5) * 0.06, h: at.h + (rnd() - 0.5) * 0.2,
       vz: speed + az * U_PER_M, vx: ax / M_PER_X, vh: ay, svz: az * U_PER_M, svx: ax / M_PER_X, svh: ay,
-      life: 0.12 + 0.22 * rnd(), width: 0.018 + 0.014 * rnd(), gravity: 9.8, r: 2.4, g: 1.25 + 0.75 * hot, b: 0.3 + 0.7 * hot * hot,
+      life: 0.15 + 0.23 * rnd(), width: 0.018 + 0.014 * rnd(), gravity: 9.8, r: 2.4, g: 1.25 + 0.75 * hot, b: 0.3 + 0.7 * hot * hot,
     });
   }
   // Flash: o clarão do choque, pequeno e breve (~5 quadros), parado no contato — dois traços largos e curtos cruzados (um de pé, um de lado), não um balão.
@@ -90,7 +92,7 @@ export function emitImpact(at: Contact, speed: number, drop: number, factor: num
     const [r, g, b] = CHIP_SHADES[Math.min(CHIP_SHADES.length - 1, Math.floor(rnd() * CHIP_SHADES.length))];
     chip({
       z: at.z + (rnd() - 0.5) * 16, x: at.x + side * 0.02 * rnd(), h: at.h,
-      vz: speed * (0.82 + 0.15 * rnd()), vx: (side * (1 + 3 * rnd())) / M_PER_X, vh: 1.5 + 2.5 * rnd(),
+      vz: speed * (0.82 + 0.15 * rnd()), vx: (side * (2 + 3 * rnd())) / M_PER_X, vh: 2 + 2.5 * rnd(),
       life: 0.55 + 0.35 * rnd(), size: 0.035 + 0.05 * rnd(), grow: 0, gravity: 9.8, r, g, b,
     });
   }

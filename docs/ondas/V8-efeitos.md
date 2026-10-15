@@ -58,3 +58,10 @@ tests/fx-plan.test.ts tests/fx-onda-pow.test.ts tests/fx-linhas.test.ts tests/ca
 equal to 0.21`, esticão do nitro `expected 0.0922… to be +0`; fx-plan `expected true to be false` (POW no padrão). O teste do tranco (escrito em seguida, antes de
 mexer no `effects.ts`): `expected 0.25924022535489666 to be less than or equal to 0.15`. Os testes de cartum dos arquivos antigos (com `cartoon: true`) passavam
 antes e seguem passando: são o comportamento de antes, agora atrás da opção.
+
+**GL, vistos falhar numa cópia congelada da árvore de antes** (`git archive` do 77a67f2 em `scratch/v8/antes/` com os testes e o laboratório novos;
+`NC_REQUIRE_GL=1 npx vitest run tests/efeitos-gl.test.ts tests/cor-brilho-gl.test.ts -t "efeitos|chama|cartum|malha"`, 1845 s com a máquina a ~55 de carga):
+`Tests  6 failed | 1 passed`. Os 4 degraus: `POW: só com "Efeitos de cartum" (V8): expected true to be false`; o cartum: `estrelinhas: expected undefined to be
+true` (a malha não tinha nome); a boca do escape: `caixa 264,308–376,328: 8.8% mudou, soma rgb(103,109,121)` → `metal aquecido é R − B ≥ 40: expected -18 to be
+greater than or equal to 40` (o disco cinza-azulado, medido). **Depois**, a árvore nova inteira dos dois arquivos: `Test Files  2 passed (2)` · `Tests  14 passed
+(14)` (2231 s).

@@ -68,11 +68,21 @@ describe('o que sai da batida', () => {
       expect(s.width, 'fina').toBeLessThanOrEqual(0.035);
       expect(s.gravity, 'cai').toBeGreaterThanOrEqual(9);
       expect(rel(s), 'velocidade relativa (m/s)').toBeGreaterThanOrEqual(2);
-      expect(rel(s), 'velocidade relativa (m/s)').toBeLessThanOrEqual(10);
+      expect(rel(s), 'velocidade relativa (m/s)').toBeLessThanOrEqual(13); // traço de no máximo ~0,4 m (o leque de antes chegava a 2,6 m)
       expect(s.r, 'metal em brasa: HDR').toBeGreaterThan(1);
       expect(s.r >= s.g && s.g >= s.b, `quente: rgb(${s.r}, ${s.g}, ${s.b})`).toBe(true);
     }
     expect(metal.some((s) => s.svx > 0) && metal.some((s) => s.svx < 0), 'para os dois lados').toBe(true);
+  });
+
+  it('visíveis da câmera de perseguição: em 0,15 s ao menos 40% das faíscas já saíram da silhueta do carro (mais de 1 m para o lado ou acima do teto)', () => {
+    // A galeria do 2P (07) mostrou a batida de frente escondida pelo próprio carro: o contato fica no para-choque dianteiro, atrás da lataria vista de
+    // trás, e faíscas de 3–9 m/s não saíam da silhueta antes de apagar. Conta só as metálicas, no referencial do carro (a câmera vai junto).
+    seed = 21;
+    const { metal } = collect(0.3, 1);
+    const T = 0.15;
+    const fora = metal.filter((s) => Math.abs(s.svx * MX * T) > 1.0 || s.h + s.svh * T - 0.5 * s.gravity * T * T > 1.35).length;
+    expect(fora / metal.length, `${fora} de ${metal.length}`).toBeGreaterThanOrEqual(0.4);
   });
 
   it('mais forte com a queda de velocidade; o degrau escala; fator 0 ("Reduzir efeitos") não solta nada — nem lasca nem flash', () => {
