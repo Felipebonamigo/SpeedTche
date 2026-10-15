@@ -43,7 +43,7 @@
   background: linear-gradient(115deg, transparent 0 74%, rgba(255, 138, 31, 0.18) 74% 76%, transparent 76% 79%, rgba(255, 61, 127, 0.18) 79% 80.5%, transparent 80.5% 83%, rgba(47, 123, 255, 0.2) 83% 84%, transparent 84%);
 }
 :root[data-tema="speedtche"] .screen.scr-title::before {
-  background: linear-gradient(115deg, transparent 0 34%, rgba(255, 138, 31, 0.24) 34% 46%, rgba(255, 61, 127, 0.22) 46% 54%, rgba(47, 123, 255, 0.2) 54% 59%, transparent 59%);
+  background: linear-gradient(115deg, transparent 0 40%, rgba(255, 138, 31, 0.16) 40% 47%, rgba(255, 61, 127, 0.14) 47% 52%, rgba(47, 123, 255, 0.13) 52% 55%, transparent 55%);
 }
 /* A pausa abre por cima da corrida: o véu de pôr do sol vira só um escurecido (o jogo atrás continua o que é). */
 :root[data-tema="speedtche"] .screen.scr-pause { background: linear-gradient(180deg, rgba(6, 8, 22, 0.55), rgba(6, 8, 22, 0.75)); }
@@ -65,6 +65,8 @@
 /* Rótulos de painel (B): caixa alta, espaçados, na cor do acento, retos. */
 :root[data-tema="speedtche"] .sub-title,
 :root[data-tema="speedtche"] .home-box-title { color: #ffad6b; letter-spacing: 0.16em; font-weight: 700; }
+/* O título do painel do lobby ("Opções da corrida (Jogador 1)") é o mais longo numa coluna estreita: espaçamento menor, numa linha só. */
+:root[data-tema="speedtche"] .lobby-panel .sub-title { letter-spacing: 0.06em; }
 :root[data-tema="speedtche"] .goal-row .goal-tag { color: var(--a-sun); }
 :root[data-tema="speedtche"] .goal-bar { height: calc(4 * var(--u)); border-radius: 0; background: rgba(255, 255, 255, 0.12); }
 :root[data-tema="speedtche"] .goal-bar > i { background: var(--a-grad); }
@@ -86,7 +88,7 @@
 }
 :root[data-tema="speedtche"] .title-foot { color: #d6c6e6; }
 :root[data-tema="speedtche"] .main-hint { color: #e3e8f2; text-shadow: 0 1px calc(8 * var(--u)) rgba(2, 4, 12, 0.9); }
-:root[data-tema="speedtche"] .screen > .hint { text-shadow: 0 1px calc(8 * var(--u)) rgba(2, 4, 12, 0.9); }
+:root[data-tema="speedtche"] .screen > .hint, :root[data-tema="speedtche"] .screen > .muted, :root[data-tema="speedtche"] .rec-hint, :root[data-tema="speedtche"] .empty { text-shadow: 0 1px calc(8 * var(--u)) rgba(2, 4, 12, 0.95), 0 0 2px rgba(2, 4, 12, 0.8); }
 :root[data-tema="speedtche"] .logo { filter: drop-shadow(0 calc(10 * var(--u)) calc(22 * var(--u)) rgba(0, 0, 0, 0.5)); }
 
 /* ── Botões (A): inclinados, itálico, degradê no foco. O rótulo do botão é título, não corpo de texto. ── */
@@ -131,6 +133,7 @@
 }
 :root[data-tema="speedtche"] .sel.focus { background: linear-gradient(100deg, rgba(255, 138, 31, 0.42), rgba(255, 61, 127, 0.3)); border-color: rgba(255, 190, 140, 0.6); }
 :root[data-tema="speedtche"] .sel-label { color: #c3cbd8; }
+:root[data-tema="speedtche"] .sel.focus .sel-label { color: #fff; }
 :root[data-tema="speedtche"] .sel-arrow { color: #ffb27a; }
 :root[data-tema="speedtche"] .car-bar-track, :root[data-tema="speedtche"] .ach-bar { border-radius: 0; }
 :root[data-tema="speedtche"] .car-bar-fill { border-radius: 0; background: var(--a-grad); }

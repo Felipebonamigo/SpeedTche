@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- Folha de componentes dos temas de menu (docs/ondas/menu-estilos.md): botão, cartões do menu (um em foco), selo, chips, barras,
-     seletor, abas, tabela, ícones, tipografia e paleta, com as classes REAIS do jogo. Serve com `npx vite` e abre em
-     /tools/menu-estilos-componentes.html?tema=a|b|c (sem o parâmetro: o visual atual). tools/menu-estilos-componentes.mjs fotografa. -->
+     seletor, abas, tabela, ícones, tipografia e paleta, com as classes REAIS do jogo. Serve com o vite de desenvolvimento e abre em
+     /tools/menu-estilos/componentes.html?tema=speedtche|classico|a|b|c (sem o parâmetro: o padrão do jogo, "speedtche"). As direções
+     a, b e c da escolha de 14/10 só existem aqui (tools/menu-estilos/tema-*.css). tools/menu-estilos/componentes.mjs fotografa. -->
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -111,10 +112,15 @@
     import '/src/ui/fonts.css';
     import '/src/ui/screens/select.css';
     import '/src/ui/screens/passport.css';
-    import '/src/ui/temas/tema';
+    import { aplicarTema } from '/src/ui/temas/tema';
+    import '/tools/menu-estilos/tema-icones.css';
+    import '/tools/menu-estilos/tema-a.css';
+    import '/tools/menu-estilos/tema-b.css';
+    import '/tools/menu-estilos/tema-c.css';
     import { icon } from '/src/ui/screens/icons.ts';
-    const tema = new URLSearchParams(location.search).get('tema');
-    document.getElementById('tema-nome').textContent = tema ? `Tema ${tema.toUpperCase()}` : 'Tema atual';
+    const tema = new URLSearchParams(location.search).get('tema') ?? 'speedtche';
+    aplicarTema(tema === 'classico' ? null : tema);
+    document.getElementById('tema-nome').textContent = `Tema ${tema}`;
     const sw = document.getElementById('sw');
     for (const [nome, v] of [['accent', '--accent'], ['accent-2', '--accent-2'], ['ok', '--ok'], ['bad', '--bad'], ['text', '--text'], ['muted', '--muted'], ['glass', '--glass']]) {
       const el = document.createElement('div'); el.className = 'sw'; el.innerHTML = `<i style="background:var(${v})"></i>${nome}`; sw.appendChild(el);

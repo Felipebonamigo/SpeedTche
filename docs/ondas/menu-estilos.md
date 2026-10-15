@@ -1,14 +1,47 @@
-# Três direções visuais para o menu (A, B, C)
+# Menu: das três direções ao tema padrão "speedtche" (V3)
+
+## Decisão do dono (14/10/2026) e o que entrou no jogo
+
+O dono escolheu **a direção A ("Velocidade") como base, com os painéis de informação da B ("Vidro")**, e isso virou o **visual padrão** dos
+menus (sem parâmetro). Diretriz visual vigente: "um pouco mais realista que o Horizon Chase Turbo, e mais bonito que ele".
+
+- **Tema `speedtche`** (`src/ui/temas/tema-speedtche.css`, ligado por `src/ui/temas/tema.ts` como atributo `data-tema` em `<html>` e no `#ui`):
+  - da A: títulos, botões e cartões em itálico forte (Fredoka inclinada); cartões do menu com número grande 01–05 que viram degradê
+    laranja→rosa no foco; botões inclinados; véu de pôr do sol e faixas diagonais laranja/rosa/azul atrás; números grandes (carteira, prêmio)
+    em itálico;
+  - da B: todo painel de informação (vidro, quadros "Próximo objetivo"/"Desde a última vez", linhas de opção, tabelas, painéis da garagem,
+    colunas do Pagamento) é vidro escuro com desfoque e fio de 1px; o **texto de dentro é reto** (sem itálico), em cinzas legíveis, com
+    rótulos em caixa alta espaçados na cor do acento.
+  - Só repinta: nenhuma tela, navegação ou estado mudou. Os tokens moram no `#ui` (o HUD de corrida, irmão dele, não muda: fica para a V5).
+- **`?tema=classico`** volta ao visual anterior (CSS e logo antigos), **só até a próxima versão**, para comparar. Depois saem o parâmetro, o
+  `logoClassicoMarkup` e a escolha em `tema.ts`, e o CSS do tema pode virar o `styles.css`.
+- **As direções B e C puras saíram do jogo**: ficam no histórico do git e na folha de componentes (`tools/menu-estilos/tema-{a,b,c}.css`,
+  `tools/menu-estilos/componentes.html?tema=a|b|c`).
+- **Logo novo** (`src/ui/logo.ts`, SVG inline, sem dependência): "SPEED" / "TCHÊ" em itálico forte, contorno azul-marinho grosso com sombra
+  sólida (legível em fundo claro e escuro), "TCHÊ" em degradê de sol e a faixa de velocidade laranja/rosa/azul cruzando por trás. Três tamanhos:
+  título (`big`), canto do menu e créditos (`small`, mesma caixa do antigo) e ícone quadrado "ST" (`icon`). Foi a variação **"cromo"**, a escolhida
+  entre três (`scratch/menu-estilos/logos.png`; as outras, "placa" e "fita", existem só em `tools/menu-estilos/logos.ts` e na folha
+  `/tools/menu-estilos/logos.html?v=placa|fita`). `textLength` fixa a largura: sem a fonte carregada, o desenho não muda de tamanho.
+- **Defeito corrigido junto** (achado pela frente técnica): o detalhe da **Copa África do Sul** não cabia em 1280×800 (Steam Deck) nem em
+  1024×600: os nomes "Cidade · trecho" quebravam e a 4ª corrida ficava por cima da dica de teclas (`scripts/pistas-ui.mjs`). Em telas mais
+  altas que 16:9 fica só o trecho (como já era com texto grande) e, com texto grande, sai o estilo do rival (`src/ui/screens/select.css`). Vale
+  no clássico e no padrão. A cena virou `cups-africa` no `scripts/playtest-layout.mjs` (vista falhar antes: 3/6 combinações limpas).
+
+{{RESULTADO_V3}}
+
+---
+
+# Três direções visuais para o menu (A, B, C) — a escolha de 14/10/2026
 
 Pedido do dono: "o nosso menu ainda é muito feio visualmente, precisamos de algo moderno e bonito", e o jogo todo mais bonito que o Horizon Chase Turbo.
 Esta página é **para escolher**: nada aqui redesenha o menu de forma definitiva. As três direções são **temas opcionais**, ligados por `?tema=a|b|c`
 na URL (atributo `data-tema` em `<html>` e no `#ui`). Sem o parâmetro, o visual atual segue como padrão, byte a byte.
 
-- Código: `src/ui/temas/` (`tema.ts` lê o parâmetro; `tema-base.css` é a parte comum; `tema-a.css`, `tema-b.css`, `tema-c.css`; `tema-icones.css` tem os ícones SVG inline).
+- Código (na escolha; em V3 as três folhas e os ícones foram para `tools/menu-estilos/`): `src/ui/temas/tema.ts` lia o parâmetro; `tema-base.css` é a parte comum; `tema-a.css`, `tema-b.css`, `tema-c.css`; `tema-icones.css` tem os ícones SVG inline.
   Nenhum arquivo de tela, comportamento, navegação ou estado foi tocado: `menus.ts` só ganhou um `import './temas/tema'`. Marcação nova: nenhuma.
-- Como ver: `npx vite` e abrir `http://localhost:5173/?tema=a` (ou `b`, `c`). Folha de componentes com as classes reais: `/tools/menu-estilos-componentes.html?tema=a`.
-- Como refazer as imagens: `node scripts/menu-estilos-capture.mjs` (telas reais, 1280×720, uma página só: o tema troca em tempo de execução),
-  `node tools/menu-estilos-componentes.mjs` (componentes) e `node tools/menu-estilos-folha.mjs` (monta a folha geral). Saída em `scratch/menu-estilos/` (fora do git).
+- Como ver (na escolha; desde a V3 o jogo só tem o padrão e o `?tema=classico`, e A, B e C ficam só na folha): folha de componentes com as classes reais: `/tools/menu-estilos/componentes.html?tema=a`.
+- Como refazer as imagens: `node tools/menu-estilos/capturar.mjs` (telas reais, 1280×720, uma página só: o tema troca em tempo de execução),
+  `node tools/menu-estilos/componentes.mjs` (componentes) e `node tools/menu-estilos/folha.mjs` (monta a folha geral). Saída em `scratch/menu-estilos/` (fora do git).
 - Regra de ouro dos três: **só repintam** (cor, borda, sombra, fundo, fonte). Contorno e sombra grossos são `box-shadow`, não borda; os cantos "inclinados" são
   `skewX` só em botões que não ficam colados a vizinhos. Nada muda tamanho, posição ou ordem de foco. O palco 3D (`.stage3d`) continua sem fundo no `.screen` e no `.gp`
   (regra em `tema-base.css`): **nenhum tema cobre a janela do carro**.
