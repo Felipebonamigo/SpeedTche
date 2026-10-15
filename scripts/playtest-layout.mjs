@@ -280,19 +280,25 @@ const SCREENS = [
     document.querySelectorAll('.rec-tab')[3]?.click();
   }],
   ['lobby-1-locked', () => {
-    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
-    for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1');
-    save.carsUnlocked = []; s.menus.show('lobby');
+    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked; const seatCars = save.seatCars;
+    // Sem ninguém ligado o lobby zera os assentos: toda passada começa no Falcão (o assento ligado guardaria o carro da passada anterior).
+    for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.menus.show('lobby');
+    save.carsUnlocked = []; save.seatCars = ['falcao', 'falcao', 'falcao', 'falcao'];
+    s.input.bindSeat(0, 'kb1'); s.menus.show('lobby');
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // do Falcão ao último da lista (o Beija-Flor, trancado)
-    save.carsUnlocked = keep;
+    save.carsUnlocked = keep; save.seatCars = seatCars;
+    if (document.querySelectorAll('.car-hero.is-locked').length !== 1) console.error('lobby-1-locked: a cena não mostrou o carro com cadeado');
   }],
   ['lobby-4-locked', () => {
-    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
+    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked; const seatCars = save.seatCars;
+    for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.menus.show('lobby'); // assentos zerados: toda passada igual (ver lobby-1-locked)
+    save.carsUnlocked = []; save.seatCars = ['falcao', 'falcao', 'falcao', 'falcao'];
     ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));
-    save.carsUnlocked = []; s.menus.show('lobby');
-    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // P1 (setas) num trancado
-    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true })); // P2 (WASD) num trancado
-    save.carsUnlocked = keep;
+    s.menus.show('lobby');
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // P1 (setas): do Falcão ao Beija-Flor, trancado
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true })); // P2 (WASD): idem
+    save.carsUnlocked = keep; save.seatCars = seatCars;
+    if (document.querySelectorAll('.car-hero.is-locked').length !== 2) console.error('lobby-4-locked: a cena não mostrou os 2 carros com cadeado');
   }],
   ['tournament-locked', () => {
     const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
@@ -303,6 +309,7 @@ const SCREENS = [
     for (let i = 0; i < 8; i++) document.querySelector('.tp-row-actions .btn:not(.disabled)')?.click();
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // o piloto em foco num trancado: a linha do erro diz o preço
     save.carsUnlocked = keep;
+    if (!document.querySelector('.tp-car.is-locked')) console.error('tournament-locked: a cena não mostrou o carro com cadeado');
   }],
 ].filter(([id]) => !ONLY || ONLY.includes(id));
 

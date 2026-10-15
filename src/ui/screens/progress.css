@@ -7,6 +7,8 @@
 .sel-lock .lock-value { min-width: 0; white-space: normal; text-align: right; line-height: 1.1; }
 /* No cartão 2×2 o texto pode quebrar em duas linhas: sem o respiro vertical da linha da pintura, para o carro de cima não ser espremido. */
 :is(.slot, .online-local) .sel-paint.sel-lock { padding-top: 0; padding-bottom: 0; }
+/* E as duas linhas sem entrelinha: a 1024×640 com texto grande, com 1.1 o carro de cima ainda transbordava 1 px (lobby-1/4-locked). */
+:is(.slot, .online-local) .sel-lock .lock-value { line-height: 1; }
 .lock-note { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; }
 .lock-note .lock-value { min-width: 0; }
 
