@@ -4,7 +4,7 @@
 // cada desenho de roda presente é outra. Modelo com atlas de paleta (`map`) tem o próprio material. Carroceria, cabine, vidro, cromo, lentes e peças vivem na
 // mesma malha e no mesmo material (cars/material.ts): pintura e acento por instância, faixas por
 // camada, farol/lanterna emissivos (freio por instância), verniz com o reflexo do céu na qualidade alta.
-// Chama de nitro em malha (cor por instância), estrelinhas da batida, sombra de contato e etiqueta de nome. Pose por viewport via
+// Chama de nitro em malha (cor por instância), estrelinhas da batida (só com "Efeitos de cartum", V8), sombra de contato e etiqueta de nome. Pose por viewport via
 // locateOnFrame; a animação (giro de roda, rolagem, mergulho) é por carro, uma vez por quadro.
 // O VISUAL do carro (N3, RenderFrame.looks / src/game/cosmetics.ts) é todo por instância: o acabamento nos bits 3–5 de `instExtra.w`, a faixa
 // nos bits A/B do corpo, a roda escolhida é só QUAL dos 9 lotes de roda recebe as 4 instâncias, o aro é o bit B do lote de roda (outro bit
@@ -123,7 +123,7 @@ export class Cars {
   private readonly stars: THREE.InstancedMesh;
   private readonly starPose: StarPose = { x: 0, y: 0, z: 0, scale: 0, roll: 0 };
   /** Entrada reaproveitada do `stepMotion` (nada de objeto novo por carro por quadro). */
-  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, maxSpeed: 1, reduce: false };
+  private readonly motionIn: MotionInput = { driftDir: 0, driftTicks: 0, driftBoostTicks: 0, nitroTicks: 0, collisionCooldown: 0, speed: 0, maxSpeed: 1, reduce: false, cartoon: false };
   /** Aparência por carro (estilo, cores, acabamento, roda, aro, chama), recalculada só quando o carro ou o look mudam. */
   private readonly looks: Array<CarDraw | null> = [];
   private readonly lookIds: string[] = [];
@@ -224,6 +224,7 @@ export class Cars {
     this.stars.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * STARS_PER_CAR * 3), 3);
     for (let k = 0; k < MAX_CARS * STARS_PER_CAR; k++) this.stars.setColorAt(k, new THREE.Color(STAR_COLORS[k % STAR_COLORS.length]));
     this.stars.renderOrder = 6;
+    this.stars.name = 'car-stars';
     for (const im of this.instanced) {
       im.frustumCulled = false;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -374,6 +375,7 @@ export class Cars {
       const mi = this.motionIn;
       mi.driftDir = c.driftDir; mi.driftTicks = c.driftTicks; mi.driftBoostTicks = c.driftBoostTicks; mi.nitroTicks = c.nitroTicks;
       mi.collisionCooldown = c.collisionCooldown; mi.speed = c.speed; mi.maxSpeed = c.stats.topSpeed; mi.reduce = frame.options.reduceEffects;
+      mi.cartoon = frame.options.cartoonEffects === true; // V8: rodopio, squash & stretch e estrelinhas só com "Efeitos de cartum"
       stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;

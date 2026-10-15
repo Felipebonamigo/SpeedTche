@@ -6,6 +6,8 @@
 // M5: cada efeito respeita `reduceEffects` e o degrau de qualidade (fx/plan.ts); as bordas do
 // estado (largada, nitro, batida, impulso) vêm de fx/cues.ts, que não perde a batida num quadro
 // de tela que cobre vários ticks.
+// V8 (docs/ondas/V8-efeitos.md): a batida é realista por padrão — faíscas metálicas curtas, lascas e um flash no PONTO DE CONTATO (fx/impact.ts) e
+// um tranco curto de câmera; o "POW!" e o leque de faíscas de quadrinho só com a opção "Efeitos de cartum" (`options.cartoonEffects`).
 import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
@@ -19,6 +21,7 @@ import { fxPlan, type FxPlan } from './fx/plan';
 import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
 import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
+import { contactPoint, emitImpact, type Contact } from './fx/impact';
 import { Pows, powSize } from './fx/pow';
 import { Shockwaves } from './fx/shockwave';
 import { draftLine, lineCount, speedLine, speedLineStrength, type LineSpec } from './fx/lines';
@@ -166,6 +169,13 @@ const NEAR_VIEWER = 8000;
 const POW_AHEAD = 20;
 /** O halo do nitro nasce 1,4 m (70 unidades) atrás do centro do carro, no escape, e vai com ele. */
 const HALO_BEHIND = 70;
+/**
+ * Decaimento (1/s) do tranco de câmera da batida: em 0,3 s fica abaixo de 10% — um tranco, não um tremor (V8; era 4,5: ~0,5 s balançando).
+ * A amplitude e o desenho do movimento são os da M5 (`shake`).
+ */
+const SHAKE_DECAY = 8;
+/** Duas batidas a menos que isto (unidades de pista; 1 m) no mesmo quadro são a mesma: os dois carros da batida em fila dão UMA rajada. */
+const SAME_CONTACT = 50;
 
 /** O que cada viewport guarda entre quadros para as linhas: intensidades suavizadas e a posição do carro dele. */
 interface ViewFx { lineS: number; draftI: number; z: number; x: number; travel: number; speedMs: number; time: number }
@@ -192,6 +202,11 @@ export class Effects {
   private readonly sparkCar: SparkCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0 };
   private readonly emitSpark = (s: SparkSpec): void => this.sparks.emit(s);
   private readonly emitPuff = (s: PuffSpec): void => this.dust.emitSpec(s);
+  /** O ponto de contato da batida (fx/impact.ts) e os já usados neste quadro (z, x), para não soltar duas rajadas no mesmo lugar. */
+  private readonly contact: Contact = { z: 0, x: 0, h: 0, partner: -1 };
+  private readonly contactsZ = new Float32Array(8);
+  private readonly contactsX = new Float32Array(8);
+  private contactsN = 0;
   private readonly puffCar: PuffCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, skidTicks: 0 };
   private readonly dustRgb: [number, number, number] = [0.54, 0.48, 0.35];
   private readonly prevSpeed = new Float32Array(20);
@@ -201,14 +216,16 @@ export class Effects {
   private lastTime = -1;
   private seed = 0;
 
-  constructor() { this.group.add(this.marks.mesh, this.waves.mesh, this.dust.points, this.streaks.mesh, this.pows.mesh); }
+  constructor() { this.group.add(this.marks.mesh, this.waves.mesh, this.waves.haloMesh, this.dust.points, this.streaks.mesh, this.pows.mesh); }
 
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
     this.dustColor.set(p.verge).lerp(new THREE.Color(p.shoulder), 0.4).multiplyScalar(p.light < 0.5 ? 0.7 : 0.92);
     // Cor-brilho: as linhas brancas (velocidade e túnel do vácuo) são aditivas; com o mesmo brilho sobre a cena da noite, 10× mais escura, viravam
-    // barras de farol ao lado dos carros (Sampa). Caem com a luz do período: 1 de dia, ~0,76 no entardecer, 0,45 à noite.
-    this.lineGain = 0.45 + 0.55 * Math.min(1, Math.max(0, (p.light - 0.32) / 0.68));
+    // barras de farol ao lado dos carros (Sampa). Caem com a luz do período. V8: 1 de dia e 0,33 no entardecer e à noite (eram ~0,76 e 0,45: no
+    // entardecer, o de limiar de bloom mais baixo, 1,6, elas brilhavam); contínuo entre os dois (a corrida que muda chama isto com a luz ao vivo).
+    const t = Math.min(1, Math.max(0, (p.light - 0.7) / 0.25));
+    this.lineGain = 0.33 + 0.67 * t * t * (3 - 2 * t);
   }
 
   /** Brilho das linhas de velocidade e do túnel pelo período (`setPalette`). */
@@ -244,7 +261,7 @@ export class Effects {
     if (frame.paused) return;
     const state: RaceState = frame.state;
     const reduce = frame.options.reduceEffects === true;
-    const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length);
+    const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length, frame.options.cartoonEffects === true);
     this.plan = plan;
     this.marks.buffer.setTrackLength(frame.track.length);
     this.marks.buffer.setCapacity(plan.marks);
@@ -275,6 +292,7 @@ export class Effects {
       if (c.nitroTicks > 0 && state.phase === 'racing') emitNitroTrail(this.sparkCarOf(c), plan.sparks, rnd, this.emitSpark);
     }
     // Bordas do estado (fx/cues.ts): a batida e o impulso da derrapagem.
+    this.contactsN = 0;
     for (const cue of observeCues(this.cueMemory, state, this.cues)) {
       const c = state.cars[cue.car]?.id === cue.car ? state.cars[cue.car] : state.cars.find((o) => o.id === cue.car);
       if (!c) continue;
@@ -284,8 +302,15 @@ export class Effects {
         // O halo é do carro de quem joga: o dos rivais (até 19) tomaria as 8 vagas dos anéis que se veem.
         if (c.seat >= 0) this.waves.spawn('halo', c.z - HALO_BEHIND, c.x, 0.55, c.id);
       } else if (cue.kind === 'hit') {
-        if (plan.pow && this.nearViewer(frame, c.z)) this.pows.spawn(c.z + POW_AHEAD, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5, c.id);
-        emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);
+        if (plan.pow) {
+          // "Efeitos de cartum": o quadrinho e o leque de faíscas de antes, em volta do carro.
+          if (this.nearViewer(frame, c.z)) this.pows.spawn(c.z + POW_AHEAD, c.x, 1.5, powSize(cue.drop), (rnd() - 0.5) * 0.5, c.id);
+          emitHitSparks(this.sparkCarOf(c), cue.drop, plan.sparks, rnd, this.emitSpark);
+        } else if (plan.sparks > 0) {
+          // Realista: faíscas, lascas e flash no ponto de contato — uma rajada por batida (os dois carros da batida em fila dão o mesmo ponto).
+          const at = contactPoint(c, state.cars, frame.track.length, this.contact);
+          if (this.freshContact(at, frame.track.length)) emitImpact(at, c.speed, cue.drop, plan.sparks, rnd, this.emitSpark, this.emitPuff);
+        }
         if (c.seat >= 0 && c.seat < 4) this.shakeAmp[c.seat] = Math.min(1, this.shakeAmp[c.seat] + 0.6 + 0.4 * (c.speed / c.stats.topSpeed));
       } else if (cue.kind === 'boost') {
         emitBoostSparks(this.sparkCarOf(c), cue.level, plan.sparks, rnd, this.emitSpark);
@@ -320,7 +345,16 @@ export class Effects {
     this.sparks.step(dt);
     this.waves.step(dt);
     this.pows.step(dt);
-    for (let s = 0; s < 4; s++) this.shakeAmp[s] *= Math.exp(-4.5 * dt);
+    for (let s = 0; s < 4; s++) this.shakeAmp[s] *= Math.exp(-SHAKE_DECAY * dt);
+  }
+
+  /** O ponto `at` ainda não soltou rajada neste quadro? (Guarda-o, se não.) */
+  private freshContact(at: Contact, trackLength: number): boolean {
+    for (let i = 0; i < this.contactsN; i++) {
+      if (Math.abs(wrappedDelta(at.z, this.contactsZ[i], trackLength)) < SAME_CONTACT && Math.abs(at.x - this.contactsX[i]) * 7 < 1) return false;
+    }
+    if (this.contactsN < this.contactsZ.length) { this.contactsZ[this.contactsN] = at.z; this.contactsX[this.contactsN] = at.x; this.contactsN++; }
+    return true;
   }
 
   /** `viewport` = o índice do viewport desta pose (as linhas de velocidade e o túnel são de quem corre nele). */

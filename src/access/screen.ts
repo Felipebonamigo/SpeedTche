@@ -1,5 +1,7 @@
 // Tela de Acessibilidade (Opções › Acessibilidade): cores dos jogadores, tamanho do HUD, legenda dos marcos, texto
-// grande, reduzir efeitos, tremor de tela e a direção assistida de cada assento, com a explicação do item em foco.
+// grande, reduzir efeitos, efeitos de cartum, tremor de tela e a direção assistida de cada assento, com a explicação do item em foco.
+// "Efeitos de cartum" (V8, docs/ondas/V8-efeitos.md) entra na coluna Visão, ao lado de "Reduzir efeitos": ela fica com 7 linhas e as amostras de cor,
+// abaixo das 9 da coluna de direção (as colunas das Opções já têm as 10 que cabem).
 // A legenda dos marcos mora aqui, ao lado do tamanho do HUD: as duas colunas das Opções já têm as dez linhas que cabem.
 // Tela própria porque a de Opções já ocupa 1280×720 inteira: uma terceira coluna lá cortava os rótulos.
 import { COLOR_PALETTES, seatColor } from '../core/data/drivers';
@@ -47,6 +49,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     { item: selector(t('caption.option'), () => onOff(s.landmarkCaptions), () => { s.landmarkCaptions = !s.landmarkCaptions; commit(); }, { sfx }), desc: () => t('caption.desc') },
     { item: selector(t('access.options.largeText'), () => onOff(s.largeText), () => { s.largeText = !s.largeText; commit(); }, { sfx }), desc: () => t('access.desc.largeText') },
     { item: selector(t('access.options.reduceEffects'), () => onOff(s.reduceEffects), () => { s.reduceEffects = !s.reduceEffects; commit(); }, { sfx }), desc: () => t('access.desc.reduceEffects') },
+    { item: selector(t('access.options.cartoon'), () => onOff(s.cartoonEffects), () => { s.cartoonEffects = !s.cartoonEffects; commit(); }, { sfx }), desc: () => t('access.desc.cartoon') },
     { item: selector(t('ui.options.shake'), () => onOff(s.screenShake), () => { s.screenShake = !s.screenShake; commit(); }, { sfx }), desc: () => t('access.desc.shake') },
   ];
   // A sessão troca o array a cada mudança de opções: sempre lido de s.seatAssists na hora.

@@ -31,6 +31,7 @@ registerStrings('access', {
     'options.hudScale': 'Tamanho do HUD',
     'options.largeText': 'Texto grande',
     'options.reduceEffects': 'Reduzir efeitos',
+    'options.cartoon': 'Efeitos de cartum',
 
     'palette.default': 'Padrão',
     'palette.deutan': 'Vermelho/verde',
@@ -44,6 +45,7 @@ registerStrings('access', {
     'desc.largeText': 'Texto maior nos menus.',
     'desc.reduceEffects': 'Sem tremor da câmera, linhas de velocidade, piscadas e faíscas.',
     'desc.shake': 'A câmera treme nas batidas. "Reduzir efeitos" também desliga o tremor.',
+    'desc.cartoon': 'Batidas de desenho animado: o balão "POW!", estrelinhas, o carro que gira e achata. Desligado: faíscas, lascas e um tranco, como de verdade.',
     'desc.level.none': 'Sem ajuda: o jogador faz tudo.',
     'desc.level.brake': 'Freio automático: tira o pé e freia sozinho antes das curvas fortes; o volante é do jogador.',
     'desc.level.steer': 'Volante assistido: compensa as curvas e segura o carro no asfalto, sem tirar o volante do jogador.',
@@ -78,6 +80,7 @@ registerStrings('access', {
     'options.hudScale': 'HUD size',
     'options.largeText': 'Large text',
     'options.reduceEffects': 'Reduce effects',
+    'options.cartoon': 'Cartoon effects',
 
     'palette.default': 'Default',
     'palette.deutan': 'Red/green',
@@ -91,6 +94,7 @@ registerStrings('access', {
     'desc.largeText': 'Bigger text in the menus.',
     'desc.reduceEffects': 'No camera shake, speed lines, blinking or sparks.',
     'desc.shake': 'The camera shakes on crashes. "Reduce effects" also turns it off.',
+    'desc.cartoon': 'Cartoon crashes: the "POW!" bubble, little stars, the car spinning and squashing. Off: sparks, debris and a jolt, like the real thing.',
     'desc.level.none': 'No help: the player does everything.',
     'desc.level.brake': 'Auto brake: lifts and brakes by itself before sharp corners; the steering is the player\'s.',
     'desc.level.steer': 'Steering assist: counters the corners and keeps the car on the asphalt without taking the wheel away.',

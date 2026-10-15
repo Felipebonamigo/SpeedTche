@@ -1,6 +1,9 @@
 // Onda de choque (M5): um anel que se abre e apaga, na largada (deitado no chão sob o carro; azul e maior na largada-foguete) e no engate do nitro
 // (de pé, atrás do carro, atravessado ao rumo da pista). Só liga transições do estado que já existem (fx/cues.ts: `go` e `nitro`); a onda N liga os
 // eventos novos aos mesmos anéis. Uma `InstancedMesh` de no máximo 8 anéis, aditiva: o brilho vai pela cor da instância (a cor × o alfa).
+// V8 (docs/ondas/V8-efeitos.md): o halo do nitro era um aro grosso (22% do raio, 1,1 m no fim) azul HDR que o bloom pegava; virou um anel FINO (4,5% do
+// raio), transparente (cor ≤ 0,4, abaixo do limiar do bloom) e rápido (0,22 s, até 3,2 m), na malha própria `haloMesh` — a geometria é outra, o
+// material (e o programa) é o mesmo do anel da largada, que não muda. Os 8 lugares do pool são dos dois.
 import * as THREE from 'three';
 import type { Track } from '../../core/types';
 import { locateOnFrame, type FramePoint, type RoadFrame } from '../roadframe';
@@ -11,10 +14,13 @@ export const SHOCK_MAX = 8;
 export const SHOCK_SPECS: Record<ShockKind, { life: number; r0: number; r1: number }> = {
   ground: { life: 0.5, r0: 0.6, r1: 7 },
   perfect: { life: 0.55, r0: 0.8, r1: 11 },
-  halo: { life: 0.35, r0: 0.8, r1: 5 },
+  halo: { life: 0.22, r0: 0.7, r1: 3.2 },
 };
 /** Cor HDR de cada tipo (o bloom pega). */
-const COLORS: Record<ShockKind, readonly [number, number, number]> = { ground: [1.5, 1.35, 0.95], perfect: [0.5, 1.2, 2.2], halo: [0.8, 1.4, 2.0] };
+const COLORS: Record<ShockKind, readonly [number, number, number]> = { ground: [1.5, 1.35, 0.95], perfect: [0.5, 1.2, 2.2], halo: [0.24, 0.32, 0.4] };
+/** As três voltas (raio interno, miolo, externo) do anel da largada e do halo fino do nitro. */
+const GROUND_RADII = [0.78, 0.9, 1] as const;
+const HALO_RADII = [0.955, 0.978, 1] as const;
 const KIND_INDEX: ShockKind[] = ['ground', 'perfect', 'halo'];
 
 /** O anel `age` s depois de nascer: o raio abre rápido e desacelera, o brilho cai. Nulo fora da vida. */
@@ -27,10 +33,9 @@ export function shockPose(kind: ShockKind, age: number): { radius: number; alpha
 
 /**
  * O anel macio: três voltas de vértices (raio 0,78 / 0,9 / 1) com cor de vértice 0 / 1 / 0 — com mistura aditiva o preto não soma nada, então as duas bordas
- * somem e o miolo brilha, em vez de uma faixa chapada (a primeira captura mostrou um aro bege duro). 160 triângulos.
+ * somem e o miolo brilha, em vez de uma faixa chapada (a primeira captura mostrou um aro bege duro). 160 triângulos. `radii`: as três voltas (o halo é fino).
  */
-export function buildShockRingGeometry(segments = 40): THREE.BufferGeometry {
-  const radii = [0.78, 0.9, 1];
+export function buildShockRingGeometry(segments = 40, radii: readonly number[] = GROUND_RADII): THREE.BufferGeometry {
   const level = [0, 1, 0];
   const pos: number[] = []; const col: number[] = []; const idx: number[] = [];
   for (let r = 0; r < radii.length; r++) {
@@ -55,7 +60,10 @@ export function buildShockRingGeometry(segments = 40): THREE.BufferGeometry {
 }
 
 export class Shockwaves {
+  /** A largada (chão e largada-foguete). */
   readonly mesh: THREE.InstancedMesh;
+  /** O halo fino do engate do nitro (V8): outra geometria, o mesmo material. */
+  readonly haloMesh: THREE.InstancedMesh;
   private readonly kind = new Uint8Array(SHOCK_MAX);
   private readonly z = new Float32Array(SHOCK_MAX);
   private readonly x = new Float32Array(SHOCK_MAX);
@@ -71,12 +79,16 @@ export class Shockwaves {
   constructor() {
     this.material = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     this.mesh = new THREE.InstancedMesh(buildShockRingGeometry(), this.material, SHOCK_MAX);
-    this.mesh.setColorAt(0, this.color.setRGB(0, 0, 0)); // aloca o instanceColor
-    this.mesh.count = 0;
-    this.mesh.visible = false;
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 2;
+    this.haloMesh = new THREE.InstancedMesh(buildShockRingGeometry(48, HALO_RADII), this.material, SHOCK_MAX);
+    for (const m of [this.mesh, this.haloMesh]) {
+      m.setColorAt(0, this.color.setRGB(0, 0, 0)); // aloca o instanceColor
+      m.count = 0;
+      m.visible = false;
+      m.frustumCulled = false;
+      m.renderOrder = 2;
+    }
     this.mesh.name = 'fx-shockwaves';
+    this.haloMesh.name = 'fx-halo';
   }
 
   /**
@@ -104,11 +116,14 @@ export class Shockwaves {
 
   alive(): number { let n = 0; for (let i = 0; i < SHOCK_MAX; i++) if (this.age[i] >= 0) n++; return n; }
 
-  clear(): void { this.age.fill(-1); this.mesh.count = 0; this.mesh.visible = false; }
+  clear(): void {
+    this.age.fill(-1);
+    for (const m of [this.mesh, this.haloMesh]) { m.count = 0; m.visible = false; }
+  }
 
-  /** Escreve as instâncias no referencial do viewport: chão deitado, halo de pé atravessado ao rumo da pista naquele ponto. */
+  /** Escreve as instâncias no referencial do viewport: chão deitado (na `mesh`), halo de pé atravessado ao rumo da pista naquele ponto (na `haloMesh`). */
   pose(rf: RoadFrame, track: Track): void {
-    let n = 0;
+    let n = 0; let nh = 0;
     const d = this.dummy;
     for (let i = 0; i < SHOCK_MAX; i++) {
       if (this.age[i] < 0) continue;
@@ -119,18 +134,22 @@ export class Shockwaves {
       if (kind === 'halo') d.rotation.set(0, Math.PI - this.pt.heading, 0); else d.rotation.set(-Math.PI / 2, 0, 0);
       d.scale.setScalar(p.radius);
       d.updateMatrix();
-      this.mesh.setMatrixAt(n, d.matrix);
       const [r, g, b] = COLORS[kind];
-      this.mesh.setColorAt(n, this.color.setRGB(r * p.alpha, g * p.alpha, b * p.alpha));
-      n++;
+      this.color.setRGB(r * p.alpha, g * p.alpha, b * p.alpha);
+      if (kind === 'halo') { this.haloMesh.setMatrixAt(nh, d.matrix); this.haloMesh.setColorAt(nh, this.color); nh++; }
+      else { this.mesh.setMatrixAt(n, d.matrix); this.mesh.setColorAt(n, this.color); n++; }
     }
-    this.mesh.count = n;
-    this.mesh.visible = n > 0;
-    if (n > 0) {
-      this.mesh.instanceMatrix.needsUpdate = true;
-      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    for (const [m, count] of [[this.mesh, n], [this.haloMesh, nh]] as const) {
+      m.count = count;
+      m.visible = count > 0;
+      if (count > 0) {
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      }
     }
   }
 
-  dispose(): void { this.mesh.geometry.dispose(); this.material.dispose(); this.mesh.dispose(); }
+  dispose(): void {
+    this.mesh.geometry.dispose(); this.haloMesh.geometry.dispose(); this.material.dispose(); this.mesh.dispose(); this.haloMesh.dispose();
+  }
 }

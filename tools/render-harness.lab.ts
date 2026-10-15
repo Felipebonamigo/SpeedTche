@@ -33,6 +33,8 @@ let current: Setup | null = null;
 let tick = 0;
 /** A câmera de cada assento no quadro (nc/cameras); sem ela, o padrão do jogo (a Alta). */
 let seatCameras: CameraMode[] | undefined;
+/** A opção "Efeitos de cartum" no quadro (V8; o padrão do jogo é desligada). */
+let cartoonFx = false;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[]): void {
@@ -55,7 +57,7 @@ function frameFor(quality: Quality): RenderFrame {
   return {
     state, track,
     viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [], ...(seatCameras?.[h.seat] ? { camera: seatCameras[h.seat] } : {}) })),
-    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false },
+    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
     time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
 }
@@ -168,8 +170,9 @@ function blob(): { found: boolean; count: number } {
  * um carro rápido à frente do 1º humano acende o túnel do vácuo. `forced = false` é a mesma cena sem forçar nada (a base da comparação de chamadas).
  * Devolve o `renderer.info` do último quadro e as malhas `fx-*` que têm o que desenhar nele.
  */
-function fxScene(quality: Quality, forced: boolean): { debug: DebugInfo; meshes: Array<{ name: string; visible: boolean; drawn: number }> } {
+function fxScene(quality: Quality, forced: boolean, cartoon = false): { debug: DebugInfo; meshes: Array<{ name: string; visible: boolean; drawn: number }> } {
   setup('copacabana', 2, 207);
+  cartoonFx = cartoon; // V8: o POW e as estrelinhas só com a opção de cartum
   if (!current) throw new Error('lab.setup primeiro');
   const { state, track } = current;
   const humans = state.cars.filter((c) => c.seat >= 0);
@@ -189,9 +192,10 @@ function fxScene(quality: Quality, forced: boolean): { debug: DebugInfo; meshes:
     renderer.render(frameFor(quality));
     debug = renderer.debugInfo();
   }
+  cartoonFx = false;
   const meshes: Array<{ name: string; visible: boolean; drawn: number }> = [];
   scene.traverse((o) => {
-    if (!o.name.startsWith('fx-')) return;
+    if (!o.name.startsWith('fx-') && o.name !== 'car-stars') return;
     const m = o as import('three').Mesh;
     const inst = o as import('three').InstancedMesh;
     meshes.push({ name: o.name, visible: o.visible, drawn: inst.isInstancedMesh ? inst.count : m.geometry.drawRange.count });
@@ -339,10 +343,14 @@ function nitro(flame: boolean): void {
   });
 }
 
-/** Desenha os dois quadros (sem e com nitro) e mede o que a chama acrescenta na caixa `box`: pixels que mudaram, os quase brancos, a cor média somada. */
-function flameDiff(quality: Quality, frames: number, box: [number, number, number, number, number, number]): {
-  changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number;
-} {
+type Box = [number, number, number, number, number, number];
+interface FlameStat { changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number }
+
+/**
+ * Desenha os dois quadros (sem e com nitro) e mede o que a chama acrescenta na caixa `box`: pixels que mudaram, os quase brancos, a cor média somada.
+ * `mouth` (V8): a mesma medida numa segunda caixa — a boca do escape —, dos mesmos dois quadros.
+ */
+function flameDiff(quality: Quality, frames: number, box: Box, mouth?: Box): FlameStat & { mouth?: FlameStat } {
   const read = (): { buf: Uint8Array; W: number; H: number } => {
     const ctx = gl.getContext();
     const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
@@ -357,20 +365,23 @@ function flameDiff(quality: Quality, frames: number, box: [number, number, numbe
   const off = read();
   nitro(true); renderer.render(frameFor(quality));
   const on = read();
-  const [st] = shoot(quality, 0, [{ box }]); // só a caixa em px (sem desenhar de novo)
   const { W, H } = on;
-  let changed = 0; let white = 0; const add = [0, 0, 0]; let luma = 0; let n = 0;
-  for (let y = st.y0; y <= st.y1; y++) for (let x = st.x0; x <= st.x1; x++) {
-    const i = ((H - 1 - y) * W + x) * 4; n++;
-    const d = [on.buf[i] - off.buf[i], on.buf[i + 1] - off.buf[i + 1], on.buf[i + 2] - off.buf[i + 2]];
-    const dl = (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) / 255;
-    if (dl > 0.04) {
-      changed++; add[0] += d[0]; add[1] += d[1]; add[2] += d[2]; luma += dl;
-      if (on.buf[i] > 235 && on.buf[i + 1] > 235 && on.buf[i + 2] > 225) white++;
+  const measure = (b: Box): FlameStat => {
+    const [st] = shoot(quality, 0, [{ box: b }]); // só a caixa em px (sem desenhar de novo)
+    let changed = 0; let white = 0; const add = [0, 0, 0]; let luma = 0; let n = 0;
+    for (let y = st.y0; y <= st.y1; y++) for (let x = st.x0; x <= st.x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4; n++;
+      const d = [on.buf[i] - off.buf[i], on.buf[i + 1] - off.buf[i + 1], on.buf[i + 2] - off.buf[i + 2]];
+      const dl = (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) / 255;
+      if (dl > 0.04) {
+        changed++; add[0] += d[0]; add[1] += d[1]; add[2] += d[2]; luma += dl;
+        if (on.buf[i] > 235 && on.buf[i + 1] > 235 && on.buf[i + 2] > 225) white++;
+      }
     }
-  }
-  const k = Math.max(1, changed);
-  return { changed: changed / Math.max(1, n), whiteOfChanged: white / k, addRgb: [add[0] / k, add[1] / k, add[2] / k], addLuma: luma / k, x0: st.x0, y0: st.y0, x1: st.x1, y1: st.y1 };
+    const k = Math.max(1, changed);
+    return { changed: changed / Math.max(1, n), whiteOfChanged: white / k, addRgb: [add[0] / k, add[1] / k, add[2] / k], addLuma: luma / k, x0: st.x0, y0: st.y0, x1: st.x1, y1: st.y1 };
+  };
+  return { ...measure(box), ...(mouth ? { mouth: measure(mouth) } : {}) };
 }
 
 const lab = {
