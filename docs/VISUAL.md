@@ -29,8 +29,8 @@ Regras que os testes travam (`tests/render-ground.test.ts`):
   "estoura").
 
 ### Pista (`road.ts`, `road-textures.ts`)
-- **Asfalto**: textura de 24 m (granulado fino, manchas largas que fecham a repetição sem emenda, trilhas de pneu,
-  remendos discretos), faixas de bordo e tracejado central pintados nela, com mipmap e anisotropia — o detalhe fino
+- **Asfalto**: textura de 48 m (V4: agregado, trilhas de pneu, óleo, remendos com borda selada, juntas e trincas; ver "Pistas com acabamento"),
+  faixas de bordo e tracejado central pintados nela, com mipmap e anisotropia — o detalhe fino
   some na distância em vez de cintilar. As marcações têm um mapa emissivo próprio: à noite a "tinta refletiva"
   acende de leve e a curva se lê de longe. Faixas de 3 segmentos um pouco mais claras/escuras dão o ritmo de
   velocidade (como antes).
@@ -39,7 +39,7 @@ Regras que os testes travam (`tests/render-ground.test.ts`):
   irregular: o asfalto não encosta direto na grama. Terra vermelha na mata, areia no deserto e no litoral, terra
   na savana, cascalho na montanha, calçada na cidade.
 - **Zebras** em relevo (7 cm de crista, seção de 3 vértices com sombreamento plano) nas curvas de |curve| ≥ 2, dos
-  dois lados, em blocos de 1 m vermelho/branco com friso escuro; são quadriláteros soltos por segmento (reta não
+  dois lados, em blocos de 1,5 m vermelho/branco com friso escuro (V4; eram de 1 m); são quadriláteros soltos por segmento (reta não
   tem, e duas curvas na mesma janela não ficam ligadas por um quad esticado).
 - **Box**: divisa zebrada amarela na faixa que a física trata como grama (x 1,02–1,25), linha amarela contínua,
   concreto claro com a vaga em U e "BOX" pintado no chão, linha branca na borda de fora. `PIT_LANE_X` segue
@@ -65,7 +65,7 @@ Regras que os testes travam (`tests/render-ground.test.ts`):
   plano de triângulos longos e finos fazia listras nos morros com o sol baixo.
 - Altura, cor e inclinação dependem só do índice do segmento: ficam numa **tabela por pista** montada na troca de
   pista; o quadro só copia (com 4 viewports isso é mais barato que o ruído por vértice de antes).
-- **Mar**: turquesa perto, azul fundo longe, faixas largas de onda, pouco céu refletido (a câmera baixa pegava
+- **Mar** (V4: saturado, ver "Pistas com acabamento"): turquesa perto, azul fundo longe, faixas largas de onda, pouco céu refletido (a câmera baixa pegava
   fresnel em tudo e o mar ficava branco), caminho de brilho do sol/lua, névoa mais leve que a do chão; as ondas
   somem com a distância (sem cintilar). **Espuma** na linha d'água (onde o chão cruza o nível do mar, calculado por
   ponto) que vai e volta, com uma faixa rasa turquesa mar adentro.
@@ -83,10 +83,8 @@ Regras que os testes travam (`tests/render-ground.test.ts`):
 - **Sol** a 34° de dia (sombras longas que desenham o relevo), **grande e baixo** no entardecer (9°, à frente na
   largada, disco laranja e não branco); **lua** grande a 20° com crateras no shader. Estrelas com brilho e tom
   variados, mais densas perto do horizonte.
-- **Nuvens** estilizadas numa malha só (1 chamada de desenho em vez de 7): cúmulos de barriga reta e faixas finas
-  e baixas no horizonte, dois tons pelo sol, borda acesa no entardecer, derretendo na cor do horizonte. Na alta as
-  bolhas são lisas (normal suave do vértice, icosaedro de 320 faces; na média e na baixa, de 80 — a mesma silhueta de
-  longe). Até 04/10 a normal vinha da face e a nuvem saía facetada.
+- **Nuvens** pintadas numa malha só (1 chamada de desenho): impostores com a normal pintada num atlas (V4; ver "Pistas com
+  acabamento"). Até a V4 eram cúmulos de icosaedros (~20 mil triângulos) a 10°–25°, quase todos acima do quadro.
 - **Luz**: direcional com a cor do período + hemisférica cujo céu é azul-claro (dia), roxo (entardecer) ou
   azul-noite: é ela que pinta as sombras (coloridas, não pretas); `shadow.intensity` 0,9 (0,7 à noite).
 - **Tone mapping ACES** (mantido: os carros foram calibrados com ele) com a exposição da paleta (0,98 dia, 1,0
@@ -778,6 +776,31 @@ Os defeitos da auditoria visual de 14/10/2026 (`docs/ondas/cor-brilho.md`, teste
   virava núcleo branco); sem ganho HDR (máx. 1,25×). Força e cobertura do fundo pela luz do período (`flameGain`, `flameCover`, blend pré-multiplicado:
   de dia o laranja cobre metade do fundo e se lê, à noite quase só soma); "Reduzir efeitos" a encurta e enfraquece (`FLAME_REDUCED`). A cor escolhida
   (N3) continua tingindo o corpo. A M5 (onda de choque, halo) não mudou: a gota branca era a malha da chama.
+
+## Pistas com acabamento (V4, frente `nc/pistas`)
+
+Os itens da auditoria de 14/10/2026 (asfalto de cor lisa, zebras e faixas pouco nítidas, o mesmo prédio repetido, poucas nuvens, água pouco saturada;
+`docs/ondas/V4-pistas.md`, teste `tests/pistas-v4.test.ts`). Tudo por dado e textura: nenhuma chamada de desenho nova.
+- **Asfalto** (`road-textures.ts`, `asphaltImage`): pixels puros → `DataTexture`, 512 × 2048 para 14 × 48 m (36,6 × 42,7 px/m; era 18,3 × 85,3, e o mip
+  do eixo comprido borrava as faixas). Agregado (pedrisco claro e poro escuro), manchas largas e médias, trilhas de pneu polidas e mais escuras (centro
+  da faixa ± 0,8 m), gota de óleo no meio da faixa, remendos com a borda selada, junta transversal, trincas seladas e a junta da pavimentação
+  (`ASPHALT_WEAR`). O desenho é montado uma vez por processo e é o mesmo nas duas pontas da corrida que muda (só a cor muda).
+- **Faixas e zebras**: faixa de bordo e traço de 0,3 m com borda antisserrilhada (`MARKINGS`), traço de 4 m a cada 12 m; zebra 96 × 256 px em blocos de
+  1,5 m (eram de 1 m e viravam rosa de longe) com friso, crista acesa e borracha na borda de dentro; anisotropia por qualidade (`ROAD_ANISOTROPY`: 4 · 8 ·
+  16 · 16), aplicada por `Road.setQuality` (reenvia as texturas, nenhum programa compila).
+- **Fachadas** (`scenery/textures.ts`, `structures.ts`, `catalog.ts`): atlas 2 × 2 por estilo (4 visuais: no apartamento, janela de sempre, fita de vidro,
+  janelões com venezianas e guarda-corpo corrido, pares de janelas com ar-condicionado e cortina; no escritório, pele de vidro verde, concreto com janela
+  recuada, brises sobre vidro bronze; no clássico, arco com pedra de fecho, venezianas verdes, pilastras e frontão; no tijolo, tijolo aparente, floreira e
+  toldinho, janela de correr). Contrato da uv: `u = local + célula × FACADE_CELL_SPAN` (64); o material amostra com `fract` + `textureGrad`
+  (`applyFacadeAtlas`, runtime.ts). Célula 0 = o desenho de antes: os marcos não mudam. O id do prédio ganha o 5º campo (`bld:aptbeach:12:2:3`): tinta
+  por família de cor, ritmo das varandas, nervuras e empenas, toldo, letreiro, térreo e telhado, com a mesma pegada, altura e frente nos 4. No layout o
+  visual é o próximo de uma permutação por pista, na ordem da pista: dois prédios seguidos nunca repetem.
+- **Nuvens pintadas** (`sky.ts`): impostores (2 triângulos cada) com a normal pintada num atlas 1024 × 512 (metabolas de núcleo compacto: lobos lisos,
+  barriga reta, oclusão nas frestas), três tons pela luz do período, forro de prata contra o sol, perspectiva aérea perto do horizonte e esmaecimento
+  com a noite. 32 cúmulos + 8 estratos na Alta (26 + 7 na Média, 18 + 5 na Baixa, subconjunto), a 2,5°–19°: ≥ 5 à vista em qualquer rumo da câmera
+  Alta. Transparente, sem escrever profundidade (montanha e prédio na frente cobrem).
+- **Mar** (`terrain.ts`, `seaLook`/`seaApparent`): reflete o topo do céu (não o horizonte claro), 45% do teto `seaSky` da paleta, 40% da névoa puxada
+  60% para a água funda do bioma, saturação ×1,3 no fim; cintilação das cristas no caminho do sol; na espuma, linhas de onda chegando à praia.
 
 ## Câmeras selecionáveis (frente `nc/cameras`)
 

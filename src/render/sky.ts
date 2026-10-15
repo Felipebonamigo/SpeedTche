@@ -174,7 +174,7 @@ function buildStars(): THREE.Points {
 export interface CloudSpec { az: number; el: number; dist: number; w: number; h: number; cell: number; flip: boolean; streak: boolean; tone: number }
 
 /** Quantas nuvens por qualidade (cúmulos, faixas baixas): a Baixa paga menos pixels transparentes. */
-const CLOUD_COUNT: Readonly<Record<Quality, [number, number]>> = { low: [18, 5], medium: [26, 7], high: [32, 8], ultra: [32, 8] };
+const CLOUD_COUNT: Readonly<Record<Quality, [number, number]>> = { low: [20, 5], medium: [28, 7], high: [36, 8], ultra: [36, 8] };
 
 /** As nuvens de uma qualidade (puro, determinístico): azimutes estratificados (cobrem a volta toda), elevação baixa, tamanho que cresce para cima. */
 export function cloudLayout(q: Quality): CloudSpec[] {
@@ -184,10 +184,13 @@ export function cloudLayout(q: Quality): CloudSpec[] {
     // A Baixa e a Média são um subconjunto da Alta (mesmas posições, menos nuvens): o céu não muda de cara com a qualidade.
     const j = Math.floor((k * CLOUD_COUNT.high[0]) / nc);
     const az = ((j + 0.15 + 0.7 * hash2(j, 401)) / CLOUD_COUNT.high[0]) * Math.PI * 2;
-    const high = hash2(j, 402) < 0.18;
-    const el = high ? 13 + 7 * hash2(j, 403) : 2.5 + 10.5 * Math.pow(hash2(j, 404), 1.25);
+    // Faixas de elevação: 15% baixas (2,5°–6°, atrás dos morros), 50% no meio (6°–13°, o céu que aparece por cima dos prédios e das serras), 35% altas
+    // (13°–21°, o alto do quadro).
+    const band = hash2(j, 402);
+    const e = hash2(j, 404);
+    const el = band < 0.15 ? 2.5 + 3.5 * e : band < 0.65 ? 6 + 7 * e : 13 + 8 * e;
     const dist = 950 + 300 * hash2(j, 405);
-    const ang = (3.4 + 4.6 * hash2(j, 406)) * (0.62 + 0.38 * Math.min(1, el / 12)); // graus de largura: perto do horizonte, menor (mais longe)
+    const ang = (8 + 9 * hash2(j, 406)) * (0.72 + 0.28 * Math.min(1, el / 12)); // graus de largura: perto do horizonte, menor (mais longe)
     const w = dist * Math.tan((ang * Math.PI) / 180);
     out.push({ az, el, dist, w, h: w * (0.44 + 0.14 * hash2(j, 407)), cell: Math.floor(hash2(j, 408) * 3), flip: hash2(j, 409) < 0.5, streak: false, tone: 0.93 + 0.1 * hash2(j, 410) });
   }

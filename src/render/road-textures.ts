@@ -90,9 +90,9 @@ export interface AsphaltCrack { y: number; x0: number; x1: number; amp: number; 
  */
 export const ASPHALT_WEAR: { patches: readonly AsphaltPatch[]; joints: readonly number[]; cracks: readonly AsphaltCrack[]; seams: readonly number[] } = {
   patches: [
-    { x0: 1.0, x1: 3.4, y0: 6.0, y1: 9.6, tone: 0.88 }, // remendo novo, escuro e liso, sobre a trilha da faixa da direita
+    { x0: 1.0, x1: 3.4, y0: 6.0, y1: 9.6, tone: 0.93 }, // remendo novo, escuro e liso, sobre a trilha da faixa da direita
     { x0: -5.7, x1: -3.3, y0: 20.5, y1: 23.2, tone: 1.15 }, // remendo antigo, claro e gasto
-    { x0: 1.2, x1: 5.6, y0: 37.0, y1: 41.5, tone: 0.9 }, // recapeamento da faixa da direita
+    { x0: 1.2, x1: 5.6, y0: 37.0, y1: 41.5, tone: 0.94 }, // recapeamento da faixa da direita
   ],
   joints: [29.0],
   cracks: [{ y: 14.2, x0: -6.3, x1: 1.6, amp: 0.18, seed: 7 }, { y: 44.6, x0: -2.2, x1: 4.8, amp: 0.12, seed: 11 }],
@@ -225,7 +225,7 @@ function asphaltStructure(): AsphaltStructure {
         kk *= patch.tone;
         st *= fresh ? 0.45 : 1.25;
         // Borda selada: piche escuro em volta do remendo.
-        if (mx - patch.x0 < SEAL || patch.x1 - mx < SEAL || my - patch.y0 < SEAL || patch.y1 - my < SEAL) { kk *= 0.72; st = 0; }
+        if (mx - patch.x0 < SEAL || patch.x1 - mx < SEAL || my - patch.y0 < SEAL || patch.y1 - my < SEAL) { kk *= 0.74; st = 0; }
       }
       if (joint < 1) { kk *= joint; st = 0; }
       for (const sm of ASPHALT_WEAR.seams) if (Math.abs(mx - sm) < 0.016) kk *= 0.86;
