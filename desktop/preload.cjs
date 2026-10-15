@@ -18,4 +18,6 @@ contextBridge.exposeInMainWorld('desktop', {
   benchWrite: (json) => ipcRenderer.invoke('bench:write', json),
   openFolder: (kind) => ipcRenderer.invoke('folder:open', kind),
   onFullscreen: (cb) => { ipcRenderer.on('fullscreen', (_e, v) => cb(v)); },
+  // O5 (opcional na página: OPTIONAL_API_FUNCTIONS): idioma do jogo na Steam e do sistema, para a 1ª abertura.
+  locale: () => ipcRenderer.invoke('app:locale'),
 });

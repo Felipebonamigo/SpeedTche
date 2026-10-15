@@ -21,6 +21,7 @@ import { button, createFocusList, dayIcon, flagFor, h, listNav, screenFrame, sel
 import { icon, medal } from './icons';
 import './online.css';
 import { lookEditor, lookSummary, paintSelector, paintSwatch } from './paint';
+import { lockNote, xpTag } from './progress';
 import { assistMark } from './results';
 import { createMuteModel } from '../../voice/mute';
 
@@ -81,7 +82,9 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
 
   function structureKey(): string {
     const r = online!.room;
-    return [view, online!.locals.length, online!.isHost, online!.ready, online!.error ?? '', r ? 'room' : '-', ctx.settings.language, lookOpen.join('')].join('|');
+    // O5: entrar ou sair de um carro trancado acrescenta ou tira a nota do cadeado (refaz a tela).
+    const locks = online!.locals.map((_, i) => (online!.viewLocked(i) ? 'L' : '-')).join('');
+    return [view, online!.locals.length, online!.isHost, online!.ready, online!.error ?? '', r ? 'room' : '-', ctx.settings.language, lookOpen.join(''), locks].join('|');
   }
 
   function render(): void {
@@ -194,7 +197,11 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
       });
       if (locked) nameInput.disabled = true;
       const nameRow = textRow(t('online.lobby.name'), nameInput);
-      const carSel = selector(t('online.lobby.car'), () => carName(online!.locals[i]?.car ?? ''), (d) => online!.cycleCar(i, d), { sfx: api.sfx, cls: locked ? 'locked' : '' });
+      // O5: o seletor mostra os 14; o trancado (só nesta tela) ganha a nota do cadeado embaixo, e a sala segue com o último liberado.
+      const carLockedHere = online!.viewLocked(i);
+      const carSel = selector(t('online.lobby.car'), () => carName(online!.viewCarOf(i)), (d) => online!.cycleCar(i, d), { sfx: api.sfx, cls: `${locked ? 'locked' : ''}${carLockedHere ? ' is-locked' : ''}`.trim() });
+      const viewDef = CARS.find((c) => c.id === online!.viewCarOf(i));
+      const lockEl = carLockedHere && viewDef ? lockNote(viewDef, 'online-lock') : null;
       // Pintura do carro deste jogador: vai para a sala (os outros computadores desenham o carro nela).
       const paintSel = paintSelector({
         current: () => online!.paintOf(i), car: () => carDef(online!.locals[i]?.car ?? CARS[0].id), onAdjust: (d) => online!.cyclePaint(i, d),
@@ -229,7 +236,7 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
           badge,
           h('span', { class: 'slot-device' }, icon(isKeyboard(p.device) ? 'keyboard' : 'gamepad'), h('span', { text: deviceLabel(p.device) })),
         ),
-        nameRow.el, carSel.el, paintSel.el, assistSel.el, lookBtn.el, editor?.el,
+        nameRow.el, carSel.el, lockEl, paintSel.el, assistSel.el, lookBtn.el, editor?.el,
       );
       // O assento (e a cor) segue a ordem da sala: muda se alguém de id menor sai.
       refreshers.push(() => {
@@ -296,9 +303,9 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
         hint.textContent = blocker ? t(blocker) : t('online.lobby.canStart');
       });
     } else {
-      mainBtn = button(t('online.lobby.readyBtn'), () => online!.toggleReady(), `btn-ready btn-online-ready${online!.ready ? ' on' : ''}`);
+      mainBtn = button(t('online.lobby.readyBtn'), () => { if (!online!.toggleReady()) api.sfx('back'); }, `btn-ready btn-online-ready${online!.ready ? ' on' : ''}`);
       if (online!.ready) mainBtn.el.prepend(icon('check'));
-      refreshers.push(() => { hint.textContent = online!.ready ? t('online.lobby.guestReady') : t('online.lobby.guestHint'); });
+      refreshers.push(() => { hint.textContent = online!.ready ? t('online.lobby.guestReady') : online!.locals.some((_, k) => online!.viewLocked(k)) ? t('progress.lock.online') : t('online.lobby.guestHint'); });
     }
     const leaveBtn = button(t('online.lobby.leave'), () => online!.leave(), 'btn-danger btn-online-leave');
     // Voz dos outros (N6): silenciar a buzina e as frases de um jogador de outro computador, só neste computador (voice/prefs.ts).
@@ -444,7 +451,8 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
         const color = r.seat >= 0 ? colorOf(r.seat) : null;
         return h('tr', { class: `${r.seat >= 0 ? 'human' : ''}${mine.has(r.seat) ? ' mine' : ''}`, style: color ? `--seat:${color}` : '' },
           h('td', { class: 'mono pos' }, medal(r.position) ?? String(r.position)),
-          h('td', {}, h('span', { text: r.name }), r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null,
+          // O5: o XP que a corrida rendeu aos jogadores deste computador, na linha deles.
+          h('td', {}, h('span', { text: r.name }), r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null, xpTag(d.progress?.find((n) => n.seat === r.seat && mine.has(r.seat))),
             ai.has(r.seat) ? h('span', { class: 'tag ai', text: t('online.results.ai'), attrs: { title: t('online.results.aiHint') } }) : null),
           h('td', { class: 'muted-cell', text: carName(r.carDefId) }),
           h('td', { class: 'mono', text: r.finished ? formatTicks(r.totalTicks) : t('ui.results.dnf') }),

@@ -20,6 +20,7 @@ import './passport.css';
 import './payout.css';
 import { button, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { isVipRow, partyResultsParts } from './party';
+import { compactProgressChip, progressChips, xpTag } from './progress';
 import { VIP_COLOR } from '../../core/modes';
 import { BRAZIL_REGIONS } from '../../core/data/cups';
 import '../passport/strings';
@@ -138,9 +139,11 @@ export function resultsScreen(api: ScreenApi, data?: ScreenData): ScreenInstance
   const collapsible = sequenced && collapsedRows.length < rows.length;
   let expanded = false;
 
-  const buildRow = (r: RaceResultRow, delay: number) => h('tr', { class: isMine(r) ? 'human' : isRival(r) ? 'rival' : '', style: `${isVipRow(d, r) ? `--seat:${VIP_COLOR}` : rowStyle(d.humans, r.seat, ctx.settings.colorPalette)};--rv:${delay}` },
+  // O5: o XP da corrida na linha de cada humano (o resultado não tem altura para um quadro a mais).
+  const newsOf = (seat: number) => (seat >= 0 ? d.progress?.find((n) => n.seat === seat) : undefined);
+  const buildRow = (r: RaceResultRow, delay: number) => h('tr', { class: isMine(r) ? 'human' : isRival(r) ? 'rival' : '', style: `${isVipRow(d, r) ? `--seat:${VIP_COLOR}` : rowStyle(d.humans, r.seat, ctx.settings.colorPalette)};--rv:${delay}`, attrs: r.seat >= 0 ? { 'data-seat': String(r.seat) } : {} },
     positionCell(r.position),
-    h('td', {}, r.name, isRival(r) ? rivalTag() : null, r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null),
+    h('td', {}, r.name, isRival(r) ? rivalTag() : null, r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null, xpTag(newsOf(r.seat))),
     h('td', { class: 'muted-cell', text: carName(r.carDefId) }),
     h('td', { class: 'mono' }, r.finished ? formatTicks(r.totalTicks) : t('ui.results.dnf'), badge(r.seat, 'race')),
     h('td', { class: 'mono' }, formatTicks(r.bestLapTicks), badge(r.seat, 'lap')),
@@ -322,14 +325,21 @@ function revealRow(wrap: HTMLElement, row: Element | null): void {
 /** Acima disto os cartões ficam compactos (só o nome): a tabela não pode sumir da tela. */
 const FULL_CHIPS_MAX = 4;
 
-/** Conquistas desbloqueadas nesta corrida, com a cor de quem as ganhou. */
+/**
+ * Conquistas desbloqueadas nesta corrida, com a cor de quem as ganhou, e (O5) o que o progresso liberou: o nível novo e os prêmios de
+ * maestria (progress.ts: progressChips). Sem conquista e só com progresso, o quadro se chama "Progresso".
+ */
 function achievementsPanel(d: ResultsScreenData, palette: ColorPalette): HTMLElement | null {
   const list = d.achievements ?? [];
-  if (list.length === 0) return null;
-  const many = list.length > FULL_CHIPS_MAX;
+  const gifts = progressChips(d.progress, (seat) => humanColor(d.humans, seat, palette), (seat) => d.humans.find((x) => x.seat === seat)?.name ?? '');
+  if (list.length === 0 && gifts.length === 0) return null;
+  const many = list.length + gifts.length > FULL_CHIPS_MAX;
+  const title = h('span', { class: 'results-ach-title' }, icon('trophy'), h('span', { text: list.length ? t('stats.results.title') : t('progress.results.title') }));
+  // Compacto: o progresso num cartão só, na linha do título (não soma fila à lista).
+  const compact = many ? compactProgressChip(d.progress, (seat) => humanColor(d.humans, seat, palette), (seat) => d.humans.find((x) => x.seat === seat)?.name ?? '') : null;
   return h('div', { class: `results-ach glass${many ? ' many' : ''}` },
-    h('span', { class: 'results-ach-title' }, icon('trophy'), h('span', { text: t('stats.results.title') })),
-    h('div', { class: 'results-ach-list' }, list.map((u) => h('div', { class: 'ach-chip', attrs: { title: achievementDescription(u.id) } },
+    compact ? h('div', { class: 'results-ach-head' }, title, compact) : title,
+    h('div', { class: 'results-ach-list' }, many ? null : gifts, list.map((u) => h('div', { class: 'ach-chip', attrs: { title: achievementDescription(u.id) } },
       h('span', { class: 'ach-chip-seats' }, u.seats.map((seat) => h('i', {
         class: 'seat-dot', style: `--seat:${humanColor(d.humans, seat, palette) ?? 'var(--accent)'}`,
         title: d.humans.find((x) => x.seat === seat)?.name ?? '',

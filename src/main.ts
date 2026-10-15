@@ -8,9 +8,9 @@ import { createSession, type Session } from './game/session';
 import { loadCarAssets, type CarAssetReport } from './render/cars/assets';
 import { loadLandmarkAssets, loadLandmarkParts, type LandmarkAssetReport } from './render/scenery/landmarks/assets';
 import { createPlaylog, getActivePlaylog, setActivePlaylog } from './game/playlog';
-import { applyAutoQuality, collectProbe, pickAutoQuality, shouldAutoQuality } from './game/auto-quality';
+import { collectProbe, pickAutoQuality } from './game/auto-quality';
 import { SAVE_KEY } from './game/save';
-import { loadSettings, sanitizeSettings, SETTINGS_KEY } from './game/settings';
+import { firstOpenSettings, languageCandidates, loadSettings, sanitizeSettings, SETTINGS_KEY } from './game/settings';
 import { setRenderPrefs } from './render/prefs';
 import { readJson, saveHealth, setSpaceFreers, writeJson } from './game/storage';
 import { showFatal } from './errors/fatal';
@@ -87,12 +87,13 @@ async function boot(): Promise<void> {
     return;
   }
 
-  // Qualidade automática (L2b): só na 1ª abertura de verdade (nem opções nem save de antes), nunca sob automação; grava antes de a sessão ler as opções.
-  const savedSettings = readJson(SETTINGS_KEY);
-  if (shouldAutoQuality(savedSettings ?? readJson(SAVE_KEY), { webdriver: navigator.webdriver === true, search: location.search })) {
-    const q = pickAutoQuality(await collectProbe(desktop !== null));
-    writeJson(SETTINGS_KEY, sanitizeSettings(applyAutoQuality(savedSettings, q)));
-  }
+  // 1ª abertura de verdade (nem opções nem save de antes), nunca sob automação: a qualidade automática (L2b) e o idioma detectado (O5: Steam,
+  // depois o sistema, depois o navegador), gravados antes de a sessão ler as opções. Escolha salva nunca é sobrescrita (settings.ts).
+  const first = await firstOpenSettings({ settings: readJson(SETTINGS_KEY), save: readJson(SAVE_KEY) }, { webdriver: navigator.webdriver === true, search: location.search }, {
+    quality: async () => pickAutoQuality(await collectProbe(desktop !== null)),
+    candidates: () => languageCandidates(desktop, navigator),
+  });
+  if (first) writeJson(SETTINGS_KEY, sanitizeSettings(first));
   setRenderPrefs(loadSettings()); // o fundo do menu e o limitador de quadros leem daqui (render/prefs.ts)
 
   const s = createSession(canvas, hud, ui);
