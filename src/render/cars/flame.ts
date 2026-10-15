@@ -21,13 +21,21 @@ const RINGS: ReadonlyArray<readonly [number, number]> = [[0, 0.24], [0.08, 0.32]
  * O tamanho da chama no carro (m): largura (escala x/y da malha) e comprimento (escala z) com o nitro cheio; `cars.ts` a pulsa e encurta com a força.
  * Comprimento ≥ 5× o diâmetro (tests/cor-brilho.test.ts): língua, não gota. Era 0,5 × 2,3 com a barriga de 0,5 (diâmetro 0,5 m).
  */
-export const FLAME_SIZE = { width: 0.4, length: 2.2 } as const;
+export const FLAME_SIZE = { width: 0.46, length: 2.2 } as const;
 /** "Reduzir efeitos": a chama mais curta e mais fraca. */
 export const FLAME_REDUCED = { length: 0.6, level: 0.5 } as const;
 
 /** Força da chama pela luz do período (`light` da paleta): cheia de dia (legível no claro), mais fraca no entardecer e à noite (sem estourar no escuro). */
 export function flameGain(light: number): number {
   return light >= 0.8 ? 1 : light >= 0.5 ? 0.85 : 0.7;
+}
+
+/**
+ * Quanto a chama COBRE o fundo (o blend é pré-multiplicado: cor·alfa + fundo·(1 − alfa·cobertura)). Só somar luz (aditivo puro) num asfalto claro de
+ * dia dá um laranja lavado, cor de pêssego, que mal se lê; cobrindo metade, o laranja aparece. À noite quase só soma (brilha no escuro).
+ */
+export function flameCover(light: number): number {
+  return light >= 0.8 ? 0.5 : light >= 0.5 ? 0.3 : 0.12;
 }
 
 /** A gota: anéis de `RADIAL` lados ao longo de +Z, tampa no bico e ponta fechada. `uv` = (volta, posição ao longo da chama). */
@@ -125,11 +133,11 @@ void main() {
  * Fragmento (cor-brilho: "o nitro mais parecido com fogo"). Núcleo azul-branco CURTO: a boca do escape (a tampa, t = 0, e os primeiros 6%), mais fraca
  * que o corpo — de trás é o escape aceso, não um disco; corpo amarelo-laranja → laranja → vermelho que apaga até a ponta e tremula em línguas (a chama de
  * sempre); a cor ESCOLHIDA (N3) tinge o corpo, com um núcleo claro dela. A borda da silhueta some (esconde as facetas). Sem ganho HDR: a gota antiga saía a
- * 2,0–2,6× com o miolo puxado ao branco e estourava; aqui o máximo é 1,25× (no núcleo), e `uFlameGain` cai com a luz do período (`flameGain`). Cores
- * saturadas (pouco verde e azul): somadas ao asfalto e passadas pelo Neutral, as claras saíam pêssego. Aditivo: a cor sai sem multiplicar pelo alfa.
+ * 2,0–2,6× com o miolo puxado ao branco e estourava; aqui o máximo é 1,25× (no núcleo), e `uFlameGain` cai com a luz do período (`flameGain`); `uFlameCover`: quanto ela cobre o fundo (`flameCover`). Cores
+ * saturadas (pouco verde e azul): somadas ao asfalto e passadas pelo Neutral, as claras saíam pêssego. Blend pré-multiplicado (cars.ts): a cor sai já multiplicada pelo alfa.
  */
 export const FLAME_FRAG = /* glsl */ `
-uniform float uTime; uniform float uFlameGain;
+uniform float uTime; uniform float uFlameGain; uniform float uFlameCover;
 varying float vT; varying float vFacing; varying float vAxis; varying vec3 vCol; varying float vLevel; varying float vWhite; varying float vPh;
 void main() {
   vec3 hue = vCol * vec3(0.55, 0.85, 1.45);
@@ -143,7 +151,7 @@ void main() {
   float edge = smoothstep(0.0, 0.3, vFacing);
   float along = mix(0.45, 1.0, smoothstep(0.0, 0.06, vT)) * (1.0 - smoothstep(0.02, 1.0, vT)); // a boca (e a tampa, t = 0) mais fraca: de trás era o disco
   float a = edge * along * mix(1.0, tongues, smoothstep(0.1, 0.4, vT)) * (0.45 + 0.55 * vLevel) * mix(1.0, 0.75, smoothstep(0.7, 1.0, vAxis));
-  gl_FragColor = vec4(c * uFlameGain * mix(1.15, 1.25, core), a);
+  gl_FragColor = vec4(c * uFlameGain * mix(1.15, 1.25, core) * a, a * uFlameCover);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

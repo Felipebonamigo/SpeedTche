@@ -28,7 +28,7 @@ import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
-import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameGain } from './cars/flame';
+import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameCover, flameGain } from './cars/flame';
 import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
@@ -207,8 +207,10 @@ export class Cars {
     this.blob.renderOrder = 1;
     // Chama em malha: a cor vem de `instanceColor` (a do visual do carro) e a fase do tremor de `aFlame`, por instância.
     this.flameMaterial = new THREE.ShaderMaterial({
-      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uFlameGain: { value: 1 } },
+      // Pré-multiplicado (cor-brilho): soma a luz da chama e cobre o fundo um tanto (`flameCover`) — de dia o laranja se lê; à noite quase só soma.
+      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      uniforms: { uTime: { value: 0 }, uFlameGain: { value: 1 }, uFlameCover: { value: 0.5 } },
     });
     const flameGeometry = buildFlameGeometry();
     this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 3), 3);
@@ -273,6 +275,7 @@ export class Cars {
       uniforms.uPopup.value = light < 0.8 ? 1 : 0;
     }
     this.flameMaterial.uniforms.uFlameGain.value = flameGain(light); // cor-brilho: legível de dia, sem estourar à noite
+    this.flameMaterial.uniforms.uFlameCover.value = flameCover(light);
     for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? HEADLIGHT.night : HEADLIGHT.dusk; }
   }
 
