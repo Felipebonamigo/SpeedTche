@@ -797,7 +797,7 @@ Os itens da auditoria de 14/10/2026 (asfalto de cor lisa, zebras e faixas pouco 
   visual é o próximo de uma permutação por pista, na ordem da pista: dois prédios seguidos nunca repetem.
 - **Nuvens pintadas** (`sky.ts`): impostores (2 triângulos cada) com a normal pintada num atlas 1024 × 512 (metabolas de núcleo compacto: lobos lisos,
   barriga reta, oclusão nas frestas), três tons pela luz do período, forro de prata contra o sol, perspectiva aérea perto do horizonte e esmaecimento
-  com a noite. 32 cúmulos + 8 estratos na Alta (26 + 7 na Média, 18 + 5 na Baixa, subconjunto), a 2,5°–19°: ≥ 5 à vista em qualquer rumo da câmera
+  com a noite (no entardecer o lado da sombra puxa para o horizonte). 36 cúmulos + 8 estratos na Alta (28 + 7 na Média, 20 + 5 na Baixa, subconjunto), de 8° a 17° de largura e a 2,5°–21° de elevação: ≥ 5 à vista em qualquer rumo da câmera
   Alta. Transparente, sem escrever profundidade (montanha e prédio na frente cobrem).
 - **Mar** (`terrain.ts`, `seaLook`/`seaApparent`): reflete o topo do céu (não o horizonte claro), 45% do teto `seaSky` da paleta, 40% da névoa puxada
   60% para a água funda do bioma, saturação ×1,3 no fim; cintilação das cristas no caminho do sol; na espuma, linhas de onda chegando à praia.
