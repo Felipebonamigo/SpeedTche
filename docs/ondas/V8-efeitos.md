@@ -79,6 +79,18 @@ depois aqui): batida e nitro com linhas, Copacabana de dia e Paraty no entardece
 estrelinhas não compilam mais na batida; nenhum novo). Montagens em `scratch/v8/folha-antes-depois.png`, `scratch/galeria/comparar-main-550e970-vs-efeitos.png`
 e os recortes `scratch/v8/crop-*.png` (fora do git).
 
+**Medidas dos testes GL na suíte inteira** (o repórter `dot` mostra os logs): boca do escape de dia, mesma caixa, soma `rgb(103,109,121)` → **`rgb(137,62,8)`**
+(8,6% dos pixels da caixa). Cena `fxScene` com tudo aceso (2 jogadores, 640×360), chamadas por viewport sem → com os efeitos: Baixa 41 → 40 / 39, Média 82 → 84 / 83,
+Alta 85 → 88 / 87, Ultra 85 → 89 / 88 (na M5: 41 → 42 / 41, 82 → 88 / 85, 85 → 92 / 89, 85 → 93 / 90) — o POW e as estrelinhas não desenham mais; malhas de efeito
+acesas: 3 na Baixa, 4 da Média em diante.
+
+**Suíte inteira, uma vez** (código do c432e9d; `NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 npx vitest run --testTimeout=300000 --hookTimeout=900000 --reporter=dot`,
+com outras três suítes inteiras de outras frentes rodando ao mesmo tempo, carga 35–46): `Test Files  11 failed | 201 passed (212)` · `Tests  28 failed | 3813 passed |
+1 skipped (3842)` — os 28 são **todos tempo-limite** (`Test timed out in 20000ms` … `240000ms`) em arquivos do núcleo e do cenário que esta frente não toca
+(ai, batidas-cenario, fuel, landmark-caption, landmarks-enquadramento, landmarks-pracas, landmarks, net-relay, race-feel, scenery, track); `gl-render` (o gate),
+`corrida-que-muda-gl`, `efeitos-gl` e `cor-brilho-gl` verdes. Os 11 rodados de novo sozinhos, em sequência (`--no-file-parallelism`, carga ~20):
+`Test Files  11 passed (11)` · `Tests  710 passed (710)`.
+
 **Opções › Acessibilidade:** `NC_LAYOUT_ONLY=access NC_LAYOUT_SKIP_HUD=1 node scripts/playtest-layout.mjs` (build de produção, `vite preview`) →
 `✓ telas de menu sem problema de layout: 14/14 combinações limpas` (7 resoluções × texto normal/grande); a mais apertada, 1024×640 com texto grande, sobra 20 px.
 
