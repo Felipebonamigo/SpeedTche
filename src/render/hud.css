@@ -91,7 +91,8 @@
 .nc-hud .mate .mp { color: var(--h-ink); font-style: italic; min-width: calc(24px * var(--s)); text-align: right; }
 
 /* Canto inferior esquerdo: combustível e nitro, sem caixa. Barras finas e inclinadas: trilho escuro com fio claro (lê na neve e na noite). */
-.nc-hud .bl { position: absolute; left: calc(22px * var(--s)); bottom: calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(9px * var(--s)); width: max(150px, calc(196px * var(--s))); }
+.nc-hud .bl { position: absolute; left: calc(22px * var(--s)); bottom: calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(9px * var(--s)); width: max(132px, calc(196px * var(--s))); }
+/* O piso de 132 px (4P a 1024×640 com o HUD em 80%) deixa o bloco à esquerda da legenda dos marcos e da dica, que guardam max(240 × --s, 156 px) de cada lado. */
 .nc-hud .gauge-row { display: flex; align-items: center; gap: calc(6px * var(--s)); }
 .nc-hud .gauge-row .label { flex: 1; white-space: nowrap; }
 .nc-hud .ico { flex: none; width: calc(15px * var(--s)); height: calc(15px * var(--s)); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
@@ -115,9 +116,11 @@
 .nc-hud .fuel-flag:empty { display: none; }
 .nc-hud .fuel-flag::before { content: '!'; display: inline-block; width: 1.25em; height: 1.25em; border-radius: 50%; background: #3b1500; color: var(--h-sun); text-align: center; line-height: 1.25; font-style: normal; }
 .nc-hud .fuel.hidden { display: none; }
-/* Nitro: o rótulo e o número numa linha, os raios ao lado (um por carga: cheio = aceso, vazio = só o contorno) e a barra embaixo. */
-.nc-hud .nitro { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: calc(8px * var(--s)); }
-.nc-hud .nitro .nbar { grid-column: 1 / -1; }
+/* Nitro: o rótulo e o número numa linha, os raios ao lado (um por carga: cheio = aceso, vazio = só o contorno) e a barra embaixo. Sem
+   espaço (o rótulo "NITRO · EQUIPE" com o piso das letras no 4P), os raios descem para a linha de baixo em vez de sair do bloco. */
+.nc-hud .nitro { display: flex; flex-wrap: wrap; align-items: center; column-gap: calc(8px * var(--s)); }
+.nc-hud .nitro .gauge-row { flex: 1 1 auto; }
+.nc-hud .nitro .nbar { flex: 0 0 100%; }
 .nc-hud .caps { display: flex; gap: calc(3px * var(--s)); align-items: center; }
 .nc-hud .caps i { display: inline-block; width: max(13px, calc(21px * var(--s))); height: max(13px, calc(21px * var(--s))); color: #bfefff; transition: transform 140ms; }
 .nc-hud .caps i svg { width: 100%; height: 100%; fill: rgba(14, 8, 34, 0.55); stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; filter: drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)); }
