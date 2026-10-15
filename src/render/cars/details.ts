@@ -86,6 +86,8 @@ export function airfoil(c0: number, c1: number, y: number, t: number): P2[] {
 export interface WingSpec {
   z: number; y: number; span: number; chord: number; thick?: number; pitch?: number;
   brush: Brush; plate?: Brush | null; strut?: 'post' | 'swan' | null; strutBrush?: Brush; baseY?: number; strutX?: number;
+  /** Altura das placas das pontas (padrão 0,2 m). */
+  plateH?: number;
   /** Faixa por cima da lâmina (V2): entre x de dentro e x de fora, dos dois lados, a lâmina leva o pincel da faixa (no casco simples, não). */
   stripe?: { x: readonly [number, number]; brush: Brush };
 }
@@ -103,7 +105,7 @@ export function wing(b: MeshBuilder, w: WingSpec): void {
     } else extrudeZY(b, airfoil(c0, c1, w.y, t), -hs, hs, w.brush);
     if (w.plate !== null) {
       const pb = w.plate ?? w.brush;
-      b.mirrored(() => roundBar(b, [hs + 0.015, w.y - 0.03, w.z + 0.02], [0.03, 0.2, w.chord + 0.1], pb, { r: 0.05, axis: 'x' }));
+      b.mirrored(() => roundBar(b, [hs + 0.015, w.y - 0.03, w.z + 0.02], [0.03, w.plateH ?? 0.2, w.chord + 0.1], pb, { r: 0.05, axis: 'x' }));
     }
   });
   if (w.strut) {

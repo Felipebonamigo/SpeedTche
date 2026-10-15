@@ -94,7 +94,9 @@ export function buildGt(lod: Lod = 0): CarModel {
 
   // Frente: faróis deitados no capô (carcaça preta, refletor, dois projetores e a luz diurna em L), grade de lamelas, entradas laterais,
   // pisca apagado no canto e o divisor rente ao chão.
-  const HL: Array<[number, number]> = [[0.38, -2.02], [0.82, -1.95], [0.84, -1.74], [0.42, -1.82]];
+  // O farol fica todo em cima do capô (x ≤ meia largura do topo): passando do ombro, a carcaça boiava sobre a pele que desce (vista de lado, um
+  // espigão preto).
+  const HL: Array<[number, number]> = [[0.4, -2.04], [0.63, -2.0], [0.645, -1.66], [0.43, -1.72]];
   if (b.lod) topPatch(b, hull, HL, HEAD, 0.04, true, HEAD_HOUSING);
   else headlampPod(b, hull, HL, { lens: HEAD, bezel: PIANO, side: TRIM, reflector: REFLECTOR });
   b.fine(() => {
@@ -120,7 +122,7 @@ export function buildGt(lod: Lod = 0): CarModel {
     exhausts: [{ x: 0.42, y: 0.26, z: 2.26, r: 0.075 }, { x: -0.42, y: 0.26, z: 2.26, r: 0.075 }],
     diffuser: { y: 0.24, z: 2.1, w: 1.2, fins: 6 },
     wing: {
-      z: 1.98, y: 1.03, span: 1.6, chord: 0.3, thick: 0.065, pitch: -0.1, brush: PAINT, plate: PAINT, strut: 'post', baseY: 0.84, strutX: 0.44,
+      z: 1.98, y: 1.03, span: 1.6, chord: 0.3, thick: 0.065, pitch: -0.1, brush: PAINT, plate: PAINT, plateH: 0.13, strut: 'post', baseY: 0.84, strutX: 0.44,
       stripe: { x: GT_STRIPE_A, brush: STRIPE_A },
     },
   });

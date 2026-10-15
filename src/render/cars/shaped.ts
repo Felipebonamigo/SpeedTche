@@ -183,7 +183,7 @@ export interface HeadlampBrushes { lens: Brush; bezel: Brush; side: Brush; refle
 
 /**
  * Farol deitado no capô, com profundidade (lado direito + espelho): carcaça preta que sobra 4,5 cm do capô, refletor embutido, dois
- * projetores redondos acesos (leque com centro: miolo e borda) e a linha de luz diurna em L na borda de dentro e na da frente. O
+ * projetores redondos (em fila, da frente para trás) acesos (leque com centro: miolo e borda) e a linha de luz diurna em L na borda de dentro e na da frente. O
  * polígono (x, z) vai na ordem dentro-frente, fora-frente, fora-trás, dentro-trás; cada ponto pousa em `topAt`.
  */
 export function headlampPod(b: MeshBuilder, hull: Hull, poly: ReadonlyArray<readonly [number, number]>, br: HeadlampBrushes): void {
@@ -193,12 +193,13 @@ export function headlampPod(b: MeshBuilder, hull: Hull, poly: ReadonlyArray<read
     prism(b, on(poly, 0), [0, H, 0], br.bezel, br.side, null);
     prism(b, on(shrink(poly, 0.82), H + 0.001), [0, 0.004, 0], br.reflector, br.reflector, null);
     const [a, d, e, c] = poly;
-    const inner: [number, number] = [(a[0] + c[0]) / 2 + 0.06, (a[1] + c[1]) / 2];
-    const outer: [number, number] = [(d[0] + e[0]) / 2 - 0.05, (d[1] + e[1]) / 2];
+    // Os dois projetores em fila, da frente para trás (o farol é comprido em z e fica todo em cima do capô, sem passar do ombro).
+    const front: [number, number] = [(a[0] + d[0]) / 2 + 0.01, (a[1] + d[1]) / 2];
+    const back: [number, number] = [(c[0] + e[0]) / 2 + 0.01, (c[1] + e[1]) / 2];
     for (let i = 0; i < 2; i++) {
-      const t = 0.18 + 0.58 * i;
-      const x = inner[0] + (outer[0] - inner[0]) * t; const z = inner[1] + (outer[1] - inner[1]) * t;
-      const r = 0.07 - i * 0.01;
+      const t = 0.3 + 0.42 * i;
+      const x = front[0] + (back[0] - front[0]) * t; const z = front[1] + (back[1] - front[1]) * t;
+      const r = 0.066 - i * 0.008;
       discUp(b, x, hull.topAt(z, x) + H + 0.003, z, r, r * 0.8, 0.022, br.lens, br.side, 12);
     }
     // Luz diurna em L: a borda de dentro (a → c) e a da frente (a → d), 3,5 cm de largura.
