@@ -122,7 +122,9 @@ describe('V4 · asfalto com agregado e desgaste', { timeout: 120_000 }, () => {
     expect([image().width, image().height]).toEqual([RT.ASPHALT_TEX.w, RT.ASPHALT_TEX.h]);
   });
 
-  it('agregado: na faixa limpa, o desvio da luma fina (contra a média 5×5 em volta) passa de 3% da média', () => {
+  // O granulado de antes (550e970, medido no canvas de verdade no Chromium com esta mesma conta; docs/ondas/V4-pistas.md §8) dava 6,6%: o piso de 8%
+  // separa o agregado do granulado (o novo dá 10,9%).
+  it('agregado: na faixa limpa, o desvio da luma fina (contra a média 5×5 em volta) passa de 8% da média (o granulado de antes dava 6,6%)', () => {
     let s2 = 0; let n = 0; let m = 0;
     for (const [a, b] of CLEAN) for (let y = 4; y < H - 4; y += 3) for (let x = col(a); x <= col(b); x += 2) {
       let loc = 0;
@@ -130,10 +132,10 @@ describe('V4 · asfalto com agregado e desgaste', { timeout: 120_000 }, () => {
       const d = L(x, y) - loc / 25;
       s2 += d * d; m += L(x, y); n++;
     }
-    expect(Math.sqrt(s2 / n) / (m / n)).toBeGreaterThan(0.03);
+    expect(Math.sqrt(s2 / n) / (m / n)).toBeGreaterThan(0.08);
   });
 
-  it('trilhas de pneu ≥ 6% mais escuras que a faixa limpa', () => {
+  it('trilhas de pneu ≥ 6% mais escuras que a faixa limpa (antes: 4,9% a 6,3%, no canvas do 550e970)', () => {
     const clean = CLEAN.reduce((s, [a, b]) => s + mean(col(a), col(b), 0, H - 1), 0) / CLEAN.length;
     for (const t of TRACKS) {
       const tr = mean(col(t - 0.15), col(t + 0.15), 0, H - 1);
