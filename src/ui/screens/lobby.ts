@@ -288,8 +288,9 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       if (s.ready) return;
       const was = lockedNow();
       s.carIndex = (s.carIndex + dir + cars.length) % cars.length;
-      // Entrou ou saiu de um trancado: a linha da pintura vira a do cadeado (ou volta), então o cartão é refeito.
-      if (was !== lockedNow()) { render(); return; }
+      // Com um trancado no meio (entrou, saiu ou foi de um para outro): a linha da pintura vira a do cadeado, ou volta, ou troca de preço;
+      // o cartão é refeito (a captura do playtest-layout mostrou o preço do carro anterior ficando na linha).
+      if (was || lockedNow()) { render(); return; }
       showCar();
       paintItem?.refresh();
     };

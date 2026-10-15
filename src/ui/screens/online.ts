@@ -21,7 +21,7 @@ import { button, createFocusList, dayIcon, flagFor, h, listNav, screenFrame, sel
 import { icon, medal } from './icons';
 import './online.css';
 import { lookEditor, lookSummary, paintSelector, paintSwatch } from './paint';
-import { lockNote, progressStrip } from './progress';
+import { lockNote, xpTag } from './progress';
 import { assistMark } from './results';
 import { createMuteModel } from '../../voice/mute';
 
@@ -451,7 +451,8 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
         const color = r.seat >= 0 ? colorOf(r.seat) : null;
         return h('tr', { class: `${r.seat >= 0 ? 'human' : ''}${mine.has(r.seat) ? ' mine' : ''}`, style: color ? `--seat:${color}` : '' },
           h('td', { class: 'mono pos' }, medal(r.position) ?? String(r.position)),
-          h('td', {}, h('span', { text: r.name }), r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null,
+          // O5: o XP que a corrida rendeu aos jogadores deste computador, na linha deles.
+          h('td', {}, h('span', { text: r.name }), r.seat >= 0 ? assistMark(seatAssist(d.humans, r.seat)) : null, xpTag(d.progress?.find((n) => n.seat === r.seat && mine.has(r.seat))),
             ai.has(r.seat) ? h('span', { class: 'tag ai', text: t('online.results.ai'), attrs: { title: t('online.results.aiHint') } }) : null),
           h('td', { class: 'muted-cell', text: carName(r.carDefId) }),
           h('td', { class: 'mono', text: r.finished ? formatTicks(r.totalTicks) : t('ui.results.dnf') }),
@@ -462,8 +463,6 @@ export function onlineScreen(api: ScreenApi): ScreenInstance {
     );
     const body = h('div', { class: 'online-results' },
       h('div', { class: 'screen-title-row' }, h('h1', { class: 'screen-title', text: t('online.results.title') }), h('span', { class: 'chip', text: trackName(d.trackDef.id, d.trackDef.name) }), h('span', { class: 'chip online-code-chip-small mono', text: online!.code })),
-      // O5: o nível e a maestria que a corrida rendeu aos jogadores deste computador.
-      progressStrip(d.progress, colorOf),
       h('div', { class: 'table-wrap glass' }, table),
       h('div', { class: 'actions' }, back.el, leave.el),
     );

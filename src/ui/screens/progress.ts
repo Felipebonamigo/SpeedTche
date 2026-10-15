@@ -9,7 +9,7 @@ import type { CarDef } from '../../core/types';
 import { carAvailable } from '../../game/career-save';
 import type { SaveData } from '../../game/contracts';
 import {
-  carXp, FRAMES, frameFor, levelOf, MASTERY_REWARDS, masteryOf, MAX_MASTERY, pilotOf, TITLES, type ProgressNews, type Unlock,
+  carXp, FRAMES, levelOf, MASTERY_REWARDS, masteryOf, MAX_MASTERY, pilotOf, TITLES, type ProgressNews, type Unlock,
 } from '../../game/progression';
 import { getLanguage, t } from '../../i18n';
 import { h, type FocusItem, type ScreenApi } from './common';
@@ -92,39 +92,45 @@ export function nextLevelText(level: number): string {
 
 const fmt = (n: number): string => n.toLocaleString(getLanguage() === 'pt' ? 'pt-BR' : 'en-US');
 
-// ───────────────────────────── Resultado: a faixa do progresso ─────────────────────────────
+// ───────────────────────────── Resultado: o progresso sem altura nova ─────────────────────────────
+// O resultado é a tela mais apertada (o playtest-layout reprovou uma faixa própria a 1024×640 com texto grande): o XP vai na linha de cada
+// humano da tabela e o que ficou liberado entra no quadro das conquistas, que só aparece quando há o que mostrar.
+
+/** "+50 XP" (e " · Nível 3!" para quem subiu) na linha do humano; o resto (nível, barra, maestria) vai na dica do mouse. */
+export function xpTag(n: ProgressNews | undefined): HTMLElement | null {
+  if (!n) return null;
+  const up = n.level.after > n.level.before;
+  const lv = levelOf(n.pilotXp);
+  const xp = t('progress.xpGain', { n: fmt(n.xp) });
+  const detail = [
+    t('progress.level', { n: n.level.after }),
+    lv.need > 0 ? t('progress.xpBar', { into: fmt(lv.into), need: fmt(lv.need) }) : t('progress.maxLevel'),
+    t('progress.masteryUp', { car: carNameOf(n.carId), n: n.mastery.after }),
+  ].join(' · ');
+  return h('span', { class: `xp-tag mono${up ? ' up' : ''}`, attrs: { title: detail, 'data-level': String(n.level.after) },
+    text: up ? `${xp} · ${t('progress.unlock.levelUp', { n: n.level.after })}` : xp });
+}
 
 /**
- * Um cartão por humano local com o que a corrida rendeu (ProgressNews, progression.ts): o nível na moldura, "+N XP", a barra do degrau, a
- * maestria do carro e o que ficou liberado. Nenhum item de foco (a navegação e o pós-corrida não mudam). null = nada a mostrar.
+ * O que ficou liberado, em cartões do quadro das conquistas (as mesmas classes `ach-chip`, com a bolinha do assento): o nível novo (com o
+ * título e a moldura que ele trouxe) e cada prêmio de maestria. Vazio quando ninguém subiu nem liberou nada.
  */
-export function progressStrip(news: readonly ProgressNews[] | undefined, seatColor: (seat: number) => string | null): HTMLElement | null {
-  if (!news || news.length === 0) return null;
-  return h('div', { class: `results-prog glass n-${news.length}`, attrs: { 'aria-label': t('progress.results.title') } },
-    news.map((n) => {
-      const lv = levelOf(n.pilotXp);
-      const up = n.level.after > n.level.before;
-      const color = seatColor(n.seat);
-      const news2 = n.unlocks.map(unlockText);
-      const masteryLine = n.mastery.after > n.mastery.before || n.mastery.after > 0
-        ? t('progress.masteryUp', { car: carNameOf(n.carId), n: n.mastery.after })
-        : `${carNameOf(n.carId)} · ${t('progress.masteryShort', { n: n.mastery.after })}`;
-      return h('div', { class: `prog-card${up ? ' up' : ''}`, style: color ? `--seat:${color}` : '', attrs: { 'data-seat': String(n.seat) } },
-        levelBadge(n.level.after, frameFor(n.level.after)),
-        h('span', { class: 'prog-text' },
-          h('span', { class: 'prog-line' },
-            h('strong', { class: 'prog-name', text: n.name }),
-            h('span', { class: 'prog-level', text: up ? t('progress.unlock.levelUp', { n: n.level.after }) : t('progress.level', { n: n.level.after }) }),
-            h('span', { class: 'prog-xp mono', text: t('progress.xpGain', { n: fmt(n.xp) }) }),
-          ),
-          progressBar(lv.into, lv.need),
-          h('span', { class: 'prog-line prog-sub' },
-            h('span', { class: 'prog-mastery', text: masteryLine }),
-            news2.length ? h('span', { class: 'prog-news', text: news2.join(' · ') }) : null,
-          ),
-        ),
-      );
-    }));
+export function progressChips(news: readonly ProgressNews[] | undefined, seatColor: (seat: number) => string | null, nameOf: (seat: number) => string): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  const chip = (seat: number, title: string, desc: string) => h('div', { class: 'ach-chip prog-chip', attrs: { title: `${title} — ${desc}`, 'data-seat': String(seat) } },
+    h('span', { class: 'ach-chip-seats' }, h('i', { class: 'seat-dot', style: `--seat:${seatColor(seat) ?? 'var(--accent)'}`, title: nameOf(seat) })),
+    h('span', { class: 'ach-chip-text' }, h('strong', { text: title }), h('span', { text: desc })),
+  );
+  for (const n of news ?? []) {
+    const levelGifts = n.unlocks.filter((u) => u.kind !== 'cosmetic').map(unlockText);
+    if (n.level.after > n.level.before) {
+      out.push(chip(n.seat, t('progress.unlock.levelUp', { n: n.level.after }), levelGifts.length ? levelGifts.join(' · ') : t('progress.xpGain', { n: fmt(n.xp) })));
+    }
+    for (const u of n.unlocks) {
+      if (u.kind === 'cosmetic') out.push(chip(n.seat, unlockText(u), t('progress.mastery', { n: u.mastery })));
+    }
+  }
+  return out;
 }
 
 // ───────────────────────────── Recordes › Nível ─────────────────────────────

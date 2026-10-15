@@ -4,7 +4,9 @@
 /* Linha do cadeado no lugar da pintura: o texto ("Compre na Expedição por $ 12.000") ocupa a largura e quebra se precisar. */
 .sel-lock .sel-label.lock-icon { flex: none; display: inline-flex; align-items: center; }
 .sel-lock .sel-box.lock-box { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
-.sel-lock .lock-value { min-width: 0; white-space: normal; text-align: right; line-height: 1.15; }
+.sel-lock .lock-value { min-width: 0; white-space: normal; text-align: right; line-height: 1.1; }
+/* No cartão 2×2 o texto pode quebrar em duas linhas: sem o respiro vertical da linha da pintura, para o carro de cima não ser espremido. */
+:is(.slot, .online-local) .sel-paint.sel-lock { padding-top: 0; padding-bottom: 0; }
 .lock-note { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; }
 .lock-note .lock-value { min-width: 0; }
 
@@ -20,21 +22,13 @@
 .lvl-badge.lvl-badge-big { width: calc(64 * var(--u)); height: calc(64 * var(--u)); border-width: calc(4 * var(--u)); }
 .lvl-badge.lvl-badge-big .lvl-n { font-size: var(--fs-lg); }
 
-/* Barras: a do degrau do nível, a da faixa do resultado e a da maestria. */
-.prog-bar, .lvl-bar, .mastery-bar { display: block; height: calc(5 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
-.prog-bar-fill, .lvl-bar-fill, .mastery-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--seat, var(--accent)); }
+/* Barras: a do degrau do nível e a da maestria (aba Nível). */
+.lvl-bar, .mastery-bar { display: block; height: calc(5 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.lvl-bar-fill, .mastery-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--seat, var(--accent)); }
 
-/* Resultado: a faixa do progresso (um cartão por humano local). Nunca encolhe nem rola: o texto quebra a linha. */
-.results-prog { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(240 * var(--u)), 1fr)); gap: calc(6 * var(--u));
-  width: min(100%, calc(1100 * var(--u))); padding: calc(6 * var(--u)) calc(10 * var(--u)); box-sizing: border-box; flex: none; }
-.prog-card { display: flex; align-items: center; gap: calc(10 * var(--u)); min-width: 0; }
-.prog-text { display: flex; flex-direction: column; gap: calc(3 * var(--u)); flex: 1; min-width: 0; }
-.prog-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 calc(8 * var(--u)); min-width: 0; line-height: 1.2; }
-.prog-name { font-weight: 800; }
-.prog-level, .prog-sub { font-size: var(--fs-sm); color: var(--muted); }
-.prog-card.up .prog-level { color: var(--ok); font-weight: 800; }
-.prog-xp { font-size: var(--fs-sm); font-weight: 800; color: var(--seat, var(--accent)); }
-.prog-news { color: var(--text); }
+/* Resultado: o XP na linha do humano (sem altura nova; não quebra a linha da tabela). O que liberou vai no quadro das conquistas (ach-chip). */
+.xp-tag { margin-left: calc(8 * var(--u)); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; color: var(--seat, var(--accent)); }
+.xp-tag.up { color: var(--ok); }
 
 /* Recordes › Nível: o cabeçalho do perfil e a lista de maestria (as linhas usam a largura do detalhe; o texto quebra). */
 .lvl-head { display: flex; align-items: center; gap: calc(14 * var(--u)); }

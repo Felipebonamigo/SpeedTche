@@ -72,6 +72,14 @@ describe('lobby: o carro trancado aparece com o cadeado e não pode ser escolhid
     expect(all(slot(), hasClass('sel-paint'))).toHaveLength(1);
   });
 
+  it('de um trancado para outro trancado: a linha do cadeado acompanha o preço do carro à mostra', () => {
+    const { screen, carId, lock } = setup();
+    until(() => carId() === 'curupira', () => press(screen, 'kb1', 'right'));
+    press(screen, 'kb1', 'right');
+    expect(carId()).toBe('sucuri');
+    expect(text(lock()[0])).toContain('Compre na Expedição por $ 16.000');
+  });
+
   it('EN: "Buy it in the Expedition for $12,000"', () => {
     setLanguage('en');
     const { screen, carId, lock } = setup();
