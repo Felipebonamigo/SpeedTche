@@ -85,6 +85,53 @@ O "antes" dos que não existem é medido na cópia do 550e970 (`scratch/orig/`, 
 `NC_REQUIRE_GL=1` `gl-render`, `corrida-que-muda-gl`, `texturas-gl` verdes com chamadas iguais e triângulos ≤ os de antes (ou a subida medida e explicada);
 galeria `main-550e970` × `pistas` nas cenas 01–06 e 08 (`scratch/galeria/comparar-main-550e970-vs-pistas.png`), cada imagem aberta; suíte inteira uma vez no fim.
 
-### 8. Registro
+### 8. Registro (15/10/2026)
 
-(preenchido na execução)
+**Entregue** (commits em `nc/pistas`, sem push; `src/core`, `hashRace` e `sim-golden` intocados; carros e HUD fora):
+
+| Item | Onde | Antes → depois |
+|---|---|---|
+| Asfalto com agregado e desgaste | `road-textures.ts` (`asphaltImage`, `ASPHALT_WEAR`) | granulado ±10 e trilhas a 0,86 em canvas → pixels puros: agregado (pedrisco/poro), manchas, trilhas polidas, óleo, 3 remendos com borda selada, junta, 2 trincas seladas, junta da pavimentação. Medido no canvas de verdade (Chromium, a conta do teste): **agregado 6,6% → 10,9%**, **trilhas 4,9%–6,3% → 9,5%–11,1%** mais escuras |
+| Faixas e zebras nítidas | `road-textures.ts`, `road.ts` (`setQuality`), `renderer.ts` (1 linha) | densidade de texel **18,3 × 85,3 → 36,6 × 42,7 px/m** (repetição 24 → 48 m); faixa de bordo 0,25 → 0,3 m (**4,6 → 11 texels**), traço 0,2 × 3 m → 0,3 × 4 m; a 60 m na Alta a faixa cobre **0,2 → 2,0 texels** no nível de mip escolhido; anisotropia 8 fixa → 4/8/16/16; zebra 32 × 128 → 96 × 256 px, bloco **1 → 1,5 m** |
+| Fachadas variadas | `scenery/textures.ts` (atlas), `geom.ts` (`facadeCell`), `structures.ts`, `catalog.ts`, `layout.ts`, `runtime.ts` (`applyFacadeAtlas`) | **1 → 4 visuais por estilo**; Copacabana: 225 prédios em 12 ids → 48 ids, cada janela de 80 segmentos com ≥ 4 prédios mostra ≥ 3 visuais; Sampa: 902 prédios, idem. Mesmo material e lote (0 chamada nova) |
+| Nuvens pintadas | `sky.ts` (`cloudLayout`, `cloudAtlasImage`, `buildClouds`) | 9 cúmulos a 10°–25° + 6 faixas, **1–4 à vista por rumo**, ~20 mil △ → **36 cúmulos + 8 estratos** (Alta; Média 28 + 7, Baixa 20 + 5), ≥ 5 à vista em todo rumo, **80 △** |
+| Mar saturado | `terrain.ts` (`seaLook`, `seaApparent`, `SEA_FRAG`, `FOAM_FRAG`) | saturação a 300 m no ângulo raso (a conta do shader): Copacabana de dia **0,56 → 1,00** (rgb 0,116,204 antes do tone mapping); 9 das 18 combinações abaixo do piso → 0 (a menor: savana no entardecer, 0,50; de dia ≥ 0,7, entardecer e noite ≥ 0,45) |
+
+**Testes vistos falhar antes** (`tests/pistas-v4.test.ts`, no código do 550e970; commit dd8742b): `Tests  17 failed | 1 passed (18)`. Pelo resultado:
+`asfalto 256×2048 px para 14 × 24 m: 18.3 × 85.3 px/m: expected 0.214 to be greater than or equal to 0.75`; `copacabana apartment: 167 prédios: expected 1 to be
+greater than or equal to 4`; `sampa_noite apartment: 476 prédios: expected 1 to be greater than or equal to 4`; malha de nuvens `expected 4320 to be less than or equal to 2000`.
+Por "não existe": `asphaltImage`, `kerbImage`, `MARKINGS`, `ASPHALT_WEAR`, `cloudLayout`, `seaLook`, `FACADE_CELL_SPAN`. Os "antes" desses, medidos com as contas do
+550e970: a faixa de bordo de 4,6 texels cobria 0,2 texel a 60 m (anisotropia 8, nível de mip 4,4); 15 nuvens, 1 a 4 à vista por rumo (os cúmulos a 12°–22°); o mar abaixo do piso
+em 9 combinações (desert:day 0,14, savanna:day 0,15, city_night:day 0,28, alpine:dusk 0,26…); o agregado do canvas (Chromium) 6,6% e as trilhas 4,9%–6,3%: o piso do
+agregado subiu de 3% para 8% depois dessa medida (b497e37), para o teste separar o agregado do granulado de antes (com 3% ele passaria no 550e970).
+
+**Testes mudados de propósito:** `horizonte-suave` — "nuvem sem faceta" passa a ser medida no atlas (a normal pintada: no miolo, entre pixels vizinhos, < 12°), porque a
+malha virou de quadros; `corrida-que-muda-estrada` — tempo-limite de 60 s (o desenho do asfalto, 1 milhão de pixels, é montado uma vez por processo: ~0,2 s com a máquina
+livre, segundos sob carga).
+
+**Contagens** (galeria, 1280 × 720, Alta, swiftshader, sem FPS): chamadas **iguais** nas 7 cenas (54 · 52 · 40 · 56 · 45 · 41 · 285); triângulos **caíram** em todas — Copacabana 205.270 → 190.882, Paraty 178.534 → 164.166, Cânion 159.260 → 145.668, Sampa à noite 184.795 → 183.519, Fuji 149.403 → 135.811, Xingó 154.811 → 141.219, 4 jogadores 917.986 → 857.894 (as nuvens custam ~14 mil △ a menos por viewport; à noite não há nuvem, e Sampa só perde as lajes dos visuais 2 e 3). **Gate e GL:** `NC_REQUIRE_GL=1 npx vitest run tests/gl-render.test.ts tests/corrida-que-muda-gl.test.ts tests/texturas-gl.test.ts` (carga ~50, a galeria rodando junto) → `Tests  1 failed | 18 passed (19)`, 3900 s: caiu o 1º do `gl-render` **por tempo** (`Test timed out in 1500000ms`: a coleta de todas as qualidades × cenas passou dos 25 min); os testes seguintes usam a MESMA coleta e passaram, inclusive o gate de contagem (`checkGate` sem violação) e, no `corrida-que-muda-gl`, nenhum programa novo no meio da transição; `texturas-gl` verde. A checagem do 1º teste foi refeita à parte no laboratório (Copacabana, Sampa e Paraty × 4 qualidades): **0 programa com log, 0 erro de shader, 0 erro de página**; Alta: 83 / 78 / 80 chamadas, 293 mil / 370 mil / 270 mil △ (limites 84 / 88 chamadas, 340 mil / 380 mil △).
+Memória de vídeo a mais (conta, não medida em GPU): asfalto 2 → 4 MB por ponta da corrida que muda, atlas de fachada 4 × 2 de 256² → 512², atlas de nuvem 2 MB: ~+16 MB
+com os mipmaps. Programas: a fachada (chave `speed-tche-facade-atlas-v1`), a nuvem e o mar mudam de shader, compilados na carga como antes.
+
+**Galeria antes × depois:** `scratch/galeria/comparar-main-550e970-vs-pistas.png` (cenas 01–06 e 08). `7 de 13 cenas mudaram · 6 sem imagem num dos lados · contagens que subiram em 0` (as 6 sem imagem ficaram fora do `--so`: carros, menus, largada, derrapagem e 2 jogadores não são desta frente).
+
+**O que ainda está feio (para o dono):**
+1. **Asfalto de dia à sombra é azul-marinho** (Copacabana, `(0,40,98)` na captura; `(18,54,106)` ao sol no modelo da cor-brilho). É a luz do dia — hemisférica azul +
+   IBL do céu + o pé do Neutral que zera o vermelho — que a cor-brilho travou ("o dia não muda", `tests/cor-brilho.test.ts`). A textura nova aparece ao sol (Paraty, Fuji,
+   Copacabana seg 380), mas à sombra o marinho engole o desgaste. **Recomendação:** abrir a trava para a família `road` (dessaturar a hemisférica/IBL no asfalto, ou o pé do
+   Neutral sobre a luminância também de dia), com antes × depois de Copacabana. Decisão do dono.
+2. **Repetição de 48 m:** remendos e trincas voltam no mesmo lugar a cada 48 m (a 270 km/h, ~1,5 vez por segundo); uma camada de decalques por hash do segmento (+1 chamada) resolveria.
+3. **Prédios:** os 4 visuais mudam janela, cor, varanda, térreo e telhado, mas a **silhueta** (coroa, recuos) é a mesma por tipo: mudar a altura mexe na visada dos marcos
+   (`block` da `sight.ts`). Fica para quando a régua dos marcos for refeita (T4).
+4. **Nuvens:** sem sombra no chão e sem nuvem à noite (somem com a luz, como antes); os impostores olham para o centro do céu (correto para a câmera de corrida).
+5. **Água:** o mar só existe no bioma `coast`; lago e rio dos outros biomas continuam conteúdo de pista (Q).
+
+**Custo de montar a pista:** com 4 visuais a Copacabana monta 39 prédios distintos em vez de 12, e o raio de oclusão do prédio da orla (`bakeAO`) dobrava o
+layout (19,8 → 43,7 s com a máquina a ~38 de carga). Os visuais 1–3 da orla levam o degradê de altura dos outros prédios (9e436bb): 22,9–30,7 s contra 20,2–25,0 s
+do 550e970 na mesma carga; o layout das 109 pistas, 45,4 s contra 56,9 s do 550e970 (carga ~12: ruído de medida, nenhuma subida).
+
+**Suíte inteira** (`NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 npx vitest run --testTimeout=300000 --hookTimeout=900000 --reporter=dot`, código do 9e436bb, com outras 4 suítes
+de outras frentes rodando juntas, carga 20–40): `Test Files  4 failed | 207 passed (211)` · `Tests  5 failed | 3828 passed | 1 skipped (3834)` · 4748 s. As 5 são
+**de tempo**, as conhecidas sob carga (PLAYBOOK §5, T6): `fuel` (2 × 30 s), `landmarks` "perLap" (120 s), `scenery` "borda de cada sprite sólido" (240 s) e o 1º do
+`gl-render` (1500 s). Sozinhas: `fuel` + `scenery` verdes (a borda dos sólidos em 135 s), `landmarks` `Tests  23 passed (23)` (perLap em 30 s), `NC_REQUIRE_GL=1` `gl-render` `Tests  14 passed (14)` em 2035 s (o 1º, que compila todos os programas, em 674 s).
+(A 1ª tentativa da suíte, antes do 9e436bb, foi cortada pelo `timeout 7000` antes do resumo e não conta.)

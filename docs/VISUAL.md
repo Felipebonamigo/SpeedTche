@@ -793,7 +793,7 @@ Os itens da auditoria de 14/10/2026 (asfalto de cor lisa, zebras e faixas pouco 
   recuada, brises sobre vidro bronze; no clássico, arco com pedra de fecho, venezianas verdes, pilastras e frontão; no tijolo, tijolo aparente, floreira e
   toldinho, janela de correr). Contrato da uv: `u = local + célula × FACADE_CELL_SPAN` (64); o material amostra com `fract` + `textureGrad`
   (`applyFacadeAtlas`, runtime.ts). Célula 0 = o desenho de antes: os marcos não mudam. O id do prédio ganha o 5º campo (`bld:aptbeach:12:2:3`): tinta
-  por família de cor, ritmo das varandas, nervuras e empenas, toldo, letreiro, térreo e telhado, com a mesma pegada, altura e frente nos 4. No layout o
+  por família de cor, ritmo das varandas, nervuras e empenas, toldo, letreiro, térreo e telhado, com a mesma pegada, altura e frente nos 4 (os visuais 1–3 do prédio da orla levam o degradê de altura, não o raio de oclusão do visual 0: montar a pista não fica mais lento). No layout o
   visual é o próximo de uma permutação por pista, na ordem da pista: dois prédios seguidos nunca repetem.
 - **Nuvens pintadas** (`sky.ts`): impostores (2 triângulos cada) com a normal pintada num atlas 1024 × 512 (metabolas de núcleo compacto: lobos lisos,
   barriga reta, oclusão nas frestas), três tons pela luz do período, forro de prata contra o sol, perspectiva aérea perto do horizonte e esmaecimento
