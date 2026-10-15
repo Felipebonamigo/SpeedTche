@@ -3,7 +3,7 @@
 // dianteiro. Onda I: carcaças, grade, retrovisor, lâmina do aerofólio e placas das pontas de cantos
 // arredondados (`roundBar`/`fillet` do kit), lâmpadas e escapes de mais lados.
 import * as THREE from 'three';
-import { AXIS_NZ, AXIS_Y, AXIS_Z, beam, box, cylinder, extrudeZY, fillet, lathe, roundBar, roundBox, type Brush, type MeshBuilder, type P2, type P3 } from './kit';
+import { AXIS_NZ, AXIS_Y, AXIS_Z, beam, box, cylinder, extrudeZY, extrudeZYSpans, fillet, lathe, roundBar, roundBox, type Brush, type MeshBuilder, type P2, type P3 } from './kit';
 import type { Axle, BodyShape } from './body';
 import { ACCENT, CHROME, GRILLE, HEAD_HOUSING, PLATE, TRIM, UNDER } from './paints';
 
@@ -86,6 +86,8 @@ export function airfoil(c0: number, c1: number, y: number, t: number): P2[] {
 export interface WingSpec {
   z: number; y: number; span: number; chord: number; thick?: number; pitch?: number;
   brush: Brush; plate?: Brush | null; strut?: 'post' | 'swan' | null; strutBrush?: Brush; baseY?: number; strutX?: number;
+  /** Faixa por cima da lâmina (V2): entre x de dentro e x de fora, dos dois lados, a lâmina leva o pincel da faixa (no casco simples, não). */
+  stripe?: { x: readonly [number, number]; brush: Brush };
 }
 
 /** Aerofólio: lâmina inclinada, placas nas pontas e dois suportes até a tampa. */
@@ -95,7 +97,10 @@ export function wing(b: MeshBuilder, w: WingSpec): void {
     // Perfil de asa: borda de ataque redonda e mais grossa que a de fuga (perfil (z, y) arredondado, extrudado em x).
     const hs = w.span / 2; const c0 = w.z - w.chord / 2; const c1 = w.z + w.chord / 2;
     if (b.lod) box(b, [0, w.y, w.z], [w.span, t, w.chord], w.brush); // casco simples: a lâmina é uma caixa
-    else extrudeZY(b, airfoil(c0, c1, w.y, t), -hs, hs, w.brush);
+    else if (w.stripe) {
+      const [xi, xo] = w.stripe.x; const sb = w.stripe.brush;
+      extrudeZYSpans(b, airfoil(c0, c1, w.y, t), [-hs, -xo, -xi, xi, xo, hs], [w.brush, sb, w.brush, sb, w.brush], w.brush);
+    } else extrudeZY(b, airfoil(c0, c1, w.y, t), -hs, hs, w.brush);
     if (w.plate !== null) {
       const pb = w.plate ?? w.brush;
       b.mirrored(() => roundBar(b, [hs + 0.015, w.y - 0.03, w.z + 0.02], [0.03, 0.2, w.chord + 0.1], pb, { r: 0.05, axis: 'x' }));

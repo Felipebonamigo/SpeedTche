@@ -145,7 +145,7 @@ faces planas como o low-poly do jogo. O que distingue cada um de perfil:
 
 | Estilo | Perfil |
 |---|---|
-| gt | capô longo, cabine recuada, traseira fastback com rabeta; faixa lateral |
+| gt | (V2, estilo HCT) motor central em cunha: bico baixo, para-lamas que sobem sobre as rodas, cabine avançada, tampa do motor longa, entrada de ar no flanco, asa com suporte; faixa lateral no vinco, que sobe para trás |
 | muscle | caixote de três volumes, capô comprido, tomada de ar, faixas por cima (teto, capô, tampa) |
 | hatch | dois volumes, curto, tampa traseira quase vertical, aerofólio de teto |
 | sedan | três volumes, quatro portas (duas janelas, linhas de porta), porta-malas saliente |
@@ -219,7 +219,7 @@ construtor é erro (`buildModel`), e `tests/car-models.test.ts` confere que as 1
 
 | Estilo | Silhueta | O que o denuncia de longe | Roda |
 |---|---|---|---|
-| `gt` | grã-turismo de motor dianteiro, fastback | capô longo entre para-lamas que sobem, "ducktail", 4 lanternas redondas, saída de ar atrás da roda | `sport5` |
+| `gt` | **estilo HCT (V2, 15/10/2026)**: supercarro de motor central em cunha (F40/F50, Countach, NSX), casco por linhas (`cars/hull.ts`) | bico baixo com faróis de projetor deitados no capô, cabine avançada de vidro escuro, entrada de ar no flanco, traseira com 4 lanternas redondas **embutidas** num painel preto (lente acesa no fundo do poço), pisca e ré apagados, difusor de 6 aletas, asa com suportes; faixas A do bico à cauda (e na asa) e B no vinco | `sport5` |
 | `muscle` | muscle car | frente alta e chata com grade de ponta a ponta e faróis redondos cromados, tomada de ar no capô, traseira curta, pneus traseiros maiores | `mag` |
 | `hatch` | hot hatch | cabine alta até o fim do carro, tampa quase vertical, aerofólio grande no teto, para-lamas alargados com borda preta, escape central duplo | `multi` |
 | `sedan` | sedã econômico | três volumes (capô, cabine, porta-malas), friso cromado das janelas, placas, calotas | `hubcap` |
@@ -409,7 +409,7 @@ falso: a prévia muda, o save guarda e volta), `tests/paint-session.test.ts` (se
 
 ## Rodas, traseira e cabine (M4)
 
-Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo. O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.
+Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo (menos no `gt` do estilo HCT, V2: vidro escuro com caimento de carro de verdade, `docs/ondas/V2-gt.md`). O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.
 
 ## Garagem e Concessionária (N2)
 

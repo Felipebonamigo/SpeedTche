@@ -333,6 +333,29 @@ export function extrudeZY(b: MeshBuilder, profile: readonly P2[], x0: number, x1
   }
 }
 
+/**
+ * O mesmo prisma de `extrudeZY`, em vãos de x (`xs` crescente) com um pincel por vão: a lâmina do aerofólio com a faixa A por cima
+ * (V2). As tampas só nas duas pontas (as divisas entre vãos não têm face: ninguém as vê).
+ */
+export function extrudeZYSpans(b: MeshBuilder, profile: readonly P2[], xs: readonly number[], brushes: readonly Brush[], side: Brush): void {
+  const n = profile.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) { const [z0, y0] = profile[i]; const [z1, y1] = profile[(i + 1) % n]; area += z0 * y1 - z1 * y0; }
+  const pts = area > 0 ? [...profile].reverse() : [...profile];
+  const at = (x: number, p: P2): P3 => [x, p[1], p[0]];
+  const x0 = xs[0]; const x1 = xs[xs.length - 1];
+  for (let i = 1; i < n - 1; i++) {
+    b.tri(at(x1, pts[0]), at(x1, pts[i]), at(x1, pts[i + 1]), side);
+    b.tri(at(x0, pts[0]), at(x0, pts[i + 1]), at(x0, pts[i]), side);
+  }
+  for (let k = 0; k < xs.length - 1; k++) {
+    for (let i = 0; i < n; i++) {
+      const p = pts[i]; const q = pts[(i + 1) % n];
+      b.quad(at(xs[k], p), at(xs[k], q), at(xs[k + 1], q), at(xs[k + 1], p), brushes[k]);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Peças chanfradas (onda I, "menos quadrado" pela geometria). A quina de 90° vira em DOIS passos de 30° (três
 // dobras de 30°: lado → chanfro → chanfro → topo), e não num chanfro de 45°: com o vinco de carro em 45° a dobra

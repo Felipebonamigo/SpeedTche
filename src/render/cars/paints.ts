@@ -40,6 +40,22 @@ export const TIRE = brush('#141416', { rough: 0.94 });
 export const TIRE_SIDE = brush('#1d1e21', { rough: 0.88 });
 export const WHITEWALL = brush('#ecebe4', { rough: 0.7 });
 export const INTERIOR = brush('#23252a', { rough: 0.85 });
+// Estilo HCT (V2, docs/ondas/V2-gt.md): pincéis SEM luz nem camada (os de luz e de faixa continuam os de cima; tests/car-round.test.ts).
+/** Vidro escuro neutro (o HCT2 aprovado): reflete o céu como o `GLASS`, sem o azul liso. */
+export const GLASS_TINT = brush('#151b25', { rough: 0.04, metal: 0.9 });
+/** Reflexo do céu nas janelas laterais do vidro escuro: mais contido que o `GLINT`. */
+export const GLINT_SOFT = brush('#c6d4e2', { rough: 0.04, metal: 1 });
+/** Reflexo no para-brisa e no vidro de trás: o céu de cima, mais apagado ainda. */
+export const GLINT_SKY = brush('#9fb2c6', { rough: 0.05, metal: 1 });
+/** Pisca e luz de ré APAGADOS (o carro andando): lente colorida, sem emissivo. */
+export const LENS_AMBER = brush('#ff9418', { rough: 0.15, metal: 0.1 });
+export const LENS_CLEAR = brush('#d9dde3', { rough: 0.12, metal: 0.35 });
+/** Fundo vermelho-escuro do poço da lanterna embutida (a lente acesa fica no fundo dele). */
+export const TAIL_WELL = brush('#3d0a08', { rough: 0.35 });
+/** Preto brilhante (painel da traseira, moldura do farol). */
+export const PIANO = brush('#0f1013', { rough: 0.22, metal: 0.3 });
+/** Refletor do farol, atrás dos projetores. */
+export const REFLECTOR = brush('#c9ced6', { rough: 0.25, metal: 0.7 });
 export const SEAT = brush('#3a2d27', { rough: 0.8 });
 export const PLATE = brush('#bdb9aa', { rough: 0.55 });
 export const WHITE = brush('#f3f3f0', { rough: 0.4 });

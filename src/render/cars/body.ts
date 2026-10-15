@@ -5,7 +5,7 @@
 // Onda I ("menos quadrado" pela geometria): bico e traseira em quarto de elipse em planta e de perfil, ombro
 // em arco de três pontos, arco da roda de 10 facetas, borda do teto e dobras do para-brisa arredondadas.
 import { loft, type Brush, type Lod, type MeshBuilder, type P2, type P3 } from './kit';
-import { GLASS, GLASS_DARK, GLINT } from './paints';
+import { GLASS, GLASS_DARK, GLASS_TINT, GLINT } from './paints';
 
 /** Seção-chave da carroceria (metros). */
 export interface Sec {
@@ -243,6 +243,8 @@ export interface CabinSpec {
   edge?: number; bend?: number;
   /** Tampa da última seção (a parede de trás da cabine da picape), no contorno da cabine. */
   capBack?: Brush;
+  /** Pincel do reflexo das janelas laterais (`cabinGlint`); padrão `GLINT`. */
+  glint?: Brush;
 }
 
 const lerpCab = (a: CabSec, b: CabSec, t: number): CabSec => ({
@@ -340,7 +342,7 @@ export function bubble(spec: CabinSpec, k = 0.7, crownBoost = 0.03, lift = 0.07)
   };
 }
 
-const isGlass = (br: Brush): boolean => br === GLASS || br === GLASS_DARK;
+const isGlass = (br: Brush): boolean => br === GLASS || br === GLASS_DARK || br === GLASS_TINT;
 
 /**
  * Reflexo do vidro (M4): duas faixas diagonais de espelho claro em cada janela lateral comprida (cartum: o reflexo do céu), 6 mm
@@ -362,7 +364,7 @@ export function cabinGlint(b: MeshBuilder, spec: CabinSpec): void {
     };
     for (const [u0, w] of [[0.2, 0.1], [0.4, 0.035]] as const) {
       const sh = 0.12;
-      b.mirrored(() => b.quad(at(u0, 0.15), at(u0 + sh, 0.85), at(u0 + w + sh, 0.85), at(u0 + w, 0.15), GLINT));
+      b.mirrored(() => b.quad(at(u0, 0.15), at(u0 + sh, 0.85), at(u0 + w + sh, 0.85), at(u0 + w, 0.15), spec.glint ?? GLINT));
     }
   }
 }
