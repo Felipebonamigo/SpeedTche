@@ -203,7 +203,7 @@ describe('online: o carro trancado fica só na tela deste computador', () => {
     expect(FREE).toContain(c.locals[0].car);
     expect(FREE).toContain(lastInfo(sock).players[0].car);
     for (const m of sock.sent) for (const p of m.info?.players ?? []) expect(PRICED.map((x) => x.id)).not.toContain(p.car);
-  });
+  }, 30_000); // o 1º teste com o controlador online levou 4–7 s com a máquina carregada (os seguintes, 1 ms): passava do limite de 5 s
 
   it('"Pronto" recusa com o carro trancado à vista; com um liberado, vale', () => {
     const { c } = lobby(false);

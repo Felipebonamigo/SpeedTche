@@ -151,6 +151,38 @@ describe('Resultado: o progresso sem tela nova (O5)', () => {
     expect(all(c.screen.el, (e) => e.className.includes('focusable') && (e.className.includes('prog-chip') || e.className.includes('xp-tag')))).toHaveLength(0);
   });
 
+  // O playtest-layout (cena results-busy-progress: 14 conquistas, o carimbo e 2 humanos com prêmio) reprovou a 1024×640 e 1280×800 com texto
+  // grande: os cartões de progresso na lista somavam uma fila e empurravam os botões 18–25 px para fora. No quadro compacto (mais de
+  // FULL_CHIPS_MAX cartões) o progresso vira UM cartão na linha do título, que tem largura sobrando.
+  it('quadro compacto (muitos cartões): o progresso vira um cartão só, na linha do título, e não soma fila às conquistas', () => {
+    const ach = ['PRIMEIRA_VITORIA', 'EQUIPE_COMPLETA', 'SEM_ARRANHAO', 'NITRO_TRIPLO', 'EMPURRAO'].map((id) => ({ id, seats: [0, 1] }));
+    const camaleao = (n: ProgressNews): ProgressNews => ({ ...n, unlocks: [{ kind: 'title', id: 'lenda_tche', level: 30 }, { kind: 'cosmetic', field: 'finish', value: 'camaleao', carId: n.carId, mastery: 5 }] });
+    const same = rig([camaleao(NEWS[0]), camaleao(NEWS[1])], ach).screen;
+    const head = all(same.el, hasClass('results-ach-head'))[0];
+    expect(head).toBeDefined();
+    expect(all(head, hasClass('results-ach-title'))).toHaveLength(1);
+    expect(all(all(same.el, hasClass('results-ach-list'))[0], hasClass('prog-chip'))).toHaveLength(0);
+    const chips = all(same.el, hasClass('prog-chip'));
+    expect(chips).toHaveLength(1);
+    expect(all(head, hasClass('prog-chip'))).toHaveLength(1);
+    expect(all(chips[0], hasClass('seat-dot'))).toHaveLength(2);
+    // O mesmo prêmio para os dois: o nome dele, sem o carro (a bolinha diz de quem é; o carro é o de cada um, e a dica diz qual).
+    expect(text(chips[0])).toBe('Acabamento camaleão');
+    const tip = chips[0].getAttribute('title') ?? '';
+    expect(tip).toContain('P1: Acabamento camaleão no Falcão GT');
+    expect(tip).toContain('P2: Acabamento camaleão no Trovão V12');
+    expect(tip).toContain('Título: Lenda Tchê');
+    // Prêmios diferentes: quantos humanos ganharam algo.
+    const mixed = rig([NEWS[0], camaleao(NEWS[1])], ach).screen;
+    expect(text(all(mixed.el, hasClass('prog-chip'))[0])).toBe('2 prêmios');
+    setLanguage('en');
+    const mixedEn = rig([NEWS[0], camaleao(NEWS[1])], ach).screen;
+    expect(text(all(mixedEn.el, hasClass('prog-chip'))[0])).toBe('2 prizes');
+    // Um só humano com prêmio, no compacto: o nome do prêmio dele.
+    const one = rig([NEWS[0], NEWS[1]], ach).screen;
+    expect(text(all(one.el, hasClass('prog-chip'))[0])).toBe('Gold rim');
+  });
+
   it('sem liberar nada (subindo de nível ou não): só o XP na linha, sem quadro', () => {
     const { screen } = rig([NEWS[1], { ...NEWS[0], unlocks: [] }]);
     expect(all(screen.el, hasClass('xp-tag'))).toHaveLength(2);

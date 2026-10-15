@@ -1,5 +1,5 @@
 // Telas do progresso que fica (O5, docs/ondas/O/O5.md §4.6–§4.7): a linha do cadeado do carro trancado (lobby, festa, online), a aba "Nível"
-// dos Recordes e a faixa de progresso do resultado. Só DOM e texto: as contas são de src/game/progression.ts. O estilo VISUAL (cor, ícone,
+// dos Recordes e o progresso no resultado (XP na linha da tabela, prêmios no quadro das conquistas). Só DOM e texto: as contas são de src/game/progression.ts. O estilo VISUAL (cor, ícone,
 // moldura) é do tema da interface (nc/menu-estilos); progress.css só tem o mínimo de estrutura para o texto caber.
 import '../../career/strings';
 import '../../cosmetics/strings';
@@ -126,17 +126,48 @@ export function xpTag(n: ProgressNews | undefined): HTMLElement | null {
 export function progressChips(news: readonly ProgressNews[] | undefined, seatColor: (seat: number) => string | null, nameOf: (seat: number) => string): HTMLElement[] {
   const out: HTMLElement[] = [];
   for (const n of news ?? []) {
-    if (n.unlocks.length === 0) continue;
-    const ordered = [...n.unlocks.filter((u) => u.kind === 'cosmetic'), ...n.unlocks.filter((u) => u.kind !== 'cosmetic')].map(unlockText);
-    const [head, ...rest] = ordered;
-    if (n.level.after > n.level.before) rest.push(t('progress.unlock.levelUp', { n: n.level.after }));
-    const desc = rest.join(' · ');
-    out.push(h('div', { class: 'ach-chip prog-chip', attrs: { title: desc ? `${head} — ${desc}` : head, 'data-seat': String(n.seat) } },
-      h('span', { class: 'ach-chip-seats' }, h('i', { class: 'seat-dot', style: `--seat:${seatColor(n.seat) ?? 'var(--accent)'}`, title: nameOf(n.seat) })),
-      h('span', { class: 'ach-chip-text' }, h('strong', { text: head }), desc ? h('span', { text: desc }) : null),
+    const g = giftOf(n);
+    if (!g) continue;
+    out.push(h('div', { class: 'ach-chip prog-chip', attrs: { title: g.desc ? `${g.head} — ${g.desc}` : g.head, 'data-seat': String(n.seat) } },
+      h('span', { class: 'ach-chip-seats' }, seatDot(n.seat, seatColor, nameOf)),
+      h('span', { class: 'ach-chip-text' }, h('strong', { text: g.head }), g.desc ? h('span', { text: g.desc }) : null),
     ));
   }
   return out;
+}
+
+/**
+ * Quadro compacto (muitos cartões: só o nome de cada um, em fila que quebra): o progresso vira UM cartão, que vai na linha do título — lá
+ * sobra largura, e um cartão a mais na lista podia somar uma fila e empurrar os botões para fora (o playtest-layout reprovou assim a
+ * 1024×640 com texto grande). As bolinhas dizem de quem; o texto é o prêmio, se for o mesmo para todos ("Acabamento camaleão": o carro é o
+ * de cada um), ou "2 prêmios"; a dica tem tudo, por piloto.
+ */
+export function compactProgressChip(news: readonly ProgressNews[] | undefined, seatColor: (seat: number) => string | null, nameOf: (seat: number) => string): HTMLElement | null {
+  const gifted = (news ?? []).flatMap((n) => { const g = giftOf(n); return g ? [{ n, g }] : []; });
+  if (gifted.length === 0) return null;
+  const label = new Set(gifted.map((x) => x.g.short)).size === 1 ? gifted[0].g.short : t('progress.results.prizes', { n: gifted.length });
+  const tip = gifted.map(({ n, g }) => `${nameOf(n.seat)}: ${g.desc ? `${g.head} — ${g.desc}` : g.head}`).join('\n');
+  return h('div', { class: 'ach-chip prog-chip prog-chip-compact', attrs: { title: tip, 'data-seat': gifted.map((x) => x.n.seat).join(',') } },
+    h('span', { class: 'ach-chip-seats' }, gifted.map(({ n }) => seatDot(n.seat, seatColor, nameOf))),
+    h('span', { class: 'ach-chip-text' }, h('strong', { text: label })),
+  );
+}
+
+/**
+ * O que um humano ganhou, para os cartões: `head` é o prêmio principal (o de maestria na frente, o mais raro), `desc` o resto (título,
+ * moldura e o "Nível N!" de quem subiu) e `short` o principal sem o carro. Subir de nível sem prêmio não conta (já está na linha da tabela).
+ */
+function giftOf(n: ProgressNews): { head: string; desc: string; short: string } | null {
+  const ordered = [...n.unlocks.filter((u) => u.kind === 'cosmetic'), ...n.unlocks.filter((u) => u.kind !== 'cosmetic')];
+  const first = ordered[0];
+  if (!first) return null;
+  const [head, ...rest] = ordered.map(unlockText);
+  if (n.level.after > n.level.before) rest.push(t('progress.unlock.levelUp', { n: n.level.after }));
+  return { head, desc: rest.join(' · '), short: first.kind === 'cosmetic' ? itemName(first.field, first.value) : head };
+}
+
+function seatDot(seat: number, seatColor: (seat: number) => string | null, nameOf: (seat: number) => string): HTMLElement {
+  return h('i', { class: 'seat-dot', style: `--seat:${seatColor(seat) ?? 'var(--accent)'}`, title: nameOf(seat) });
 }
 
 // ───────────────────────────── Recordes › Nível ─────────────────────────────

@@ -29,6 +29,13 @@
 /* Resultado: o XP na linha do humano (sem altura nova; não quebra a linha da tabela). O que liberou vai no quadro das conquistas (ach-chip). */
 .xp-tag { margin-left: calc(8 * var(--u)); font-size: var(--fs-sm); font-weight: 800; white-space: nowrap; color: var(--seat, var(--accent)); }
 .xp-tag.up { color: var(--ok); }
+/* Quadro compacto (muitas conquistas): o título e o cartão do progresso numa linha só — o cartão encolhe com reticências em vez de
+   quebrar para uma fila nova (é a altura que o resultado não tem). */
+.results-ach-head { display: flex; align-items: center; gap: calc(14 * var(--u)); min-width: 0; }
+.results-ach-head .prog-chip-compact { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+/* Da altura do título (o texto do título, não a de um cartão): senão a linha cresce e o resultado de 1024×640 com texto grande rola. */
+.results-ach.many .results-ach-head .prog-chip-compact { padding-top: 0; padding-bottom: 0; font-size: var(--fs-sm); line-height: 1.2; }
+.results-ach-head .prog-chip-compact .ach-chip-text strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
 
 /* Recordes › Nível: o cabeçalho do perfil e a lista de maestria (as linhas usam a largura do detalhe; o texto quebra). */
 .lvl-head { display: flex; align-items: center; gap: calc(14 * var(--u)); }

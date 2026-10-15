@@ -147,5 +147,5 @@ describe('online: o editor do visual respeita a maestria do perfil do jogador', 
       expect(seen.includes('dourado'), JSON.stringify(progress)).toBe(has);
       c.leave(false);
     }
-  });
+  }, 30_000); // o 1º teste com o controlador online levou 4–7 s com a máquina carregada (os seguintes, 1 ms): passava do limite de 5 s
 });

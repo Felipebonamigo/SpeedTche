@@ -20,7 +20,7 @@ import './passport.css';
 import './payout.css';
 import { button, createFocusList, h, listNav, screenFrame, trackName, type FocusItem, type ScreenApi, type ScreenData, type ScreenInstance } from './common';
 import { isVipRow, partyResultsParts } from './party';
-import { progressChips, xpTag } from './progress';
+import { compactProgressChip, progressChips, xpTag } from './progress';
 import { VIP_COLOR } from '../../core/modes';
 import { BRAZIL_REGIONS } from '../../core/data/cups';
 import '../passport/strings';
@@ -334,9 +334,12 @@ function achievementsPanel(d: ResultsScreenData, palette: ColorPalette): HTMLEle
   const gifts = progressChips(d.progress, (seat) => humanColor(d.humans, seat, palette), (seat) => d.humans.find((x) => x.seat === seat)?.name ?? '');
   if (list.length === 0 && gifts.length === 0) return null;
   const many = list.length + gifts.length > FULL_CHIPS_MAX;
+  const title = h('span', { class: 'results-ach-title' }, icon('trophy'), h('span', { text: list.length ? t('stats.results.title') : t('progress.results.title') }));
+  // Compacto: o progresso num cartão só, na linha do título (não soma fila à lista).
+  const compact = many ? compactProgressChip(d.progress, (seat) => humanColor(d.humans, seat, palette), (seat) => d.humans.find((x) => x.seat === seat)?.name ?? '') : null;
   return h('div', { class: `results-ach glass${many ? ' many' : ''}` },
-    h('span', { class: 'results-ach-title' }, icon('trophy'), h('span', { text: list.length ? t('stats.results.title') : t('progress.results.title') })),
-    h('div', { class: 'results-ach-list' }, gifts, list.map((u) => h('div', { class: 'ach-chip', attrs: { title: achievementDescription(u.id) } },
+    compact ? h('div', { class: 'results-ach-head' }, title, compact) : title,
+    h('div', { class: 'results-ach-list' }, many ? null : gifts, list.map((u) => h('div', { class: 'ach-chip', attrs: { title: achievementDescription(u.id) } },
       h('span', { class: 'ach-chip-seats' }, u.seats.map((seat) => h('i', {
         class: 'seat-dot', style: `--seat:${humanColor(d.humans, seat, palette) ?? 'var(--accent)'}`,
         title: d.humans.find((x) => x.seat === seat)?.name ?? '',
