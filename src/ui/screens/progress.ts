@@ -66,19 +66,26 @@ export function progressBar(into: number, need: number, cls = 'prog-bar'): HTMLE
 
 const carNameOf = (carId: string): string => CARS.find((c) => c.id === carId)?.name ?? carId;
 
+/** O prêmio com o nome do campo: "Aro dourado", "Acabamento cromado" / "Gold rim", "Chrome finish" ("Dourado" sozinho não diz o que é). */
+export function itemName(field: 'finish' | 'rim', value: string): string {
+  const f = t(`look.field.${field}`);
+  const v = lookOptionLabel(field, value);
+  return t('progress.item', { field: f, value: v, fieldLower: f.toLowerCase(), valueLower: v.toLowerCase() });
+}
+
 /** "Dourado no Falcão GT", "Título: Piloto", "Moldura de bronze". */
 export function unlockText(u: Unlock): string {
   switch (u.kind) {
     case 'title': return t('progress.unlock.title', { title: t(`progress.title.${u.id}`) });
     case 'frame': return t('progress.unlock.frame', { frame: t(`progress.frame.${u.id}`) });
-    case 'cosmetic': return t('progress.unlock.cosmetic', { item: lookOptionLabel(u.field, u.value), car: carNameOf(u.carId) });
+    case 'cosmetic': return t('progress.unlock.cosmetic', { item: itemName(u.field, u.value), car: carNameOf(u.carId) });
   }
 }
 
 /** O próximo prêmio da maestria de um carro ("Maestria 3: Cromado"), ou "Tudo liberado". */
 export function nextMasteryText(mastery: number): string {
   const next = MASTERY_REWARDS.find((r) => r.mastery > mastery);
-  return next ? t('progress.next.cosmetic', { n: next.mastery, item: lookOptionLabel(next.field, next.value) }) : t('progress.next.cosmeticNone');
+  return next ? t('progress.next.cosmetic', { n: next.mastery, item: itemName(next.field, next.value) }) : t('progress.next.cosmeticNone');
 }
 
 /** O próximo título ou moldura (o que vier antes), ou "Todos ganhos". */
@@ -112,23 +119,22 @@ export function xpTag(n: ProgressNews | undefined): HTMLElement | null {
 }
 
 /**
- * O que ficou liberado, em cartões do quadro das conquistas (as mesmas classes `ach-chip`, com a bolinha do assento): o nível novo (com o
- * título e a moldura que ele trouxe) e cada prêmio de maestria. Vazio quando ninguém subiu nem liberou nada.
+ * O que ficou liberado, no quadro das conquistas (as mesmas classes `ach-chip`, com a bolinha do assento): UM cartão por humano que ganhou
+ * alguma coisa — o prêmio de maestria na frente (o mais raro), depois o título e a moldura, e o "Nível N!" junto. Subir de nível sem prêmio
+ * não vira cartão (o "Nível N!" já está na linha dele na tabela). O quadro do resultado não tem altura para um cartão por item.
  */
 export function progressChips(news: readonly ProgressNews[] | undefined, seatColor: (seat: number) => string | null, nameOf: (seat: number) => string): HTMLElement[] {
   const out: HTMLElement[] = [];
-  const chip = (seat: number, title: string, desc: string) => h('div', { class: 'ach-chip prog-chip', attrs: { title: `${title} — ${desc}`, 'data-seat': String(seat) } },
-    h('span', { class: 'ach-chip-seats' }, h('i', { class: 'seat-dot', style: `--seat:${seatColor(seat) ?? 'var(--accent)'}`, title: nameOf(seat) })),
-    h('span', { class: 'ach-chip-text' }, h('strong', { text: title }), h('span', { text: desc })),
-  );
   for (const n of news ?? []) {
-    const levelGifts = n.unlocks.filter((u) => u.kind !== 'cosmetic').map(unlockText);
-    if (n.level.after > n.level.before) {
-      out.push(chip(n.seat, t('progress.unlock.levelUp', { n: n.level.after }), levelGifts.length ? levelGifts.join(' · ') : t('progress.xpGain', { n: fmt(n.xp) })));
-    }
-    for (const u of n.unlocks) {
-      if (u.kind === 'cosmetic') out.push(chip(n.seat, unlockText(u), t('progress.mastery', { n: u.mastery })));
-    }
+    if (n.unlocks.length === 0) continue;
+    const ordered = [...n.unlocks.filter((u) => u.kind === 'cosmetic'), ...n.unlocks.filter((u) => u.kind !== 'cosmetic')].map(unlockText);
+    const [head, ...rest] = ordered;
+    if (n.level.after > n.level.before) rest.push(t('progress.unlock.levelUp', { n: n.level.after }));
+    const desc = rest.join(' · ');
+    out.push(h('div', { class: 'ach-chip prog-chip', attrs: { title: desc ? `${head} — ${desc}` : head, 'data-seat': String(n.seat) } },
+      h('span', { class: 'ach-chip-seats' }, h('i', { class: 'seat-dot', style: `--seat:${seatColor(n.seat) ?? 'var(--accent)'}`, title: nameOf(n.seat) })),
+      h('span', { class: 'ach-chip-text' }, h('strong', { text: head }), desc ? h('span', { text: desc }) : null),
+    ));
   }
   return out;
 }

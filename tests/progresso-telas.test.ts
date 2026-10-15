@@ -69,11 +69,11 @@ describe('Recordes › Nível', () => {
     expect(rows.map((r) => r.getAttribute('data-car'))).toEqual(CARS.map((c) => c.id));
     const falcao = rows.find((r) => r.getAttribute('data-car') === 'falcao')!;
     expect(falcao.getAttribute('data-mastery')).toBe('2');
-    expect(text(falcao)).toContain('Maestria 3: Cromado');
+    expect(text(falcao)).toContain('Maestria 3: Acabamento cromado');
     const beija = rows.find((r) => r.getAttribute('data-car') === 'beijaflor')!;
     expect(beija.getAttribute('data-mastery')).toBe('5');
     expect(text(beija)).toContain('Tudo liberado');
-    expect(text(rows.find((r) => r.getAttribute('data-car') === 'saci')!)).toContain('Maestria 1: Dourado');
+    expect(text(rows.find((r) => r.getAttribute('data-car') === 'saci')!)).toContain('Maestria 1: Aro dourado');
   });
 
   it('descer da lista para outro perfil troca o detalhe', () => {
@@ -127,13 +127,15 @@ describe('Resultado: o progresso sem tela nova (O5)', () => {
   it('o que ficou liberado entra no quadro das conquistas: o nível novo com o título, o prêmio do carro', () => {
     const { screen } = rig(NEWS);
     const chips = all(screen.el, hasClass('prog-chip'));
-    expect(chips.map(text)).toEqual(['Nível 4!Título: Piloto', 'Dourado no Falcão GTMaestria 1']);
+    // Um cartão por humano que ganhou algo: o prêmio de maestria na frente, o título e o nível novo juntos (o P2 não ganhou nada: sem cartão).
+    expect(chips.map(text)).toEqual(['Aro dourado no Falcão GTTítulo: Piloto · Nível 4!']);
+    expect(chips[0].getAttribute('data-seat')).toBe('0');
     // Só progresso: o quadro chama "Progresso"; com conquistas junto, o título de sempre.
     expect(text(all(screen.el, hasClass('results-ach-title'))[0])).toContain('Progresso');
     const both = rig(NEWS, [{ id: 'PRIMEIRA_CORRIDA', seats: [0, 1] }]).screen;
     expect(text(all(both.el, hasClass('results-ach-title'))[0])).toContain('Conquistas desbloqueadas');
-    expect(all(both.el, hasClass('prog-chip'))).toHaveLength(2);
-    expect(all(both.el, hasClass('ach-chip')).length).toBe(3);
+    expect(all(both.el, hasClass('prog-chip'))).toHaveLength(1);
+    expect(all(both.el, hasClass('ach-chip')).length).toBe(2);
   });
 
   it('sem progresso (dado ausente ou vazio) nada muda; com ele, nenhum item de foco novo', () => {
@@ -149,9 +151,10 @@ describe('Resultado: o progresso sem tela nova (O5)', () => {
     expect(all(c.screen.el, (e) => e.className.includes('focusable') && (e.className.includes('prog-chip') || e.className.includes('xp-tag')))).toHaveLength(0);
   });
 
-  it('sem subir nem liberar nada: só o XP na linha, sem quadro', () => {
-    const { screen } = rig([NEWS[1]]);
-    expect(all(screen.el, hasClass('xp-tag'))).toHaveLength(1);
+  it('sem liberar nada (subindo de nível ou não): só o XP na linha, sem quadro', () => {
+    const { screen } = rig([NEWS[1], { ...NEWS[0], unlocks: [] }]);
+    expect(all(screen.el, hasClass('xp-tag'))).toHaveLength(2);
+    expect(text(all(screen.el, hasClass('xp-tag'))[0])).toContain('Nível 4!'); // P1 (assento 0) subiu
     expect(all(screen.el, hasClass('results-ach'))).toHaveLength(0);
   });
 });

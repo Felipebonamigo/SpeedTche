@@ -71,7 +71,7 @@ await page.evaluate(() => {
 // ───────────── Preparação: uma corrida de copa de verdade (resultado, classificação, "Continuar") ─────────────
 // Com NC_LAYOUT_ONLY sem as telas que dependem dela (resultado, classificação, "Continuar" no menu), pula a corrida.
 const ONLY = process.env.NC_LAYOUT_ONLY?.split(',') ?? null;
-if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub', 'results', 'results-busy', 'results-stamp', 'standings', 'results-score', 'standings-score'].includes(id))) {
+if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub', 'results', 'results-busy', 'results-stamp', 'standings', 'results-score', 'standings-score', 'results-busy-progress', 'results-progress-4'].includes(id))) {
   console.log('preparando: corrida da Copa Rio de Janeiro com 2 jogadores…');
   await page.evaluate((h) => { const s = window.nc.session; s.menus.hide(); s.debugBind(0, 'kb1'); s.debugBind(1, 'kb2'); s.startCup('br_rj', h); }, humans(2));
   await page.keyboard.down('ArrowUp'); await page.keyboard.down('KeyW');
@@ -86,7 +86,7 @@ if (!ONLY || ONLY.some((id) => ['main', 'free', 'main-expedition', 'garage-hub',
   check(await page.evaluate(() => !!window.__shown.results), 'corrida terminada e resultado guardado para as medições');
 }
 // N4: o Pagamento precisa de uma carreira com a corrida somada (`lastReport`): o pior caso é o co-op com 4 pilotos (4 colunas, equipe e cofre).
-if (!ONLY || ONLY.includes('payout-4') || ONLY.includes('payout-4-stars')) {
+if (!ONLY || ONLY.includes('payout-4') || ONLY.includes('payout-4-stars') || ONLY.includes('results-progress-4')) {
   console.log('preparando: corrida de carreira co-op com 4 pilotos…');
   await page.evaluate(() => { window.__shown.cupResults = window.__shown.results; });
   await page.evaluate((h) => {
@@ -122,6 +122,10 @@ function seedStars({ tracks, rivals }, names = [], lastTrack = null) {
 }
 const STARS_ARG = { tracks: ALL_TRACKS, rivals: RIVAL_KEYS, seed: seedStars.toString() };
 const ACH = ['PRIMEIRA_VITORIA', 'EQUIPE_COMPLETA', 'SEM_ARRANHAO', 'NITRO_TRIPLO', 'EMPURRAO', 'VOLTA_PERFEITA', 'MESTRE_DO_VACUO', 'NITRO_NA_BANDEIRA', 'MADRUGADA', 'SEM_BOX', 'PODIO_DE_EQUIPE', 'DO_ULTIMO_AO_PRIMEIRO', 'COPA_BR_RJ', 'CAMPEAO'];
+// O5: o pior caso do progresso no resultado — cada humano chegando ao nível 30 (título e moldura novos) e à maestria 5 (camaleão): o XP mais
+// longo na linha da tabela e o maior número de cartões no quadro das conquistas; e o carro com cadeado (o save da medição tem os 7 à venda liberados: as cenas do cadeado os trancam só na
+// montagem, e devolvem a lista em seguida — o cartão já desenhado fica com o cadeado até a medição).
+const NEWS = { xp: 1234, pilotXp: 13050, level: { before: 29, after: 30 }, carXp: 2200, mastery: { before: 4, after: 5 }, unlocks: [{ kind: 'title', id: 'lenda_tche', level: 30 }, { kind: 'frame', id: 'nitro', level: 30 }] };
 
 /** Cada tela: como montá-la dentro da página (roda a cada resolução/tamanho de texto, depois do redimensionamento). */
 const SCREENS = [
@@ -249,6 +253,57 @@ const SCREENS = [
   }],
   ['garage-hub', () => window.nc.session.menus.show('garageHub')],
   ['pause', () => window.nc.session.menus.show('pause')],
+  // ── O5 (só acréscimo): o progresso no resultado (2 pilotos com as 14 conquistas; 4 pilotos), a aba Nível e o carro com cadeado.
+  ['results-busy-progress', (a) => {
+    const d = window.__shown.results;
+    const news = d.humans.map((h) => ({ ...a.news, seat: h.seat, name: h.name, carId: h.carId, unlocks: [...a.news.unlocks, { kind: 'cosmetic', field: 'finish', value: 'camaleao', carId: h.carId, mastery: 5 }] }));
+    window.nc.session.menus.show('results', { ...d, achievements: a.ach.map((id) => ({ id, seats: [0, 1] })), progress: news });
+    window.__shown.results = d; // o `show` guardou estes dados: as outras cenas de resultado continuam com os da corrida de verdade
+  }, { ach: ACH, news: NEWS }],
+  ['results-progress-4', (a) => {
+    const d = window.__shown.careerResults ?? window.__shown.results;
+    const news = d.humans.map((h) => ({ ...a.news, seat: h.seat, name: h.name, carId: h.carId, unlocks: [...a.news.unlocks, { kind: 'cosmetic', field: 'finish', value: 'camaleao', carId: h.carId, mastery: 5 }] }));
+    const keep = window.__shown.results;
+    window.nc.session.menus.show('results', { ...d, mode: 'quick', progress: news });
+    window.__shown.results = keep;
+  }, { news: NEWS }],
+  // A aba Nível com o pior caso: um nome de 12 letras no nível 30 e todos os 14 carros com maestria (a lista inteira rola dentro do detalhe).
+  ['records-level', () => {
+    const s = window.nc.session;
+    const stats = s.debugSave().stats;
+    if (!stats.players.some((p) => p.name === 'Wwwwwwwwwwww')) {
+      stats.players.unshift({ name: 'Wwwwwwwwwwww', races: 300, wins: 120, podiums: 200, laps: 900, meters: 1, nitros: 0, towsGiven: 0, towsReceived: 0, collisions: 0, crashes: 0, pitStops: 0, raceTicks: 1, coopWins: 0, bestPositions: {} });
+    }
+    const p = s.debugProgress();
+    if (!p.profiles.some((x) => x.name === 'Wwwwwwwwwwww')) p.profiles.unshift({ name: 'Wwwwwwwwwwww', cars: Object.fromEntries(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'curupira', 'sucuri', 'carcara', 'pororoca', 'iara', 'boitata', 'beijaflor'].map((id, i) => [id, i * 170])) });
+    s.menus.show('records');
+    document.querySelectorAll('.rec-tab')[3]?.click();
+  }],
+  ['lobby-1-locked', () => {
+    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
+    for (let i = 0; i < 4; i++) s.input.unbindSeat(i); s.input.bindSeat(0, 'kb1');
+    save.carsUnlocked = []; s.menus.show('lobby');
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // do Falcão ao último da lista (o Beija-Flor, trancado)
+    save.carsUnlocked = keep;
+  }],
+  ['lobby-4-locked', () => {
+    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
+    ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));
+    save.carsUnlocked = []; s.menus.show('lobby');
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // P1 (setas) num trancado
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true })); // P2 (WASD) num trancado
+    save.carsUnlocked = keep;
+  }],
+  ['tournament-locked', () => {
+    const s = window.nc.session; const save = s.debugSave(); const keep = save.carsUnlocked;
+    ['kb1', 'kb2', 'gp0', 'gp1'].forEach((d, i) => s.input.bindSeat(i, d));
+    save.carsUnlocked = [];
+    s.menus.show('lobby');
+    s.menus.show('tournament');
+    for (let i = 0; i < 8; i++) document.querySelector('.tp-row-actions .btn:not(.disabled)')?.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true })); // o piloto em foco num trancado: a linha do erro diz o preço
+    save.carsUnlocked = keep;
+  }],
 ].filter(([id]) => !ONLY || ONLY.includes(id));
 
 /**
