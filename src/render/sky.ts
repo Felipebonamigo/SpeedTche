@@ -1,16 +1,14 @@
 // Céu: domo com gradiente forte (horizonte → meio → topo) e o horizonte do lado do sol puxando
 // para o brilho do período; sol grande com halo e lua com crateras no próprio shader; estrelas
-// com brilho variado à noite; nuvens low-poly estilizadas (lado iluminado × sombra, numa malha
-// só); luzes (direcional com sombras + hemisférica que dá a cor das sombras), névoa colorida e o
+// com brilho variado à noite; nuvens pintadas (impostores com a normal pintada num atlas, três tons pela luz do período, numa
+// malha só; V4); luzes (direcional com sombras + hemisférica que dá a cor das sombras), névoa colorida e o
 // env map (PMREM do próprio domo) para o reflexo nos carros. O grupo do céu gira pelo rumo
 // absoluto do carro: é a única coisa "fixa no mundo".
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SceneryId, TimeOfDay } from '../core/types';
 import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
-import { smoothNormals } from './normals';
 import { buildLensFlare } from './lensflare';
 import { bodyColor, lightsAmount, mix, palette, starAlpha, type LivePalette, type Palette } from './palette';
 import { applyGrade } from './stylize';
@@ -74,29 +72,45 @@ void main() {
 }`;
 
 const CLOUD_VERT = /* glsl */ `
-varying vec3 vW; varying vec3 vN;
+attribute vec3 aRight; attribute float aTone;
+varying vec2 vUv; varying vec3 vW; varying vec3 vN; varying vec3 vR; varying float vTone;
 void main() {
+  vUv = uv;
+  vTone = aTone;
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vW = wp.xyz;
   vN = normalize(mat3(modelMatrix) * normal);
+  vR = normalize(mat3(modelMatrix) * aRight);
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
-// Nuvem estilizada: bolhas lisas (normal suave do vértice — antes era a da face e a nuvem saía facetada), dois tons
-// pelo sol, barriga mais escura, borda acesa pelo sol baixo e, perto do horizonte, derretendo na cor do horizonte.
+/**
+ * Nuvem pintada (V4, docs/ondas/V4-pistas.md): impostor de um cúmulo com a normal PINTADA no atlas (`cloudAtlasImage`: as bolhas de um
+ * campo de alturas, lisas por pixel, sem faceta), três tons pela luz do período (sombra → meio → luz, passagem de pincel), a barriga e as frestas
+ * escuras (canal B), o forro de prata contra o sol e a perspectiva aérea perto do horizonte. `uFade` some com a noite.
+ */
 export const CLOUD_FRAG = /* glsl */ `
-uniform vec3 uLit; uniform vec3 uShade; uniform vec3 uRim; uniform vec3 uHorizon; uniform vec3 uSunDir;
-varying vec3 vW; varying vec3 vN;
+uniform sampler2D uAtlas; uniform vec3 uLit; uniform vec3 uShade; uniform vec3 uRim; uniform vec3 uHorizon; uniform vec3 uSunDir; uniform float uFade;
+varying vec2 vUv; varying vec3 vW; varying vec3 vN; varying vec3 vR; varying float vTone;
 void main() {
-  vec3 n = normalize(vN);
+  vec4 t = texture2D(uAtlas, vUv);
+  float a = t.a * uFade;
+  if (a < 0.004) discard;
+  vec2 nt = t.rg * 2.0 - 1.0;
+  float nz = sqrt(max(0.0, 1.0 - dot(nt, nt)));
+  vec3 up = cross(normalize(vN), normalize(vR));
+  vec3 n = normalize(nt.x * vR + nt.y * up + nz * vN);
   float l = dot(n, uSunDir) * 0.5 + 0.5;
-  vec3 c = mix(uShade, uLit, smoothstep(0.35, 0.8, l));
-  c = mix(c, uShade, smoothstep(0.1, -0.7, n.y) * 0.45);
+  vec3 mid = mix(uShade, uLit, 0.55);
+  vec3 c = mix(uShade, mid, smoothstep(0.16, 0.42, l));
+  c = mix(c, uLit, smoothstep(0.5, 0.8, l));
+  c = mix(uShade * 0.9, c, 0.5 + 0.5 * t.b);
   vec3 v = normalize(vW - cameraPosition);
   float toward = max(dot(v, uSunDir), 0.0);
-  c += uRim * pow(toward, 6.0) * 0.5;
-  c = mix(uHorizon, c, smoothstep(0.0, 0.2, v.y));
-  gl_FragColor = vec4(c, 1.0);
+  c += uRim * pow(1.0 - nz, 2.0) * (0.3 + 0.7 * pow(toward, 3.0));
+  c *= vTone;
+  c = mix(uHorizon, c, 0.4 + 0.6 * smoothstep(0.0, 0.16, v.y));
+  gl_FragColor = vec4(c, a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -152,56 +166,181 @@ function buildStars(): THREE.Points {
   return pts;
 }
 
-/** Vinco das bolhas de nuvem: a bolha inteira lisa; a barriga reta (dobra de ~90°) continua com quina. */
-const CLOUD_CREASE = 75;
+// ───────────────────────────── Nuvens pintadas (V4) ─────────────────────────────
+// Até a V4: 9 cúmulos de icosaedros a 10°–25° de elevação (quase todos acima do quadro da câmera Alta, que vê o céu de 0° a ~18°) e ~20 mil
+// triângulos. Agora: impostores (2 triângulos por nuvem) com a normal pintada num atlas, muitos e na faixa baixa do céu, numa malha só.
 
-/**
- * Um cúmulo: bolhas de icosaedro achatadas por baixo, com normal suave; `streak` = faixa comprida e fina. `detail` 1
- * (alta) usa icosaedro de 320 faces; 0 (média/baixa), de 80 — a mesma silhueta de longe, lisa nos dois.
- */
-function cloudPuffs(seed: number, streak: boolean, detail: number, m: THREE.Matrix4, out: THREE.BufferGeometry[]): void {
-  const blobs = streak ? 9 : 4 + Math.floor(hash2(seed, 1) * 4);
-  for (let k = 0; k < blobs; k++) {
-    const r = (streak ? 10 : 12) + hash2(seed, 10 + k) * (streak ? 6 : 14);
-    const taper = streak ? 1 - Math.abs((k / (blobs - 1)) - 0.5) * 1.2 : 1;
-    const g = new THREE.IcosahedronGeometry(r * taper, streak ? 1 : detail + 1);
-    const sx = streak ? 2.6 : 1.6; const sy = streak ? 0.22 : 0.8; const sz = streak ? 0.9 : 1.15;
-    // Faixa: puffs ao longo de x, afinando nas pontas; cúmulo: aglomerado.
-    const along = streak ? (k / (blobs - 1) - 0.5) : 0;
-    const x = streak ? along * 260 + (hash2(seed, 20 + k) - 0.5) * 20 : (hash2(seed, 20 + k) - 0.5) * 64;
-    const y = (hash2(seed, 30 + k) - 0.2) * (streak ? 5 : 10);
-    const z = (hash2(seed, 40 + k) - 0.5) * (streak ? 16 : 26);
-    g.applyMatrix4(new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z));
-    // Base reta: nuvem estilizada tem barriga plana.
-    const p = g.attributes.position as THREE.BufferAttribute;
-    const floor = -r * sy * 0.35;
-    for (let i = 0; i < p.count; i++) if (p.getY(i) < floor) p.setY(i, floor);
-    smoothNormals(g, CLOUD_CREASE);
-    g.applyMatrix4(m);
-    out.push(g);
+/** Uma nuvem do céu: azimute (rad, 0 = à frente na largada, + = à direita), elevação (graus) do centro, distância (m), tamanho (m), célula do atlas. */
+export interface CloudSpec { az: number; el: number; dist: number; w: number; h: number; cell: number; flip: boolean; streak: boolean; tone: number }
+
+/** Quantas nuvens por qualidade (cúmulos, faixas baixas): a Baixa paga menos pixels transparentes. */
+const CLOUD_COUNT: Readonly<Record<Quality, [number, number]>> = { low: [18, 5], medium: [26, 7], high: [32, 8], ultra: [32, 8] };
+
+/** As nuvens de uma qualidade (puro, determinístico): azimutes estratificados (cobrem a volta toda), elevação baixa, tamanho que cresce para cima. */
+export function cloudLayout(q: Quality): CloudSpec[] {
+  const [nc, ns] = CLOUD_COUNT[q];
+  const out: CloudSpec[] = [];
+  for (let k = 0; k < nc; k++) {
+    // A Baixa e a Média são um subconjunto da Alta (mesmas posições, menos nuvens): o céu não muda de cara com a qualidade.
+    const j = Math.floor((k * CLOUD_COUNT.high[0]) / nc);
+    const az = ((j + 0.15 + 0.7 * hash2(j, 401)) / CLOUD_COUNT.high[0]) * Math.PI * 2;
+    const high = hash2(j, 402) < 0.18;
+    const el = high ? 13 + 7 * hash2(j, 403) : 2.5 + 10.5 * Math.pow(hash2(j, 404), 1.25);
+    const dist = 950 + 300 * hash2(j, 405);
+    const ang = (3.4 + 4.6 * hash2(j, 406)) * (0.62 + 0.38 * Math.min(1, el / 12)); // graus de largura: perto do horizonte, menor (mais longe)
+    const w = dist * Math.tan((ang * Math.PI) / 180);
+    out.push({ az, el, dist, w, h: w * (0.44 + 0.14 * hash2(j, 407)), cell: Math.floor(hash2(j, 408) * 3), flip: hash2(j, 409) < 0.5, streak: false, tone: 0.93 + 0.1 * hash2(j, 410) });
   }
+  for (let k = 0; k < ns; k++) {
+    const j = Math.floor((k * CLOUD_COUNT.high[1]) / ns);
+    const az = ((j + 0.3 + 0.4 * hash2(j, 501)) / CLOUD_COUNT.high[1]) * Math.PI * 2;
+    const dist = 1150 + 120 * hash2(j, 502);
+    const ang = 13 + 9 * hash2(j, 503);
+    const w = dist * Math.tan((ang * Math.PI) / 180);
+    out.push({ az, el: 1.3 + 2.6 * hash2(j, 504), dist, w, h: w * (0.1 + 0.05 * hash2(j, 505)), cell: 3, flip: hash2(j, 506) < 0.5, streak: true, tone: 0.95 + 0.06 * hash2(j, 507) });
+  }
+  return out;
 }
 
-export function buildClouds(detail: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  const place = (a: number, r: number, y: number, yaw: number, s: number) =>
-    new THREE.Matrix4().compose(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)), new THREE.Vector3(s, s, s));
-  for (let k = 0; k < 9; k++) {
-    const a = (k / 9) * Math.PI * 2 + hash2(k, 99) * 0.5;
-    const r = 760 + hash2(k, 5) * 320;
-    cloudPuffs(k * 17 + 3, false, detail, place(a, r, 190 + hash2(k, 6) * 170, hash2(k, 7) * Math.PI, 1.3 + hash2(k, 8) * 1.1), parts);
+/** Atlas das nuvens: 2 × 2 células de 512 × 256 (3 cúmulos e 1 faixa). */
+export const CLOUD_ATLAS = { w: 1024, h: 512, cellW: 512, cellH: 256 } as const;
+
+/**
+ * As nuvens numa malha só (2 triângulos por nuvem, de frente para o centro do céu, onde a câmera está): posição, uv da célula (espelhada ou não),
+ * a normal (para a câmera) e o "direita" do quadro (o shader monta a normal pintada no mundo), e o tom da nuvem.
+ */
+export function buildClouds(q: Quality): THREE.BufferGeometry {
+  const list = cloudLayout(q);
+  const pos: number[] = []; const nor: number[] = []; const uv: number[] = []; const right: number[] = []; const tone: number[] = []; const idx: number[] = [];
+  const c = new THREE.Vector3(); const r = new THREE.Vector3(); const u = new THREE.Vector3(); const Y = new THREE.Vector3(0, 1, 0);
+  list.forEach((cl, i) => {
+    c.copy(fromAngles(cl.el, (cl.az * 180) / Math.PI));
+    r.crossVectors(c, Y).normalize();
+    u.crossVectors(r, c).normalize();
+    const center = c.clone().multiplyScalar(cl.dist);
+    const cx = cl.cell % 2; const cy = Math.floor(cl.cell / 2);
+    const u0 = cx * 0.5; const u1 = u0 + 0.5; const v0 = cy * 0.5; const v1 = v0 + 0.5;
+    const [ul, ur] = cl.flip ? [u1, u0] : [u0, u1];
+    // A barriga reta da célula fica 16% acima da borda de baixo: o centro do quadro sobe para a nuvem ficar na elevação dela.
+    for (const [sx, sy, uu, vv] of [[-1, -1, ul, v0], [1, -1, ur, v0], [1, 1, ur, v1], [-1, 1, ul, v1]] as const) {
+      const p = center.clone().addScaledVector(r, (sx * cl.w) / 2).addScaledVector(u, (sy * cl.h) / 2);
+      pos.push(p.x, p.y, p.z);
+      nor.push(-c.x, -c.y, -c.z);
+      // A normal pintada é de quem olha a nuvem: espelhar a uv inverte o "direita" do quadro.
+      const rr = cl.flip ? -1 : 1;
+      right.push(r.x * rr, r.y * rr, r.z * rr);
+      uv.push(uu, vv);
+      tone.push(cl.tone);
+    }
+    const o = i * 4;
+    idx.push(o, o + 1, o + 2, o, o + 2, o + 3); // anti-horário visto do centro (a câmera)
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aRight', new THREE.Float32BufferAttribute(right, 3));
+  g.setAttribute('aTone', new THREE.Float32BufferAttribute(tone, 1));
+  g.setIndex(idx);
+  return g;
+}
+
+/** Uma bolha do cúmulo (px na célula, y para cima) e o quanto ela vem para a frente (`z`, px). */
+interface Puff { x: number; y: number; r: number; z: number; sx: number }
+
+/** As bolhas de uma célula: fileira de baixo (barriga reta), o miolo maior por cima e uma ou duas torres. */
+function cellPuffs(cell: number): { puffs: Puff[]; base: number } {
+  const W = CLOUD_ATLAS.cellW; const H = CLOUD_ATLAS.cellH;
+  const seed = 900 + cell * 37;
+  const puffs: Puff[] = [];
+  if (cell === 3) {
+    // Faixa baixa (estrato): bolhas achatadas e compridas ao longo, bordas macias.
+    for (let k = 0; k < 7; k++) {
+      const t = k / 6;
+      puffs.push({ x: 150 + t * (W - 300), y: H * (0.42 + 0.12 * (hash2(seed, k) - 0.5)), r: H * (0.1 + 0.1 * Math.sin(Math.PI * t)) * (0.85 + 0.3 * hash2(seed, 20 + k)), z: 0, sx: 2.2 });
+    }
+    return { puffs, base: H * 0.18 };
   }
-  // Faixas baixas perto do horizonte (o entardecer as acende por baixo).
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + 0.4 + hash2(k, 55) * 0.6;
-    const r = 1150 + hash2(k, 56) * 120;
-    // Tangente ao círculo: a faixa corre ao longo do horizonte.
-    cloudPuffs(k * 29 + 101, true, detail, place(a, r, 95 + hash2(k, 57) * 70, -a + Math.PI / 2, 1.6 + hash2(k, 58)), parts);
+  const base = H * 0.17;
+  const n = 5 + Math.floor(hash2(seed, 1) * 2);
+  for (let k = 0; k < n; k++) {
+    const t = (k + 0.5) / n;
+    const r = H * (0.17 + 0.07 * hash2(seed, 10 + k)) * (0.75 + 0.35 * Math.sin(Math.PI * t));
+    puffs.push({ x: W * (0.1 + 0.8 * t) + (hash2(seed, 30 + k) - 0.5) * 18, y: base + r * 0.62, r, z: r * 0.25, sx: 1 });
   }
-  const merged = mergeGeometries(parts.map((g) => g.index ? g.toNonIndexed() : g), false);
-  for (const p of parts) p.dispose();
-  if (!merged) throw new Error('nuvem vazia');
-  return merged;
+  const m = 2 + Math.floor(hash2(seed, 2) * 2);
+  for (let k = 0; k < m; k++) {
+    const t = (k + 0.5) / m;
+    const r = H * (0.25 + 0.07 * hash2(seed, 50 + k));
+    puffs.push({ x: W * (0.27 + 0.46 * t) + (hash2(seed, 60 + k) - 0.5) * 40, y: base + H * 0.3 + (hash2(seed, 70 + k) - 0.5) * 22, r, z: 0, sx: 1 });
+  }
+  const tops = 2 + Math.floor(hash2(seed, 3) * 2);
+  for (let k = 0; k < tops; k++) {
+    const r = H * (0.13 + 0.06 * hash2(seed, 80 + k));
+    puffs.push({ x: W * (0.3 + 0.4 * ((k + hash2(seed, 90 + k)) / tops)), y: base + H * (0.5 + 0.1 * hash2(seed, 95 + k)), r, z: -r * 0.15, sx: 1 });
+  }
+  return { puffs, base };
+}
+
+/**
+ * O atlas das nuvens em pixels (linha 0 = v 0): RG = a normal pintada (x, y no quadro, 0,5 + 0,5·n), B = a oclusão (barriga e frestas escuras),
+ * A = a cobertura com a borda antisserrilhada. A altura de cada pixel é a união suave das bolhas (esferas), e a normal vem do gradiente dela: lisa,
+ * sem faceta (tests/horizonte-suave.test.ts).
+ */
+let cloudAtlasCache: { width: number; height: number; data: Uint8Array } | null = null;
+export function cloudAtlasImage(): { width: number; height: number; data: Uint8Array } {
+  if (cloudAtlasCache) return cloudAtlasCache; // constante: montado uma vez por processo (cada Sky tem a sua textura, com os mesmos pixels)
+  const { w: AW, h: AH, cellW: W, cellH: H } = CLOUD_ATLAS;
+  const data = new Uint8Array(AW * AH * 4);
+  const hgt = new Float32Array(W * H); const cov = new Float32Array(W * H);
+  for (let cell = 0; cell < 4; cell++) {
+    const { puffs, base } = cellPuffs(cell);
+    const soft = cell === 3 ? 7 : 1.6;
+    let top = 0;
+    for (const p of puffs) top = Math.max(top, p.y + p.r);
+    // Metabolas: a soma de gaussianas das bolhas é lisa em todo lugar (a borda de uma bolha dentro de outra não vira risco); a forma é onde a soma
+    // passa de T (a borda de uma bolha sozinha), e a altura sob ela é √(soma − T): de pé na silhueta (a normal deita) e redonda no miolo.
+    // Núcleo compacto de Wyvill (1 − d²/R²)³, R = 1,35 r: liso (derivada 0 em R) e curto, as bolhas se fundem só na junta e os lóbulos ficam.
+    const KR = 1.35; const T = (1 - 1 / (KR * KR)) ** 3;
+    const slope = (6 / KR) * (1 / (KR * KR)) * (1 - 1 / (KR * KR)) ** 2; // |d soma / d d| na borda de uma bolha sozinha, × r
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let sum = 0; let rw = 0; let wsum = 0;
+      for (const p of puffs) {
+        const dx = (x + 0.5 - p.x) / p.sx; const dy = y + 0.5 - p.y;
+        const q = 1 - (dx * dx + dy * dy) / (p.r * p.r * KR * KR);
+        if (q <= 0) continue;
+        const e = q * q * q;
+        sum += e; rw += e * p.r; wsum += e;
+      }
+      const i = y * W + x;
+      const r = wsum > 1e-6 ? rw / wsum : 40;
+      hgt[i] = sum > T ? r * 1.1 * Math.sqrt((sum - T) / (1 - T)) : 0;
+      // Cobertura antisserrilhada: a soma cruza T com inclinação ~slope/r por pixel.
+      const d = (sum - T) / ((slope / r) * soft);
+      // A barriga reta: abaixo da base a cobertura cai (borda macia).
+      const belly = Math.min(1, Math.max(0, (y + 0.5 - base + 2) / 5));
+      cov[i] = Math.min(1, Math.max(0, 0.5 + 0.5 * d)) * belly;
+    }
+    const ox = (cell % 2) * W; const oy = Math.floor(cell / 2) * H;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      const hx = (hgt[y * W + Math.min(W - 1, x + 1)] - hgt[y * W + Math.max(0, x - 1)]) / 2;
+      const hy = (hgt[Math.min(H - 1, y + 1) * W + x] - hgt[Math.max(0, y - 1) * W + x]) / 2;
+      const flat = cell === 3 ? 2.2 : 1;
+      let nx = -hx; let ny = -hy; let nz = flat;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+      // Oclusão: a barriga escurece (de baixo até ~45% da altura) e a fresta entre bolhas (onde a altura afunda) também.
+      const up = Math.min(1, Math.max(0, (y - base) / Math.max(1, (top - base) * 0.45)));
+      const crease = Math.min(1, hgt[i] / 30);
+      const ao = (0.35 + 0.65 * up * up * (3 - 2 * up)) * (0.72 + 0.28 * crease);
+      const o = ((oy + y) * AW + ox + x) * 4;
+      data[o] = Math.round(255 * (0.5 + 0.5 * nx)); data[o + 1] = Math.round(255 * (0.5 + 0.5 * ny));
+      data[o + 2] = Math.round(255 * Math.min(1, cell === 3 ? 0.75 + 0.25 * ao : ao)); data[o + 3] = Math.round(255 * cov[i]);
+    }
+  }
+  cloudAtlasCache = { width: AW, height: AH, data };
+  return cloudAtlasCache;
 }
 
 /** Refeitas do env map por transição (M6): o PMREM é caro, a mudança entre dois passos de 1/8 é só reflexo. */
@@ -234,8 +373,9 @@ export class Sky {
   private readonly dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
   private readonly stars: THREE.Points;
   private readonly clouds: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
-  /** Nuvens por qualidade: redondas na alta, facetadas (¼ dos triângulos) na média e na baixa. */
-  private readonly cloudGeo: [THREE.BufferGeometry, THREE.BufferGeometry] = [buildClouds(0), buildClouds(1)];
+  /** Nuvens por qualidade (V4): a Baixa e a Média com menos nuvens (subconjunto das da Alta). */
+  private readonly cloudGeo: Record<'low' | 'medium' | 'high', THREE.BufferGeometry> = { low: buildClouds('low'), medium: buildClouds('medium'), high: buildClouds('high') };
+  private readonly cloudAtlas: THREE.DataTexture;
   /** Reflexo de lente do entardecer (lensflare.ts): uma malha, visível só quando a paleta, a qualidade e o jogador deixam. */
   readonly flare: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> = buildLensFlare();
   private flareStrength = 0;
@@ -270,15 +410,24 @@ export class Sky {
     this.group.add(this.dome);
     this.stars = buildStars();
     this.group.add(this.stars);
+    const atlas = cloudAtlasImage();
+    this.cloudAtlas = new THREE.DataTexture(atlas.data, atlas.width, atlas.height, THREE.RGBAFormat, THREE.UnsignedByteType);
+    this.cloudAtlas.generateMipmaps = true;
+    this.cloudAtlas.minFilter = THREE.LinearMipmapLinearFilter;
+    this.cloudAtlas.magFilter = THREE.LinearFilter;
+    this.cloudAtlas.needsUpdate = true; // dado (normal, oclusão, cobertura): sem espaço de cor
+    // Transparente e sem escrever profundidade: vai no passe dos transparentes, depois de tudo o que é opaco (montanha e prédio na frente cobrem a
+    // nuvem pelo teste de profundidade) e antes dos outros transparentes (renderOrder −9).
     const cloudMat = new THREE.ShaderMaterial({
-      vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, fog: false,
+      vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, fog: false, transparent: true, depthWrite: false,
       uniforms: {
+        uAtlas: { value: this.cloudAtlas },
         uLit: { value: new THREE.Color('#ffffff') }, uShade: { value: new THREE.Color('#c8d8f0') }, uRim: { value: new THREE.Color('#000000') },
-        uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal },
+        uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal }, uFade: { value: 1 },
       },
     });
     applyGrade(cloudMat);
-    this.clouds = new THREE.Mesh(this.cloudGeo[1], cloudMat);
+    this.clouds = new THREE.Mesh(this.cloudGeo.high, cloudMat);
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = -9;
     this.group.add(this.clouds);
@@ -305,7 +454,7 @@ export class Sky {
 
   /** Tamanho do mapa de sombra por qualidade (0 = sem sombra) e a névoa (a baixa desenha menos pista). */
   setQuality(q: Quality): void {
-    this.clouds.geometry = this.cloudGeo[atLeast(q, 'high') ? 1 : 0];
+    this.clouds.geometry = this.cloudGeo[atLeast(q, 'high') ? 'high' : atLeast(q, 'medium') ? 'medium' : 'low'];
     const size = atLeast(q, 'high') ? 2048 : atLeast(q, 'medium') ? 1024 : 0;
     this.sun.castShadow = size > 0;
     if (size > 0 && this.sun.shadow.mapSize.x !== size) {
@@ -381,8 +530,11 @@ export class Sky {
     (cu.uLit.value as THREE.Color).set(t <= 0 ? litA : t >= 1 ? litB : mix(litA, litB, t));
     (cu.uShade.value as THREE.Color).set(p.cloudShade);
     const rim = duskAmount(p.light);
-    (cu.uRim.value as THREE.Color).set(mix('#000000', p.skyGlow, rim));
+    // Forro de prata: de dia, um branco fraco na borda; no entardecer, o brilho do sol (V4: era só no entardecer).
+    (cu.uRim.value as THREE.Color).set(mix('#3a3a3a', p.skyGlow, rim));
     (cu.uHorizon.value as THREE.Color).set(p.sky[2]);
+    // Somem com a noite pela luz (as luzes da cidade acendendo), sem piscar; à noite fechada, `visible` desliga a chamada.
+    cu.uFade.value = 1 - lightsAmountNight(p.light);
     this.sun.color.set(p.sunLight);
     this.sun.intensity = p.sunIntensity;
     // Sombra um pouco aberta: a hemisférica (céu) pinta o que o sol não alcança (mais aberta à noite).
@@ -426,7 +578,8 @@ export class Sky {
   dispose(): void {
     this.dome.geometry.dispose(); this.dome.material.dispose();
     this.stars.geometry.dispose(); (this.stars.material as THREE.Material).dispose();
-    for (const g of this.cloudGeo) g.dispose();
+    for (const g of Object.values(this.cloudGeo)) g.dispose();
+    this.cloudAtlas.dispose();
     this.clouds.material.dispose();
     this.flare.geometry.dispose(); this.flare.material.dispose();
     if (this.envTarget) this.envTarget.dispose();
