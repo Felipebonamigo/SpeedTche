@@ -76,3 +76,12 @@ HUD do modo Retrô ganhar visual próprio (ele usa este mesmo `Hud`), `src/rende
 - **Galeria antes × depois:** `scratch/galeria/comparar-main-550e970-vs-hud.png` (+ `.json`), cenas Copacabana, Sampa noite, Monte Fuji, 2P,
   4P e largada: as 6 mudaram (15–32% dos pixels, só o HUD); chamadas e triângulos idênticos (nada no 3D). Monte Fuji na reta do segmento 80 tem
   neve só nos morros do fundo: o "dia claro" é o céu azul-claro; a neve de verdade e o asfalto claro entram pelo teste de contraste.
+- **`playtest.mjs`** (build final): 37 ✓, 0 ✗ até "Próxima copa" (corrida, HUD de 1 a 4 jogadores, resultado, pausa, copa); a máquina estava com
+  carga 40–60 em 4 núcleos e o roteiro foi cortado no limite de 2 h antes do Pagamento da carreira (N4, telas de menu que a V5 não toca). A 1ª
+  tentativa morreu na captura do título (timeout de 240 s, carga).
+- **Suíte inteira** (`NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 … --reporter=dot`, em 3 fatias `--shard` porque a rodada única passou do limite de 2 h
+  com a carga): **3811 ✓**, 1 pulado (o de sempre), **14 falhas, todas por tempo** (`Test timed out`, nenhuma asserção): `fuel.test.ts` (11 casos de
+  "aviso ao jogador", limite de 30 s), `landmarks.test.ts` (perLap, 120 s), `scenery.test.ts` (sprites × colisão) e `gl-render.test.ts` (compilar
+  os programas, 1500 s). Repetidos sozinhos: 269 ✓ e 6 de novo por tempo, **em casos diferentes** dos da 1ª vez (fuel: copacabana, paraty,
+  curitiba). `fuel`, `landmarks` e `scenery` não importam nada que a V5 mudou (núcleo e cenário); o `gl-render` sobe a página inteira, mas o que
+  estoura é a compilação dos shaders no swiftshader. **Falta rodar a suíte numa máquina folgada antes de mesclar.**
