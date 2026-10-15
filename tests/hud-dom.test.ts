@@ -204,6 +204,15 @@ describe('HUD: combustível e nitro legíveis sem depender da cor', () => {
   });
 });
 
+describe('HUD V5: os números principais sem caixa (docs/ondas/V5-hud.md)', () => {
+  it('os painéis dos cantos, os companheiros e o minimapa não são mais caixas de vidro (.glass); o div.lines morto da M5 saiu', () => {
+    const s = scene();
+    s.draw();
+    for (const cls of ['tl', 'tr', 'bl', 'br', 'mini', 'mates']) expect(one(s.root, cls).classList.contains('glass'), `.${cls}`).toBe(false);
+    expect(all(s.root, has('lines')), 'o <div class="lines"> (as linhas de velocidade são 3D desde a M5)').toHaveLength(0);
+  });
+});
+
 describe('HUD: selo LARGADA PERFEITA (N1)', () => {
   it('aparece nos primeiros 2,5 s da corrida de quem fez a largada perfeita e some depois; quem não fez não vê', () => {
     const s = scene();

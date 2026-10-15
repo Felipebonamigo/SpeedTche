@@ -3,7 +3,8 @@
 // nitro (com marca, número e rótulo, além da cor; ou o cofre da equipe), ícone de vácuo, faixa ÚLTIMA VOLTA, mensagens
 // animadas, minimapa SVG, etiqueta do jogador, companheiros no co-op, contagem regressiva e pausa. Com 3
 // jogadores a célula livre mostra a classificação completa. Os nós são criados uma vez e só
-// `textContent`/atributos mudam por quadro (cada escrita é comparada antes).
+// `textContent`/atributos mudam por quadro (cada escrita é comparada antes). Desde a V5 (docs/ondas/V5-hud.md) os blocos dos
+// cantos não são caixas (`.glass` só na célula livre): os números leem sozinhos, com contorno e sombra (hud.css).
 import '../ui/fonts.css';
 import './hud.css';
 import './hud-rival.css';
@@ -119,6 +120,7 @@ class LandmarkCaption {
 class MiniMap {
   readonly root: HTMLElement;
   private readonly path: SVGPathElement;
+  private readonly casing: SVGPathElement;
   private readonly label: HTMLElement;
   private readonly dots: SVGCircleElement[] = [];
   private outline: Outline = [];
@@ -129,7 +131,9 @@ class MiniMap {
     this.root = el('div', cls, parent);
     this.label = el('div', 'mini-name', this.root);
     const s = svg('svg', this.root, { viewBox: `0 0 ${MAP_SIZE} ${MAP_SIZE}` });
-    this.path = svg('path', s, { d: '' });
+    // O traçado com um contorno escuro por baixo (V5): lê sobre neve e sobre noite sem caixa atrás.
+    this.casing = svg('path', s, { d: '', class: 'casing' });
+    this.path = svg('path', s, { d: '', class: 'line' });
     for (let i = 0; i < MAX_CARS; i++) this.dots.push(svg('circle', s, { r: '3', cx: '0', cy: '0', class: 'ai', visibility: 'hidden' }));
   }
 
@@ -140,7 +144,8 @@ class MiniMap {
       const named = t(key);
       this.label.textContent = trackTitle(track.def.id, named === key ? track.def.name : named, getLanguage());
       this.outline = trackOutline(track, MAP_SIZE);
-      this.path.setAttribute('d', this.outline.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('') + 'Z');
+      const d = this.outline.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('') + 'Z';
+      this.path.setAttribute('d', d); this.casing.setAttribute('d', d);
     }
     const cars = state.cars;
     for (let i = 0; i < MAX_CARS; i++) {
@@ -212,15 +217,14 @@ class SeatHud {
   private readonly mini: MiniMap;
   private readonly topMsgs: MessageSlots; private readonly centerMsgs: MessageSlots;
   private readonly count: HTMLElement; private lastCount = '';
-  private readonly pause: HTMLElement; private readonly lines: HTMLElement;
+  private readonly pause: HTMLElement;
   private readonly topList: HudMessage[] = []; private readonly centerList: HudMessage[] = [];
   private readonly ghost: GhostDelta;
   private readonly caption: LandmarkCaption;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'vp', parent);
-    this.lines = el('div', 'lines', this.root);
-    const tl = el('div', 'tl glass', this.root);
+    const tl = el('div', 'tl', this.root);
     const tag = el('div', 'tag', tl); el('i', 'dot', tag); this.tagName = el('span', 'name', tag); this.assist = el('span', 'assist', tag);
     const pos = el('div', 'pos', tl); this.pos = pos; this.posN = el('span', 'pos-n', pos); this.posOf = el('span', 'pos-of', pos); this.posBadge = el('span', 'pos-badge', pos);
     this.lap = el('div', 'lap', tl);
@@ -229,19 +233,19 @@ class SeatHud {
     const aheadRow = el('div', 'gap gap-ahead', gaps); el('i', 'gap-ico', aheadRow); const aheadN = el('span', 'gap-n', aheadRow);
     const behindRow = el('div', 'gap gap-behind', gaps); el('i', 'gap-ico', behindRow); const behindN = el('span', 'gap-n', behindRow);
     this.gaps = { ahead: aheadRow, aheadN, behind: behindRow, behindN };
-    const tr = el('div', 'tr glass', this.root);
+    const tr = el('div', 'tr', this.root);
     this.time = el('div', 'time', tr);
     const laps = el('div', 'laps', tr);
     const last = el('span', 'last', laps); this.lastLabel = el('span', '', last); this.lastVal = el('b', '', last);
     const best = el('span', 'best', laps); this.bestLabel = el('span', '', best); this.bestVal = el('b', '', best);
     this.ghost = new GhostDelta(tr);
-    this.mates = el('div', 'mates glass', this.root);
+    this.mates = el('div', 'mates', this.root);
     for (let i = 0; i < 3; i++) {
       const row = el('div', 'mate', this.mates); const dot = el('i', '', row); const name = el('span', 'mn', row); const assist = el('span', 'ma', row); const p = el('span', 'mp', row);
       row.style.display = 'none';
       this.mateRows.push({ row, dot, name, assist, pos: p });
     }
-    const bl = el('div', 'bl glass', this.root);
+    const bl = el('div', 'bl', this.root);
     // Combustível: bomba + rótulo + percentual + (baixo) o rótulo em texto, e uma barra de marcas de 25%.
     this.fuel = el('div', 'fuel', bl);
     const frow = el('div', 'gauge-row', this.fuel);
@@ -267,14 +271,14 @@ class SeatHud {
     const wind = svg('svg', this.draft, { class: 'ico wind', viewBox: '0 0 24 24', 'aria-hidden': 'true' });
     svg('path', wind, { d: 'M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8' });
     this.draftLabel = el('span', '', this.draft);
-    const br = el('div', 'br glass', this.root);
+    const br = el('div', 'br', this.root);
     const rpm = svg('svg', br, { class: 'rpm', viewBox: '0 0 100 100' });
     const d = 'M 20.3 79.7 A 42 42 0 1 1 79.7 79.7';
     svg('path', rpm, { class: 'bg', d });
     this.rpmFg = svg('path', rpm, { class: 'fg', d, 'stroke-dasharray': `${RPM_LEN} ${RPM_LEN}`, 'stroke-dashoffset': `${RPM_LEN}` });
     const speed = el('div', 'speed', br); this.kmh = el('span', 'kmh', speed); this.unit = el('span', 'unit', speed);
     this.gear = el('div', 'gear', br); this.gearLabel = el('small', '', this.gear); this.gear.appendChild(document.createTextNode(''));
-    this.mini = new MiniMap(this.root, 'mini glass');
+    this.mini = new MiniMap(this.root, 'mini');
     this.caption = new LandmarkCaption(this.root);
     this.seal = el('div', 'launch-seal', this.root); this.seal.setAttribute('role', 'status');
     this.finalBand = el('div', 'final-band', this.root); this.finalBand.setAttribute('role', 'status');
@@ -379,7 +383,6 @@ class SeatHud {
     const sinceGo = state.tick - state.startTick;
     setText(this.seal, t('hud.perfectLaunch'));
     setClass(this.seal, 'show', car.launch === LAUNCH_PERFECT && state.phase !== 'countdown' && sinceGo >= 0 && sinceGo < LAUNCH_SEAL_TICKS && !frame.paused);
-    setClass(this.lines, 'on', car.nitroTicks > 0 && !frame.paused && !frame.options.reduceEffects);
     // Velocímetro: RPM = posição da velocidade dentro da marcha.
     const sf = car.speed / car.stats.topSpeed;
     const lo = car.gear > 0 ? GEAR_TOP[car.gear - 1] : 0;

@@ -1,6 +1,8 @@
-/* Diferença para o fantasma (ghost-hud.ts): no painel do tempo, cor pelo sinal. */
-.nc-hud .ghost-delta { font-size: calc(13px * var(--s)); font-weight: 800; letter-spacing: 0.06em; color: #a3acc2; }
+/* Diferença para o fantasma (ghost-hud.ts): embaixo do tempo, cor pelo sinal (o sinal +/− é o canal que não depende da cor). Sem caixa
+   desde a V5: contorno escuro por baixo da tinta e o número em itálico, como os outros números do HUD (hud.css). */
+.nc-hud .ghost-delta { font-size: max(10px, calc(13px * var(--s))); font-weight: 700; letter-spacing: 0.06em; color: #dfe5f2;
+  paint-order: stroke fill; --h-stroke: max(1.5px, calc(2.5px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge); text-shadow: 0 calc(1px * var(--s)) calc(3px * var(--s)) rgba(10, 6, 28, 0.85); }
 .nc-hud .ghost-delta.off { display: none; }
-.nc-hud .ghost-delta b { font-size: calc(17px * var(--s)); }
-.nc-hud .ghost-delta.ahead b { color: #3ddc84; }
-.nc-hud .ghost-delta.behind b { color: #ff5a5a; }
+.nc-hud .ghost-delta b { font-size: max(12px, calc(17px * var(--s))); font-style: italic; color: #fff; }
+.nc-hud .ghost-delta.ahead b { color: #4be39a; }
+.nc-hud .ghost-delta.behind b { color: #ff6b7f; }

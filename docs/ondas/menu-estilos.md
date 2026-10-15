@@ -12,7 +12,7 @@ menus (sem parâmetro). Diretriz visual vigente: "um pouco mais realista que o H
   - da B: todo painel de informação (vidro, quadros "Próximo objetivo"/"Desde a última vez", linhas de opção, tabelas, painéis da garagem,
     colunas do Pagamento) é vidro escuro com desfoque e fio de 1px; o **texto de dentro é reto** (sem itálico), em cinzas legíveis, com
     rótulos em caixa alta espaçados na cor do acento.
-  - Só repinta: nenhuma tela, navegação ou estado mudou. Os tokens moram no `#ui` (o HUD de corrida, irmão dele, não muda: fica para a V5).
+  - Só repinta: nenhuma tela, navegação ou estado mudou. Os tokens moram no `#ui` (o HUD de corrida, irmão dele, não muda com o menu; ganhou a mesma língua na V5, com tokens próprios `--h-*` na raiz do HUD: `docs/ondas/V5-hud.md`).
 - **`?tema=classico`** volta ao visual anterior (CSS e logo antigos), **só até a próxima versão**, para comparar. Depois saem o parâmetro, o
   `logoClassicoMarkup` e a escolha em `tema.ts`, e o CSS do tema pode virar o `styles.css`.
 - **As direções B e C puras saíram do jogo**: ficam no histórico do git e na folha de componentes (`tools/menu-estilos/tema-{a,b,c}.css`,
@@ -102,6 +102,8 @@ na URL (atributo `data-tema` em `<html>` e no `#ui`). Sem o parâmetro, o visual
   ladrilho simples gerado em SVG); logo já combina.
 
 ## O HUD de corrida (só anotação)
+
+> **Feito na V5** (`docs/ondas/V5-hud.md`): números sem caixa, itálicos, com contorno e sombra; tokens `--h-*` na raiz `.nc-hud` (não no `#ui`, não no `:root`), sem depender do `data-tema`. A anotação abaixo é de 14/10.
 
 Nenhum dos temas toca no HUD (`src/render/hud.css`, `.nc-hud`): os tokens ficam no `#ui`, e o `#hud` é irmão dele. Ele é DOM e não entra no `hashRace`/`sim-golden`, então **dá para temá-lo com segurança**, mas é onde o risco do
 Deck está (números de posição, volta e velocidade com mínimo de 12 px efetivos, medidos em `playtest-layout.mjs`). Seria uma segunda etapa: `:root[data-tema] .nc-hud { … }` só
