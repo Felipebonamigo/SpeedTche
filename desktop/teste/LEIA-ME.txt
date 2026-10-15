@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.4, build de 12/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.5, build de 15/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -15,8 +15,8 @@ CONTROLES (dá para trocar em Opções › Controles)
   Acelerar    ↑                     W                     A / RT
   Frear       ↓                     S                     X / B / LT
   Virar       ← →                   A D                   D-pad / analógico
-  Nitro       Espaço                F                     RB
-  Marchas     M (sobe) N (desce)    E / Q                 Y / LB
+  Nitro       Espaço                F                     LB / Y
+  Marchas     M (sobe) N (desce)    E / Q                 D-pad ↑ / ↓
   Derrapar    Shift direito         Shift esquerdo        RB
   Olhar trás  B                     R                     R3
   Buzina      H                     G                     L3
@@ -26,6 +26,16 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.5 (sobre a 0.1.4):
+  * MENU NOVO, mais moderno, com o logo novo do Speed Tchê. O detalhe da Copa África do Sul agora cabe no Steam Deck.
+  * 4 CÂMERAS: Alta (padrão, mais alta e mais aberta, para ver os pontos turísticos), Baixa, Capô e Frente.
+    Troca na hora com C (Jogador 1), V (Jogador 2) ou Select/Back no controle; cada jogador tem a sua e o jogo lembra.
+  * COR E BRILHO: sem o clarão e sem o véu rosado de antes; faróis acompanham o carro; lanternas vermelhas de verdade;
+    pintura com verniz; a chama do nitro agora parece fogo; as linhas de vácuo e velocidade escurecem à noite.
+  * Corrigido: o jogo ia ficando mais pesado depois de várias largadas com 3–4 jogadores (vazamento de memória de vídeo).
+  * O painel "CREW RACING" da beira da pista virou "TCHÊ RACING".
+  * Controle: o mapa padrão tinha mudado e este LEIA-ME estava desatualizado — Nitro no LB (ou Y), marchas no D-pad ▲▼,
+    derrapar no RB. Quem trocou em Opções › Controles continua com o seu.
 - NOVIDADES DA 0.1.4 (sobre a 0.1.3):
   * ESTRELAS: até 3 por corrida (classificar, vencer o rival da copa e cumprir o objetivo da pista, que aparece antes da largada),
     troféu bronze/prata/ouro por copa, contador de estrelas, placar contra cada rival ("Zé Turbo 7 × 5 você") e retratos dos pilotos.

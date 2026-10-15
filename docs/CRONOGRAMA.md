@@ -116,7 +116,7 @@ Se cada onda passar de uma semana, o W cai em abril e o Next Fest de junho conti
 
 **Cronograma que falta:** O1 (27 desenhos nas pistas), O2 (recalibrar e congelar), O5 (progresso), e as ondas P a W.
 
-**Decisões abertas do dono:** jogar a 0.1.4 e rodar o `--bench` (T1, T5); conta Steamworks (nº 3); `sightline.ts` dos
+**Decisões abertas do dono:** jogar a 0.1.5 e rodar o `--bench` (T1, T5); conta Steamworks (nº 3); `sightline.ts` dos
 marcos (T4); limiares do troféu (bronze 1/3, prata 2/3, ouro todas as estrelas); logos da Atomatiza e da Galeria Atomo
 (nº 26); câmera "na frente" olhando para trás (a feita é a do para-choque); saldo inicial de $ 2.500 para quem só tinha
 campeonato (N5); folha A/B/C de contorno (`tools/folha-contorno.mjs`); fonte do HUD; lugar do "Abrir pasta"; VPS (nº 16).
