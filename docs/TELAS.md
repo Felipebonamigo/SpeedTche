@@ -69,6 +69,10 @@ dos marcos (docs/VISUAL.md, "Legenda dos marcos") na tela, com o nome e o lugar 
 | tempo / velocidade / marcha | 23,7 / 32,6 / 14,8 px | igual |
 | nome / rótulos | 9,6 / 8,2 px | 10 / 10 px |
 
+V5 (15/10/2026, `docs/ondas/V5-hud.md`): sem as caixas, os números cresceram — 2P a 1280×800: posição 43 px, "/20" 14,8, volta 13,3,
+tempo 26,7, velocidade 38,5, marcha 16,3; 4P a 1024×640 com HUD 80%: tudo ≥ 12 px, contorno de 1,5 a 2,4 px. O roteiro confere também que os
+painéis dos números não têm fundo, borda nem desfoque e que os números estão em itálico com contorno ≥ 1 px por baixo da tinta.
+
 ## Como rodar
 
 ```
