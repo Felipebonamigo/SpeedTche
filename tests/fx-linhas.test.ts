@@ -1,4 +1,5 @@
-// M5: linhas de velocidade 3D acima de 85% da máxima (no lugar do gradiente CSS) e o túnel de ar do vácuo (computeModifiers). Os geradores
+// M5: linhas de velocidade 3D acima de 85% da máxima (no lugar do gradiente CSS) e o túnel de ar do vácuo (computeModifiers). V8 (docs/ondas/V8-efeitos.md):
+// acima de 90%, de 3 a 7 cm e alfa até 0,32 (eram 9–20 cm e 0,75: brilhavam no entardecer; tests/efeitos-realistas.test.ts). Os geradores
 // (src/render/fx/lines.ts) são funções do deslocamento do carro, sem estado e sem sorteio; o Effects as junta ao lote de traços de cada viewport.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -18,11 +19,11 @@ const all = (n: number, travel: number, strength: number, speed = 110): LineSpec
 };
 
 describe('intensidade das linhas de velocidade', () => {
-  it('nada até 85% da máxima, cheia na máxima, crescente; o nitro garante metade mesmo devagar', () => {
-    expect(SPEED_LINES_START).toBe(0.85);
+  it('nada até 90% da máxima, cheia na máxima, crescente; o nitro garante metade mesmo devagar', () => {
+    expect(SPEED_LINES_START).toBe(0.9);
     expect(speedLineStrength(0.5, false)).toBe(0);
-    expect(speedLineStrength(0.85, false)).toBe(0);
-    expect(speedLineStrength(0.925, false)).toBeCloseTo(0.5, 6);
+    expect(speedLineStrength(0.9, false)).toBe(0);
+    expect(speedLineStrength(0.95, false)).toBeCloseTo(0.5, 6);
     expect(speedLineStrength(1, false)).toBeCloseTo(1, 9);
     expect(speedLineStrength(1.2, false)).toBe(1);
     let prev = 0;
@@ -41,7 +42,7 @@ describe('intensidade das linhas de velocidade', () => {
 });
 
 describe('linhas de velocidade 3D', () => {
-  it('cada linha fica fora da silhueta do carro, na janela da pista (de 12 m atrás a 48 m à frente), de 9 a 20 cm de largura e comprida', () => {
+  it('cada linha fica fora da silhueta do carro, na janela da pista (de 12 m atrás a 48 m à frente), de 3 a 7 cm de largura e comprida', () => {
     for (const travel of [0, 13.7, 500.25]) {
       const l = all(40, travel, 1);
       expect(l).toHaveLength(40);
@@ -50,8 +51,8 @@ describe('linhas de velocidade 3D', () => {
         expect(s.h).toBeGreaterThanOrEqual(0.4);
         expect(s.dz).toBeGreaterThanOrEqual(-12 - 1e-9); expect(s.dz).toBeLessThanOrEqual(48 + 1e-9);
         expect(s.tail - s.dz).toBeGreaterThanOrEqual(2); expect(s.tail - s.dz).toBeLessThanOrEqual(14);
-        expect(s.width).toBeGreaterThanOrEqual(0.09); expect(s.width).toBeLessThanOrEqual(0.2);
-        expect(s.a).toBeGreaterThanOrEqual(0); expect(s.a).toBeLessThanOrEqual(0.75 + 1e-9);
+        expect(s.width).toBeGreaterThanOrEqual(0.03); expect(s.width).toBeLessThanOrEqual(0.07);
+        expect(s.a).toBeGreaterThanOrEqual(0); expect(s.a).toBeLessThanOrEqual(0.32 + 1e-9);
         expect(Math.max(s.r, s.g, s.b)).toBeGreaterThan(0.8); expect(s.b).toBeGreaterThanOrEqual(s.r); // azul-branco
       }
     }
@@ -117,8 +118,8 @@ describe('túnel de ar do vácuo', () => {
       expect(s.dz).toBeGreaterThanOrEqual(-9 - 1e-9); expect(s.dz).toBeLessThanOrEqual(23 + 1e-9); // a captura mostrou que o tubo longo (46 m) encolhe no miolo da tela
       expect(s.tail - s.dz).toBeGreaterThanOrEqual(4);
       expect(Math.min(s.r, s.g, s.b)).toBeGreaterThan(0.7); // claro
-      expect(s.width).toBeGreaterThanOrEqual(0.14); expect(s.width).toBeLessThanOrEqual(0.26); // visível na tela (a captura mostrou que 3 cm e até 16 cm somem ao longe)
-      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.8 + 1e-9);
+      expect(s.width).toBeGreaterThanOrEqual(0.05); expect(s.width).toBeLessThanOrEqual(0.1); // V8: fio (eram 14–26 cm: a M5 os engrossou para aparecer; viraram barras)
+      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.4 + 1e-9);
     }
     expect(l.filter((s) => s.lat < 0).length).toBeGreaterThan(5); expect(l.filter((s) => s.lat > 0).length).toBeGreaterThan(5);
     expect(l.filter((s) => s.h > 0.8).length).toBeGreaterThan(5); expect(l.filter((s) => s.h < 0.8).length).toBeGreaterThan(5);
@@ -166,8 +167,8 @@ describe('as linhas no Effects', () => {
     return n;
   }
 
-  it('abaixo de 85% da máxima não há linha; a 100% há, até o teto do degrau; reduzir efeitos não tem', () => {
-    expect(corre(cena('high'), 90, 0.8)).toBe(0);
+  it('abaixo de 90% da máxima não há linha; a 100% há, até o teto do degrau; reduzir efeitos não tem', () => {
+    expect(corre(cena('high'), 90, 0.88)).toBe(0);
     const cheio = corre(cena('high'), 120, 1);
     expect(cheio).toBe(fxPlan('high', false).speedLines);
     expect(corre(cena('high', { reduce: true }), 120, 1)).toBe(0);
@@ -183,7 +184,7 @@ describe('as linhas no Effects', () => {
     expect(corre(quatro, 120, 1)).toBe(fxPlan('high', false, 4).speedLines);
   });
 
-  it('sobe e desce com suavidade ao cruzar 85% (sem piscar de uma vez)', () => {
+  it('sobe e desce com suavidade ao cruzar 90% (sem piscar de uma vez)', () => {
     const s = cena('high');
     corre(s, 60, 0.8);
     const subida: number[] = [];

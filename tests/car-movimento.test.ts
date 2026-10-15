@@ -1,6 +1,8 @@
 // M4 — o que o carro faz na pista além de andar, SÓ visual (src/render/cars/motion.ts, puro): a guinada da derrapagem
 // (~0,35 rad, do lado de `driftDir`), o rodopio, o quique, o squash & stretch e o relógio das estrelinhas da batida.
 // Tudo é lido do estado que já existe (driftDir/driftTicks, collisionCooldown, speed, nitroTicks, driftBoostTicks); nada vai ao núcleo.
+// V8 (docs/ondas/V8-efeitos.md): rodopio de 360°, squash & stretch e estrelinhas são a opção "Efeitos de cartum" (`cartoon`); no padrão a batida é
+// um tranco (guinada pequena e quique baixo). Os testes do cartum ligam `cartoon: true`; os do padrão estão no fim.
 import { describe, expect, it } from 'vitest';
 import { DRIFT_YAW, STARS_SECONDS, newMotion, stepMotion, type Motion, type MotionInput } from '../src/render/cars/motion';
 
@@ -50,14 +52,14 @@ describe('guinada da derrapagem', () => {
   });
 });
 
-/** A batida: o `collisionCooldown` sobe de 0 para 20 no quadro em que o núcleo a registra; a velocidade cai junto. */
-const hit = (dropFraction: number) => (t: number): Partial<MotionInput> => {
-  if (t < 0.2) return { speed: 4000 };
+/** A batida: o `collisionCooldown` sobe de 0 para 20 no quadro em que o núcleo a registra; a velocidade cai junto. `cartoon`: a opção "Efeitos de cartum". */
+const hit = (dropFraction: number, cartoon = true) => (t: number): Partial<MotionInput> => {
+  if (t < 0.2) return { speed: 4000, cartoon };
   const after = 4000 - dropFraction * 5000;
-  return { speed: after, collisionCooldown: Math.max(0, 20 - Math.round((t - 0.2) * 60)) };
+  return { speed: after, collisionCooldown: Math.max(0, 20 - Math.round((t - 0.2) * 60)), cartoon };
 };
 
-describe('batida: rodopio, quique e squash & stretch', () => {
+describe('batida com "Efeitos de cartum": rodopio, quique e squash & stretch', () => {
   it('batida forte (queda ≥ 12% da máxima): gira ~360° em menos de 0,8 s e volta a zero', () => {
     const m = newMotion();
     let peak = 0; let hopPeak = 0; let neg = false; let tAtPeak = 0;
@@ -87,7 +89,7 @@ describe('batida: rodopio, quique e squash & stretch', () => {
   it('quem é batido (a velocidade SOBE no quadro da batida) só quica', () => {
     const m = newMotion();
     let peak = 0; let hopPeak = 0;
-    run(m, 1.2, (t) => (t < 0.2 ? { speed: 3000 } : { speed: 3400, collisionCooldown: Math.max(0, 20 - Math.round((t - 0.2) * 60)) }), () => { peak = Math.max(peak, Math.abs(m.spin)); hopPeak = Math.max(hopPeak, m.hop); });
+    run(m, 1.2, (t) => (t < 0.2 ? { speed: 3000, cartoon: true } : { speed: 3400, collisionCooldown: Math.max(0, 20 - Math.round((t - 0.2) * 60)), cartoon: true }), () => { peak = Math.max(peak, Math.abs(m.spin)); hopPeak = Math.max(hopPeak, m.hop); });
     expect(peak).toBeLessThan(1.2);
     expect(hopPeak).toBeGreaterThan(0.03);
   });
@@ -110,7 +112,7 @@ describe('batida: rodopio, quique e squash & stretch', () => {
     for (const key of ['nitroTicks', 'driftBoostTicks'] as const) {
       const m = newMotion();
       let peak = 1;
-      run(m, 1, (t) => (t < 0.2 ? {} : { [key]: 90 }), () => { peak = Math.max(peak, m.sz); });
+      run(m, 1, (t) => (t < 0.2 ? { cartoon: true } : { [key]: 90, cartoon: true }), () => { peak = Math.max(peak, m.sz); });
       expect(peak, key).toBeGreaterThan(1.05);
       expect(peak, key).toBeLessThanOrEqual(1.16 + 1e-6);
       expect(m.sz, key).toBeCloseTo(1, 1); // com o efeito ainda aceso, já assentou
@@ -121,13 +123,13 @@ describe('batida: rodopio, quique e squash & stretch', () => {
   it('o carro que já entra na cena com o nitro aceso ou em cooldown não reage (nada de rodopio fantasma)', () => {
     const m = newMotion();
     let peak = 0;
-    run(m, 0.6, () => ({ nitroTicks: 80, collisionCooldown: 12, speed: 1000 }), () => { peak = Math.max(peak, Math.abs(m.spin), m.hop, Math.abs(m.sz - 1)); });
+    run(m, 0.6, () => ({ nitroTicks: 80, collisionCooldown: 12, speed: 1000, cartoon: true }), () => { peak = Math.max(peak, Math.abs(m.spin), m.hop, Math.abs(m.sz - 1)); });
     expect(peak).toBe(0);
     expect(m.starsT).toBeLessThan(0);
   });
 });
 
-describe('estrelinhas da batida', () => {
+describe('estrelinhas da batida ("Efeitos de cartum")', () => {
   it('acendem na batida por ~0,9 s e apagam', () => {
     expect(STARS_SECONDS).toBeCloseTo(0.9, 6);
     const m = newMotion();
@@ -142,7 +144,7 @@ describe('estrelinhas da batida', () => {
 });
 
 describe('"Reduzir efeitos"', () => {
-  it('sem rodopio, sem squash e sem estrelinhas; o carro só dá o tranco do quique pequeno', () => {
+  it('mesmo com "Efeitos de cartum": sem rodopio, sem squash e sem estrelinhas; o carro só dá o tranco do quique pequeno', () => {
     const m = newMotion();
     let spin = 0; let sq = 0; let stars = false; let hop = 0;
     run(m, 1.2, (t) => ({ ...hit(0.4)(t), reduce: true }), () => { spin = Math.max(spin, Math.abs(m.spin)); sq = Math.max(sq, Math.abs(m.sz - 1)); if (m.starsT >= 0) stars = true; hop = Math.max(hop, m.hop); });
@@ -151,5 +153,34 @@ describe('"Reduzir efeitos"', () => {
     expect(stars).toBe(false);
     expect(hop).toBeGreaterThan(0.01); // o tranco existe, só sem o espetáculo
     expect(hop).toBeLessThan(0.1);
+  });
+});
+
+describe('padrão realista (V8): a batida é um tranco, não desenho animado', () => {
+  it('batida forte: guinada curta de 3° a 12° que volta a zero, quique de 2 a 12 cm, sem rodopio, sem squash & stretch e sem estrelinhas', () => {
+    for (const cartoon of [undefined, false]) {
+      const m = newMotion();
+      let spin = 0; let hop = 0; let sq = 0; let stars = false;
+      run(m, 1.6, (t) => ({ ...hit(0.4, false)(t), cartoon }), () => {
+        spin = Math.max(spin, Math.abs(m.spin)); hop = Math.max(hop, m.hop); sq = Math.max(sq, Math.abs(m.sz - 1), Math.abs(m.sx - 1));
+        if (m.starsT >= 0) stars = true;
+      });
+      expect(spin, `guinada (${cartoon})`).toBeGreaterThanOrEqual(0.05);
+      expect(spin, `guinada (${cartoon})`).toBeLessThanOrEqual(0.21);
+      expect(hop, `quique (${cartoon})`).toBeGreaterThanOrEqual(0.02);
+      expect(hop, `quique (${cartoon})`).toBeLessThanOrEqual(0.12);
+      expect(sq, `squash (${cartoon})`).toBe(0);
+      expect(stars, `estrelinhas (${cartoon})`).toBe(false);
+      expect(m.spin).toBe(0); expect(m.hop).toBe(0);
+    }
+  });
+
+  it('o nitro e o impulso da derrapagem não esticam o carro', () => {
+    for (const key of ['nitroTicks', 'driftBoostTicks'] as const) {
+      const m = newMotion();
+      let sq = 0;
+      run(m, 1, (t) => (t < 0.2 ? {} : { [key]: 90 }), () => { sq = Math.max(sq, Math.abs(m.sz - 1)); });
+      expect(sq, key).toBe(0);
+    }
   });
 });

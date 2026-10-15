@@ -591,7 +591,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       });
     return {
       state: r.afterFlag?.display ?? r.state, track: r.track, viewports,
-      options: { quality: settings.quality, showMinimap: settings.showMinimap, screenShake: settings.screenShake, reduceEffects: settings.reduceEffects, palette: settings.colorPalette, landmarkCaptions: settings.landmarkCaptions },
+      options: { quality: settings.quality, showMinimap: settings.showMinimap, screenShake: settings.screenShake, reduceEffects: settings.reduceEffects, cartoonEffects: settings.cartoonEffects, palette: settings.colorPalette, landmarkCaptions: settings.landmarkCaptions },
       time: elapsed, paused: session.paused, coop: r.humans.length >= 2 && r.humans.every((h) => h.teamId === r.humans[0].teamId),
       showHud: menus.current() === null || menus.current() === 'pause' || (r.driver !== null && online.quitOpen),
       ghost: r.ghost?.frame(r.state),

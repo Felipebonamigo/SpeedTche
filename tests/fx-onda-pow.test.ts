@@ -1,4 +1,6 @@
 // M5: a onda de choque (largada e engate do nitro) e o "POW" da batida (src/render/fx/shockwave.ts e pow.ts). Puro/Node.
+// V8 (docs/ondas/V8-efeitos.md): o halo do nitro virou um anel fino e rápido, na malha própria (`haloMesh`, o mesmo material); o POW só com a opção
+// "Efeitos de cartum" (`cartoonEffects`). As travas do anel fino estão em tests/efeitos-realistas.test.ts.
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { LAUNCH_PERFECT } from '../src/core/constants';
@@ -33,8 +35,8 @@ describe('onda de choque: o anel', () => {
       expect(shockPose(k, sp.life * 0.99)!.alpha).toBeLessThan(0.1);
     }
     expect(SHOCK_SPECS.perfect.r1).toBeGreaterThan(SHOCK_SPECS.ground.r1); // a largada-foguete abre mais
-    expect(SHOCK_SPECS.ground.life).toBeCloseTo(0.5, 6); expect(SHOCK_SPECS.halo.life).toBeCloseTo(0.35, 6);
-    expect(SHOCK_SPECS.ground.r1).toBe(7); expect(SHOCK_SPECS.perfect.r1).toBe(11); expect(SHOCK_SPECS.halo.r1).toBe(5);
+    expect(SHOCK_SPECS.ground.life).toBeCloseTo(0.5, 6); expect(SHOCK_SPECS.halo.life).toBeLessThanOrEqual(0.25); // V8: some rápido (era 0,35 s)
+    expect(SHOCK_SPECS.ground.r1).toBe(7); expect(SHOCK_SPECS.perfect.r1).toBe(11); expect(SHOCK_SPECS.halo.r1).toBeLessThanOrEqual(3.5); // V8: era 5 m
   });
 
   it('o pool: nasce, passa de idade, morre, e no máximo 8 vivos (o mais velho cai)', () => {
@@ -56,7 +58,10 @@ describe('onda de choque: o anel', () => {
     w.step(0.1);
     w.pose(rf, track);
     expect(w.mesh.visible).toBe(true);
-    expect(w.mesh.count).toBe(2);
+    expect(w.mesh.count).toBe(1); // V8: o chão na malha de sempre, o halo na dele
+    expect(w.haloMesh.visible).toBe(true);
+    expect(w.haloMesh.count).toBe(1);
+    expect(w.haloMesh.material).toBe(w.mesh.material); // o mesmo material: o mesmo programa
     const m = new THREE.Matrix4(); const pos = new THREE.Vector3(); const q = new THREE.Quaternion(); const sc = new THREE.Vector3();
     w.mesh.getMatrixAt(0, m); m.decompose(pos, q, sc);
     expect(pos.x).toBeCloseTo(0.2 * 7, 3); expect(pos.z).toBeCloseTo(0, 3); expect(pos.y).toBeCloseTo(0.05, 2);
@@ -64,7 +69,7 @@ describe('onda de choque: o anel', () => {
     expect(sc.x).toBeCloseTo(p.radius, 4); expect(sc.y).toBeCloseTo(p.radius, 4);
     const n0 = new THREE.Vector3(0, 0, 1).applyQuaternion(q); // a normal do anel
     expect(Math.abs(n0.y)).toBeGreaterThan(0.99); // o do chão é horizontal
-    w.mesh.getMatrixAt(1, m); m.decompose(pos, q, sc);
+    w.haloMesh.getMatrixAt(0, m); m.decompose(pos, q, sc);
     expect(pos.z).toBeGreaterThan(2); // 4 m atrás
     expect(pos.y).toBeCloseTo(0.5, 2);
     const n1 = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
@@ -77,7 +82,7 @@ describe('onda de choque: o anel', () => {
     const w = new Shockwaves();
     w.spawn('halo', 60_000, 0, 0.5); w.step(0.05); w.pose(f, curva);
     const m = new THREE.Matrix4(); const pos = new THREE.Vector3(); const q = new THREE.Quaternion(); const sc = new THREE.Vector3();
-    w.mesh.getMatrixAt(0, m); m.decompose(pos, q, sc);
+    w.haloMesh.getMatrixAt(0, m); m.decompose(pos, q, sc);
     const n = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
     const pt = { x: 0, y: 0, z: 0, heading: 0 };
     expect(locateOnFrame(f, curva, 60_000, 0, pt)).toBe(true);
@@ -106,9 +111,9 @@ describe('onda de choque: o anel', () => {
     w.follow(6, 9999, 0.9);
     w.step(0.1); w.pose(rf, track);
     const m = new THREE.Matrix4(); const pos = new THREE.Vector3();
-    w.mesh.getMatrixAt(0, m); pos.setFromMatrixPosition(m);
+    w.haloMesh.getMatrixAt(0, m); pos.setFromMatrixPosition(m);
     expect(pos.z).toBeCloseTo(-(500 / 50), 3); expect(pos.x).toBeCloseTo(0.1 * 7, 3); // 3500 − 3000 = 500 unidades = 10 m à frente de rf
-    w.mesh.getMatrixAt(1, m); pos.setFromMatrixPosition(m);
+    w.mesh.getMatrixAt(0, m); pos.setFromMatrixPosition(m);
     expect(pos.z).toBeCloseTo(0, 3);
   });
 
@@ -202,13 +207,13 @@ describe('POW da batida', () => {
 });
 
 describe('os eventos ligam o anel e o POW (Effects)', () => {
-  function cena(quality: Quality, reduce = false) {
+  function cena(quality: Quality, reduce = false, cartoon = false) {
     const t = getTrack('copacabana');
     const { state } = quickRace({ humans: [human(0), human(1, 1)], totalCars: 4, track: t });
     const idx = state.cars.findIndex((c) => c.seat === 0);
     const frame = { state, track: t, time: 5, paused: false, coop: true, showHud: false,
       viewports: state.cars.filter((c) => c.seat >= 0).map((c) => ({ seat: c.seat, carIndex: state.cars.indexOf(c), color: '#fff', name: `P${c.seat + 1}`, messages: [] })),
-      options: { quality, showMinimap: false, screenShake: true, reduceEffects: reduce, palette: 'default' } } as unknown as RenderFrame;
+      options: { quality, showMinimap: false, screenShake: true, reduceEffects: reduce, palette: 'default', cartoonEffects: cartoon } } as unknown as RenderFrame;
     const fx = new Effects(); fx.update(frame);
     return { state, frame, fx, car: state.cars[idx] };
   }
@@ -242,12 +247,12 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     w.pose(buildRoadFrame(s.frame.track, s.car.z, 30, 200), s.frame.track);
     const mm = new THREE.Matrix4(); const p = new THREE.Vector3();
     let found = false;
-    for (let i = 0; i < w.mesh.count; i++) { w.mesh.getMatrixAt(i, mm); p.setFromMatrixPosition(mm); if (Math.abs(p.y - 0.55) < 1e-3 && Math.abs(p.z - 70 / 50) < 1e-2) found = true; }
+    for (let i = 0; i < w.haloMesh.count; i++) { w.haloMesh.getMatrixAt(i, mm); p.setFromMatrixPosition(mm); if (Math.abs(p.y - 0.55) < 1e-3 && Math.abs(p.z - 70 / 50) < 1e-2) found = true; }
     expect(found).toBe(true);
   });
 
   it('só os carros dos humanos ganham o halo do nitro, e só a batida perto de um viewport ganha POW (o anel e o quadrinho dos rivais longe não tomam a vaga dos que se veem)', () => {
-    const s = cena('high'); s.state.phase = 'racing'; s.state.tick = 600; tick(s);
+    const s = cena('high', false, true); // o POW é da opção "Efeitos de cartum" (V8) s.state.phase = 'racing'; s.state.tick = 600; tick(s);
     const ia = s.state.cars.filter((c) => c.seat < 0);
     const humano = s.car;
     ia.forEach((c, i) => { c.z = (humano.z + 40_000 + i * 2000) % s.state.trackLength; }); // longe: 800 m+
@@ -261,8 +266,8 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     expect(pows(s.fx)).toBe(1); // batida a 60 m do jogador: POW
   });
 
-  it('a batida acende um POW (mesmo num quadro de 3 ticks); reduzir efeitos não; o anel/POW passam de idade e somem', () => {
-    const s = cena('high'); s.state.phase = 'racing'; s.state.tick = 600; tick(s); s.car.speed = 5000; tick(s);
+  it('com "Efeitos de cartum", a batida acende um POW (mesmo num quadro de 3 ticks); reduzir efeitos não; o anel/POW passam de idade e somem', () => {
+    const s = cena('high', false, true); s.state.phase = 'racing'; s.state.tick = 600; tick(s); s.car.speed = 5000; tick(s);
     s.car.speed = 3000; s.car.collisionCooldown = 17; tick(s);
     expect(pows(s.fx)).toBe(1);
     // o carro anda 6 m nos próximos quadros e o quadrinho vai junto, 0,4 m à frente do centro dele
@@ -274,7 +279,7 @@ describe('os eventos ligam o anel e o POW (Effects)', () => {
     expect(new THREE.Vector3().setFromMatrixPosition(mm).z).toBeCloseTo(-20 / 50, 2);
     for (let i = 0; i < 40; i++) tick(s);
     expect(pows(s.fx)).toBe(0);
-    const r = cena('high', true); r.state.phase = 'racing'; tick(r); r.car.speed = 5000; tick(r); r.car.collisionCooldown = 20; r.car.speed = 3000; tick(r);
+    const r = cena('high', true, true); r.state.phase = 'racing'; tick(r); r.car.speed = 5000; tick(r); r.car.collisionCooldown = 20; r.car.speed = 3000; tick(r);
     expect(pows(r.fx)).toBe(0);
   });
 });
