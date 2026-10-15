@@ -179,7 +179,8 @@ export function shrink(poly: ReadonlyArray<readonly [number, number]>, k: number
   return poly.map(([x, z]) => [cx + (x - cx) * k, cz + (z - cz) * k]);
 }
 
-export interface HeadlampBrushes { lens: Brush; bezel: Brush; side: Brush; reflector: Brush }
+/** `wall`: as paredes de fora da carcaça (padrão `side`); na cor do carro, a carcaça vista de lado some no capô em vez de virar uma aleta preta. */
+export interface HeadlampBrushes { lens: Brush; bezel: Brush; side: Brush; reflector: Brush; wall?: Brush }
 
 /**
  * Farol deitado no capô, com profundidade (lado direito + espelho): carcaça preta que sobra 4,5 cm do capô, refletor embutido, dois
@@ -190,7 +191,7 @@ export function headlampPod(b: MeshBuilder, hull: Hull, poly: ReadonlyArray<read
   const on = (pts: ReadonlyArray<readonly [number, number]>, lift: number): P3[] => pts.map(([x, z]) => [x, hull.topAt(z, x) + lift, z] as P3);
   const H = 0.045;
   b.mirrored(() => {
-    prism(b, on(poly, 0), [0, H, 0], br.bezel, br.side, null);
+    prism(b, on(poly, 0), [0, H, 0], br.bezel, br.wall ?? br.side, null);
     prism(b, on(shrink(poly, 0.82), H + 0.001), [0, 0.004, 0], br.reflector, br.reflector, null);
     const [a, d, e, c] = poly;
     // Os dois projetores em fila, da frente para trás (o farol é comprido em z e fica todo em cima do capô, sem passar do ombro).

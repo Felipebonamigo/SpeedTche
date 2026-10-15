@@ -98,7 +98,7 @@ export function buildGt(lod: Lod = 0): CarModel {
   // espigão preto).
   const HL: Array<[number, number]> = [[0.4, -2.04], [0.63, -2.0], [0.645, -1.66], [0.43, -1.72]];
   if (b.lod) topPatch(b, hull, HL, HEAD, 0.04, true, HEAD_HOUSING);
-  else headlampPod(b, hull, HL, { lens: HEAD, bezel: PIANO, side: TRIM, reflector: REFLECTOR });
+  else headlampPod(b, hull, HL, { lens: HEAD, bezel: PIANO, side: TRIM, reflector: REFLECTOR, wall: PAINT });
   b.fine(() => {
     meshGrille(b, hull, 'front', 0, 0.48, 0.29, 0.42, 3, TRIM, TRIM_SOFT);
     meshGrille(b, hull, 'front', 0.53, 0.77, 0.29, 0.4, 2, TRIM, TRIM_SOFT);
