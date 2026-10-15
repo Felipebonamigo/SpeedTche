@@ -531,8 +531,9 @@ export class Sky {
     const litA = a.cloudLit ?? a.cloudShade; const litB = b.cloudLit ?? b.cloudShade;
     this.clouds.visible = p.cloudLit !== null;
     (cu.uLit.value as THREE.Color).set(t <= 0 ? litA : t >= 1 ? litB : mix(litA, litB, t));
-    (cu.uShade.value as THREE.Color).set(p.cloudShade);
     const rim = duskAmount(p.light);
+    // No entardecer o lado da sombra puxa para o horizonte do período (V4): contra o sol as nuvens eram manchas roxas pesadas sobre o céu rosa.
+    (cu.uShade.value as THREE.Color).set(mix(p.cloudShade, p.sky[2], 0.4 * rim));
     // Forro de prata: de dia, um branco fraco na borda; no entardecer, o brilho do sol (V4: era só no entardecer).
     (cu.uRim.value as THREE.Color).set(mix('#3a3a3a', p.skyGlow, rim));
     (cu.uHorizon.value as THREE.Color).set(p.sky[2]);
