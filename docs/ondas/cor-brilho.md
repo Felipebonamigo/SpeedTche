@@ -86,6 +86,8 @@ paraty 76 / 301.728, sampa_noite 71 / 301.953, split4 285 / 917.986. O verniz e 
 vértice); nenhum passe novo (o teto é dentro do filtro de brilho do bloom). Programas: a chave do carro (v4) e a da estilização (v2) mudaram (compilados na carga).
 `NC_REQUIRE_GL=1 npx vitest run tests/cor-brilho-gl.test.ts tests/corrida-que-muda-gl.test.ts tests/gl-render.test.ts`: `Test Files  3 passed (3)` ·
 `Tests  23 passed (23)` (5172 s, com a máquina a ~45 de carga; código do commit d10177b).
+**Suíte inteira, uma vez, no fim** (código do e971684): `NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 npx vitest run --testTimeout=300000 --hookTimeout=900000 --reporter=dot` →
+`Test Files  206 passed (206)` · `Tests  3680 passed | 1 skipped (3681)` (2485 s; o pulado é o de sempre: `car-pipeline`, o carro do Kenney em `art/raw/`, fora do git).
 
 **Chama do nitro (acréscimo do coordenador).** A gota branca é a **malha da chama**, não a onda de choque/halo da M5: o laboratório (`flameDiff`) desenha o mesmo
 quadro, no mesmo instante, com e sem a malha, com os `fx-*` escondidos — no 150dd01 a diferença é 46% de pixels quase brancos de dia. (O anel grande em volta
