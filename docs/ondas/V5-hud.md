@@ -51,3 +51,28 @@ completo; `node scripts/playtest.mjs`; `node scripts/playtest-voz.mjs` se a roda
 
 Arte nova (fonte itálica de verdade, ícones desenhados), velocímetro em barra no estilo HCT (o arco fino fica: mesma caixa, layout medido), o
 HUD do modo Retrô ganhar visual próprio (ele usa este mesmo `Hud`), `src/render/cars/**` (V2) e pista/cenário/céu (V4).
+
+## Resultado (15/10/2026, `nc/hud`)
+
+- **O que ficou:** os blocos dos cantos sem caixa; posição 58 u (era 46), tempo 36 (32), velocidade 52 (44), volta 18 (16), "/20" 20 (16),
+  combustível/nitro 18 (15). Contorno `-webkit-text-stroke` com `paint-order: stroke fill` (a tinta não é comida) e sombra dura na cor do contorno;
+  posição e velocidade com o eco rosa dos títulos do menu; a faixa de três cores embaixo da posição e em cima do minimapa. Itálico sintetizado
+  (`font-synthesis: style`: a Fredoka não tem face itálica; peso acima de 700 continua sem síntese). Barras de combustível e nitro finas e
+  inclinadas (trilho escuro + fio claro de 1 px); os raios do nitro descem de linha quando o rótulo "NITRO · EQUIPE" não deixa espaço. Minimapa:
+  traçado com contorno escuro (`path.casing` + `path.line`, o mesmo na célula livre de 3P) e o nome com piso de 10 px (antes 8 px no 2P). Vidro
+  escuro do tema na fala do rival/aviso de câmera (`.msg.info`), na classificação de 3P e na roda de frases (`src/voice/hud.css`, com a cor do
+  assento num fio à esquerda). Sai o `div.lines` (M5).
+- **Testes:** `tests/hud-estilo.test.ts` (9, vistos falhar: tokens ausentes, `font-synthesis: none`, sem itálico/contorno), `hud-dom` (+1, visto
+  falhar: `.tl` era `.glass`), `fx-hud-linhas` (reescrito, visto falhar: `'lines'` no `hud.ts`, `.lines` no `hud.css`); `npx tsc` limpo; 23 arquivos
+  de HUD/UI/voz/tutorial/i18n (405 testes) verdes.
+- **`playtest-layout`:** no build de antes (550e970 + só o roteiro novo) as 8 conferências novas falharam e o resto da parte do HUD e das dicas passou (175 ✓). Depois:
+  telas de menu **686/686** combinações limpas (build de 6894257; o conserto seguinte só tocou `.bl`/`.nitro` do HUD) e a parte do HUD e das dicas
+  **toda verde** no build final (a787523: 183 ✓, 0 ✗). A primeira rodada pegou `bl×lmk` e `fuel-flag×lmk` no 4P a 1024×640 com HUD 80%
+  (o piso de 150 px do bloco encostava 4 px na legenda dos marcos): piso de 132 px e os raios que descem de linha, a787523. Medidas no 2P a
+  1280×800: posição 43 px (era 34,1), "/20" 14,8, volta 13,3, tempo 26,7, velocidade 38,5, marcha 16,3; no 4P a 1024×640 com HUD 80% tudo
+  ≥ 12 px e contorno de 1,5 a 2,4 px.
+- **`playtest-voz`:** 738 ✓, 0 ✗ (build de 6894257) e o 4J a 1024×640 de novo no build final: 78 ✓, 0 ✗ (a roda e os balões não cobrem os
+  blocos do HUD).
+- **Galeria antes × depois:** `scratch/galeria/comparar-main-550e970-vs-hud.png` (+ `.json`), cenas Copacabana, Sampa noite, Monte Fuji, 2P,
+  4P e largada: as 6 mudaram (15–32% dos pixels, só o HUD); chamadas e triângulos idênticos (nada no 3D). Monte Fuji na reta do segmento 80 tem
+  neve só nos morros do fundo: o "dia claro" é o céu azul-claro; a neve de verdade e o asfalto claro entram pelo teste de contraste.
