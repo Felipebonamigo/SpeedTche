@@ -75,8 +75,10 @@ export function draftLine(k: number, count: number, travel: number, time: number
   out.tail = dz + 4 + 0.06 * speedMs * (0.7 + 0.6 * h4);
   out.lat = r * Math.cos(theta);
   out.h = 0.8 + 0.75 * r * Math.sin(theta);
-  out.width = 0.14 + 0.12 * h2;
+  // V8: fio, não barra — de 5 a 10 cm e alfa até 0,4 (eram 14–26 cm e 0,8: nas capturas lia como as barras brancas das linhas de velocidade). O HUD já
+  // diz "VÁCUO"; o túnel é a sensação.
+  out.width = 0.05 + 0.05 * h2;
   out.r = 0.95; out.g = 1.0; out.b = 1.05;
-  out.a = 0.8 * clamp01(intensity) * fade;
+  out.a = 0.4 * clamp01(intensity) * fade;
   return true;
 }

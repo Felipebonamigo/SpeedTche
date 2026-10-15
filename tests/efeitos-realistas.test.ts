@@ -16,7 +16,7 @@ import { sanitizeSettings } from '../src/game/settings';
 import { Cars } from '../src/render/cars';
 import * as F from '../src/render/cars/flame';
 import { Effects } from '../src/render/effects';
-import { lineCount, speedLine, speedLineStrength, type LineSpec } from '../src/render/fx/lines';
+import { draftLine, lineCount, speedLine, speedLineStrength, type LineSpec } from '../src/render/fx/lines';
 import type { Pows } from '../src/render/fx/pow';
 import { SHOCK_SPECS, Shockwaves } from '../src/render/fx/shockwave';
 import { palette, type Palette } from '../src/render/palette';
@@ -220,6 +220,15 @@ describe('linhas de velocidade: finas, sutis, só acima de 90% (e no nitro)', ()
     expect(dia, 'dia').toBeLessThanOrEqual(0.35);
     expect(tarde, 'entardecer').toBeLessThanOrEqual(0.12);
     expect(tarde / dia, 'entardecer ÷ dia').toBeLessThanOrEqual(0.4);
+  });
+
+  it('o túnel do vácuo também é fio, não barra: de 5 a 10 cm e alfa até 0,4 (eram 14–26 cm e 0,8; nas capturas lia como as mesmas barras brancas)', () => {
+    for (let k = 0; k < 24; k++) {
+      const s: LineSpec = { dz: 0, tail: 0, lat: 0, h: 0, width: 0, r: 0, g: 0, b: 0, a: 0 };
+      expect(draftLine(k, 24, 50, 3, 100, 1, s)).toBe(true);
+      expect(s.width, `traço ${k}`).toBeGreaterThanOrEqual(0.05); expect(s.width, `traço ${k}`).toBeLessThanOrEqual(0.1);
+      expect(s.a, `traço ${k}`).toBeLessThanOrEqual(0.4);
+    }
   });
 
   it('o número de linhas acesas segue o teto do degrau (nada mudou nisso)', () => {

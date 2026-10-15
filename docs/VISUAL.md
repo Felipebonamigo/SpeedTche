@@ -774,10 +774,24 @@ Os defeitos da auditoria visual de 14/10/2026 (`docs/ondas/cor-brilho.md`, teste
 - **Verniz estilizado** (`cars/material.ts`, `carVarnish`): a lataria pintada reflete o céu do período e o chão escuro abaixo da linha do horizonte, por
   Fresnel, com as cores de `setStylizePalette` (`uStylizeSky*`); 0 na Baixa. Sem amostra de textura nem chamada nova.
 - **Chama do nitro de fogo** (`cars/flame.ts`): língua que abre na boca do escape e só afina (`FLAME_SIZE` 0,46 × 2,2 m), corpo amarelo-laranja →
-  vermelho que apaga e tremula, núcleo azul-branco só na boca; normal pela inversa da escala (a direta deitava as normais e, de trás, a chama inteira
+  vermelho que apaga e tremula, a boca do escape em metal aquecido (`FLAME_MOUTH`, laranja escuro; era azul-branca e de dia lia como disco cinza — V8); normal pela inversa da escala (a direta deitava as normais e, de trás, a chama inteira
   virava núcleo branco); sem ganho HDR (máx. 1,25×). Força e cobertura do fundo pela luz do período (`flameGain`, `flameCover`, blend pré-multiplicado:
   de dia o laranja cobre metade do fundo e se lê, à noite quase só soma); "Reduzir efeitos" a encurta e enfraquece (`FLAME_REDUCED`). A cor escolhida
   (N3) continua tingindo o corpo. A M5 (onda de choque, halo) não mudou: a gota branca era a malha da chama.
+
+## Efeitos realistas (V8, frente `nc/efeitos`)
+
+Diretriz "um pouco mais realista que o Horizon Chase Turbo" (`docs/ondas/V8-efeitos.md`). Só render e uma opção; nenhum programa novo.
+- **Batida** (`fx/impact.ts`): no ponto de contato (o meio dos dois carros na batida em fila; a quina da frente, do lado de fora, no cenário) uma chuva
+  curta de faíscas metálicas finas (3–9 m/s, 0,12–0,34 s, 1,8–3,2 cm, com gravidade; lote de traços), 4–8 lascas escuras de 3–9 cm que caem e quicam
+  (o pool de bolhas, sem inchar) e um flash de 0,08 s (dois traços largos cruzados); uma rajada por batida. O tranco de câmera é o tremor da M5 com
+  decaimento 8/s. O carro dá um tranco de guinada (pico ~2,5°–10°) e um quique de 3–11 cm (`cars/motion.ts`).
+- **"Efeitos de cartum"** (Opções › Acessibilidade, coluna Visão; `Settings.cartoonEffects`, desligado, campo aditivo; `RenderOptions.cartoonEffects`):
+  devolve o "POW!", as estrelinhas, o leque de faíscas de quadrinho, o rodopio de 360°, o quique alto e o squash & stretch. "Reduzir efeitos" vale mais.
+- **Anel do nitro**: malha própria (`Shockwaves.haloMesh`, `fx-halo`; o material do anel da largada) com faixa de 4,5% do raio, cor ≤ 0,4 (sem bloom),
+  0,7 → 3,2 m em 0,22 s. O anel da largada não mudou.
+- **Linhas de velocidade** (`fx/lines.ts`): acima de 90% (e no nitro), 3,5–7 cm, alfa até 0,30; ganho do período 1 de dia e 0,33 no entardecer e à
+  noite (`Effects.lineGain`, contínuo). O túnel do vácuo também virou fio (5–10 cm, alfa até 0,4; eram 14–26 cm e 0,8) e usa o mesmo ganho.
 
 ## Câmeras selecionáveis (frente `nc/cameras`)
 

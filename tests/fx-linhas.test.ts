@@ -118,8 +118,8 @@ describe('túnel de ar do vácuo', () => {
       expect(s.dz).toBeGreaterThanOrEqual(-9 - 1e-9); expect(s.dz).toBeLessThanOrEqual(23 + 1e-9); // a captura mostrou que o tubo longo (46 m) encolhe no miolo da tela
       expect(s.tail - s.dz).toBeGreaterThanOrEqual(4);
       expect(Math.min(s.r, s.g, s.b)).toBeGreaterThan(0.7); // claro
-      expect(s.width).toBeGreaterThanOrEqual(0.14); expect(s.width).toBeLessThanOrEqual(0.26); // visível na tela (a captura mostrou que 3 cm e até 16 cm somem ao longe)
-      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.8 + 1e-9);
+      expect(s.width).toBeGreaterThanOrEqual(0.05); expect(s.width).toBeLessThanOrEqual(0.1); // V8: fio (eram 14–26 cm: a M5 os engrossou para aparecer; viraram barras)
+      expect(s.a).toBeGreaterThan(0); expect(s.a).toBeLessThanOrEqual(0.4 + 1e-9);
     }
     expect(l.filter((s) => s.lat < 0).length).toBeGreaterThan(5); expect(l.filter((s) => s.lat > 0).length).toBeGreaterThan(5);
     expect(l.filter((s) => s.h > 0.8).length).toBeGreaterThan(5); expect(l.filter((s) => s.h < 0.8).length).toBeGreaterThan(5);

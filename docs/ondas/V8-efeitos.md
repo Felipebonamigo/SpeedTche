@@ -11,7 +11,7 @@
 |---|---|---|
 | 1 | Batida: balão **"POW!"** (`fx/pow.ts`), **estrelinhas** no teto (`cars/stars.ts`), leque de faíscas amarelas grossas de 8–22 m/s espalhado ±1,2 m em volta do carro, rodopio de 360° e squash & stretch (`cars/motion.ts`) | **Padrão realista:** no **ponto de contato** (entre os dois carros na batida em fila; a quina de fora no cenário) uma chuva curta de **faíscas metálicas** finas (3–9 m/s, 0,12–0,35 s, com gravidade), **lascas** pequenas escuras que caem e quicam (o pool de bolhas que já existe, sem crescer) e um **flash** breve e contido (dois traços largos de ~0,08 s, no mesmo lote); o **tranco** é o tremor que já existe (`Effects.shake`), mais curto; o carro dá um tranco de guinada (3–9°) e um quique pequeno (≤ 0,12 m), sem rodopio nem squash. **"Efeitos de cartum"** (Opções › Acessibilidade, coluna Visão, desligada por padrão; campo aditivo `cartoonEffects` no settings) devolve o POW, as estrelinhas, o leque antigo, o rodopio e o squash & stretch. |
 | 2 | Anel do engate do nitro: aro de 22% do raio (1,1 m no fim), 0,8 → 5 m, cor HDR azul (2,0) que o bloom pega | **Anel fino e transparente que some rápido**: malha própria com faixa de ~4% do raio (mesmo material e programa do anel da largada), 0,7 → 3,2 m em 0,22 s, cor ≤ 0,4 (abaixo do limiar do bloom). O anel da largada não muda. |
-| 3 | Linhas de velocidade de 9–20 cm, alfa até 0,75, a partir de 85%, ganho 0,76 no entardecer (o limiar do bloom do entardecer é 1,6, o do dia 2,6): brilham | **Finas e sutis**: 3,5–7 cm, alfa até 0,32, só **acima de 90%** (e no nitro); ganho do período 1 de dia e 0,35 no entardecer e à noite (contínuo na corrida que muda). O túnel do vácuo segue igual (fora do pedido). |
+| 3 | Linhas de velocidade de 9–20 cm, alfa até 0,75, a partir de 85%, ganho 0,76 no entardecer (o limiar do bloom do entardecer é 1,6, o do dia 2,6): brilham | **Finas e sutis**: 3,5–7 cm, alfa até 0,32, só **acima de 90%** (e no nitro); ganho do período 1 de dia e 0,35 no entardecer e à noite (contínuo na corrida que muda). O **túnel do vácuo** (mesmo lote, lia como as mesmas barras brancas na galeria) também vira fio: 5–10 cm, alfa até 0,4 (eram 14–26 cm e 0,8). |
 | 4 | Boca do escape (a tampa e o começo da chama, `cars/flame.ts`) azul-branca × 0,45: de trás, de dia, um disco cinza | **Metal aquecido**: a boca em laranja escuro (`FLAME_MOUTH`), em qualquer cor de chama; o corpo da chama não muda. |
 
 Tudo respeita "Reduzir efeitos" (faíscas, lascas, flash, POW, estrelinhas, anel e linhas = 0; o tranco já segue a opção de tremor) e o degrau (`fxPlan`:
@@ -31,6 +31,7 @@ o pool de bolhas (1); no engate do nitro o anel vai para a malha própria (+1 s�
 | Settings: `cartoonEffects` falso por padrão; save antigo (sem o campo) abre igual; lixo vira falso | campo inexistente |
 | Anel do nitro: faixa ≤ 6% do raio e ≤ 0,2 m no raio final; cor ≤ 0,45; vida ≤ 0,25 s | faixa 22% (1,1 m), cor 2,0, vida 0,35 s |
 | Linhas: nada a 89%; largura ≤ 7 cm; pico aditivo de dia ≤ 0,35; no entardecer ≤ 0,12 e ≤ 0,4 × o do dia | começam a 85%; 20 cm; pico 0,86; entardecer 0,65 |
+| Túnel do vácuo: 5–10 cm, alfa ≤ 0,4 (acrescentado depois de ver a galeria do 550e970: as barras brancas do 09 são o túnel) | `traço 0: expected 0.24009574867784977 to be less than or equal to 0.1` |
 | Batida padrão (motion): sem rodopio (< 0,2 rad), quique ≤ 0,12 m, sem squash; com cartum, como antes | 360°, 0,35 m, squash 16% |
 | Chama: a boca em laranja escuro (R ≥ 2,5 G, G ≥ 1,5 B) no shader; GL: o que a boca soma de dia é quente (R − B ≥ 40), não cinza | boca azul-branca |
 
@@ -46,6 +47,14 @@ Galeria antes × depois só nas cenas afetadas (`--so 07-dividida-2p,08-dividida
 (harness, 1280×720, Alta): batida, nitro engatando com as linhas, de dia (Copacabana) e no entardecer (Paraty), antes (`main` 550e970) × depois, mais a
 batida com "Efeitos de cartum".
 
-## 5. Registro
+## 5. Registro (15/10/2026)
 
-(preenchido no fim)
+**Testes vistos falhar antes do código** (árvore do 77a67f2, só os testes mudados): `npx vitest run tests/fx-impacto.test.ts tests/efeitos-realistas.test.ts
+tests/fx-plan.test.ts tests/fx-onda-pow.test.ts tests/fx-linhas.test.ts tests/car-movimento.test.ts tests/car-chama.test.ts` → `Test Files  6 failed | 1 passed (7)` ·
+`Tests  21 failed | 50 passed (71)`. Motivos: `fx-impacto` — `Cannot find module '../src/render/fx/impact'`; POW no padrão `expected 2 to be +0`; faíscas
+`84 de 84 faíscas longe do contato`; estrelinhas no padrão `expected 3 to be +0`; settings `expected undefined to be false`; anel `faixa ÷ raio: expected
+0.22000004818252794 to be less than or equal to 0.06` (e vida `0.35 ≤ 0.25`); linhas `expected 0.2666… to be +0` (a 89%), largura `0.109 ≤ 0.07`, pico de dia
+`0.8624764710669623 ≤ 0.35`; boca `FLAME_MOUTH: expected undefined to be defined`; motion padrão `guinada (undefined): expected 6.283100500121666 to be less than or
+equal to 0.21`, esticão do nitro `expected 0.0922… to be +0`; fx-plan `expected true to be false` (POW no padrão). O teste do tranco (escrito em seguida, antes de
+mexer no `effects.ts`): `expected 0.25924022535489666 to be less than or equal to 0.15`. Os testes de cartum dos arquivos antigos (com `cartoon: true`) passavam
+antes e seguem passando: são o comportamento de antes, agora atrás da opção.
