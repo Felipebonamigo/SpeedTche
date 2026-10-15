@@ -122,6 +122,8 @@ if (q.get('seg') !== null) {
   for (const c of state.cars) if (c !== me) c.z = (me.z + track.length / 2 + c.id * 300) % track.length;
   if (q.get('together') === '1') for (const c of state.cars) if (c.seat > 0) { c.z = (me.z - c.seat * 400 + track.length) % track.length; c.x = c.seat % 2 ? 0.45 : -0.45; }
 }
+// car=<id> fora das vistas de carro (V2): o carro do jogador na corrida e na câmera de capô (a folha de cada estilo).
+if (carview === null && !showroom && sheet === null && q.get('car')) me.carId = q.get('car');
 if (carview !== null || showroom || sheet !== null) {
   for (const c of state.cars) { c.speed = 0; c.nitroTicks = 0; c.skidTicks = 0; c.steerPose = 0; }
   const away = (me.z + track.length / 2) % track.length;

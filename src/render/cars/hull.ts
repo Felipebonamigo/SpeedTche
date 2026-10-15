@@ -5,7 +5,7 @@
 // (cobrindo o pneu grande da M4). Veio do protótipo aprovado pelo dono (`nc/estilo-carros`, `tools/estilo-carros/hct2/hull.ts`, rodada 2);
 // aqui ganhou a faixa A configurável e as consultas que as peças usam para pousar na pele (`topAt`, `skinX`, `creaseY`, `endZ`).
 // O nível 1 (lod1) sai do mesmo casco: menos facetas no arco, sem a rampa do para-lama e metade das estações do meio.
-import type { Axle, Region } from './body';
+import type { Axle, CabSec, Region } from './body';
 import { curve, type Curve, type Pts } from './curve';
 import { loft, type Brush, type Lod, type MeshBuilder, type P2 } from './kit';
 
@@ -24,6 +24,8 @@ export interface HullSpec {
   yb: Pts; yt: Pts; crown: Pts; hw: Pts; yc: Pts; sh: Pts; tuck: Pts;
   /** Alargamento e subida do para-lama sobre cada roda (dianteira, traseira). A subida nunca deixa o pneu à mostra (`cover`). */
   flare: readonly [number, number]; rise: readonly [number, number];
+  /** Comprimento da rampa do para-lama de cada roda, em raios do arco (padrão 1,45): a cunha, de capô baixo, sobe o para-lama dianteiro mais devagar. */
+  ramp?: readonly [number, number];
   clear?: number; cover?: number;
   /** Altura da faixa lateral (camada B) logo abaixo do vinco. */
   band?: number;
@@ -56,7 +58,10 @@ export class Hull {
     spec.axles.forEach((ax, ai) => {
       const ra = ax.r + clear;
       // Estações do arco: rampa do para-lama, parede vertical, semicírculo em facetas, parede.
-      if (!lod) st.push({ z: ax.z - ra * 1.45, archY: null, bump: 0, axle: ai }, { z: ax.z + ra * 1.45, archY: null, bump: 0, axle: ai });
+      const rp = this.ramp(ai);
+      if (!lod) st.push({ z: ax.z - ra * rp, archY: null, bump: 0, axle: ai }, { z: ax.z + ra * rp, archY: null, bump: 0, axle: ai });
+      // Rampa longa: uma estação no meio dela, senão a subida vira uma reta quebrada.
+      if (!lod && rp > 1.6) st.push({ z: ax.z - ra * (1 + rp) / 2, archY: null, bump: 0, axle: ai }, { z: ax.z + ra * (1 + rp) / 2, archY: null, bump: 0, axle: ai });
       st.push({ z: ax.z - ra, archY: null, bump: 0, axle: ai }, { z: ax.z - ra, archY: ax.r, bump: 0, axle: ai });
       for (let k = facets - 1; k >= 1; k--) {
         const rad = (k / facets) * Math.PI;
@@ -69,7 +74,7 @@ export class Hull {
       spec.axles.forEach((ax, ai) => {
         const ra = ax.r + clear; const dz = s.z - ax.z;
         if (s.axle === -1 && Math.abs(dz) < ra) { s.archY = ax.r + Math.sqrt(ra * ra - dz * dz); s.axle = ai; }
-        const u = Math.min(1, Math.abs(dz) / (ra * 1.45));
+        const u = Math.min(1, Math.abs(dz) / (ra * this.ramp(ai)));
         s.bump = Math.max(s.bump, 0.5 + 0.5 * Math.cos(Math.PI * u));
       });
     }
@@ -77,6 +82,8 @@ export class Hull {
     st.sort((a, b) => a.z - b.z || this.wallOrder(a, b));
     this.stations = st.filter((s) => s.z >= this.zFront - 1e-9 && s.z <= this.zBack + 1e-9);
   }
+
+  private ramp(ai: number): number { return this.spec.ramp?.[ai] ?? 1.45; }
 
   private wallOrder(a: Station, b: Station): number {
     const ax = this.spec.axles[Math.max(0, a.axle)];
@@ -91,7 +98,7 @@ export class Hull {
     let bump = 0; let axle = 0; let best = Infinity;
     this.spec.axles.forEach((ax, ai) => {
       const ra = ax.r + clear; const dz = z - ax.z;
-      bump = Math.max(bump, 0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, Math.abs(dz) / (ra * 1.45))));
+      bump = Math.max(bump, 0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, Math.abs(dz) / (ra * this.ramp(ai)))));
       if (Math.abs(dz) < best) { best = Math.abs(dz); axle = ai; }
     });
     return { z, archY: null, bump, axle };
@@ -163,6 +170,19 @@ export class Hull {
   halfWidth(z: number): number { const p = this.params(this.probe(z)); return p.hw + p.flare; }
   /** Borda do capô/tampa (com a subida do para-lama). */
   edgeTop(z: number): number { const p = this.params(this.probe(z)); return p.yt + p.rise; }
+  /** Base da cabine em z: assenta rente à borda de cima do casco (meia largura do topo e a altura dela). */
+  cabinBase(z: number): { z: number; hwb: number; yb: number } {
+    const top = this.topHalf(z);
+    return { z, hwb: top - 0.005, yb: this.topAt(z, top) - 0.004 };
+  }
+  /**
+   * Seção de ponta da cabine (a base do para-brisa, o fim da tampa): plana na borda e com o meio descendo até o topo do casco (o `crown` negativo da
+   * seção) — quando o capô afunda entre para-lamas altos, a borda do vidro acompanha o capô em vez de passar por cima dele deixando uma fresta.
+   */
+  cabinEnd(z: number): CabSec {
+    const b = this.cabinBase(z);
+    return { ...b, hwt: b.hwb, yt: b.yb, crown: Math.min(0, this.topAt(z, 0) - 0.004 - b.yb) };
+  }
   /** Altura do vinco da cintura em z (onde a faixa B termina, por cima). */
   creaseY(z: number): number { return this.ring(this.probe(z))[7][1]; }
   /** x da pele lateral (lado direito) na altura y de z: da saia ao ombro. */
