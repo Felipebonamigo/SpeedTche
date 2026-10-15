@@ -122,6 +122,11 @@ export interface Settings {
   largeText: boolean;
   /** Sem tremor de câmera, linhas de velocidade, piscadas e faíscas. */
   reduceEffects: boolean;
+  /**
+   * "Efeitos de cartum" (Opções › Acessibilidade; V8, docs/ondas/V8-efeitos.md): a batida com o balão "POW!", as estrelinhas, o rodopio e o squash &
+   * stretch de antes, no lugar das faíscas, lascas e do tranco realistas. Desligado por padrão; campo aditivo (save sem ele abre desligado).
+   */
+  cartoonEffects: boolean;
   /** Legenda com o nome do marco turístico quando ele entra bem à vista (src/render/caption/, Opções › Acessibilidade). */
   landmarkCaptions: boolean;
   /** 30 fps travados na Média com 3 e 4 jogadores (Opções › Visual; onda L, L2b). Desligado por padrão. */
@@ -141,7 +146,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   serverUrl: 'ws://localhost:8787',
   ghost: true,
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
-  landmarkCaptions: true, lockFps30: false,
+  landmarkCaptions: true, lockFps30: false, cartoonEffects: false,
   seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[],
 });
 
@@ -245,6 +250,8 @@ export interface RenderOptions {
   screenShake: boolean;
   /** Reduzir efeitos (acessibilidade): sem tremor, linhas de velocidade, piscadas e faíscas. */
   reduceEffects: boolean;
+  /** "Efeitos de cartum" (V8): POW, estrelinhas, rodopio e squash & stretch na batida; ausente = desligado (os efeitos realistas). */
+  cartoonEffects?: boolean;
   /** Paleta das cores dos jogadores (os de outro computador, no online, não têm viewport aqui). */
   palette: ColorPalette;
   /** Legenda dos marcos turísticos (src/render/caption/); ausente = ligada. O modo Retrô não tem marcos nem legenda. */

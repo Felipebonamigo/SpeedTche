@@ -1,6 +1,6 @@
 /* Acessibilidade (src/access/apply.ts): texto dos menus escalado por --text-scale no #ui; HUD por
-   --hud-scale no #hud (hud.ts multiplica o --s de cada viewport); reduzir efeitos tira piscadas e
-   linhas de velocidade (o tremor e as faíscas saem pelo RenderOptions). */
+   --hud-scale no #hud (hud.ts multiplica o --s de cada viewport); reduzir efeitos tira piscadas (as linhas de
+   velocidade, o tremor e as faíscas saem pelo RenderOptions: são 3D desde a M5). */
 #ui {
   --text-scale: 1;
   --fs: calc(18 * var(--u) * var(--text-scale));
@@ -16,7 +16,6 @@
 .nc-hud .tag .assist.on { display: inline-block; }
 
 /* Reduzir efeitos: nada pisca, nada gira. */
-.nc-hud.reduce-fx .lines { display: none; }
 .nc-hud.reduce-fx .lap.final, .nc-hud.reduce-fx .fuel.low .fill { animation: none; }
 #ui.reduce-fx *, #ui.reduce-fx *::before, #ui.reduce-fx *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 

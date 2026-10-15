@@ -4,6 +4,8 @@
 // (0 → 20 ticks, só em batida traseira ou no cenário; o raspão de lado não a põe) é a batida; o começo do nitro e do
 // impulso da derrapagem é o esticão. O núcleo, o hash e o online não sabem que isto existe.
 // Quem desenha (cars.ts) só lê `drift`, `spin`, `hop`, `sx/sy/sz` e `starsT`.
+// V8 (docs/ondas/V8-efeitos.md): o rodopio de 360°, o quique alto, o squash & stretch e as estrelinhas são a opção "Efeitos de cartum" (`cartoon`);
+// no padrão a batida é um tranco — guinada curta de 3° a 10° e um quique baixo —, como num carro de verdade (diretriz "mais realista que o HCT").
 
 /** Guinada máxima da derrapagem (rad): o bico aponta para dentro da curva, do lado de `driftDir`. */
 export const DRIFT_YAW = 0.35;
@@ -16,6 +18,9 @@ const SPIN_SECONDS = 0.7;
 /** Quique máximo (m) e o do "Reduzir efeitos". */
 const HOP_MAX = 0.35;
 const HOP_REDUCED = 0.04;
+/** O padrão realista (V8): quique de 3 a 11 cm e guinada de balanço de 0,06 a 0,24 rad de amplitude (pico de ~2,5° a ~10°). */
+const HOP_REAL = [0.03, 0.11] as const;
+const JOLT_REAL = [0.06, 0.24] as const;
 /** Squash máximo (fração do comprimento) e stretch do nitro/impulso. */
 const SQUASH_MAX = 0.16;
 const STRETCH = 0.12;
@@ -28,6 +33,8 @@ export interface MotionInput {
   speed: number; /** Velocidade máxima da corrida (car.stats.topSpeed). */ maxSpeed: number;
   /** "Reduzir efeitos": sem rodopio, sem squash/stretch e sem estrelinhas (a guinada é pose, fica). */
   reduce: boolean;
+  /** "Efeitos de cartum" (V8): rodopio, quique alto, squash & stretch e estrelinhas. Ausente/falso: o tranco realista. "Reduzir efeitos" vale mais. */
+  cartoon?: boolean;
 }
 
 export interface Motion {
@@ -72,16 +79,18 @@ export function stepMotion(m: Motion, e: MotionInput, dt: number): void {
   const drop = e.maxSpeed > 0 ? (m.speed - e.speed) / e.maxSpeed : 0;
   m.seen = true; m.cd = e.collisionCooldown; m.speed = e.speed; m.nitro = e.nitroTicks; m.boost = e.driftBoostTicks;
 
+  const toon = e.cartoon === true && !e.reduce;
   if (hit) {
     const sev = clamp01(drop / SPIN_DROP);
     m.hits++;
     m.hitT = 0;
     m.hitDir = m.hits % 2 === 0 ? -1 : 1;
-    m.hitSpin = drop >= SPIN_DROP && !e.reduce;
-    m.hitH = e.reduce ? HOP_REDUCED : 0.08 + (HOP_MAX - 0.08) * sev; // quem é batido (drop ≤ 0) também dá o seu pulinho
-    m.hitAmp = e.reduce ? 0 : 0.15 + 0.45 * sev; // balanço quando não dá a volta
-    if (!e.reduce) { m.sqT = 0; m.sqQ = SQUASH_MAX * (0.55 + 0.45 * sev); m.starsT = 0; }
-  } else if ((nitroStart || boostStart) && !e.reduce) {
+    m.hitSpin = drop >= SPIN_DROP && toon;
+    // quem é batido (drop ≤ 0) também dá o seu pulinho
+    m.hitH = e.reduce ? HOP_REDUCED : toon ? 0.08 + (HOP_MAX - 0.08) * sev : HOP_REAL[0] + (HOP_REAL[1] - HOP_REAL[0]) * sev;
+    m.hitAmp = e.reduce ? 0 : toon ? 0.15 + 0.45 * sev : JOLT_REAL[0] + (JOLT_REAL[1] - JOLT_REAL[0]) * sev; // balanço quando não dá a volta
+    if (toon) { m.sqT = 0; m.sqQ = SQUASH_MAX * (0.55 + 0.45 * sev); m.starsT = 0; }
+  } else if ((nitroStart || boostStart) && toon) {
     m.sqT = 0; m.sqQ = -STRETCH;
   }
 

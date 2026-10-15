@@ -1,179 +1,233 @@
-/* HUD da corrida: painéis gordos sobre o WebGL (contorno claro, sombra deslocada na cor do assento), números grandes na
-   fonte de exibição (ui/fonts.css), legível do sofá. Tudo escala por --s (uiScale do viewport) e usa --accent (cor do
-   assento). Combustível e nitro têm forma, número e rótulo além da cor; a posição tem seta e sinal. */
+/* HUD da corrida (V5, docs/ondas/V5-hud.md): enxuto, na língua do tema `speedtche` dos menus (V3). Os números principais ficam SEM caixa —
+   grandes, em itálico, brancos com contorno escuro por baixo da tinta (paint-order) e sombra dura — e leem sobre qualquer fundo (dia claro,
+   neve, noite); a faixa de pôr do sol (laranja/rosa/azul) é o acento. Vidro escuro só onde há texto corrido (fala do rival, classificação da
+   célula livre). Tudo escala por --s (uiScale do viewport × --hud-scale das opções) e usa --accent (cor do assento). Combustível e nitro têm
+   forma, número e rótulo além da cor; a posição tem seta e sinal. Os tokens moram aqui, na raiz do HUD: o menu não muda, e o HUD não depende
+   do `data-tema` (vale no render-harness e na galeria). Piso de legibilidade no fim do arquivo (docs/TELAS.md). */
 .nc-hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden;
-  font-family: var(--font-display); color: #f6f8ff;
-  font-variant-numeric: tabular-nums; font-synthesis: none; -webkit-user-select: none; user-select: none; }
+  --h-ink: #ffffff;
+  --h-edge: #140c2c;
+  --h-pink: #ff3d7f;
+  --h-sun: #ffd23f;
+  --h-label: #ffd9b8;
+  --h-muted: #dfe5f2;
+  --h-grad: linear-gradient(100deg, #ff8a1f 0%, #ff3d7f 100%);
+  --h-bars: linear-gradient(90deg, #ff8a1f 0 34%, #ff3d7f 34% 67%, #2f7bff 67%);
+  --h-skew: -12deg;
+  --h-track: rgba(14, 8, 34, 0.74);
+  --h-hair: rgba(255, 255, 255, 0.8);
+  --h-fuel: #ffc23d;
+  --h-nitro: #4fd2ff;
+  font-family: var(--font-display); color: var(--h-ink);
+  /* A Fredoka não tem face itálica: o navegador inclina (style); o negrito acima de 700 não é sintetizado (weight fora). */
+  font-variant-numeric: tabular-nums; font-synthesis: style; -webkit-user-select: none; user-select: none; }
 .nc-hud.hidden { display: none; }
 .nc-hud .vp { position: absolute; overflow: hidden; --s: 1; --accent: #ffd23f; font-size: calc(16px * var(--s)); }
-/* Painel gordo: fundo azul-noite quase opaco, contorno claro grosso e uma sombra "sólida" deslocada para baixo na cor
-   escura do assento (o que dá o ar de botão de jogo); a sombra macia vem por baixo. */
-.nc-hud .glass { --edge: max(2px, calc(3px * var(--s)));
-  background: rgba(14, 18, 40, 0.8); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  border: var(--edge) solid rgba(255, 255, 255, 0.9); border-radius: calc(18px * var(--s));
-  box-shadow: 0 calc(5px * var(--s)) 0 color-mix(in srgb, var(--accent) 58%, #05070f), 0 calc(9px * var(--s)) calc(20px * var(--s)) rgba(0, 0, 0, 0.45); }
-.nc-hud .label { font-size: calc(11px * var(--s)); letter-spacing: 0.12em; text-transform: uppercase; color: #b4bdd8; font-weight: 700; }
+/* Vidro escuro do tema (só a classificação e o mapa grande da célula livre de 3P): fio de 1px e o traço de pôr do sol no alto. */
+.nc-hud .glass {
+  background: linear-gradient(90deg, #ff8a1f, #ff3d7f 22%, rgba(255, 61, 127, 0) 46%) top left / 100% 2px no-repeat, rgba(8, 10, 18, 0.66);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: calc(8px * var(--s));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 calc(10px * var(--s)) calc(28px * var(--s)) rgba(0, 0, 0, 0.4); }
 
-/* Canto superior esquerdo: posição, volta e os segundos para o carro da frente e o de trás. */
-.nc-hud .tl { position: absolute; left: calc(18px * var(--s)); top: calc(16px * var(--s)); padding: calc(9px * var(--s)) calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(2px * var(--s)); min-width: calc(120px * var(--s)); }
-.nc-hud .tag { display: flex; align-items: center; gap: calc(7px * var(--s)); padding: 0; border: 0; border-radius: 0; /* o `.tag` global das telas online (online.css) é uma pílula: aqui não */ font-size: calc(13px * var(--s)); font-weight: 800; letter-spacing: 0.06em; color: var(--accent); }
-.nc-hud .tag .dot { width: calc(10px * var(--s)); height: calc(10px * var(--s)); border-radius: 50%; background: var(--accent); box-shadow: 0 0 calc(8px * var(--s)) var(--accent); }
-.nc-hud .pos { position: relative; display: flex; align-items: baseline; gap: calc(4px * var(--s)); line-height: 1; }
-.nc-hud .pos-n { display: inline-block; transform-origin: 20% 80%; font-size: calc(46px * var(--s)); font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.4); transition: color 160ms; }
-.nc-hud .pos-of { font-size: calc(16px * var(--s)); font-weight: 700; color: #b4bdd8; }
+/* ── Números e rótulos sem caixa: itálico, contorno escuro por baixo da tinta e sombra dura ── */
+.nc-hud .pos-n, .nc-hud .pos-of, .nc-hud .lap, .nc-hud .gap-n, .nc-hud .time, .nc-hud .kmh, .nc-hud .gear, .nc-hud .fuel-pct, .nc-hud .nitro-n {
+  font-style: italic; font-weight: 700; color: var(--h-ink); paint-order: stroke fill;
+  --h-stroke: max(1.5px, calc(3px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge);
+  text-shadow: calc(1.5px * var(--s)) calc(2.5px * var(--s)) 0 var(--h-edge); }
+/* Os dois heróis (posição e velocidade): contorno mais grosso e o eco rosa dos títulos do menu. */
+.nc-hud .pos-n, .nc-hud .kmh { --h-stroke: max(2px, calc(5px * var(--s))); text-shadow: calc(3px * var(--s)) calc(3px * var(--s)) 0 var(--h-pink), calc(4.5px * var(--s)) calc(5px * var(--s)) 0 var(--h-edge); }
+.nc-hud .time { --h-stroke: max(2px, calc(4px * var(--s))); }
+.nc-hud .tag, .nc-hud .label, .nc-hud .unit, .nc-hud .laps, .nc-hud .mates, .nc-hud .mini .mini-name {
+  paint-order: stroke fill; --h-stroke: max(1.5px, calc(2.5px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge);
+  text-shadow: 0 calc(1px * var(--s)) calc(3px * var(--s)) rgba(10, 6, 28, 0.85); }
+.nc-hud .label { font-size: calc(11px * var(--s)); letter-spacing: 0.14em; text-transform: uppercase; color: var(--h-label); font-weight: 700; }
+
+/* Canto superior esquerdo: quem é, posição (com a mola e o selo ±N), volta e os segundos para o carro da frente e o de trás. */
+.nc-hud .tl { position: absolute; left: calc(22px * var(--s)); top: calc(12px * var(--s)); display: flex; flex-direction: column; gap: calc(1px * var(--s)); min-width: calc(120px * var(--s)); }
+.nc-hud .tag { display: flex; align-items: center; gap: calc(7px * var(--s)); padding: 0; border: 0; border-radius: 0; /* o `.tag` global das telas online (online.css) é uma pílula: aqui não */ font-size: calc(13px * var(--s)); font-weight: 700; letter-spacing: 0.12em; color: var(--accent); }
+.nc-hud .tag .dot { width: calc(10px * var(--s)); height: calc(10px * var(--s)); border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 max(1px, calc(1.5px * var(--s))) var(--h-edge); }
+.nc-hud .pos { position: relative; align-self: flex-start; display: flex; align-items: baseline; gap: calc(3px * var(--s)); line-height: 1; padding-bottom: calc(7px * var(--s)); }
+/* A faixa de pôr do sol embaixo da posição (a mesma dos títulos do menu). */
+.nc-hud .pos::after { content: ''; position: absolute; left: calc(4px * var(--s)); bottom: 0; width: calc(74px * var(--s)); height: max(3px, calc(4px * var(--s))); background: var(--h-bars); transform: skewX(-24deg); box-shadow: 0 calc(1.5px * var(--s)) 0 rgba(10, 6, 28, 0.6); }
+.nc-hud .pos-n { display: inline-block; transform-origin: 20% 80%; font-size: calc(58px * var(--s)); letter-spacing: -0.01em; line-height: 0.95; transition: color 160ms; }
+.nc-hud .pos-of { font-size: calc(20px * var(--s)); color: var(--h-muted); }
 .nc-hud .pos.gain .pos-n { color: #7dffb4; }
-.nc-hud .pos.loss .pos-n { color: #ff8f7a; }
-/* Selo da ultrapassagem: colado no canto do painel, com SETA (forma) e sinal (+/−) além da cor. */
-.nc-hud .pos-badge { position: absolute; left: calc(100% + 2px * var(--s)); top: calc(-12px * var(--s)); display: inline-flex; align-items: center; gap: calc(4px * var(--s));
-  padding: calc(1px * var(--s)) calc(8px * var(--s)); border-radius: 999px; font-size: calc(19px * var(--s)); font-weight: 900; line-height: 1.15; white-space: nowrap;
-  border: max(2px, calc(2.5px * var(--s))) solid #fff; box-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.4); opacity: 0; transform: rotate(-6deg); }
+.nc-hud .pos.loss .pos-n { color: #ff9a86; }
+/* Selo da ultrapassagem: etiqueta inclinada colada no canto da posição, com SETA (forma) e sinal (+/−) além da cor. */
+.nc-hud .pos-badge { position: absolute; left: calc(100% + 4px * var(--s)); top: calc(-8px * var(--s)); display: inline-flex; align-items: center; gap: calc(4px * var(--s));
+  padding: calc(1px * var(--s)) calc(9px * var(--s)); border-radius: calc(4px * var(--s)); font-size: calc(19px * var(--s)); font-weight: 700; font-style: italic; line-height: 1.15; white-space: nowrap;
+  box-shadow: 0 0 0 max(1.5px, calc(2px * var(--s))) #fff, calc(3px * var(--s)) calc(4px * var(--s)) 0 var(--h-edge); opacity: 0; transform: skewX(var(--h-skew)); }
 .nc-hud .pos-badge:empty { display: none; }
 .nc-hud .pos-badge::before { content: ''; border-left: calc(5px * var(--s)) solid transparent; border-right: calc(5px * var(--s)) solid transparent; }
 .nc-hud .pos.gain .pos-badge { background: #2fd477; color: #062514; }
 .nc-hud .pos.gain .pos-badge::before { border-bottom: calc(8px * var(--s)) solid #062514; }
-.nc-hud .pos.loss .pos-badge { background: #ff5a47; color: #fff; }
+.nc-hud .pos.loss .pos-badge { background: #ff4766; color: #fff; }
 .nc-hud .pos.loss .pos-badge::before { border-top: calc(8px * var(--s)) solid #fff; }
-.nc-hud .lap { font-size: calc(16px * var(--s)); font-weight: 800; letter-spacing: 0.08em; }
-.nc-hud .lap.final { color: #ffd23f; animation: nc-blink 0.7s steps(2, start) infinite; }
-.nc-hud .lap.done { color: #3ddc84; }
+.nc-hud .lap { font-size: calc(18px * var(--s)); letter-spacing: 0.05em; margin-top: calc(3px * var(--s)); }
+.nc-hud .lap.final { color: var(--h-sun); animation: nc-blink 0.7s steps(2, start) infinite; }
+.nc-hud .lap.done { color: #4be39a; }
 /* Segundos para o carro da frente (seta para cima) e o de trás (para baixo): quem é quem está na forma, não na cor.
-   Some com visibility (a altura do painel não pula quando o líder perde a linha da frente). */
-.nc-hud .gaps { display: flex; flex-direction: column; gap: calc(1px * var(--s)); margin-top: calc(3px * var(--s)); }
+   Some com visibility (a altura do bloco não pula quando o líder perde a linha da frente). */
+.nc-hud .gaps { display: flex; flex-direction: column; gap: calc(1px * var(--s)); margin-top: calc(2px * var(--s)); }
 .nc-hud .gap { display: flex; align-items: center; gap: calc(6px * var(--s)); line-height: 1.1; }
 .nc-hud .gap.none { visibility: hidden; }
-.nc-hud .gap-n { font-weight: 800; letter-spacing: 0.02em; }
-.nc-hud .gap-ico { flex: none; width: 0; height: 0; border-left: max(4px, calc(5px * var(--s))) solid transparent; border-right: max(4px, calc(5px * var(--s))) solid transparent; }
+.nc-hud .gap-n { letter-spacing: 0.02em; }
+.nc-hud .gap-ico { flex: none; width: 0; height: 0; border-left: max(4px, calc(5px * var(--s))) solid transparent; border-right: max(4px, calc(5px * var(--s))) solid transparent;
+  filter: drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)) drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)); }
 .nc-hud .gap-ahead .gap-ico { border-bottom: max(6px, calc(9px * var(--s))) solid #9fe3ff; }
 .nc-hud .gap-behind .gap-ico { border-top: max(6px, calc(9px * var(--s))) solid #ffd28a; }
-.nc-hud .gap.close .gap-n { color: #ffd23f; }
+.nc-hud .gap.close .gap-n { color: var(--h-sun); }
 
 /* Topo, no meio: tempo e voltas. */
-.nc-hud .tr { position: absolute; left: 50%; transform: translateX(-50%); top: calc(16px * var(--s)); padding: calc(8px * var(--s)) calc(18px * var(--s)); text-align: center; display: flex; flex-direction: column; gap: calc(2px * var(--s)); }
-.nc-hud .time { font-size: calc(32px * var(--s)); font-weight: 900; line-height: 1; letter-spacing: 0.02em; min-width: 7ch; text-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.35); }
-.nc-hud .laps { font-size: calc(12px * var(--s)); color: #b4bdd8; font-weight: 700; display: flex; gap: calc(12px * var(--s)); justify-content: center; }
-.nc-hud .laps b { color: #f6f8ff; }
-.nc-hud .mates { position: absolute; right: calc(18px * var(--s)); top: calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(3px * var(--s)); font-size: calc(12px * var(--s)); font-weight: 700; padding: calc(6px * var(--s)) calc(12px * var(--s)); }
+.nc-hud .tr { position: absolute; left: 50%; transform: translateX(-50%); top: calc(12px * var(--s)); text-align: center; display: flex; flex-direction: column; align-items: center; gap: calc(2px * var(--s)); }
+.nc-hud .time { font-size: calc(36px * var(--s)); line-height: 1; letter-spacing: 0.02em; min-width: 7ch; }
+.nc-hud .laps { font-size: calc(12px * var(--s)); color: var(--h-label); font-weight: 700; letter-spacing: 0.08em; display: flex; gap: calc(12px * var(--s)); justify-content: center; }
+.nc-hud .laps b { color: var(--h-ink); font-style: italic; letter-spacing: 0.02em; }
+.nc-hud .mates { position: absolute; right: calc(22px * var(--s)); top: calc(14px * var(--s)); display: flex; flex-direction: column; gap: calc(3px * var(--s)); font-size: calc(12px * var(--s)); font-weight: 700; }
 .nc-hud .mates:empty, .nc-hud .mates.empty { display: none; }
 .nc-hud .mate { display: flex; justify-content: flex-end; align-items: center; gap: calc(6px * var(--s)); }
-.nc-hud .mate i { width: calc(8px * var(--s)); height: calc(8px * var(--s)); border-radius: 50%; display: inline-block; }
-.nc-hud .mate .mp { color: #b4bdd8; min-width: calc(24px * var(--s)); text-align: right; }
+.nc-hud .mate i { width: calc(8px * var(--s)); height: calc(8px * var(--s)); border-radius: 50%; display: inline-block; box-shadow: 0 0 0 max(1px, calc(1.5px * var(--s))) var(--h-edge); }
+.nc-hud .mate .mp { color: var(--h-ink); font-style: italic; min-width: calc(24px * var(--s)); text-align: right; }
 
-/* Canto inferior esquerdo: combustível e nitro. */
-.nc-hud .bl { position: absolute; left: calc(18px * var(--s)); bottom: calc(16px * var(--s)); padding: calc(10px * var(--s)) calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(8px * var(--s)); min-width: calc(170px * var(--s)); }
+/* Canto inferior esquerdo: combustível e nitro, sem caixa. Barras finas e inclinadas: trilho escuro com fio claro (lê na neve e na noite). */
+.nc-hud .bl { position: absolute; left: calc(22px * var(--s)); bottom: calc(16px * var(--s)); display: flex; flex-direction: column; gap: calc(9px * var(--s)); width: max(132px, calc(196px * var(--s))); }
+/* O piso de 132 px (4P a 1024×640 com o HUD em 80%) deixa o bloco à esquerda da legenda dos marcos e da dica, que guardam max(240 × --s, 156 px) de cada lado. */
 .nc-hud .gauge-row { display: flex; align-items: center; gap: calc(6px * var(--s)); }
 .nc-hud .gauge-row .label { flex: 1; white-space: nowrap; }
-.nc-hud .ico { flex: none; width: calc(15px * var(--s)); height: calc(15px * var(--s)); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.nc-hud .pump { color: #ffcf5a; }
-.nc-hud .fuel-pct, .nc-hud .nitro-n { font-size: calc(15px * var(--s)); font-weight: 900; }
+.nc-hud .ico { flex: none; width: calc(15px * var(--s)); height: calc(15px * var(--s)); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)) drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)); }
+.nc-hud .pump { color: var(--h-fuel); }
+.nc-hud .fuel-pct, .nc-hud .nitro-n { font-size: calc(18px * var(--s)); }
+.nc-hud .nitro-n { color: #c9f1ff; }
 /* Barra de combustível: UMA cor (âmbar) com marcas de 25% por cima — sem o degradê vermelho→verde. Baixo vira listras
-   diagonais e ganha a plaquinha com o texto; vazio, a barra fica só com o contorno. */
-.nc-hud .bar { position: relative; height: max(7px, calc(12px * var(--s))); border-radius: calc(7px * var(--s)); background: rgba(255, 255, 255, 0.14); overflow: hidden; margin-top: calc(4px * var(--s)); }
-.nc-hud .bar .fill { position: absolute; inset: 0; background: linear-gradient(180deg, #ffe08a, #ffb830); border-radius: inherit; }
+   diagonais e ganha a plaquinha com o texto; vazio, a barra fica só com o trilho. */
+.nc-hud .bar, .nc-hud .nbar { position: relative; height: max(5px, calc(7px * var(--s))); margin-top: calc(5px * var(--s)); border-radius: 1px; background: var(--h-track);
+  box-shadow: 0 0 0 1px var(--h-hair), calc(2px * var(--s)) calc(3px * var(--s)) 0 rgba(10, 6, 28, 0.55); overflow: hidden; transform: skewX(var(--h-skew)); }
+.nc-hud .bar .fill { position: absolute; inset: 0; background: linear-gradient(180deg, #ffe08a, var(--h-fuel)); }
 .nc-hud .bar::after { content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, transparent calc(25% - 1px), rgba(14, 18, 40, 0.9) calc(25% - 1px) 25%, transparent 25% calc(50% - 1px), rgba(14, 18, 40, 0.9) calc(50% - 1px) 50%, transparent 50% calc(75% - 1px), rgba(14, 18, 40, 0.9) calc(75% - 1px) 75%, transparent 75%); }
+  background: linear-gradient(90deg, transparent calc(25% - 1px), var(--h-edge) calc(25% - 1px) 25%, transparent 25% calc(50% - 1px), var(--h-edge) calc(50% - 1px) 50%, transparent 50% calc(75% - 1px), var(--h-edge) calc(75% - 1px) 75%, transparent 75%); }
 .nc-hud .fuel[data-level="low"] .bar .fill { background: repeating-linear-gradient(135deg, #ff7a5c 0 calc(5px * var(--s)), #fff2c2 calc(5px * var(--s)) calc(10px * var(--s))); animation: nc-blink 0.9s steps(2, start) infinite; }
 .nc-hud .fuel[data-level="low"] .label, .nc-hud .fuel[data-level="empty"] .label { color: #ffd28a; }
-.nc-hud .fuel[data-level="empty"] .bar { background: repeating-linear-gradient(135deg, rgba(255, 122, 92, 0.35) 0 calc(5px * var(--s)), transparent calc(5px * var(--s)) calc(10px * var(--s))); }
-.nc-hud .fuel-flag { position: absolute; right: calc(10px * var(--s)); bottom: calc(100% - max(2px, calc(4px * var(--s)))); display: inline-flex; align-items: center; gap: calc(4px * var(--s)); padding: 0 calc(8px * var(--s)); border-radius: 999px;
-  background: #ffd23f; color: #3b1500; border: max(2px, calc(2.5px * var(--s))) solid #fff; font-size: calc(12px * var(--s)); font-weight: 900; letter-spacing: 0.06em; line-height: 1.25; animation: nc-blink 0.9s steps(2, start) infinite; }
+.nc-hud .fuel[data-level="empty"] .bar { background: repeating-linear-gradient(135deg, rgba(255, 122, 92, 0.45) 0 calc(5px * var(--s)), var(--h-track) calc(5px * var(--s)) calc(10px * var(--s))); }
+.nc-hud .fuel-flag { position: absolute; right: calc(4px * var(--s)); bottom: calc(100% + 6px * var(--s)); display: inline-flex; align-items: center; gap: calc(4px * var(--s)); padding: 0 calc(8px * var(--s)); border-radius: calc(3px * var(--s));
+  background: var(--h-sun); color: #3b1500; font-size: calc(12px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.06em; line-height: 1.3; transform: skewX(var(--h-skew));
+  box-shadow: 0 0 0 max(1.5px, calc(2px * var(--s))) #fff, calc(2px * var(--s)) calc(3px * var(--s)) 0 var(--h-edge); animation: nc-blink 0.9s steps(2, start) infinite; }
 .nc-hud .fuel-flag:empty { display: none; }
-.nc-hud .fuel-flag::before { content: '!'; display: inline-block; width: 1.25em; height: 1.25em; border-radius: 50%; background: #3b1500; color: #ffd23f; text-align: center; line-height: 1.25; }
+.nc-hud .fuel-flag::before { content: '!'; display: inline-block; width: 1.25em; height: 1.25em; border-radius: 50%; background: #3b1500; color: var(--h-sun); text-align: center; line-height: 1.25; font-style: normal; }
 .nc-hud .fuel.hidden { display: none; }
-/* Nitro: um raio por carga. Cheio = raio aceso; vazio = só o contorno. O número ao lado diz quantas há. */
-.nc-hud .caps { display: flex; gap: calc(4px * var(--s)); align-items: center; margin-top: calc(4px * var(--s)); }
-.nc-hud .caps i { display: inline-block; width: max(13px, calc(24px * var(--s))); height: max(13px, calc(24px * var(--s))); color: #6fd3ff; transition: transform 140ms; }
-.nc-hud .caps i svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; opacity: 0.55; }
+/* Nitro: o rótulo e o número numa linha, os raios ao lado (um por carga: cheio = aceso, vazio = só o contorno) e a barra embaixo. Sem
+   espaço (o rótulo "NITRO · EQUIPE" com o piso das letras no 4P), os raios descem para a linha de baixo em vez de sair do bloco. */
+.nc-hud .nitro { display: flex; flex-wrap: wrap; align-items: center; column-gap: calc(8px * var(--s)); }
+.nc-hud .nitro .gauge-row { flex: 1 1 auto; }
+.nc-hud .nitro .nbar { flex: 0 0 100%; }
+.nc-hud .caps { display: flex; gap: calc(3px * var(--s)); align-items: center; }
+.nc-hud .caps i { display: inline-block; width: max(13px, calc(21px * var(--s))); height: max(13px, calc(21px * var(--s))); color: #bfefff; transition: transform 140ms; }
+.nc-hud .caps i svg { width: 100%; height: 100%; fill: rgba(14, 8, 34, 0.55); stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; filter: drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)); }
 .nc-hud .caps i.on { transform: scale(1.08); }
-.nc-hud .caps i.on svg { fill: #4fc3f7; stroke: #e6f9ff; opacity: 1; filter: drop-shadow(0 0 calc(4px * var(--s)) #4fc3f7); }
-.nc-hud .caps .extra { font-size: calc(13px * var(--s)); font-weight: 800; color: #b3ecff; margin-left: calc(2px * var(--s)); }
-.nc-hud .nitro-n { color: #b3ecff; }
+.nc-hud .caps i.on svg { fill: var(--h-nitro); stroke: #f2fcff; filter: drop-shadow(0 0 max(1px, calc(1.2px * var(--s))) var(--h-edge)) drop-shadow(0 0 calc(5px * var(--s)) var(--h-nitro)); }
+.nc-hud .caps .extra { font-size: calc(13px * var(--s)); font-weight: 700; font-style: italic; color: #c9f1ff; margin-left: calc(2px * var(--s)); paint-order: stroke fill;
+  --h-stroke: max(1.5px, calc(2.5px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge); }
 /* A barra de nitro (N1): sempre visível; cada marca é uma carga (--cap = quantas cabem, 3 no carro, 3 por humano na equipe). O fio de baixo
    (.nburn) é o nitro aceso queimando; com ele aceso a barra brilha (.burn). */
-.nc-hud .nbar { position: relative; height: max(7px, calc(10px * var(--s))); margin-top: calc(4px * var(--s)); background: rgba(255, 255, 255, 0.14); border-radius: calc(5px * var(--s)); overflow: hidden; --cap: 3; }
-.nc-hud .nbar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #4fc3f7, #b3ecff); transition: width 160ms ease-out; }
-.nc-hud .nbar.burn .fill { background: linear-gradient(90deg, #4fc3f7, #ffffff); box-shadow: 0 0 calc(8px * var(--s)) #4fc3f7; }
+.nc-hud .nbar { --cap: 3; }
+.nc-hud .nbar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #2fa8ff, var(--h-nitro) 60%, #c9f1ff); transition: width 160ms ease-out; }
+.nc-hud .nbar.burn { box-shadow: 0 0 0 1px #fff, 0 0 calc(10px * var(--s)) var(--h-nitro), calc(2px * var(--s)) calc(3px * var(--s)) 0 rgba(10, 6, 28, 0.55); }
+.nc-hud .nbar.burn .fill { background: linear-gradient(90deg, var(--h-nitro), #ffffff); }
 .nc-hud .nbar::after { content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, transparent calc(100% - max(1.5px, calc(2px * var(--s)))), rgba(14, 18, 40, 0.9) 0) 0 0 / calc(100% / var(--cap)) 100%; }
-.nc-hud .nbar .nburn { position: absolute; left: 0; bottom: 0; height: max(2px, calc(3px * var(--s))); width: 0; background: #ffd23f; opacity: 0; }
+  background: linear-gradient(90deg, transparent calc(100% - max(1.5px, calc(2px * var(--s)))), var(--h-edge) 0) 0 0 / calc(100% / var(--cap)) 100%; }
+.nc-hud .nbar .nburn { position: absolute; left: 0; bottom: 0; height: max(2px, calc(2.5px * var(--s))); width: 0; background: var(--h-sun); opacity: 0; }
 .nc-hud .nbar.burn .nburn { opacity: 1; }
-/* Selo LARGADA PERFEITA (N1): pílula amarela no meio, em cima do JÁ, nos primeiros 2,5 s. */
-.nc-hud .launch-seal { position: absolute; left: 0; right: 0; margin-inline: auto; width: fit-content; top: 21%; display: none; align-items: center; padding: calc(3px * var(--s)) calc(20px * var(--s)); border-radius: 999px;
-  background: #ffd23f; color: #3b1500; border: max(2px, calc(3px * var(--s))) solid #fff; box-shadow: 0 calc(4px * var(--s)) 0 rgba(0, 0, 0, 0.4); font-size: calc(26px * var(--s)); font-weight: 900; letter-spacing: 0.08em;
+/* Selo LARGADA PERFEITA (N1): faixa inclinada de pôr do sol no meio, em cima do JÁ, nos primeiros 2,5 s. */
+.nc-hud .launch-seal { position: absolute; left: 0; right: 0; margin-inline: auto; width: fit-content; top: 21%; display: none; align-items: center; padding: calc(3px * var(--s)) calc(22px * var(--s)); border-radius: calc(4px * var(--s));
+  background: var(--h-grad); color: #fff; box-shadow: 0 0 0 max(2px, calc(2.5px * var(--s))) #fff, calc(4px * var(--s)) calc(5px * var(--s)) 0 var(--h-edge);
+  font-size: calc(26px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.06em; transform: skewX(var(--h-skew));
+  paint-order: stroke fill; --h-stroke: max(1.5px, calc(3px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge);
   line-height: 1.2; white-space: nowrap; pointer-events: none; }
 .nc-hud .launch-seal.show { display: inline-flex; animation: nc-msg-in 280ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .nc-hud .calm .launch-seal.show, .nc-hud .vp.calm .launch-seal.show, .nc-hud.reduce-fx .launch-seal.show { animation: none; }
-/* Vácuo: pílula que flutua em cima do painel (não mexe na altura dele quando liga). */
-.nc-hud .draft { position: absolute; left: calc(10px * var(--s)); bottom: calc(100% + 9px * var(--s)); display: none; align-items: center; gap: calc(5px * var(--s)); padding: calc(1px * var(--s)) calc(10px * var(--s)) calc(1px * var(--s)) calc(7px * var(--s));
-  border-radius: 999px; background: #53cfff; color: #04263a; border: max(2px, calc(2.5px * var(--s))) solid #fff; box-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.4); font-size: calc(13px * var(--s)); font-weight: 900; letter-spacing: 0.08em; line-height: 1.25; white-space: nowrap; }
+/* Vácuo: etiqueta inclinada que flutua em cima do combustível (não mexe na altura do bloco quando liga). */
+.nc-hud .draft { position: absolute; left: calc(2px * var(--s)); bottom: calc(100% + 6px * var(--s)); display: none; align-items: center; gap: calc(5px * var(--s)); padding: calc(1px * var(--s)) calc(10px * var(--s)) calc(1px * var(--s)) calc(7px * var(--s));
+  border-radius: calc(3px * var(--s)); background: #53cfff; color: #04263a; box-shadow: 0 0 0 max(1.5px, calc(2px * var(--s))) #fff, calc(2px * var(--s)) calc(3px * var(--s)) 0 var(--h-edge);
+  font-size: calc(13px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.08em; line-height: 1.3; white-space: nowrap; transform: skewX(var(--h-skew)); }
 .nc-hud .draft.on { display: inline-flex; animation: nc-msg-in 240ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-.nc-hud .draft .wind { color: #04263a; stroke-width: 2.2; }
+.nc-hud .draft .wind { color: #04263a; stroke-width: 2.2; filter: none; }
 
-/* Canto inferior direito: velocímetro. */
-.nc-hud .br { position: absolute; right: calc(18px * var(--s)); bottom: calc(16px * var(--s)); width: calc(150px * var(--s)); height: calc(150px * var(--s)); border-radius: 50%; }
-.nc-hud .rpm { position: absolute; inset: 0; width: 100%; height: 100%; }
-.nc-hud .rpm .bg { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 7; stroke-linecap: round; }
-.nc-hud .rpm .fg { fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); transition: stroke 120ms; }
-.nc-hud .rpm .fg.red { stroke: #ff5252; filter: drop-shadow(0 0 4px #ff5252); }
-.nc-hud .speed { position: absolute; left: 0; right: 0; top: 29%; text-align: center; line-height: 1; }
-.nc-hud .kmh { display: block; font-size: calc(44px * var(--s)); font-weight: 900; letter-spacing: -0.03em; text-shadow: 0 calc(3px * var(--s)) 0 rgba(0, 0, 0, 0.35); }
-.nc-hud .unit { display: block; font-size: calc(11px * var(--s)); color: #b4bdd8; font-weight: 700; letter-spacing: 0.12em; margin-top: calc(2px * var(--s)); }
-.nc-hud .gear { position: absolute; left: 0; right: 0; bottom: 8%; text-align: center; font-size: calc(20px * var(--s)); font-weight: 900; color: var(--accent); }
-.nc-hud .gear small { font-size: 55%; color: #b4bdd8; margin-right: 2px; }
+/* Canto inferior direito: velocímetro sem disco — o número grande, a unidade, a marcha e o arco fino de RPM com trilho escuro. */
+.nc-hud .br { position: absolute; right: calc(18px * var(--s)); bottom: calc(14px * var(--s)); width: calc(152px * var(--s)); height: calc(152px * var(--s)); }
+.nc-hud .rpm { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.nc-hud .rpm .bg { fill: none; stroke: var(--h-track); stroke-width: 8.5; stroke-linecap: round; }
+.nc-hud .rpm .fg { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; transition: stroke 120ms; }
+.nc-hud .rpm .fg.red { stroke: #ff4766; }
+.nc-hud .speed { position: absolute; left: 0; right: 0; top: 27%; text-align: center; line-height: 1; }
+.nc-hud .kmh { display: block; font-size: calc(52px * var(--s)); letter-spacing: -0.02em; }
+.nc-hud .unit { display: block; font-size: calc(11px * var(--s)); color: var(--h-label); font-weight: 700; letter-spacing: 0.14em; margin-top: calc(3px * var(--s)); text-transform: uppercase; }
+.nc-hud .gear { position: absolute; left: 0; right: 0; bottom: 7%; text-align: center; font-size: calc(22px * var(--s)); color: var(--accent); }
+.nc-hud .gear small { font-size: 55%; color: var(--h-muted); margin-right: 2px; }
 
-/* Minimapa (maior que o da onda anterior: 92 → 124). */
-.nc-hud .mini { position: absolute; right: calc(18px * var(--s)); bottom: calc(184px * var(--s)); width: calc(124px * var(--s)); height: calc(124px * var(--s)); padding: calc(5px * var(--s)); }
+/* Minimapa com moldura mínima: o traçado com contorno escuro (lê na neve e na noite), o nome da pista e a faixa de pôr do sol. */
+.nc-hud .mini { position: absolute; right: calc(18px * var(--s)); bottom: calc(190px * var(--s)); width: calc(124px * var(--s)); height: calc(124px * var(--s)); padding: calc(5px * var(--s)); }
 .nc-hud .mini.hidden { display: none; }
-.nc-hud .mini .mini-name { position: absolute; right: 0; bottom: 100%; width: calc(220px * var(--s)); margin-bottom: calc(6px * var(--s)); text-align: right; font-size: calc(11px * var(--s)); font-weight: 700; letter-spacing: 0.02em; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-.nc-hud .mini svg { width: 100%; height: 100%; display: block; }
-.nc-hud .mini path { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 3.4; stroke-linejoin: round; stroke-linecap: round; }
-.nc-hud .mini .ai { fill: #9aa3b5; }
+.nc-hud .mini::before { content: ''; position: absolute; right: calc(2px * var(--s)); top: 0; width: calc(48px * var(--s)); height: max(2px, calc(3px * var(--s))); background: var(--h-bars); transform: skewX(-24deg); }
+.nc-hud .mini .mini-name { position: absolute; right: 0; bottom: 100%; width: calc(220px * var(--s)); margin-bottom: calc(4px * var(--s)); text-align: right; font-size: calc(11px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.03em; color: var(--h-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.nc-hud .mini svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.nc-hud .mini path, .nc-hud .spare .bigmap path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.nc-hud .mini path.casing, .nc-hud .spare .bigmap path.casing { stroke: rgba(14, 8, 34, 0.72); stroke-width: 7.4; }
+.nc-hud .mini path.line { stroke: rgba(255, 255, 255, 0.92); stroke-width: 3; }
+.nc-hud .mini .ai, .nc-hud .spare .bigmap .ai { fill: #9aa3b5; stroke: var(--h-edge); stroke-width: 1; }
+.nc-hud .mini .human, .nc-hud .spare .bigmap .human { stroke: var(--h-edge); stroke-width: 1.2; }
 .nc-hud .mini .me { stroke: #fff; stroke-width: 2; }
 
 /* Mensagens e centro. */
 .nc-hud .top-msgs { position: absolute; left: 50%; top: calc(84px * var(--s)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: calc(6px * var(--s)); width: max-content; max-width: 86%; }
 .nc-hud .center { position: absolute; left: 0; right: 0; top: 30%; display: flex; flex-direction: column; align-items: center; gap: calc(8px * var(--s)); }
-.nc-hud .msg { display: none; font-weight: 900; text-align: center; letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6); animation: nc-msg-in 280ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.nc-hud .msg { display: none; font-weight: 700; text-align: center; letter-spacing: 0.04em; animation: nc-msg-in 280ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .nc-hud .msg.show { display: block; }
-.nc-hud .msg.big { font-size: calc(52px * var(--s)); color: #fff; text-shadow: 0 calc(4px * var(--s)) 0 rgba(0, 0, 0, 0.45), 0 2px 14px rgba(0, 0, 0, 0.5); }
-.nc-hud .msg.warn { font-size: calc(20px * var(--s)); color: #fff; background: rgba(255, 82, 82, 0.9); padding: calc(6px * var(--s)) calc(18px * var(--s)); border-radius: 999px; border: max(2px, calc(2.5px * var(--s))) solid #fff; }
-.nc-hud .msg.good { font-size: calc(22px * var(--s)); color: #0b2a1a; background: rgba(61, 220, 132, 0.95); padding: calc(6px * var(--s)) calc(18px * var(--s)); border-radius: 999px; border: max(2px, calc(2.5px * var(--s))) solid #fff; }
-/* "info" também leva a fala do rival (várias palavras): quebra de linha e cantos menos redondos. */
-.nc-hud .msg.info { font-size: calc(15px * var(--s)); font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: #f6f8ff; background: rgba(14, 18, 40, 0.82); padding: calc(5px * var(--s)) calc(14px * var(--s)); border-radius: calc(16px * var(--s)); border: max(2px, calc(2.5px * var(--s))) solid rgba(255, 255, 255, 0.85); max-width: calc(520px * var(--s)); text-wrap: balance; }
-.nc-hud .count { display: none; font-size: calc(150px * var(--s)); font-weight: 900; line-height: 1; color: #ffd23f; text-shadow: 0 calc(6px * var(--s)) 0 rgba(120, 70, 0, 0.6), 0 0 calc(30px * var(--s)) rgba(255, 210, 63, 0.6), 0 4px 20px rgba(0, 0, 0, 0.6); animation: nc-pop 500ms ease-out both; }
+.nc-hud .msg.big { font-size: calc(54px * var(--s)); font-style: italic; color: var(--h-ink); paint-order: stroke fill; --h-stroke: max(2px, calc(5px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge);
+  text-shadow: calc(3px * var(--s)) calc(3px * var(--s)) 0 var(--h-pink), calc(5px * var(--s)) calc(6px * var(--s)) 0 var(--h-edge); }
+/* Avisos e boas notícias: etiquetas inclinadas, no tom da posição (verde = ganhou, vermelho = atenção), contorno branco e sombra dura. */
+.nc-hud .msg.warn, .nc-hud .msg.good { font-size: calc(21px * var(--s)); font-style: italic; padding: calc(4px * var(--s)) calc(18px * var(--s)); border-radius: calc(4px * var(--s)); transform: skewX(var(--h-skew));
+  box-shadow: 0 0 0 max(1.5px, calc(2.5px * var(--s))) #fff, calc(3px * var(--s)) calc(4px * var(--s)) 0 var(--h-edge); }
+.nc-hud .msg.warn { color: #fff; background: #ff4766; }
+.nc-hud .msg.good { color: #062514; background: #2fd477; }
+/* "info" também leva a fala do rival e o aviso da câmera (várias palavras): vidro escuro do tema, texto reto, quebra de linha. */
+.nc-hud .msg.info { font-size: calc(15px * var(--s)); letter-spacing: 0.02em; line-height: 1.2; color: #f4f6fb; max-width: calc(520px * var(--s)); text-wrap: balance;
+  background: linear-gradient(90deg, #ff8a1f, #ff3d7f 30%, rgba(255, 61, 127, 0) 60%) top left / 100% 2px no-repeat, rgba(8, 10, 18, 0.8);
+  padding: calc(5px * var(--s)) calc(14px * var(--s)); border-radius: calc(6px * var(--s)); border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 calc(6px * var(--s)) calc(18px * var(--s)) rgba(0, 0, 0, 0.35); }
+.nc-hud .count { display: none; font-size: calc(150px * var(--s)); font-weight: 700; font-style: italic; line-height: 1; color: var(--h-sun); paint-order: stroke fill;
+  --h-stroke: max(3px, calc(6px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge);
+  text-shadow: calc(6px * var(--s)) calc(6px * var(--s)) 0 var(--h-pink), calc(9px * var(--s)) calc(11px * var(--s)) 0 var(--h-edge); animation: nc-pop 500ms ease-out both; }
 .nc-hud .count.show { display: block; }
-.nc-hud .count.ready { font-size: calc(40px * var(--s)); letter-spacing: 0.2em; }
-.nc-hud .pause { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(4, 6, 12, 0.55); font-size: calc(48px * var(--s)); font-weight: 900; letter-spacing: 0.3em; }
+.nc-hud .count.ready { font-size: calc(40px * var(--s)); letter-spacing: 0.2em; --h-stroke: max(2px, calc(4px * var(--s))); text-shadow: calc(2px * var(--s)) calc(3px * var(--s)) 0 var(--h-pink), calc(3px * var(--s)) calc(5px * var(--s)) 0 var(--h-edge); }
+.nc-hud .pause { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(4, 6, 12, 0.55); font-size: calc(48px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.3em;
+  paint-order: stroke fill; --h-stroke: max(2px, calc(4px * var(--s))); -webkit-text-stroke: var(--h-stroke) var(--h-edge); text-shadow: calc(3px * var(--s)) calc(3px * var(--s)) 0 var(--h-pink); }
 .nc-hud .pause.show { display: flex; }
 
 /* Faixa ÚLTIMA VOLTA: cruza o viewport (entra, fica e sai dentro de BAND_SECONDS, render/hud-motion.ts), amarela com
-   as laterais quadriculadas de chegada. Reduzir efeitos: sem o deslize, só aparece e some. */
+   as laterais quadriculadas de chegada e o fio de pôr do sol embaixo. Reduzir efeitos: sem o deslize, só aparece e some. */
 .nc-hud .final-band { position: absolute; left: 0; right: 0; top: 38%; display: none; align-items: stretch; justify-content: center; gap: 0;
-  background: #ffd23f; color: #1c1300; border-top: max(2px, calc(3px * var(--s))) solid #fff; border-bottom: max(2px, calc(3px * var(--s))) solid #fff;
-  box-shadow: 0 calc(5px * var(--s)) 0 rgba(120, 70, 0, 0.55), 0 calc(8px * var(--s)) calc(18px * var(--s)) rgba(0, 0, 0, 0.4); }
+  background: var(--h-bars) bottom / 100% max(3px, calc(4px * var(--s))) no-repeat, var(--h-sun); color: #1c1300;
+  border-top: max(2px, calc(3px * var(--s))) solid #fff; border-bottom: max(2px, calc(3px * var(--s))) solid #fff;
+  box-shadow: 0 calc(5px * var(--s)) 0 rgba(20, 12, 44, 0.6), 0 calc(8px * var(--s)) calc(18px * var(--s)) rgba(0, 0, 0, 0.4); }
 .nc-hud .final-band.show { display: flex; animation: nc-band 2.6s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
-.nc-hud .final-band span { padding: calc(3px * var(--s)) calc(22px * var(--s)); font-size: calc(30px * var(--s)); font-weight: 900; letter-spacing: 0.14em; line-height: 1.1; text-transform: uppercase; white-space: nowrap; }
+.nc-hud .final-band span { padding: calc(3px * var(--s)) calc(22px * var(--s)) calc(5px * var(--s)); font-size: calc(30px * var(--s)); font-weight: 700; font-style: italic; letter-spacing: 0.12em; line-height: 1.1; text-transform: uppercase; white-space: nowrap; }
 .nc-hud .final-band .stripes { flex: 0 0 min(18%, calc(120px * var(--s))); background: repeating-conic-gradient(#14182b 0 25%, #ffd23f 0 50%) 0 0 / calc(14px * var(--s)) calc(14px * var(--s)); }
 .nc-hud .calm .final-band.show, .nc-hud .vp.calm .final-band.show, .nc-hud.reduce-fx .final-band.show { animation: nc-fade 2.6s linear both; }
 /* Reduzir efeitos (access.css já tira o .lap.final e o enchimento do combustível baixo): o resto do que pisca ou pula também. */
 .nc-hud.reduce-fx .fuel-flag, .nc-hud.reduce-fx .draft.on, .nc-hud.reduce-fx .fuel[data-level="low"] .bar .fill { animation: none; }
 .nc-hud.reduce-fx .caps i, .nc-hud.reduce-fx .pos-n { transition: none; }
 
-/* As linhas de velocidade agora são 3D, no mundo (src/render/fx/lines.ts, M5): o cone de gradiente girando saiu. O hud.ts ainda cria o elemento e
-   liga a classe `on`; fica escondido, então nada pinta por cima do canvas. */
-.nc-hud .lines { display: none; }
-
-/* Célula livre com 3 jogadores: classificação e minimapa grande. */
-.nc-hud .spare { position: absolute; overflow: hidden; --s: 1; font-size: calc(16px * var(--s)); display: flex; gap: calc(14px * var(--s)); padding: calc(14px * var(--s)); box-sizing: border-box; background: rgba(6, 10, 18, 0.7); }
+/* Célula livre com 3 jogadores: classificação e minimapa grande, em vidro escuro (é texto corrido). */
+.nc-hud .spare { position: absolute; overflow: hidden; --s: 1; font-size: calc(16px * var(--s)); display: flex; gap: calc(14px * var(--s)); padding: calc(14px * var(--s)); box-sizing: border-box; background: rgba(6, 8, 18, 0.7); }
 .nc-hud .spare .standings { flex: 1; padding: calc(10px * var(--s)) calc(14px * var(--s)); display: flex; flex-direction: column; gap: calc(1px * var(--s)); overflow: hidden; }
 .nc-hud .spare .row { display: flex; align-items: center; gap: calc(8px * var(--s)); font-size: calc(12.5px * var(--s)); font-weight: 700; line-height: 1.25; }
-.nc-hud .spare .row .p { width: calc(22px * var(--s)); text-align: right; color: #b4bdd8; }
+.nc-hud .spare .row .p { width: calc(22px * var(--s)); text-align: right; color: #aeb9cb; font-style: italic; }
 .nc-hud .spare .row .n { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nc-hud .spare .row .l { color: #b4bdd8; }
-.nc-hud .spare .row.human .n { font-weight: 900; }
+.nc-hud .spare .row .l { color: #aeb9cb; }
 .nc-hud .spare .bigmap { width: 45%; padding: calc(8px * var(--s)); display: flex; align-items: center; justify-content: center; }
 .nc-hud .spare .bigmap svg { width: 100%; height: 100%; }
-.nc-hud .spare .bigmap path { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 2.8; stroke-linejoin: round; stroke-linecap: round; }
-.nc-hud .spare .bigmap .ai { fill: #9aa3b5; }
+.nc-hud .spare .bigmap path.casing { stroke-width: 6; }
+.nc-hud .spare .bigmap path.line { stroke: rgba(255, 255, 255, 0.85); stroke-width: 2.6; }
 
 @keyframes nc-blink { 50% { opacity: 0.25; } }
 @keyframes nc-msg-in { from { opacity: 0; transform: scale(0.5) translateY(10px); } to { opacity: 1; transform: none; } }
@@ -184,16 +238,18 @@
 /* Piso de legibilidade (passo 5.5, docs/TELAS.md): com tela dividida o --s cai para ~0,74 no Steam Deck
    (1280×800, 7") e para ~0,47 com HUD em 80% e 4 jogadores em 1024×640 — a volta e o "/20" ficavam com
    8–12 px. Números nunca abaixo de 12 px efetivos, rótulos nunca abaixo de 10 px; acima disso segue a escala. */
-.nc-hud .pos-n { font-size: max(12px, calc(46px * var(--s))); }
-.nc-hud .pos-of, .nc-hud .lap { font-size: max(12px, calc(16px * var(--s))); }
+.nc-hud .pos-n { font-size: max(12px, calc(58px * var(--s))); }
+.nc-hud .pos-of { font-size: max(12px, calc(20px * var(--s))); }
+.nc-hud .lap { font-size: max(12px, calc(18px * var(--s))); }
 .nc-hud .pos-badge { font-size: max(12px, calc(19px * var(--s))); }
 .nc-hud .gap-n { font-size: max(12px, calc(15px * var(--s))); }
-.nc-hud .fuel-pct, .nc-hud .nitro-n { font-size: max(12px, calc(15px * var(--s))); }
-.nc-hud .time { font-size: max(12px, calc(32px * var(--s))); }
+.nc-hud .fuel-pct, .nc-hud .nitro-n { font-size: max(12px, calc(18px * var(--s))); }
+.nc-hud .time { font-size: max(12px, calc(36px * var(--s))); }
 .nc-hud .laps { font-size: max(12px, calc(12px * var(--s))); }
-.nc-hud .kmh { font-size: max(12px, calc(44px * var(--s))); }
-.nc-hud .gear { font-size: max(12px, calc(20px * var(--s))); }
+.nc-hud .kmh { font-size: max(12px, calc(52px * var(--s))); }
+.nc-hud .gear { font-size: max(12px, calc(22px * var(--s))); }
 .nc-hud .tag { font-size: max(10px, calc(13px * var(--s))); }
 .nc-hud .label, .nc-hud .unit { font-size: max(10px, calc(11px * var(--s))); }
 .nc-hud .fuel-flag, .nc-hud .draft { font-size: max(10px, calc(12px * var(--s))); }
 .nc-hud .mates { font-size: max(10px, calc(12px * var(--s))); }
+.nc-hud .mini .mini-name { font-size: max(10px, calc(11px * var(--s))); }

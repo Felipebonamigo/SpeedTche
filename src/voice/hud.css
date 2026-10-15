@@ -28,9 +28,12 @@
 
 /* A roda: 8 frases em 2 colunas, a marcada em destaque. Fica logo abaixo do painel de posição (à esquerda, entre ele e o de combustível):
    a faixa livre ali tem ~210 unidades de altura em qualquer tamanho de viewport (a escala `--s` é por altura) e a roda cabe em ~180. */
+/* V5 (docs/ondas/V5-hud.md): o vidro escuro do tema `speedtche` (o mesmo da fala do rival no HUD), com o traço de pôr do sol no alto e a cor
+   do assento num fio à esquerda; o contorno branco gordo e a sombra deslocada saíram com os painéis do HUD. */
 .vh-wheel { display: none; position: absolute; left: calc(18px * var(--s)); top: calc(188px * var(--s)); box-sizing: border-box; padding: calc(6px * var(--s)) calc(10px * var(--s));
-  border-radius: calc(16px * var(--s)); background: rgba(14, 18, 40, 0.94); border: max(2px, calc(3px * var(--s))) solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 calc(4px * var(--s)) 0 color-mix(in srgb, var(--accent) 58%, #05070f), 0 calc(8px * var(--s)) calc(18px * var(--s)) rgba(0, 0, 0, 0.45);
+  border-radius: calc(8px * var(--s)); border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(90deg, #ff8a1f, #ff3d7f 30%, rgba(255, 61, 127, 0) 60%) top left / 100% 2px no-repeat, rgba(8, 10, 18, 0.9);
+  box-shadow: inset max(2px, calc(3px * var(--s))) 0 0 var(--accent), 0 calc(10px * var(--s)) calc(28px * var(--s)) rgba(0, 0, 0, 0.45);
   color: #f6f8ff; max-width: calc(100% - 36px * var(--s)); }
 .vh-wheel.open { display: block; animation: vh-pop 220ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .vh-title { font-size: max(12px, calc(13px * var(--s))); line-height: 1.1; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: calc(3px * var(--s)); }

@@ -142,8 +142,9 @@ describe('Cars: guinada da derrapagem e estrelinhas', () => {
     }
   });
 
-  it('a batida liga 3 estrelinhas sobre o carro por ~0,9 s; passado o tempo, somem', () => {
+  it('com "Efeitos de cartum" (V8: no padrão, nenhuma), a batida liga 3 estrelinhas sobre o carro por ~0,9 s; passado o tempo, somem', () => {
     const s = scene((st, own) => { st.cars[own].speed = 4000; });
+    (s.frame.options as { cartoonEffects?: boolean }).cartoonEffects = true;
     s.draw(0);
     s.draw(0.016);
     expect(inner(s.cars).stars.count).toBe(0);
@@ -160,9 +161,10 @@ describe('Cars: guinada da derrapagem e estrelinhas', () => {
     s.cars.dispose();
   });
 
-  it('"Reduzir efeitos" desliga as estrelinhas', () => {
+  it('"Reduzir efeitos" desliga as estrelinhas (mesmo com "Efeitos de cartum")', () => {
     const s = scene((st, own) => { st.cars[own].speed = 4000; });
     s.frame.options.reduceEffects = true;
+    (s.frame.options as { cartoonEffects?: boolean }).cartoonEffects = true;
     s.draw(0);
     s.state.cars[s.own].collisionCooldown = 20;
     s.state.cars[s.own].speed = 2000;

@@ -1,7 +1,7 @@
 {
   "name": "speed-tche-desktop",
   "productName": "SpeedTche",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Empacotamento desktop (Electron) do Speed Tchê para Steam/Windows/Linux/macOS.",
   "author": "Felipe Bonamigo",
   "main": "main.cjs",

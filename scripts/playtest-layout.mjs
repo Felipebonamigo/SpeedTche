@@ -6,7 +6,8 @@
 //   3. nenhum rótulo cortado com reticências (text-overflow: ellipsis que de fato cortou);
 //   4. nenhum par de elementos irmãos sobreposto (cada irmão conta com o que transborda dele).
 // Depois mede o HUD do Steam Deck: 2 jogadores em tela dividida a 1280×800, números de posição,
-// volta e velocidade com pelo menos 12 px efetivos, e a legenda dos marcos sem cobrir os painéis dos cantos.
+// volta e velocidade com pelo menos 12 px efetivos, e a legenda dos marcos sem cobrir os painéis dos cantos; desde a V5, os
+// painéis dos números sem caixa (fundo, borda, desfoque) e os números em itálico com contorno.
 // Uso: node scripts/playtest-layout.mjs [url] [prefixo-das-capturas]
 //   NC_LAYOUT_ONLY=options,lobby-4   só essas telas      NC_LAYOUT_RES=1280x720,1024x640   só essas resoluções
 //   NC_LAYOUT_TEXT=normal|large      só um tamanho de texto      NC_LAYOUT_SKIP_HUD=1   pula a parte do HUD
@@ -529,7 +530,22 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
           const a = panels[i].getBoundingClientRect(); const b = panels[j].getBoundingClientRect();
           if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) overlaps.push(`${panels[i].className.split(' ')[0]}×${panels[j].className.split(' ')[0]}`);
         }
+        // V5 (docs/ondas/V5-hud.md): os painéis dos números principais sem caixa (fundo, borda, sombra de caixa, desfoque), e os números em
+        // itálico com contorno de pelo menos 1 px efetivo pintado por baixo da tinta (paint-order), para ler sem a caixa em qualquer fundo.
+        const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(/[\s,/]+/).filter(Boolean); return p.length > 3 ? Number(p[3]) : 1; };
+        const boxy = [...vp.querySelectorAll(':scope > .tl, :scope > .tr, :scope > .mates, :scope > .bl, :scope > .br, :scope > .mini')].filter((e) => {
+          const st = getComputedStyle(e);
+          return alpha(st.backgroundColor) > 0 || st.backgroundImage !== 'none' || (st.backdropFilter ?? 'none') !== 'none' || st.boxShadow !== 'none'
+            || ['Top', 'Right', 'Bottom', 'Left'].some((s) => parseFloat(st[`border${s}Width`]) > 0 && st[`border${s}Style`] !== 'none');
+        }).map((e) => e.className.split(' ')[0]);
+        const strokes = {};
+        const plain = ['.pos-n', '.lap', '.time', '.kmh'].filter((s) => {
+          const e = vp.querySelector(s); if (!e) return true;
+          const st = getComputedStyle(e); strokes[s.slice(1)] = parseFloat(st.webkitTextStrokeWidth) || 0;
+          return strokes[s.slice(1)] < 0.99 || st.fontStyle !== 'italic' || !String(st.paintOrder).startsWith('stroke');
+        });
         return {
+          boxy, plain, strokes,
           nums: { pos: px(vp.querySelector('.pos-n')), of: px(vp.querySelector('.pos-of')), lap: px(vp.querySelector('.lap')), time: px(vp.querySelector('.time')),
             laps: px(vp.querySelector('.laps')), kmh: px(vp.querySelector('.kmh')), gear: px(vp.querySelector('.gear')), landmark: px(vp.querySelector('.lmk-name')),
             gap: px(vp.querySelector('.gap-n')), fuelPct: px(vp.querySelector('.fuel-pct')), nitroN: px(vp.querySelector('.nitro-n')), badge: px(vp.querySelector('.pos-badge')) },
@@ -546,6 +562,10 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
     check(minOf('labels') >= HUD_LABEL_MIN_PX - 0.05, `${tag}: menor rótulo ${minOf('labels').toFixed(1)}px (mín. ${HUD_LABEL_MIN_PX}) — ${fmt('labels')}`);
     const ov = hud.flatMap((v) => v.overlaps);
     check(ov.length === 0, `${tag}: painéis do HUD sem sobreposição (${ov.join(', ') || 'nenhuma'})`);
+    const boxy = hud.flatMap((v) => v.boxy);
+    check(boxy.length === 0, `${tag}: números sem caixa (${boxy.length ? `com fundo, borda ou desfoque: ${[...new Set(boxy)].join(', ')}` : 'nenhum painel dos cantos com fundo, borda ou desfoque'})`);
+    const plain = hud.flatMap((v) => v.plain);
+    check(plain.length === 0, `${tag}: números em itálico com contorno ≥ 1 px por baixo da tinta (${plain.length ? `falta em ${[...new Set(plain)].join(', ')}` : Object.entries(hud[0]?.strokes ?? {}).map(([k, x]) => `${k} ${x.toFixed(1)}px`).join(' ')})`);
     await page.screenshot({ path: `${out}-hud-${n}p-${w}x${h}${hudScale !== 1 ? '-80' : ''}.png` });
   }
   await page.evaluate(() => { const s = window.nc.session; s.settings.hudScale = 1; s.handleMenuEvent({ type: 'settingsChanged', settings: s.settings }); });
