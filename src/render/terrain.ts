@@ -219,8 +219,51 @@ void main() {
   #include <fog_vertex>
 }`;
 
-// Mar estilizado: turquesa perto, azul fundo longe, faixas largas de onda, céu refletido no
-// ângulo raso e o caminho de brilho do sol/lua. As ondas somem com a distância (sem cintilar).
+// ───────────────────────────── Mar (V4: saturado e vivo) ─────────────────────────────
+/**
+ * Quanto do teto de céu refletido da paleta (`seaSky`) o mar usa, a névoa que ele leva e o reforço de saturação no fim (V4, docs/ondas/V4-pistas.md).
+ * Até a V4 o mar refletia até 0,5 do horizonte claro no ângulo raso e levava 0,7 da névoa: longe, saía turquesa-acinzentado. A paleta (M2) continua
+ * dizendo o caminho de brilho e o teto do reflexo (`seaSky`, `seaGlint`, `seaSpec`: tests/lente-m2.test.ts); o shader usa uma fração deles.
+ */
+export const SEA_SKY_SCALE = 0.45;
+export const SEA_FOG_MIX = 0.4;
+/** A névoa que cai no mar puxa para a água funda do bioma: longe, o mar continua azul (a névoa quente do deserto ou da savana o deixava cinza). */
+export const SEA_FOG_WATER = 0.6;
+export const SEA_SATURATION = 1.3;
+
+/**
+ * O que o shader do mar recebe de uma paleta (puro): as águas do bioma, o céu que ela reflete e os números do brilho. O reflexo é o TOPO do céu (o
+ * azul fundo de dia, o índigo do entardecer), não o horizonte claro ou o laranja do pôr do sol: a água fica azul como no Horizon Chase; o pôr do sol
+ * entra pelo caminho de brilho (`seaGlint`).
+ */
+export interface SeaLook { deep: string; shallow: string; sky: string; skyMix: number; fogMix: number; saturation: number; spec: number; glint: number; foam: string }
+export function seaLook(p: Palette): SeaLook {
+  return {
+    deep: p.waterDeep, shallow: p.waterShallow, sky: p.sky[0], skyMix: p.seaSky * SEA_SKY_SCALE, fogMix: SEA_FOG_MIX,
+    saturation: SEA_SATURATION, spec: p.seaSpec, glint: p.seaGlint, foam: p.foam,
+  };
+}
+
+/**
+ * A cor (sRGB 0..255) que o shader do mar dá a `dist` m no ângulo raso (o céu refletido no teto), sem o brilho do sol: a mesma conta do `SEA_FRAG`
+ * (as cores em linear, a névoa exp² e o reforço de saturação no fim). É o que tests/pistas-v4.test.ts mede por bioma e período.
+ */
+export function seaApparent(look: SeaLook, dist: number, fogDensity: number, fogColor: string): [number, number, number] {
+  const lin = (h: string): [number, number, number] => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
+  const mixv = (a: number[], b: number[], t: number): [number, number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const ss = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  let c = mixv(lin(look.shallow), lin(look.deep), ss(25, 320, dist));
+  c = mixv(c, lin(look.sky), look.skyMix);
+  const f = 1 - Math.exp(-((fogDensity * dist) ** 2));
+  c = mixv(c, mixv(lin(fogColor), lin(look.deep), SEA_FOG_WATER), f * look.fogMix);
+  const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  c = c.map((v) => Math.max(0, l + (v - l) * look.saturation)) as [number, number, number];
+  const out = new THREE.Color(c[0], c[1], c[2]).convertLinearToSRGB();
+  return [out.r * 255, out.g * 255, out.b * 255];
+}
+
+// Mar estilizado: turquesa perto, azul fundo longe, faixas largas de onda, um pouco do MEIO do céu refletido no ângulo raso, o caminho de brilho
+// do sol/lua com a cintilação das cristas (V4) e a saturação reforçada depois da névoa. As ondas somem com a distância (sem cintilar).
 const SEA_FRAG = /* glsl */ `
 uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSky; uniform vec3 uSunDir; uniform vec3 uSunColor;
 uniform float uTime; uniform float uSpec; uniform float uGlint; uniform float uSkyMix;
@@ -240,17 +283,22 @@ void main() {
   float fres = pow(1.0 - max(dot(n, v), 0.0), 4.0);
   vec3 col = mix(uShallow, uDeep, smoothstep(25.0, 320.0, dist));
   float band = sin(dot(p, vec2(0.045, 0.1)) + t * 0.7 + sin(p.x * 0.025 + t * 0.2) * 2.2);
-  col *= 1.0 + 0.07 * smoothstep(0.55, 0.95, band) * near;
-  col = mix(col, uSky, clamp(fres * uSkyMix, 0.0, uSkyMix));
+  col *= 1.0 + 0.09 * smoothstep(0.55, 0.95, band) * near;
+  col = mix(col, uSky, clamp(fres * uSkyMix * ${SEA_SKY_SCALE.toFixed(3)}, 0.0, uSkyMix * ${SEA_SKY_SCALE.toFixed(3)}));
   vec3 r = reflect(-v, n);
   float s = max(dot(r, uSunDir), 0.0);
-  col += uSunColor * (pow(s, uSpec) * 2.2 + pow(s, uSpec * 0.08) * 0.12) * uGlint;
-  gl_FragColor = vec4(col, 1.0);
+  // Cintilação: cristas pequenas que acendem e apagam no caminho do sol (perto), além do brilho firme e do largo.
+  float spark = smoothstep(0.86, 1.0, sin(p.x * 1.7 + t * 3.1) * sin(p.y * 1.3 - t * 2.3 + p.x * 0.4)) * near;
+  vec3 glint = uSunColor * (pow(s, uSpec) * 2.2 + pow(s, uSpec * 0.08) * 0.12 + pow(s, uSpec * 0.3) * spark * 1.6) * uGlint;
   #if defined(USE_FOG) && defined(FOG_EXP2)
     // Névoa mais leve no mar: o azul chega saturado até o horizonte.
     float seaFog = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, seaFog * 0.7);
-  #else
+    col = mix(col, mix(fogColor, uDeep, ${SEA_FOG_WATER.toFixed(3)}), seaFog * ${SEA_FOG_MIX.toFixed(3)});
+  #endif
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = max(vec3(lum) + (col - vec3(lum)) * ${SEA_SATURATION.toFixed(3)}, vec3(0.0));
+  gl_FragColor = vec4(col + glint, 1.0);
+  #if !(defined(USE_FOG) && defined(FOG_EXP2))
     #include <fog_fragment>
   #endif
   #include <tonemapping_fragment>
@@ -280,8 +328,12 @@ void main() {
   float wave = 0.5 + 0.5 * sin(uTime * 1.3 + vV * 0.9);
   float edge = 0.55 + 0.4 * wave;
   float foam = 1.0 - smoothstep(edge - 0.25, edge, vU);
-  foam *= 0.75 + 0.25 * sin(vV * 3.1 + uTime * 0.7);
-  float shallow = (1.0 - smoothstep(1.0, 2.0, vU)) * 0.55;
+  foam *= 0.8 + 0.2 * sin(vV * 3.1 + uTime * 0.7);
+  // V4: as ondas que chegam, linhas de espuma no raso andando para a praia (vU desce) e se desfazendo.
+  float crest = sin((vU + uTime * 0.32) * 6.2832 * 1.5 + sin(vV * 0.35) * 1.2);
+  float lines = smoothstep(0.82, 0.97, crest) * (1.0 - smoothstep(1.2, 2.0, vU)) * step(0.9, vU) * 0.75;
+  foam = max(foam, lines);
+  float shallow = (1.0 - smoothstep(1.0, 2.0, vU)) * 0.6;
   vec3 col = mix(uShallow, uFoam, foam);
   float a = max(foam, shallow);
   if (a < 0.01) discard;
@@ -541,7 +593,7 @@ export class Terrain {
     const su = this.sea.material.uniforms;
     (su.uDeep.value as THREE.Color).set(p.waterDeep);
     (su.uShallow.value as THREE.Color).set(p.waterShallow);
-    (su.uSky.value as THREE.Color).set(p.sky[2]).lerp(this.tmp.set(p.sky[1]), 0.5);
+    (su.uSky.value as THREE.Color).set(seaLook(p).sky);
     (su.uSunColor.value as THREE.Color).set(p.sun ?? p.moon ?? '#ffffff');
     // O caminho de brilho do sol/lua na água vem da paleta (M2): comprido e forte no pôr do sol, firme de dia, largo no luar.
     su.uSpec.value = p.seaSpec; su.uGlint.value = p.seaGlint; su.uSkyMix.value = p.seaSky;
@@ -801,7 +853,7 @@ export class Terrain {
     const su = this.sea.material.uniforms;
     (su.uDeep.value as THREE.Color).set(p.waterDeep);
     (su.uShallow.value as THREE.Color).set(p.waterShallow);
-    (su.uSky.value as THREE.Color).set(p.sky[2]).lerp(this.tmp.set(p.sky[1]), 0.5);
+    (su.uSky.value as THREE.Color).set(seaLook(p).sky);
     (su.uSunColor.value as THREE.Color).set(live.body);
     su.uSpec.value = p.seaSpec; su.uGlint.value = p.seaGlint; su.uSkyMix.value = p.seaSky;
     const fu = this.foam.material.uniforms;
