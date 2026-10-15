@@ -79,6 +79,9 @@ depois aqui): batida e nitro com linhas, Copacabana de dia e Paraty no entardece
 estrelinhas não compilam mais na batida; nenhum novo). Montagens em `scratch/v8/folha-antes-depois.png`, `scratch/galeria/comparar-main-550e970-vs-efeitos.png`
 e os recortes `scratch/v8/crop-*.png` (fora do git).
 
+**Opções › Acessibilidade:** `NC_LAYOUT_ONLY=access NC_LAYOUT_SKIP_HUD=1 node scripts/playtest-layout.mjs` (build de produção, `vite preview`) →
+`✓ telas de menu sem problema de layout: 14/14 combinações limpas` (7 resoluções × texto normal/grande); a mais apertada, 1024×640 com texto grande, sobra 20 px.
+
 **O que ficou discreto ou ainda feio:** na tela dividida a batida realista lê pouco (faíscas de 1,8–3,2 cm, um ou dois pixels no viewport de 2P/4P;
 é um número se o dono quiser mais); a fumaça do pneu continua em **bolhas de cartum** (contorno escuro, M5) e as faíscas da derrapagem nas 3 cores
 continuam grossas — fora deste pedido, candidatas à próxima rodada; a boca do escape lê laranja-acastanhado de dia (metal aquecido, não brasa).
