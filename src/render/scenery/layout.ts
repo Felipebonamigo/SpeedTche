@@ -11,7 +11,7 @@ import { SPRITE_HALF_WIDTH } from '../../core/track/sprites';
 import type { SpriteRef, Track } from '../../core/types';
 import { hash2, hash3, valueNoise } from '../noise';
 import { ROAD_HALF_WIDTH_M, SEGMENT_M, turnPerCurve, Y_SCALE } from '../units';
-import { dressingRecipe, farModelFor, LANDMARK_PREFIX, landmarkOf, modelBandRadius, modelBounds, modelFrontX, modelHeight, spriteVisual, type DressingRecipe } from './catalog';
+import { buildingLookOrder, dressingRecipe, farModelFor, LANDMARK_PREFIX, landmarkOf, modelBandRadius, modelBounds, modelFrontX, modelHeight, spriteVisual, withBuildingLook, type DressingRecipe } from './catalog';
 import { setClearings, type Clearing } from './clearings';
 import { groundOffset, isSeaSide, seaLevelOffset } from './ground';
 import type { LandmarkDef } from './landmarks/types';
@@ -152,11 +152,17 @@ function tintFor(seed: number, amount: number): [number, number, number] {
 function placeSprites(track: Track, table: ModelTable, out: Placement[][], occ: Occupancy, tall: Occupancy, block: Occupancy): void {
   const segs = track.segments;
   const def = track.def;
+  // V4: o visual de cada prédio (fachada, tinta, varandas, térreo) é o próximo da permutação da pista, na ordem da pista: dois seguidos nunca repetem.
+  const looks = buildingLookOrder(def.id);
+  let nBuilding = 0;
   for (let i = 0; i < segs.length; i++) {
     const sprites = segs[i].sprites;
     for (let k = 0; k < sprites.length; k++) {
       const sp: SpriteRef = sprites[k];
-      const vis = spriteVisual(sp.kind, sp.variant, sp.scale, def);
+      const vis0 = spriteVisual(sp.kind, sp.variant, sp.scale, def);
+      const vis = vis0.mode === 'building'
+        ? { ...vis0, models: vis0.models.map((m, mi) => (mi === 0 ? { ...m, id: withBuildingLook(m.id, looks[nBuilding++ % 4]) } : m)) }
+        : vis0;
       const side = sp.x < 0 ? -1 : 1;
       const half = SPRITE_HALF_WIDTH[sp.kind] * sp.scale * ROAD_HALF_WIDTH_M;
       const xm = sp.x * ROAD_HALF_WIDTH_M;

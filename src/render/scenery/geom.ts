@@ -20,6 +20,21 @@ export type Geo = THREE.BufferGeometry;
  * `panel` é o atlas de outdoors e placas; `cone` é o facho de luz aditivo (só à noite); `cutout` é o cartão com recorte alfa
  * (capim, folhagem rala: position, normal, color e uv; `scenery/cutout.ts`).
  */
+/**
+ * V4: a fachada é um atlas de 4 visuais por estilo (scenery/textures.ts); a célula vai na uv: `u = local + célula × FACADE_CELL_SPAN` (local sempre
+ * < 64 repetições). Aqui (puro) para os construtores e o material não dependerem um do outro.
+ */
+export const FACADE_CELL_SPAN = 64;
+
+/** Desloca a uv de uma fachada para a célula `look` do atlas (0 = a de antes; não mexe). */
+export function facadeCell(g: Geo, look: number): Geo {
+  const uv = g.getAttribute('uv') as THREE.BufferAttribute | undefined;
+  if (!uv || look <= 0) return g;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) + look * FACADE_CELL_SPAN);
+  uv.needsUpdate = true;
+  return g;
+}
+
 export type MatKey = 'flat' | 'office' | 'apartment' | 'classic' | 'house' | 'glow' | 'beacon' | 'cone' | 'panel' | 'cutout';
 
 export interface ModelPart {
