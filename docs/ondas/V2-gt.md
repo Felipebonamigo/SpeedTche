@@ -97,3 +97,79 @@ corrida, capô, noite; atual × novo) abertas e conferidas.
 ### 8. Capturas
 `scratch/gt-hct/folha-gt.png` (atual × novo, 6 vistas) e `scratch/galeria/comparar-main-550e970-vs-gt-hct.png`. O "antes" sai de uma cópia congelada
 do 550e970 (`git archive`) servida por outro vite.
+
+### 9. Resultado (15/10/2026)
+
+**Commits** (em `nc/gt-hct`, sobre 550e970, nada empurrado): `65380a4` cartão · `969fc75` o `gt` HCT em produção, com os testes · `e96b4fa` farol todo
+em cima do capô e placas da asa menores · `3553014` paredes da carcaça do farol na cor do carro · o registro (este).
+
+**O que mudou.** `src/render/cars/curve.ts`, `hull.ts` e `shaped.ts` (novos: o casco por linhas e as peças que pousam na pele, do HCT2 aprovado,
+reescritos para o contrato do jogo) e `styles/gt.ts` reescrito. Pequenos e aditivos: `paints.ts` (8 pincéis sem luz nem camada: vidro escuro, dois
+reflexos, pisca e ré apagados, poço da lanterna, preto brilhante, refletor), `body.ts` (`cabinGlint` aceita o vidro novo e um pincel de reflexo),
+`kit.ts` (`extrudeZYSpans`), `details.ts` (`wing` ganhou `stripe` e `plateH`), `ui/screens/icons.ts` (a silhueta 2D do `gt` com a forma nova).
+Diferenças do protótipo, de propósito: as lanternas são **4 redondas embutidas** (a referência do dono, `ref-hct.webp`, e a identidade do GT de
+antes) em vez da barra de 3 elementos; o farol ficou todo em cima do capô (no HCT2 ele passava do ombro); a roda continua a `sport5` (o HCT2 trazia
+uma roda própria fora do sistema de aro da N3).
+
+**Testes vistos falhar antes** (`npx vitest run tests/estilo-carro-gt.test.ts`, no GT antigo): `Tests  13 failed | 2 passed (15)` —
+`expected -0.5799999833106995 to be less than or equal to -0.75` (para-brisa), `expected 0.628231942653656 to be less than 0.6` (bico),
+`expected 1.2816548347473145 to be less than or equal to 1.26` (teto), `expected 0.9471077059488068 to be less than 0.92` (vidro bolha),
+`lado 1: expected 0.015691571359052223 to be greater than 0.08` (entrada de ar), `x = 0.62: expected -0.019999980926513672 to be greater than or
+equal to 0.01` (lente rente à moldura), `âmbar, lado 1: expected 0 to be greater than 0`, `expected 5 to be greater than or equal to 6`
+(aletas), `lado 1: expected 0 to be greater than or equal to 2` (projetores), `x = 0.22, z = 2.15: a faixa A tem de estar à vista`,
+`lado 1: expected 0.7878787878787878 to be greater than or equal to 0.8` (faixa B), `expected 0.4512396694214876 to be less than or equal to 0.45`
+(lod1). Os 2 verdes são travas (4 lanternas redondas acesas; lod1 com luz e as duas faixas).
+**Ajustes de teste, de propósito:** (1) `tests/estilo-carro.test.ts`: a cabine bolha (≥ 92%, cartum da M4) não vale para os estilos `HCT`
+(`['gt']`); o caimento é conferido no teste novo. (2) No teste novo, antes do código: "vidro de trás longo" media o centroide (1,40 no GT antigo)
+e passou ao vértice (o antigo chega a 1,72: virou trava); as aletas eram contadas por baldes de 5 cm (a mesma aleta caía em dois e o antigo passava)
+e passaram a grupos por distância (o antigo dá 5). (3) Depois do código: o centro do leque precisa de `aLens` < 0,05 — a lente abaulada (1,2 cm na
+lanterna, 4 mm no projetor) tirava força do miolo (o teste da cor-brilho exige o miolo > 0,95); o abaulado caiu para 3 mm e 2 mm.
+
+**Números** (sem FPS). Casco 3.630 → **3.804 △** (+174; teto 4.500), lod1 1.638 → **1.500** (45% → 39%). Áreas (m², a faixa do `car-round`):
+farol 0,105 → 0,080 (0,065–0,174), lanterna 0,168 → 0,154 (> 0,068; ≥ 0,15 vista de trás), faixa A 2,081 → 2,205, faixa B 0,351 → 0,391,
+acento 0,283 → 0,283. Câmera de capô: `hoodTop` 1,01 → 1,00, corte 1,03 → 1,02, teto 1,286 → 1,198. Eixos, pegada, escapes (as saídas da chama)
+iguais. **Chamadas iguais** (o mesmo lote `gt` e o mesmo lote de lod1); triângulos por cena: +348 com o GT do jogador perto (carview e corrida
+201.763 → 202.111 e 203.952 → 204.300).
+
+**Galeria antes × depois** (`node tools/galeria/comparar.mjs main-550e970 gt-hct`; as 6 cenas pedidas, o resto fica "sem imagem"): `6 de 13 cenas
+mudaram`, todas por causa do GT — Copacabana 5,54% dos pixels, Paraty 5,13%, Sampa 4,65%, derrapagem 6,30%, os 14 de trás 2,16%, garagem 6,34%.
+**Chamadas iguais nas 6** (54, 52, 56, 76, 52, 26). Triângulos ▲: Copacabana 205.270 → 205.618, Paraty 178.534 → 178.882, Sampa 184.795 →
+185.143, os 14 de trás 191.648 → 191.996 (+348: dois GT de perto), derrapagem 274.492 → 275.536 (+1.044: seis GT de perto), garagem 8.402 → 8.576
+(+174: um). É o +174 △ de cada GT desenhado no casco inteiro; o GT longe (lod1) tem 138 a menos. A base de Copacabana, Paraty e Sampa veio da
+galeria `main-550e970` gerada pela frente `nc/pistas` (mesmo commit, limpo, mesma raiz); a derrapagem, os 14 de trás e a garagem foram gerados aqui.
+
+**Capturas** (abertas e conferidas): `scratch/gt-hct/folha-gt.png` (atual × novo: 3/4 frente, 3/4 traseira, lateral, câmera de corrida, capô, noite
+com freio, Boitatá com a faixa B; Copacabana `seg=300`, 1280×720, Alta), `scratch/galeria/comparar-main-550e970-vs-gt-hct.png` e
+`scratch/galeria/gt-hct/folha.png`. As vistas de trás da folha saíram do `e96b4fa` (o `3553014` só pinta as paredes do farol da frente); as da frente,
+do `3553014`. Para iterar a forma sem a fila de captura, `scratch/raster.ts` (rasterizador em software, fora do git).
+
+**O que ainda não está no nível do HCT** (honesto, para o dono julgar dirigindo):
+- **Reflexo do sol no vidro de trás**: na câmera de corrida de dia aparece um ponto branco com halo no alto do vidro (o sol num vidro quase espelho);
+  o teto do bloom (cor-brilho) segura o tamanho, mas ele chama atenção. Ajuste fino de rugosidade do vidro/faixa de reflexo, na rodada seguinte.
+- **Superfície**: continua um loft de ~2.000 faces no casco; o vinco da cintura é macio (dobra de ~35°, abaixo do vinco de 45° das normais).
+- **Rodas**: a `sport5` de sempre (5 raios prata). A roda do HCT2 (10 raios escuros, lábio usinado, pinça vermelha) não entrou: ela não tem a camada
+  de aro da N3. Proposta: um desenho novo de roda no catálogo (`WHEEL_IDS`) com aro, para o GT e os esportivos.
+- **Lanternas**: profundidade e miolo aceso de verdade, mas sem lente translúcida nem LED desenhado; à noite o halo é o do bloom do jogo.
+- **Faróis**: carcaça embutida com projetores; de frente ainda leem um pouco como "óculos" (a carcaça é um prisma de 4 lados).
+- **Silhueta 2D** (`icons.ts`) refeita só no `gt`.
+
+**Plano para os outros 12** (depois da aprovação do GT): o `Hull` e o `shaped.ts` servem a todos; cada estilo vira um `styles/<estilo>.ts` sobre
+eles (~150–250 linhas) com o seu bloco no `tests/estilo-carro-gt.test.ts` (proporções, lanternas com profundidade, faixas na forma nova, lod1) e a
+entrada em `HCT` no `tests/estilo-carro.test.ts`. Ordem por parentesco e risco: `wedge` e `hyper` (variantes do GT: cunha mais radical com faróis
+escamoteáveis — atenção ao pincel `POP_*` do `car-round` — e o largo de asa em pescoço de cisne), `prototype`, `roadster` (sem teto), depois `hatch`,
+`sedan` e `pickup` (o HCT2 já tem a forma), `rally` (do hatch), `muscle` e `electric` (do sedã), e por fim `classic` e `micro` (forma própria). ~9
+sessões, uma folha antes × depois e a galeria por estilo; os contratos que este GT resolveu (pincéis nomeados, lente em leque, vidro que conta como
+vidro, faixa que não some debaixo de peça) valem igual para eles.
+
+**Verificação** (código do `3553014`): `npx tsc --noEmit -p .` sem saída; `npm run build` exit 0. Área (`npx vitest run tests/car-* tests/estilo-carro*
+tests/cameras* tests/stage* tests/cor-brilho* tests/garage-stage*`, com o Chromium, no `969fc75`): `Test Files  23 passed (23)` · `Tests  511 passed |
+1 skipped (512)`; depois de cada ajuste, `estilo-carro-gt`, `car-round`, `estilo-carro`, `car-models`, `cameras` e `cor-brilho`: `Tests  207 passed
+(207)`; `cosmetics`, `paint`, `render-normals`, `track`: `Tests  238 passed (238)`; a silhueta (`cars.test -t silhueta`): 3 verdes.
+**Suíte inteira, uma vez** (`NC_REQUIRE_RELAY=1 NC_REQUIRE_GL=1 npx vitest run --testTimeout=300000 --hookTimeout=900000 --reporter=dot`, com a máquina
+a 35–60 de carga e 3 suítes de outras frentes rodando juntas): `Test Files  6 failed | 205 passed (211)` · `Tests  7 failed | 3822 passed | 1 skipped
+(3830)` em 6.754 s. **Os 7 são tempo-limite** (`Test timed out in …`, o limite escrito no próprio teste): `ai` (30 s), `batidas-cenario` (120 s),
+`fuel` ×2 (30 s), `gl-render` "compila todos os programas" (1.500 s), `landmarks-enquadramento` (180 s), `landmarks` "perLap" (120 s) — a
+armadilha conhecida do PLAYBOOK §5. Cada um rodado sozinho, verde: `gl-render` 14/14 (2.103 s), `ai` 251/251, `batidas-cenario` 4/4, `fuel` 227/227,
+`landmarks-enquadramento` 6/6, `landmarks` 23/23. Na suíte inteira o **gate de contagem** (`gl-render`, "dentro dos limites provisórios") passou, e
+`stage-gl` (garagem, pódio, revelação), `cor-brilho-gl`, `corrida-que-muda-gl` e `efeitos-gl` passaram inteiros. O pulado é o de sempre
+(`car-pipeline`, o carro do Kenney fora do git).
