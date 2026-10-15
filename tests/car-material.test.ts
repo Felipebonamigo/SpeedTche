@@ -31,10 +31,11 @@ describe('shader dos carros: acabamentos', () => {
     expect(FINISH_IDS.length - 1).toBeLessThanOrEqual(FINISH_MASK);
   });
 
-  it('a chave do programa mudou (v4) e a estilização continua composta na chave', () => {
+  it('a chave do programa mudou (v5) e a estilização continua composta na chave', () => {
     const key = material.customProgramCacheKey();
-    // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado.
-    expect(key).toContain('speed-tche-car-v4');
+    // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado;
+    // v5 (V2): o sol com rugosidade mínima na luz direta (o ponto branco com halo no teto do GT).
+    expect(key).toContain('speed-tche-car-v5');
     expect(key).not.toContain('speed-tche-car-v1');
   });
 
@@ -113,5 +114,20 @@ describe('verniz só na Alta (a Média usa a aproximação)', () => {
     const { material } = createCarMaterial();
     setCarQuality(material, q);
     expect(material.clearcoat).toBe(coat);
+  });
+});
+
+describe('shader dos carros: o realce do sol tem teto (V2)', () => {
+  const { frag } = compiled();
+  it('depois da luz direta e antes do reflexo do céu, o realce direto (base e verniz) fica abaixo de uSunCap; o reflexo do céu não tem teto', () => {
+    const direct = at(frag, '#include <lights_fragment_begin>');
+    const cap = at(frag, 'reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( uSunCap ) );');
+    const coat = at(frag, 'clearcoatSpecularDirect = min( clearcoatSpecularDirect, vec3( uSunCap ) );');
+    const ibl = at(frag, '#include <lights_fragment_maps>');
+    expect(cap).toBeGreaterThan(direct);
+    expect(coat).toBeGreaterThan(direct);
+    expect(cap).toBeLessThan(ibl);
+    expect(coat).toBeLessThan(ibl);
+    expect(count(frag, 'uSunCap )')).toBe(2);
   });
 });

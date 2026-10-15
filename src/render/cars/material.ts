@@ -30,7 +30,18 @@ export interface CarUniforms {
   uEnvBoost: { value: number };
   /** Força do verniz estilizado (reflexo do céu e do horizonte na lataria; cor-brilho): 0 na Baixa. */
   uVarnish: { value: number };
+  /** Teto do realce da luz direta (o sol) no verniz, no vidro e no cromo: ver `SUN_SPEC_CAP`. */
+  uSunCap: { value: number };
 }
+
+/**
+ * O realce do sol tem teto (V2, docs/ondas/V2-gt.md §10). O sol é uma luz de ponto: no verniz (rugosidade 0,06), no vidro (0,05) e no cromo o realce
+ * dele chega a milhares de vezes o limiar do bloom, e na câmera de corrida de dia acendia um ponto branco com halo na dobra do teto do GT (medido: some sem
+ * o sol e some sem o verniz). O realce continua nítido e no mesmo lugar, só não passa deste valor (linear, antes do tom): fica um brilho, não um clarão.
+ * O reflexo do céu (o env map) não tem teto. Provisório: medido no laboratório GL (tests/cor-brilho-gl.test.ts). (Subir a rugosidade só para o sol, a 0,3,
+ * foi tentado e espalhou o realce num borrão branco maior: 39% de pixels estourados contra 4%.)
+ */
+export const SUN_SPEC_CAP = 0.5;
 
 /**
  * Lanterna (cor-brilho, docs/ondas/cor-brilho.md): o miolo esquenta para laranja-branco quando o brilho passa de `LAMP_HOT_FROM` (à noite e no freio),
@@ -120,6 +131,7 @@ uniform float uTailGlow;
 uniform float uBrakeGlow;
 uniform float uEnvBoost;
 uniform float uVarnish;
+uniform float uSunCap;
 uniform vec3 uStylizeSkyTop;
 uniform vec3 uStylizeSkyHorizon;
 uniform vec3 uStylizeGround;
@@ -213,7 +225,7 @@ float fFlake = 0.0;
 export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uniforms: CarUniforms } {
   const uniforms: CarUniforms = {
     uSelfLight: { value: 0.2 }, uHeadGlow: { value: 0.4 }, uTailGlow: { value: 0.9 }, uBrakeGlow: { value: 3.2 },
-    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') },
+    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') }, uSunCap: { value: SUN_SPEC_CAP },
   };
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true, roughness: 0.4, metalness: 0.2, // normal suave da malha (kit.ts), não sombreado plano
@@ -245,7 +257,12 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         #ifdef USE_CLEARCOAT
           material.clearcoat *= vPaintW * 0.7 * ( 1.0 - wMatte );
         #endif`)
-      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+      .replace('#include <lights_fragment_maps>', `// O realce do sol tem teto (SUN_SPEC_CAP): aqui a luz direta já foi somada (lights_fragment_begin) e o reflexo do céu ainda não.
+        reflectedLight.directSpecular = min( reflectedLight.directSpecular, vec3( uSunCap ) );
+        #ifdef USE_CLEARCOAT
+          clearcoatSpecularDirect = min( clearcoatSpecularDirect, vec3( uSunCap ) );
+        #endif
+        #include <lights_fragment_maps>
         #if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
           // Peças metálicas (cromo, aro) e vidro refletem mais o céu; a pintura, pouco (a cor manda).
           radiance *= uEnvBoost * ( 0.35 + fMetal );
@@ -262,8 +279,8 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         #include <opaque_fragment>`);
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
-  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado.
-  material.customProgramCacheKey = () => 'speed-tche-car-v4';
+  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`).
+  material.customProgramCacheKey = () => 'speed-tche-car-v5';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };
