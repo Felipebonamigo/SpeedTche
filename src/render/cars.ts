@@ -22,13 +22,13 @@ import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
-import { createCarMaterial, FINISH_SHIFT, setCarQuality, type CarUniforms } from './cars/material';
+import { createCarMaterial, FINISH_SHIFT, setCarQuality, tailGlow, type CarUniforms } from './cars/material';
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
-import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor } from './cars/flame';
+import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameCover, flameGain } from './cars/flame';
 import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
@@ -39,6 +39,14 @@ const VIP_LABEL = 4;
 /** Bit de freio em `instExtra.w` (os de pintura vêm de cars/paints.ts). */
 const BRAKE_BIT = 1;
 const SIDES = [-1, 1] as const;
+/**
+ * Faróis do carro do viewport (cor-brilho, docs/ondas/cor-brilho.md): a lâmpada e o ponto de mira no referencial do carro (−z à frente; x é o do
+ * farol da direita, o da esquerda é o espelho), o cone e o decaimento, e a força por período (cd). No entardecer o farol fica ABAIXO da luz do céu na
+ * traseira de um carro a 20 m (tests/cor-brilho.test.ts): com 110 cd ele era 4× o céu e, com o especular voltando à câmera, o bloom fazia um clarão.
+ */
+export const HEADLIGHT = { lamp: [0.55, 0.6, -2.0], aim: [1.0, -0.4, -40], angle: 0.42, distance: 90, decay: 1.3, night: 200, dusk: 20 } as const;
+const IDENTITY = new THREE.Matrix4();
+
 /** Carro mais que isto à frente do carro do viewport (a câmera fica 7,8 m atrás) usa a roda simples. */
 const FAR_WHEELS_M = 30;
 
@@ -199,8 +207,10 @@ export class Cars {
     this.blob.renderOrder = 1;
     // Chama em malha: a cor vem de `instanceColor` (a do visual do carro) e a fase do tremor de `aFlame`, por instância.
     this.flameMaterial = new THREE.ShaderMaterial({
-      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 } },
+      // Pré-multiplicado (cor-brilho): soma a luz da chama e cobre o fundo um tanto (`flameCover`) — de dia o laranja se lê; à noite quase só soma.
+      vertexShader: FLAME_VERT, fragmentShader: FLAME_FRAG, transparent: true, depthWrite: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      uniforms: { uTime: { value: 0 }, uFlameGain: { value: 1 }, uFlameCover: { value: 0.5 } },
     });
     const flameGeometry = buildFlameGeometry();
     this.flameExtra = new THREE.InstancedBufferAttribute(new Float32Array(MAX_CARS * 2 * 3), 3);
@@ -229,15 +239,15 @@ export class Cars {
       this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, motion: newMotion() });
       this.looks.push(null); this.lookIds.push(''); this.lookCars.push('');
     }
-    // Faróis do carro do viewport (sempre na origem, olhando −Z): dois SpotLights fixos.
-    for (const sx of [-0.55, 0.55]) {
-      const spot = new THREE.SpotLight('#fff3d0', 230, 110, 0.48, 0.6, 1.3);
-      spot.position.set(sx, 0.6, -2.0);
-      spot.target.position.set(sx * 2.2, -0.6, -45);
+    // Faróis do carro do viewport: dois SpotLights que `pose` leva à frente do carro do viewport (cor-brilho: ficavam na linha central, e com o
+    // carro numa faixa a poça caía ao lado dele). Feixe de borda suave (penumbra 1).
+    for (let k = 0; k < 2; k++) {
+      const spot = new THREE.SpotLight('#fff3d0', HEADLIGHT.night, HEADLIGHT.distance, HEADLIGHT.angle, 1, HEADLIGHT.decay);
       spot.visible = false;
       scene.add(spot, spot.target);
       this.spots.push(spot);
     }
+    this.aimHeadlights(IDENTITY);
     scene.add(this.group);
   }
 
@@ -259,15 +269,29 @@ export class Cars {
     for (const { uniforms } of this.rigs) {
       uniforms.uSelfLight.value = 0.05 + 0.15 * light;
       uniforms.uHeadGlow.value = night ? 2.6 : light < 0.8 ? 0.9 : 0.35;
-      uniforms.uTailGlow.value = night ? 1.3 : 0.9;
+      const tg = tailGlow(light); // cor-brilho: a lanterna passa do limiar do bloom à noite e fica abaixo dele de dia
+      uniforms.uTailGlow.value = tg.tail;
+      uniforms.uBrakeGlow.value = tg.brake;
       uniforms.uPopup.value = light < 0.8 ? 1 : 0;
     }
-    for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? 230 : 110; }
+    this.flameMaterial.uniforms.uFlameGain.value = flameGain(light); // cor-brilho: legível de dia, sem estourar à noite
+    this.flameMaterial.uniforms.uFlameCover.value = flameCover(light);
+    for (const s of this.spots) { s.visible = light < 0.8; s.intensity = night ? HEADLIGHT.night : HEADLIGHT.dusk; }
+  }
+
+  /** Os faróis saem da frente do carro de matriz `m` (o do viewport) e miram a pista adiante dele: posição, rumo, guinada e mergulho do carro. */
+  private aimHeadlights(m: THREE.Matrix4): void {
+    for (let k = 0; k < this.spots.length; k++) {
+      const s = this.spots[k];
+      const sx = k === 0 ? -1 : 1;
+      s.position.set(sx * HEADLIGHT.lamp[0], HEADLIGHT.lamp[1], HEADLIGHT.lamp[2]).applyMatrix4(m);
+      s.target.position.set(sx * HEADLIGHT.aim[0], HEADLIGHT.aim[1], HEADLIGHT.aim[2]).applyMatrix4(m);
+    }
   }
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
-    for (const { material } of this.rigs) setCarQuality(material, q); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
+    for (const { material, uniforms } of this.rigs) setCarQuality(material, q, uniforms); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
     this.lowQuality = q === 'low';
   }
 
@@ -353,7 +377,11 @@ export class Cars {
       stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;
+    this.reduceFx = frame.options.reduceEffects;
   }
+
+  /** "Reduzir efeitos" do último `update` (a chama fica mais curta e mais fraca). */
+  private reduceFx = false;
 
   /** Uma instância: a matriz, a cor da carroceria e `instExtra` = (cor do detalhe — no lote de roda, a do aro —, bits). */
   private put(b: Batch, m: THREE.Matrix4, look: CarDraw, flags: number, extra: THREE.Color = look.accent): void {
@@ -388,6 +416,7 @@ export class Cars {
    */
   pose(rf: RoadFrame, state: RaceState, track: Track, ownIndex: number, viewportSeats: ReadonlyArray<{ seat: number; name: string; color: string; carIndex: number }>, time: number, camera: CameraMode = 'low'): void {
     this.ownEyeOn = false;
+    this.aimHeadlights(IDENTITY); // sem carro do viewport (fundo do menu), no lugar de sempre
     const cars = state.cars;
     const d = this.dummy;
     const w = this.wheelDummy;
@@ -415,6 +444,7 @@ export class Cars {
       d.updateMatrix();
       this.m.copy(d.matrix);
       let flags = look.body | (a.brake ? BRAKE_BIT : 0);
+      if (i === ownIndex) this.aimHeadlights(this.m);
       if (i === ownIndex && isMountedCamera(camera)) {
         const mp = this.mountOf(model);
         const pt = camera === 'hood' ? mp.hood : mp.bumper;
@@ -459,12 +489,12 @@ export class Cars {
           if (nFlames >= MAX_CARS * 2) break;
           w.position.set(ex[0], ex[1], ex[2]);
           w.rotation.set(0, 0, 0);
-          w.scale.set(0.5, 0.5, 2.3 * pulse * (0.55 + 0.45 * a.nitro));
+          w.scale.set(FLAME_SIZE.width, FLAME_SIZE.width, FLAME_SIZE.length * (this.reduceFx ? FLAME_REDUCED.length : 1) * pulse * (0.55 + 0.45 * a.nitro));
           w.updateMatrix();
           this.mw.multiplyMatrices(this.m, w.matrix);
           this.flames.setMatrixAt(nFlames, this.mw);
           this.flames.setColorAt(nFlames, look.flame);
-          this.flameExtra.setXYZ(nFlames, i * 1.7 + e * 3.1, a.nitro, look.flameWhite);
+          this.flameExtra.setXYZ(nFlames, i * 1.7 + e * 3.1, a.nitro * (this.reduceFx ? FLAME_REDUCED.level : 1), look.flameWhite);
           nFlames++; e++;
         }
       }

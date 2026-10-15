@@ -13,10 +13,27 @@ import type { PostPlan } from './plan';
 import { RadialBlurPass } from './radial';
 import { SceneStage } from './stage';
 
-/** O bloom com a cadeia começando em `scale` × ½ do alvo: 1 = a do `UnrealBloomPass`; 0,5 = bloom em meia resolução (a Média). */
+/**
+ * Teto do bloom (cor-brilho, docs/ondas/cor-brilho.md): a luminância que entra no borrão é limitada a `BLOOM_CEILING` × o limiar. O filtro de brilho
+ * do three passa o texel HDR inteiro; um realce especular do farol no vidro de um carro (centenas de vezes o limiar, em poucos pixels) virava uma
+ * nuvem branca sobre a pista no Cânion. Com o teto, ele brilha como uma lâmpada; o que fica perto do limiar (luminárias, neon, sol) não muda.
+ */
+export const BLOOM_CEILING = 2;
+
+const HIGH_PASS_ANCHOR = 'gl_FragColor = mix( outputColor, texel, alpha );';
+
+/** O filtro de brilho do three com o teto. Falha alto se o three mudar a linha (senão o remendo viraria no-op calado). */
+export function patchBloomHighPass(fragment: string): string {
+  if (!fragment.includes(HIGH_PASS_ANCHOR)) throw new Error('pipeline: o three mudou o LuminosityHighPassShader (âncora do teto do bloom não achada)');
+  return fragment.replace(HIGH_PASS_ANCHOR, () => `texel.rgb *= min( 1.0, ( luminosityThreshold * ${BLOOM_CEILING.toFixed(1)} ) / max( v, 1e-4 ) );\n\t\t\t${HIGH_PASS_ANCHOR}`);
+}
+
+/** O bloom com a cadeia começando em `scale` × ½ do alvo: 1 = a do `UnrealBloomPass`; 0,5 = bloom em meia resolução (a Média). Com teto (`BLOOM_CEILING`). */
 class ScaledBloomPass extends UnrealBloomPass {
   constructor(private readonly scale: number, resolution: THREE.Vector2, strength: number, radius: number, threshold: number) {
     super(resolution, strength, radius, threshold);
+    this.materialHighPassFilter.fragmentShader = patchBloomHighPass(this.materialHighPassFilter.fragmentShader);
+    this.materialHighPassFilter.needsUpdate = true;
   }
 
   override setSize(width: number, height: number): void {

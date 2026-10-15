@@ -759,6 +759,26 @@ O sol do entardecer tem azimute e elevação por bioma (`palette.ts`), conferido
 
 `racePeriodPlan` (dia → entardecer na última volta, entardecer → noite nas duas últimas) e `blendPalette` interpolam a `PALETTE_TABLE` campo a campo. As duas pontas de cada pista são montadas uma vez e cada passo é só uniforme, a cada 1/512 do `t`. O env map é refeito no máximo 8× por transição. Traçado 3D = mapa: escala por pista `2π/|Σcurve|` (0,69 a 26,9; 17 pistas ≥ 10×); 28 pistas cruzam a si mesmas, em cruzamento plano.
 
+## Cor e brilho (frente `nc/cor-brilho`)
+
+Os defeitos da auditoria visual de 14/10/2026 (`docs/ondas/cor-brilho.md`, testes `tests/cor-brilho.test.ts` e `tests/cor-brilho-gl.test.ts`):
+- **Bloom com teto** (`postfx/pipeline.ts`, `BLOOM_CEILING`): a luminância que entra no borrão é limitada a 2× o limiar. Um realce especular de 500 vira o
+  brilho de uma lâmpada, não uma nuvem sobre a pista.
+- **Faróis do jogador** (`cars.ts`, `HEADLIGHT`): saem da frente do carro do viewport (não da linha central) e, no entardecer, ficam abaixo da luz do céu
+  num carro a 20 m (20 cd; à noite 200 cd); feixe de borda suave (penumbra 1).
+- **A luz que cai nos objetos é quase neutra; a cor forte fica no céu, na névoa e no reflexo.** Entardecer e noite: hemisférica e sol/lua pouco saturados
+  (`palette.ts`), a IBL difusa do domo dessaturada (`uStylizeFill`, só o difuso), o pé do Neutral sobre a luminância (`stylizeNeutral`, `uGradeAdjust.z`)
+  e o asfalto neutro-quente. De dia nada muda (trava). `lateness(light)` liga isso contínuo na corrida que muda.
+- **Lanternas**: a lente tem miolo e borda (`kit.ts`, `lensRadius` → atributo `aLens`: o emissivo cai do centro do leque para `LENS_RIM`) e brilho HDR por período
+  (`cars/material.ts`, `tailGlow`/`lampEmission`): acima do limiar do bloom à noite, abaixo de dia; o miolo esquenta para laranja-branco.
+- **Verniz estilizado** (`cars/material.ts`, `carVarnish`): a lataria pintada reflete o céu do período e o chão escuro abaixo da linha do horizonte, por
+  Fresnel, com as cores de `setStylizePalette` (`uStylizeSky*`); 0 na Baixa. Sem amostra de textura nem chamada nova.
+- **Chama do nitro de fogo** (`cars/flame.ts`): língua que abre na boca do escape e só afina (`FLAME_SIZE` 0,46 × 2,2 m), corpo amarelo-laranja →
+  vermelho que apaga e tremula, núcleo azul-branco só na boca; normal pela inversa da escala (a direta deitava as normais e, de trás, a chama inteira
+  virava núcleo branco); sem ganho HDR (máx. 1,25×). Força e cobertura do fundo pela luz do período (`flameGain`, `flameCover`, blend pré-multiplicado:
+  de dia o laranja cobre metade do fundo e se lê, à noite quase só soma); "Reduzir efeitos" a encurta e enfraquece (`FLAME_REDUCED`). A cor escolhida
+  (N3) continua tingindo o corpo. A M5 (onda de choque, halo) não mudou: a gota branca era a malha da chama.
+
 ## Câmeras selecionáveis (frente `nc/cameras`)
 
 Quatro câmeras por jogador, trocadas em corrida pela ação `camera` (C / V / Select, ver `docs/CONTROLES.md`) ou escolhidas em Opções › Acessibilidade

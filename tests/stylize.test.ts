@@ -76,7 +76,8 @@ describe('tone mapping Custom (Neutral/AgX + gradação), um chunk global', () =
     installToneMapping();
     const once = THREE.ShaderChunk.tonemapping_pars_fragment;
     expect(once).toContain('stylizeGrade');
-    expect(once).toMatch(/CustomToneMapping\( vec3 color \) \{ return stylizeGrade\( (?:Neutral|AgX)ToneMapping\( color \) \); \}/);
+    // cor-brilho: a curva Neutral é a `stylizeNeutral` (o Khronos Neutral do three com o pé dos escuros que pode valer sobre a luminância; 0 = idêntica).
+    expect(once).toMatch(/CustomToneMapping\( vec3 color \) \{ return stylizeGrade\( (?:stylizeNeutral|AgXToneMapping)\( color \) \); \}/);
     expect(once).toContain('uniform vec3 uGradeShadows');
     installToneMapping();
     expect(THREE.ShaderChunk.tonemapping_pars_fragment).toBe(once);

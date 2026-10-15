@@ -13,6 +13,8 @@ const scenes = [
   ['copacabana', 'track=copacabana&ticks=1500&frames=24'],
   ['sampa_noite', 'track=sampa_noite&ticks=1400&frames=24'],
   ['canion', 'track=canion&ticks=1600&frames=24'],
+  // Paraty ao entardecer na largada (a poça do farol no asfalto; cor-brilho, docs/ondas/cor-brilho.md).
+  ['paraty', 'track=paraty&ticks=700&frames=24'],
   ['monte_fuji', 'track=monte_fuji&ticks=1700&frames=24'],
   ['rota_66', 'track=rota_66&ticks=1500&frames=24'],
   ['split4', 'track=copacabana&humans=4&ticks=1500&frames=24'],
@@ -60,9 +62,9 @@ for (const [name, query, size] of run) {
   const t0 = Date.now();
   try {
     await page.goto(`http://localhost:${port}/tools/render-harness.html?${query}`, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => window.ready, null, { timeout: 400000 });
+    await page.waitForFunction(() => window.ready, null, { timeout: 3600000 });
     const debug = await page.evaluate(() => window.debug);
-    await page.screenshot({ path: `scratch/render-${name}.png`, timeout: 120000 });
+    await page.screenshot({ path: `scratch/render-${name}.png`, timeout: 600000 });
     const pageErrors = await page.evaluate(() => window.errors);
     console.log(`${name.padEnd(12)} ${JSON.stringify(debug)} (${Date.now() - t0} ms)`);
     if (pageErrors.length) console.log('  erros na página:', pageErrors.join(' | '));
