@@ -65,3 +65,20 @@ antes e seguem passando: são o comportamento de antes, agora atrás da opção.
 true` (a malha não tinha nome); a boca do escape: `caixa 264,308–376,328: 8.8% mudou, soma rgb(103,109,121)` → `metal aquecido é R − B ≥ 40: expected -18 to be
 greater than or equal to 40` (o disco cinza-azulado, medido). **Depois**, a árvore nova inteira dos dois arquivos: `Test Files  2 passed (2)` · `Tests  14 passed
 (14)` (2231 s).
+
+**Visto na captura e corrigido (teste primeiro):** (1) na galeria do 9 as barras brancas eram o **túnel do vácuo** (mesmo lote): virou fio, teste
+`traço 0: expected 0.24009574867784977 to be less than or equal to 0.1` antes; (2) no 2P a batida de frente não mostrava nada — o contato fica atrás da
+lataria vista pela câmera de perseguição e as faíscas de 3–9 m/s apagavam escondidas: passaram a 6–12 m/s, mais para os lados e para cima, com o teste
+"em 0,15 s ao menos 40% saem da silhueta" visto falhar antes (`1 de 26: expected 0.0384… to be greater than or equal to 0.4`).
+
+**Galeria** (`--so 07-dividida-2p,08-dividida-4p,09-derrapagem-faiscas`; `main-550e970` × `efeitos` c8e87fd; `comparar.mjs`): 3 de 3 mudaram (17,33%, 9,35%,
+5,87% dos pixels) · **contagens que subiram: 0** — chamadas 2P 151 → 147, 4P 285 → 277, derrapagem 76 → 76; triângulos 583.467 → 582.873, 917.986 → 916.674,
+274.492 → 274.480 (saem POW e estrelinhas; nada novo desenha fora da batida). Folha própria (harness 1280×720, Alta, sem HUD; antes no `main` 550e970,
+depois aqui): batida e nitro com linhas, Copacabana de dia e Paraty no entardecer — chamadas iguais ou menores em todas (batida dia 55 → 54, nitro dia
+57 → 57, batida tarde 54 → 53, nitro tarde 52 → 52) e **programas** iguais ou menores (56 → 55, 58 → 58, 45 → 44, 43 → 43: o do POW e o das
+estrelinhas não compilam mais na batida; nenhum novo). Montagens em `scratch/v8/folha-antes-depois.png`, `scratch/galeria/comparar-main-550e970-vs-efeitos.png`
+e os recortes `scratch/v8/crop-*.png` (fora do git).
+
+**O que ficou discreto ou ainda feio:** na tela dividida a batida realista lê pouco (faíscas de 1,8–3,2 cm, um ou dois pixels no viewport de 2P/4P;
+é um número se o dono quiser mais); a fumaça do pneu continua em **bolhas de cartum** (contorno escuro, M5) e as faíscas da derrapagem nas 3 cores
+continuam grossas — fora deste pedido, candidatas à próxima rodada; a boca do escape lê laranja-acastanhado de dia (metal aquecido, não brasa).
