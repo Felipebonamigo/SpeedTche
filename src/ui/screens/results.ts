@@ -8,7 +8,9 @@ import '../../access/access.css';
 import { achievementDescription, achievementName } from '../../game/achievements';
 import type { ResultsScreenData, StandingsScreenData } from '../../game/contracts';
 import { cupRival } from '../../game/rivals';
-import { paintColors } from '../../game/paints';
+import { raceLooks } from '../../game/paints';
+import { factoryColors, lookColors } from '../../game/cosmetics';
+import { carDef } from '../../core/data/cars';
 import { createHoldSkip, guardConfirm, planPostRace, sequenceFor, type PostRace, type PostStepId } from '../../game/post-race';
 import { mountPodium, type StageHandle } from '../../render/stage-mount';
 import type { PodiumEntry } from '../../render/stage-bus';
@@ -79,13 +81,15 @@ export function standingsButton(api: ScreenApi, d: ResultsScreenData): FocusItem
 
 /** Os três primeiros que terminaram, com carro e pintura (a do humano; a IA corre com a de fábrica), para o pódio 3D. */
 export function podiumEntries(d: ResultsScreenData): PodiumEntry[] {
+  const looks = raceLooks(d.results.map((r) => ({ seat: r.seat, carId: r.carDefId })), d.humans);
   return [...d.results]
     .filter((r) => r.finished && r.position >= 1 && r.position <= 3)
     .sort((a, b) => a.position - b.position)
-    .map((r) => ({
-      place: r.position as 1 | 2 | 3, carId: r.carDefId,
-      paint: r.seat >= 0 ? paintColors(d.humans.find((x) => x.seat === r.seat)?.look?.paint) : null,
-    }));
+    .map((r) => {
+      // O visual que a corrida desenhou (T8): o look inteiro, com a troca de pintura de dois humanos iguais (raceLooks); IA de fábrica.
+      const look = looks[d.results.indexOf(r)] ?? null;
+      return { place: r.position as 1 | 2 | 3, carId: r.carDefId, paint: look ? lookColors(look, factoryColors(carDef(r.carDefId))) : null, look };
+    });
 }
 
 /** O plano do pós-corrida desta corrida: chegada e pódio 3D (fora do Retrô) e, na carreira com relatório, o Pagamento. */

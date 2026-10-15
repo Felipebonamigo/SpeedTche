@@ -18,7 +18,7 @@ import { effectiveStats } from '../../core/sim/stats';
 import type { CarDef, CarStats, UpgradeLevels, UpgradePart } from '../../core/types';
 import type { DeviceId, MenuContext, MenuNav } from '../../game/contracts';
 import { unlockCar } from '../../game/career-save';
-import { paintColors, paintedCar, seatPaint, stepSeatPaint } from '../../game/paints';
+import { paintColors, paintedCar, seatLook, seatPaint, stepSeatPaint } from '../../game/paints';
 import { saveSave } from '../../game/save';
 import { getLanguage, t } from '../../i18n';
 import { mountShowroom, type StageHandle } from '../../render/stage';
@@ -537,7 +537,7 @@ export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
       if (!b.stageEl) return;
       const car = cars[uis[seat].view];
       stages[seat] = mountShowroom(b.stageEl, {
-        id: stageId(seat), carId: car.id, paint: paintColors(seatPaint(ctx.save, seat, car.id)), focus: b.focusOf(),
+        id: stageId(seat), carId: car.id, paint: paintColors(seatPaint(ctx.save, seat, car.id)), look: seatLook(ctx.save, seat, car.id), focus: b.focusOf(),
         quality: ctx.settings.quality, reduceEffects: ctx.settings.reduceEffects, ring: seatColor(seat, ctx.settings.colorPalette),
       });
     });

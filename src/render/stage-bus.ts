@@ -3,6 +3,7 @@
 // Assim os menus não conhecem o renderizador e a sessão não muda. Sem `three` e sem DOM: o host é qualquer coisa com `getBoundingClientRect`.
 // O estado do palco (a câmera, o ângulo do prato, a revelação em curso) mora no `stage.ts`, por id; aqui só mora o que a tela quer.
 import type { CarColors, Quality } from '../game/contracts';
+import type { CarLook } from '../core/types';
 import { MAX_PANELS, type Rect, type StageFocus } from './stage-plan';
 
 /** Um elemento que sabe onde está na tela (um `HTMLElement` serve). */
@@ -12,8 +13,8 @@ export interface StageHost {
 
 export type PanelKind = 'car' | 'podium';
 
-/** Um dos três primeiros do pódio. */
-export interface PodiumEntry { place: 1 | 2 | 3; carId: string; paint: CarColors | null }
+/** Um dos três primeiros do pódio. `look` (o visual inteiro da corrida) vale mais que `paint`; sem ele, só as cores (ou as de fábrica). */
+export interface PodiumEntry { place: 1 | 2 | 3; carId: string; paint: CarColors | null; look?: CarLook | null }
 
 /** Os selos DOM do host (o "NOVO!" e o clarão), guiados pelo palco a cada quadro: o plano da revelação manda, não uma animação de CSS. */
 export interface PanelFx {
@@ -26,6 +27,8 @@ export interface PanelState {
   kind: PanelKind;
   carId: string | null;
   paint: CarColors | null;
+  /** O visual inteiro (acabamento, roda, aro, faixa, chama; N3); vale mais que `paint`. Null = só as cores. */
+  look: CarLook | null;
   focus: StageFocus;
   /** Qualidade das Opções; sem ela o palco usa a Média (o padrão do Deck). */
   quality: Quality | undefined;
@@ -40,6 +43,7 @@ export class StagePanel implements PanelState {
   kind: PanelKind = 'car';
   carId: string | null = null;
   paint: CarColors | null = null;
+  look: CarLook | null = null;
   focus: StageFocus = null;
   quality: Quality | undefined = undefined;
   reduceEffects = false;

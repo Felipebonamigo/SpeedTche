@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newCareer, ownsCar, walletOf, type CareerState } from '../src/core/career';
 import { CARS } from '../src/core/data/cars';
 import { DEFAULT_SETTINGS, type DeviceId, type InputProvider, type MenuNav, type SaveData, type Settings } from '../src/game/contracts';
-import { PAINT_IDS, paintColors, seatPaint } from '../src/game/paints';
+import { PAINT_IDS, paintColors, seatLook, seatPaint, setSeatLook } from '../src/game/paints';
 import { sanitizeSave } from '../src/game/save';
 import { setLanguage, t } from '../src/i18n';
 import { stageBus } from '../src/render/stage-bus';
@@ -250,6 +250,32 @@ describe('Garagem: oficina, foco e pintura no palco', () => {
     expect(all(panels(r)[1], hasClass('gp-stage'))[0].getAttribute('data-color')).toBe(CARS.find((c) => c.id === 'trovao')?.color);
     press(r, 'kb1', 'left');
     expect(stageBus.panel('garage:P1').paint).toBeNull(); // a Original: as cores de fábrica
+  });
+});
+
+describe('T8: a garagem mostra o visual inteiro, não só as cores', () => {
+  const down = (r: Rig, n: number): void => { for (let i = 0; i < n; i++) press(r, 'kb1', 'down'); };
+  const LOOK = { finish: 'cromado', wheel: 'mag', rim: 'dourado', stripe: 'nenhuma', flame: 'rosa' };
+
+  it('acabamento, roda, aro, faixa e chama do assento chegam ao painel do palco (o look, além da pintura)', () => {
+    const r = rig(garageScreen, { drivers: 2 });
+    setSeatLook(r.save, 0, 'falcao', LOOK);
+    down(r, 7); // a linha da pintura
+    press(r, 'kb1', 'right'); // troca a pintura: a tela refaz o painel
+    const p1 = stageBus.panel('garage:P1');
+    expect(p1.look).toEqual(seatLook(r.save, 0, 'falcao'));
+    expect(p1.look).toMatchObject({ ...LOOK, paint: PAINT_IDS[1] });
+    expect(stageBus.panel('garage:P2').look).toBeNull(); // de fábrica
+  });
+
+  it('já na abertura da tela o painel leva o look gravado', () => {
+    const r0 = rig(garageScreen);
+    setSeatLook(r0.save, 0, 'falcao', LOOK);
+    r0.screen.destroy?.();
+    stageBus.clear();
+    const again = garageScreen(r0.api);
+    expect(stageBus.panel('garage:P1').look).toMatchObject(LOOK);
+    again.destroy?.();
   });
 });
 
