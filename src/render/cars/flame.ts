@@ -130,9 +130,16 @@ void main() {
 }`;
 
 /**
- * Fragmento (cor-brilho: "o nitro mais parecido com fogo"). Núcleo azul-branco CURTO: a boca do escape (a tampa, t = 0, e os primeiros 6%), mais fraca
- * que o corpo — de trás é o escape aceso, não um disco; corpo amarelo-laranja → laranja → vermelho que apaga até a ponta e tremula em línguas (a chama de
- * sempre); a cor ESCOLHIDA (N3) tinge o corpo, com um núcleo claro dela. A borda da silhueta some (esconde as facetas). Sem ganho HDR: a gota antiga saía a
+ * A boca do escape (a tampa, t = 0, e os primeiros 6% da chama), em linear: metal aquecido, laranja escuro (V8, docs/ondas/V8-efeitos.md). Era o núcleo
+ * azul-branco × 0,45, somado e cobrindo metade do fundo: de trás, de dia, um disco cinza na ponteira. Vale para qualquer cor de chama (é o metal, não o fogo).
+ */
+export const FLAME_MOUTH: readonly [number, number, number] = [0.55, 0.17, 0.05];
+const glslVec3 = (c: readonly number[]): string => `vec3(${c[0]}, ${c[1]}, ${c[2]})`;
+
+/**
+ * Fragmento (cor-brilho: "o nitro mais parecido com fogo"). A boca do escape (a tampa, t = 0, e os primeiros 6%) é metal aquecido (`FLAME_MOUTH`, V8),
+ * cobrindo o fundo um tanto mais que o fogo (lê-se laranja escuro sobre a lataria clara, em vez de somar e lavar); corpo amarelo-laranja → laranja → vermelho que apaga até a ponta e tremula em línguas (a chama de
+ * sempre); a cor ESCOLHIDA (N3) tinge o corpo. A borda da silhueta some (esconde as facetas). Sem ganho HDR: a gota antiga saía a
  * 2,0–2,6× com o miolo puxado ao branco e estourava; aqui o máximo é 1,25× (no núcleo), e `uFlameGain` cai com a luz do período (`flameGain`); `uFlameCover`: quanto ela cobre o fundo (`flameCover`). Cores
  * saturadas (pouco verde e azul): somadas ao asfalto e passadas pelo Neutral, as claras saíam pêssego. Blend pré-multiplicado (cars.ts): a cor sai já multiplicada pelo alfa.
  */
@@ -144,14 +151,13 @@ void main() {
   vec3 fire = mix(vec3(1.0, 0.5, 0.1), vec3(1.0, 0.28, 0.04), smoothstep(0.08, 0.4, vT));
   fire = mix(fire, vec3(0.85, 0.1, 0.02), smoothstep(0.4, 0.95, vT));
   vec3 body = mix(hue, fire, vWhite);
-  vec3 coreCol = mix(hue, vec3(0.75, 0.87, 1.0), 0.2 + 0.5 * vWhite);
   float core = 1.0 - smoothstep(0.0, 0.06, vT);
-  vec3 c = mix(body, coreCol, core);
+  vec3 c = mix(body, ${glslVec3(FLAME_MOUTH)}, core); // a boca: metal aquecido
   float tongues = 0.7 + 0.3 * sin(vT * 19.0 - uTime * 47.0 + vPh * 3.0);
   float edge = smoothstep(0.0, 0.3, vFacing);
-  float along = mix(0.45, 1.0, smoothstep(0.0, 0.06, vT)) * (1.0 - smoothstep(0.02, 1.0, vT)); // a boca (e a tampa, t = 0) mais fraca: de trás era o disco
+  float along = mix(0.7, 1.0, smoothstep(0.0, 0.06, vT)) * (1.0 - smoothstep(0.02, 1.0, vT)); // a boca (e a tampa, t = 0) um pouco mais fraca que o fogo
   float a = edge * along * mix(1.0, tongues, smoothstep(0.1, 0.4, vT)) * (0.45 + 0.55 * vLevel) * mix(1.0, 0.75, smoothstep(0.7, 1.0, vAxis));
-  gl_FragColor = vec4(c * uFlameGain * mix(1.15, 1.25, core) * a, a * uFlameCover);
+  gl_FragColor = vec4(c * uFlameGain * mix(1.15, 1.25, core) * a, a * mix(uFlameCover, 0.8, core));
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

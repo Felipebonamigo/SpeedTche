@@ -1,5 +1,7 @@
 // M5: os efeitos acesos no renderizador de verdade, em GL (Chromium com swiftshader), pelo laboratório `tools/render-harness.lab.*` (cena `fxScene`):
 // faíscas esticadas, fumaça em bolha, marcas de pneu, anel da largada e do nitro, POW, linhas de velocidade e túnel do vácuo ao mesmo tempo.
+// V8 (docs/ondas/V8-efeitos.md): no padrão a batida não acende o POW nem as estrelinhas (faíscas, lascas e flash no lote de traços e no pool de bolhas);
+// com a opção "Efeitos de cartum" os dois voltam — e os programas deles compilam.
 //   - todos os programas de shader compilam em cada qualidade (os shaders novos: traços, bolha, POW);
 //   - cada efeito vira UMA malha (no máximo 5 chamadas a mais por viewport, com tudo aceso ao mesmo tempo) e o que a qualidade desliga não desenha (a onda de choque
 //     só da Média em diante); as contagens ficam no log. O gate de chamadas (src/bench/gate.ts) é do tests/gl-render.test.ts, com a cena da largada.
@@ -21,7 +23,7 @@ const LEVELS: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
 interface FxResult { debug: DebugInfo; meshes: Array<{ name: string; visible: boolean; drawn: number }> }
 interface LabApi {
-  fxScene(quality: Quality, forced: boolean): FxResult;
+  fxScene(quality: Quality, forced: boolean, cartoon?: boolean): FxResult;
   programs(): { total: number; bad: string[]; shaderErrors: string[] };
 }
 
@@ -31,10 +33,10 @@ describe.skipIf(!available)('efeitos da M5 em GL (swiftshader)', { timeout: 1_50
   let server: ViteDevServer; let browser: Browser; let page: Page;
   const errors: string[] = [];
   const runs = new Map<string, FxResult & { programs: { total: number; bad: string[]; shaderErrors: string[] } }>();
-  const run = async (q: Quality, forced: boolean) => {
-    const key = `${q}/${forced}`;
+  const run = async (q: Quality, forced: boolean, cartoon = false) => {
+    const key = `${q}/${forced}/${cartoon}`;
     if (!runs.has(key)) {
-      const r = await page.evaluate(([qq, f]) => { const lab = (window as unknown as { lab: LabApi }).lab; const out = lab.fxScene(qq as Quality, f as boolean); return { ...out, programs: lab.programs() }; }, [q, forced] as const);
+      const r = await page.evaluate(([qq, f, c]) => { const lab = (window as unknown as { lab: LabApi }).lab; const out = lab.fxScene(qq as Quality, f as boolean, c as boolean); return { ...out, programs: lab.programs() }; }, [q, forced, cartoon] as const);
       runs.set(key, r);
     }
     return runs.get(key)!;
@@ -69,14 +71,26 @@ describe.skipIf(!available)('efeitos da M5 em GL (swiftshader)', { timeout: 1_50
       expect(by.get('fx-streaks')?.visible, 'traços (faíscas, linhas, túnel)').toBe(true);
       expect(by.get('fx-streaks')?.drawn).toBeGreaterThan(0);
       expect(by.get('fx-marks')?.visible, 'marcas de pneu').toBe(true);
-      expect(by.get('fx-pow')?.visible, 'POW').toBe(true);
+      expect(by.get('fx-pow')?.visible, 'POW: só com "Efeitos de cartum" (V8)').toBe(false);
+      expect(by.get('car-stars')?.visible ?? false, 'estrelinhas: só com "Efeitos de cartum" (V8)').toBe(false);
+      expect(by.get('fx-dust')?.visible, 'bolhas (fumaça e as lascas da batida)').toBe(true);
       if (q === 'low') expect(by.get('fx-shockwaves')?.visible, 'a onda de choque só da Média em diante').toBe(false);
       else expect(by.get('fx-shockwaves')?.visible, 'onda de choque').toBe(true);
       expect(errors).toEqual([]);
     });
   }
 
-  it('cada efeito é uma malha só: com tudo aceso, no máximo 5 chamadas por viewport (traços, marcas, anel, POW e as bolhas); a cena normal segue no gate', async () => {
+  it('com "Efeitos de cartum" (Alta) o POW e as estrelinhas voltam na batida, e os programas compilam', async () => {
+    const r = await run('high', true, true);
+    expect(r.programs.shaderErrors, 'onShaderError').toEqual([]);
+    expect(r.programs.bad, 'programas com log').toEqual([]);
+    const by = new Map(r.meshes.map((m) => [m.name, m]));
+    expect(by.get('fx-pow')?.visible, 'POW').toBe(true);
+    expect(by.get('car-stars')?.visible, 'estrelinhas').toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  it('cada efeito é uma malha só: com tudo aceso, no máximo 5 chamadas por viewport (traços, marcas, os dois anéis e as bolhas; o POW só no cartum); a cena normal segue no gate', async () => {
     const lines: string[] = [];
     const checks: Array<() => void> = [];
     for (const q of LEVELS) {

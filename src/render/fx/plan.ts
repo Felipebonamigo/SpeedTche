@@ -2,6 +2,8 @@
 // `tests/fx-plan.test.ts`. Mesma ideia do `postfx/plan.ts`: o degrau SOBE em efeitos, nunca troca um por outro. Os números são
 // PROVISÓRIOS (sem GPU aqui, docs/ondas/M/M5.md): o custo de verdade é do `--bench` do dono. `reduceEffects` (acessibilidade) tira
 // o que pisca ou estoura (faíscas, POW, onda de choque, linhas, túnel) e deixa o que não pisca (bolhas de fumaça e marcas de pneu).
+// V8 (docs/ondas/V8-efeitos.md): o POW é da opção "Efeitos de cartum" (`cartoon`); no padrão a batida é realista (fx/impact.ts: faíscas, lascas e
+// flash, todos pelo fator `sparks`).
 import type { Quality } from '../../game/contracts';
 import { atLeast } from '../../game/quality';
 
@@ -20,7 +22,7 @@ export interface FxPlan {
   draftLines: number;
   /** Anel da largada e do engate do nitro. */
   shockwave: boolean;
-  /** O "POW" da batida. */
+  /** O "POW" da batida (e o leque de faíscas de quadrinho): só com "Efeitos de cartum". */
   pow: boolean;
 }
 
@@ -33,7 +35,7 @@ const DRAFT_LINES = [0, 10, 16, 24] as const;
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
-export function fxPlan(q: Quality, reduceEffects: boolean, viewports = 1): FxPlan {
+export function fxPlan(q: Quality, reduceEffects: boolean, viewports = 1, cartoon = false): FxPlan {
   const i = Math.max(0, ORDER.indexOf(q));
   // Tela dividida em 3 ou 4: cada viewport tem um quarto dos pixels, e as linhas (as que mais enchem a tela) caem pela metade.
   const split = viewports >= 3 ? 0.5 : 1;
@@ -46,6 +48,6 @@ export function fxPlan(q: Quality, reduceEffects: boolean, viewports = 1): FxPla
     speedLines: lines(SPEED_LINES[i]),
     draftLines: lines(DRAFT_LINES[i]),
     shockwave: !reduceEffects && atLeast(q, 'medium'),
-    pow: !reduceEffects,
+    pow: !reduceEffects && cartoon,
   };
 }

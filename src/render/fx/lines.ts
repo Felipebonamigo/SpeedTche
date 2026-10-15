@@ -5,8 +5,8 @@
 // traços (cabeça = ponta mais perto da câmera, brilhante; cauda = `tail`, mais à frente) é o `effects.ts`.
 import { hash2 } from '../noise';
 
-/** Fração da velocidade máxima em que as linhas começam (o cronograma: "acima de 85%"). */
-export const SPEED_LINES_START = 0.85;
+/** Fração da velocidade máxima em que as linhas começam (V8: "só acima de ~90%"; a M5 começava em 85%). */
+export const SPEED_LINES_START = 0.9;
 /** O que o nitro garante mesmo devagar (0..1). */
 const NITRO_FLOOR = 0.5;
 
@@ -16,7 +16,7 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 const smoothstep = (e0: number, e1: number, v: number): number => { const t = clamp01((v - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
 const mod = (a: number, n: number): number => ((a % n) + n) % n;
 
-/** Intensidade das linhas, 0..1: nada até 85% da máxima, cheia na máxima; o nitro garante metade. */
+/** Intensidade das linhas, 0..1: nada até 90% da máxima, cheia na máxima; o nitro garante metade. */
 export function speedLineStrength(speedFrac: number, nitro: boolean): number {
   const fast = clamp01((speedFrac - SPEED_LINES_START) / (1 - SPEED_LINES_START));
   return nitro ? Math.max(fast, NITRO_FLOOR) : fast;
@@ -48,9 +48,11 @@ export function speedLine(k: number, count: number, travel: number, speedMs: num
   out.tail = dz + 2 + 0.07 * speedMs * (0.7 + 0.6 * h6);
   out.lat = (h1 < 0.5 ? -1 : 1) * (2.6 + 8.4 * h4);
   out.h = 0.4 + 5.6 * h3 * h3;
-  out.width = 0.09 + 0.11 * h5; // de 9 a 20 cm: 1 a 5 px a 10–30 m de distância; mais fino que isso some na tela
-  out.r = 1.0; out.g = 1.0; out.b = 1.15;
-  out.a = (0.3 + 0.45 * clamp01(strength)) * fade;
+  // V8 (docs/ondas/V8-efeitos.md): finas e sutis — de 3,5 a 7 cm (1 a 2,5 px a 10–30 m: um fio, não uma barra; eram 9–20 cm) e alfa até 0,30 (era
+  // 0,75): a sensação de vento, não um efeito que se nota. O brilho ainda cai com a luz do período (`Effects.lineGain`: no entardecer não brilham).
+  out.width = 0.035 + 0.035 * h5;
+  out.r = 1.0; out.g = 1.0; out.b = 1.08;
+  out.a = (0.12 + 0.18 * clamp01(strength)) * fade;
   return true;
 }
 

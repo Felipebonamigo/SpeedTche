@@ -1,4 +1,5 @@
-// Estrelinhas da batida (M4): três estrelas de cinco pontas girando sobre o teto do carro por ~0,9 s (cartum: "viu estrelas").
+// Estrelinhas da batida (M4): três estrelas de cinco pontas girando sobre o teto do carro por ~0,9 s (cartum: "viu estrelas"). Desde a V8, só com a
+// opção "Efeitos de cartum" (docs/ondas/V8-efeitos.md); no padrão a batida é realista (fx/impact.ts).
 // A geometria e a pose de cada uma são puras (testáveis sem GL); `Cars` só liga as instâncias.
 import * as THREE from 'three';
 import { STARS_SECONDS } from './motion';

@@ -1,4 +1,4 @@
-// "POW" da batida (M5): a explosão de quadrinhos com a palavra, um billboard que estoura, segura e some em 0,55 s, em cima do carro batido. É
+// "POW" da batida (M5) — desde a V8 só com a opção "Efeitos de cartum" (docs/ondas/V8-efeitos.md; no padrão, fx/impact.ts): a explosão de quadrinhos com a palavra, um billboard que estoura, segura e some em 0,55 s, em cima do carro batido. É
 // somado às estrelinhas sobre o teto (cars/stars.ts, da M4) e às faíscas. Uma `InstancedMesh` de no máximo 6 quads, sem teste de profundidade (o
 // quadrinho aparece por cima, como no desenho). A textura vem de um canvas 2D desenhado uma vez; sem canvas (testes no Node) fica uma textura branca.
 import * as THREE from 'three';

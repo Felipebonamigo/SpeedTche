@@ -1,5 +1,5 @@
 // M5: o plano de efeitos por degrau (src/render/fx/plan.ts). Puro. Cada degrau tem tudo do anterior; `reduceEffects` tira o que pisca
-// (faíscas, POW, onda de choque, linhas e túnel) e deixa o que não pisca (bolhas de fumaça e marcas de pneu).
+// (faíscas, POW, onda de choque, linhas e túnel) e deixa o que não pisca (bolhas de fumaça e marcas de pneu). V8: o POW é só da opção "Efeitos de cartum".
 import { describe, expect, it } from 'vitest';
 import type { Quality } from '../src/game/contracts';
 import { fxPlan, type FxPlan } from '../src/render/fx/plan';
@@ -28,7 +28,9 @@ describe('plano de efeitos (M5)', () => {
     expect(fxPlan('low', false).shockwave).toBe(false); // a onda de choque só a partir da Média
     expect(fxPlan('medium', false).shockwave).toBe(true);
     expect(fxPlan('low', false).wheelSparks).toBe(true);
-    expect(fxPlan('low', false).pow).toBe(true);
+    // V8 (docs/ondas/V8-efeitos.md): o POW é cartum — só com a opção "Efeitos de cartum" (o 4º argumento), em qualquer degrau.
+    expect(fxPlan('low', false).pow).toBe(false);
+    expect(fxPlan('low', false, 1, true).pow).toBe(true);
   });
 
   it('fatores de emissão ficam em 0..1', () => {
@@ -42,7 +44,8 @@ describe('plano de efeitos (M5)', () => {
   it('reduzir efeitos: sem faíscas, POW, onda, linhas e túnel; as marcas e a fumaça (que não piscam) ficam', () => {
     for (const q of LEVELS) {
       const on = fxPlan(q, false); const off = fxPlan(q, true);
-      expect(on.sparks, `${q} ligado`).toBeGreaterThan(0); expect(on.speedLines, `${q} ligado`).toBeGreaterThan(0); expect(on.pow, `${q} ligado`).toBe(true);
+      expect(on.sparks, `${q} ligado`).toBeGreaterThan(0); expect(on.speedLines, `${q} ligado`).toBeGreaterThan(0); expect(fxPlan(q, false, 1, true).pow, `${q} cartum`).toBe(true);
+      expect(fxPlan(q, true, 1, true).pow, `${q} cartum + reduzir`).toBe(false);
       expect(off.sparks, q).toBe(0); expect(off.wheelSparks, q).toBe(false); expect(off.pow, q).toBe(false); expect(off.shockwave, q).toBe(false);
       expect(off.speedLines, q).toBe(0); expect(off.draftLines, q).toBe(0);
       expect(off.marks, q).toBe(on.marks); expect(off.smoke, q).toBe(on.smoke);

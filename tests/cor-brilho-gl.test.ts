@@ -17,12 +17,13 @@ const available = existsSync(CHROME);
 
 type Probe = { box: [number, number, number, number, number, number] } | { point: [number, number, number]; r: number };
 interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number] }
+interface FlameStat { changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number }
 interface Lab {
   freeze(track: string, ticks: number, opts?: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night' }): void;
   headlights(on: boolean): void;
   shoot(q: Quality, frames: number, probes: Probe[]): ProbeStat[];
   bloomHalo(hdr: number, bloom: [number, number, number], px?: number): { halo: number; core: number };
-  flameDiff(q: Quality, frames: number, box: [number, number, number, number, number, number]): { changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number };
+  flameDiff(q: Quality, frames: number, box: [number, number, number, number, number, number], mouth?: [number, number, number, number, number, number]): FlameStat & { mouth?: FlameStat };
   programs(): { total: number; bad: string[]; shaderErrors: string[] };
 }
 
@@ -30,6 +31,11 @@ interface Lab {
 const AHEAD: Probe = { box: [-6, 0, -45, 6, 1.6, -6] };
 /** Atrás do carro do jogador (+z é para trás), do escape até 5,5 m, do chão a 1 m: onde a chama do nitro aparece na câmera de corrida. */
 const FLAME_BOX = [-1.2, 0, 2.0, 1.2, 1.0, 5.5];
+/**
+ * V8: a boca do escape (os escapes do GT em x = ±0,42, y = 0,26, z = 2,28): a metade de cima da boca, da ponteira até 7 cm atrás dela — o pedaço da
+ * chama que a câmera de corrida vê ACIMA do corpo (que vem para a câmera e cai mais baixo na tela). Era o disco cinza de dia.
+ */
+const MOUTH_BOX = [-0.65, 0.28, 2.18, 0.65, 0.44, 2.35];
 /** Pixels estourados que os faróis podem ACRESCENTAR à região (fração): as "bolhas brancas". */
 const BLOWN = 0.0005;
 /**
@@ -122,22 +128,31 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
   it('a chama do nitro de trás, na câmera de corrida, de dia e à noite: fogo (a cor somada é quente, R ≥ G ≥ B), não gota branca (≤ 5% dos pixels dela quase brancos)', async () => {
     // A chama isolada: o mesmo quadro com o nitro ligado, com e sem a malha da chama (laboratório, `flameDiff`). Era uma gota azul-branca, gorda e HDR (ganho 2,0–2,6):
     // de trás, a ponta vem para a câmera e a gota vira um disco branco opaco (galeria main-f241703: Paraty, Fuji, Xingó).
-    const r = await lab((L, box) => {
+    const r = await lab((L, boxes) => {
+      const [box, mouth] = boxes as [[number, number, number, number, number, number], [number, number, number, number, number, number]];
       const out: Record<string, ReturnType<Lab['flameDiff']>> = {};
       // A mesma corrida e o mesmo enquadramento de dia e à noite (o período forçado): em sampa_noite 1400 a chama fica abaixo do quadro e a "diferença"
       // medida lá era só o tempo andando entre os dois quadros (agora o mesmo instante, `flameDiff`).
       for (const [name, tod] of [['dia', 'day'], ['noite', 'night']] as const) {
         L.freeze('copacabana', 1500, { x: 0, tod });
-        out[name] = L.flameDiff('high', 6, box as [number, number, number, number, number, number]);
+        out[name] = L.flameDiff('high', 6, box, mouth);
       }
       return out;
-    }, FLAME_BOX);
+    }, [FLAME_BOX, MOUTH_BOX]);
     for (const [name, f] of Object.entries(r)) {
       const [R, G, B] = f.addRgb.map((v) => Math.round(v));
       expect(f.changed, `${name}: a chama aparece na caixa ${f.x0},${f.y0}–${f.x1},${f.y1}`).toBeGreaterThan(0.01);
       expect(f.whiteOfChanged, `${name}: fração quase branca da chama (soma rgb(${R},${G},${B}))`).toBeLessThanOrEqual(0.05);
       expect(R >= G && G >= B, `${name}: cor somada rgb(${R},${G},${B}) — fogo é R ≥ G ≥ B`).toBe(true);
     }
+    // V8: de dia a boca do escape é metal aquecido (laranja escuro), não o disco cinza-azulado: o que ela soma é quente.
+    const m = r.dia.mouth;
+    expect(m, 'medida da boca').toBeDefined();
+    const [mr, mg, mb] = (m?.addRgb ?? [0, 0, 0]).map((v) => Math.round(v));
+    console.log(`[V8 boca do escape, dia] caixa ${m?.x0},${m?.y0}–${m?.x1},${m?.y1}: ${((m?.changed ?? 0) * 100).toFixed(1)}% mudou, soma rgb(${mr},${mg},${mb})`);
+    expect(m?.changed ?? 0, 'a boca aparece na caixa').toBeGreaterThan(0.02);
+    expect(mr - mb, `boca de dia: soma rgb(${mr},${mg},${mb}) — metal aquecido é R − B ≥ 40`).toBeGreaterThanOrEqual(40);
+    expect(mr >= mg && mg >= mb, `boca de dia: soma rgb(${mr},${mg},${mb}) — R ≥ G ≥ B`).toBe(true);
     expect(errors).toEqual([]);
   });
 
