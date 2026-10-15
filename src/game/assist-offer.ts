@@ -1,8 +1,8 @@
 // Oferta de assistência depois de 2 eliminações seguidas (O3, docs/ondas/O/O3.md): "Freio automático ou Amador?". Pura: a sessão
 // registra o fim de cada corrida (`recordRaceEnd`), pergunta se a oferta está na hora (`offerDue`) e aplica a resposta
 // (`applyAssistChoice`). A oferta é RECUSÁVEL e aparece UMA vez por sessão (`markOffered`), aceita ou não: não volta a cada corrida.
-// atalho: a conta e o "já ofereci" vivem só na sessão (não no save, para não criar campo de save nesta frente); reiniciar o jogo os zera.
-// Saída se isso incomodar: dois campos aditivos no save (sequência de eliminações e "oferta recusada"), com saneador.
+// A conta e o "já ofereci" vivem só na sessão; a RECUSA fica nas opções (`Settings.assistOfferDeclined`, campo aditivo; T8) e a sessão
+// marca a oferta como feita ao abrir. atalho: a sequência de eliminações zera com o jogo reaberto (não é gravada).
 import type { AssistLevel, Difficulty } from '../core/types';
 import type { RaceMode, Settings } from './contracts';
 

@@ -143,5 +143,6 @@ nível 1, o Falcão segura todas as curvas na máxima, o Trovão, o Pororoca e a
 Depois de **2 eliminações seguidas** (copa ou Expedição; classificar zera, outros modos não contam) a próxima largada
 (`startCup`, `continueCup`, `nextRace`, `retryRace`, `careerRace`) é segurada por uma tela: **Freio automático**
 (`seatAssists` = `brake` só para quem corre sem assistência), **Nível Amador** (`difficulty`) ou **Seguir assim**
-(Esc/B também). Cada opção só aparece se ainda ajuda. **Uma vez por sessão**, aceita ou recusada. A conta vive na
-sessão (`src/game/assist-offer.ts`), não no save: reiniciar o jogo a zera (atalho, com a saída no cabeçalho do módulo).
+(Esc/B também). Cada opção só aparece se ainda ajuda. **Uma vez por sessão**, aceita ou recusada; **recusada,
+nunca mais** (T8: `Settings.assistOfferDeclined`, campo aditivo, `docs/SAVE.md`). A sequência de eliminações vive na sessão
+(`src/game/assist-offer.ts`): reiniciar o jogo a zera.

@@ -134,6 +134,11 @@ export interface Settings {
   lockFps30: boolean;
   /** A câmera de cada assento (P1..P4): Alta, Baixa, Capô ou Frente. Só renderização e entrada local (nada no núcleo, nada na rede). Campo aditivo: save sem ele abre na Alta. */
   seatCameras: CameraMode[];
+  /**
+   * O jogador recusou ("Seguir assim") a oferta de Freio automático / Amador depois de 2 eliminações (O3, `game/assist-offer.ts`):
+   * ela não volta mais, nem com o jogo reaberto (T8). Campo aditivo: opções sem ele abrem com a oferta de pé; a 0.1.4/0.1.5 o ignoram.
+   */
+  assistOfferDeclined: boolean;
   /** A qualidade que a escolha automática da 1ª abertura gravou (L2b). Ausente = não rodou (save de antes, ou automação): é campo aditivo, sem padrão. */
   autoQuality?: Quality;
 }
@@ -149,6 +154,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
   landmarkCaptions: true, lockFps30: false, cartoonEffects: false,
   seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[],
+  assistOfferDeclined: false,
 });
 
 export interface BestLap {
