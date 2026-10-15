@@ -421,13 +421,18 @@ export function carCount(car: CarDef, cars: readonly CarDef[]): string {
 
 /** Cartão do carro: silhueta do estilo dele na cor, nome, quatro barras (animadas ao entrar) e a frase de apresentação. */
 /** Ficha do carro no lobby; `paint` = a pintura escolhida (id da paleta) ou o look inteiro (N3), que o desenho já mostra. */
-export function carCard(car: CarDef, cars: readonly CarDef[], paint: string | CarLook | null = ORIGINAL_PAINT): HTMLElement {
+/**
+ * O cartão do carro (nome, desenho, barras, frase). Com `stage` (o lobby fora do Retrô; T8), no lugar da silhueta SVG vai essa janela do palco
+ * 3D (`.car-stage`, do tamanho da silhueta), onde a tela já montou o `mountShowroom`.
+ */
+export function carCard(car: CarDef, cars: readonly CarDef[], paint: string | CarLook | null = ORIGINAL_PAINT, stage: HTMLElement | null = null): HTMLElement {
   const bars = carBars(car, cars);
   const paintId = typeof paint === 'string' ? paint : paint?.paint ?? ORIGINAL_PAINT;
+  const visual = stage ?? carSilhouette(paintedCar(car, paint));
   return h('div', { class: 'car-card', attrs: { 'data-car': car.id, 'data-paint': paintId } },
     h('div', { class: 'car-name', text: car.name }),
     // O contador fica embaixo do desenho, não ao lado do nome: na grade 2×2 o "POROROCA V10" não cabia com ele.
-    h('div', { class: 'car-visual' }, carSilhouette(paintedCar(car, paint)), cars.length > 1 ? h('span', { class: 'car-count mono', text: carCount(car, cars) }) : null),
+    h('div', { class: `car-visual${stage ? ' is-stage' : ''}` }, visual, cars.length > 1 ? h('span', { class: 'car-count mono', text: carCount(car, cars) }) : null),
     h('div', { class: 'car-bars' }, CAR_STAT_KEYS.map((key, i) =>
       h('div', { class: 'car-bar' },
         h('span', { class: 'car-bar-label', text: t(`ui.lobby.stat.${key}`) }),

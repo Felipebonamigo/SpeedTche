@@ -458,7 +458,8 @@ export class Stage {
     const pose = focusPose(model, panel.focus, aspect);
     const k = slot.fresh ? 1 : 1 - Math.exp(-dt * 5);
     slot.fresh = false;
-    if (pose.yaw === null) slot.yaw += TURN_SPEED * dt;
+    // "Reduzir efeitos" (T8): o prato não gira; o carro fica parado no ângulo de mostra (o foco de uma peça ainda vira o carro para ela).
+    if (pose.yaw === null) slot.yaw += reduce ? 0 : TURN_SPEED * dt;
     else slot.yaw += wrapPi(pose.yaw - slot.yaw) * k;
     slot.az += wrapPi(pose.azimuth - slot.az) * k;
     slot.el += (pose.elevation - slot.el) * k;

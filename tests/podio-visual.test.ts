@@ -82,6 +82,25 @@ describe('o palco desenha o look inteiro', () => {
   });
 });
 
+describe('reduzir efeitos no palco (T8, lobby e garagem)', () => {
+  it('com "reduzir efeitos" o prato não gira: o carro fica parado no ângulo de mostra; sem, gira', async () => {
+    const { stage } = await setup();
+    const s = stage as unknown as Internal & { slots: Map<string, { yaw: number }> };
+    const spin = (reduce: boolean): number => {
+      const panel = new StageBus().panel(`lobby:${reduce}`);
+      panel.set({ carId: 'falcao', reduceEffects: reduce });
+      const slot = s.slotFor(panel) as { yaw: number };
+      s.poseCar(panel, slot, 16 / 9, 1 / 60, null, null, 0, reduce);
+      const y0 = slot.yaw;
+      for (let i = 0; i < 30; i++) s.poseCar(panel, slot, 16 / 9, 1 / 30, null, null, 0, reduce);
+      return Math.abs(slot.yaw - y0);
+    };
+    expect(spin(false)).toBeGreaterThan(0.1);
+    expect(spin(true)).toBe(0);
+    stage.dispose();
+  });
+});
+
 describe('pódio do resultado: as entradas trazem o look da corrida', () => {
   const row = (position: number, seat: number, carDefId: string): RaceResultRow => ({
     carId: position, seat, name: seat >= 0 ? `P${seat + 1}` : `IA ${position}`, teamId: 0, carDefId, position, finished: true, totalTicks: 1000 * position, bestLapTicks: 300, points: 0,

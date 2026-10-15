@@ -127,8 +127,9 @@ describe('lobby: cada assento escolhe a pintura do carro', () => {
     expect(paintRow(slots()[0]).getAttribute('data-paint')).toBe(first);
     const card = one(slots()[0], (el) => el.getAttribute('data-car') === 'falcao' && el.getAttribute('data-paint') !== null);
     expect(card.getAttribute('data-paint')).toBe(first);
-    const svg = one(card, (el) => el.tag === 'svg' && el.innerHTML.includes('<path'));
-    expect(svg.innerHTML).toContain(`fill="${paintColors(first)?.color}"`);
+    // T8: fora do Retrô a prévia é o carro no palco 3D; a janela leva a cor à mostra (o SVG continua no Retrô).
+    const win = one(card, hasClass('car-stage'));
+    expect(win.getAttribute('data-color')).toBe(paintColors(first)?.color);
     // O controle do P2 anda na dele, para trás.
     press(screen, 'gp0', 'down');
     press(screen, 'gp0', 'left');

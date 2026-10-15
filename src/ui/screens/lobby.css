@@ -42,3 +42,22 @@
 /* Quem cede largura é o campo do nome (o texto rola dentro dele), nunca o rótulo do dispositivo. */
 .scr-lobby .slot-head .slot-device { margin-left: auto; flex: none; }
 .scr-lobby .slot.ready .slot-device > span { display: none; }
+
+/* ───────────── Palco 3D no lobby (T8; o mesmo esquema da garagem, garage.css "Palco 3D") ─────────────
+   O carro de cada assento é o modelo 3D desenhado no canvas ATRÁS do menu, na janela `.car-stage` do cartão, do tamanho da silhueta SVG
+   que ela substitui (proporção 200 × 72 e a mesma altura máxima: a grade não muda). O vidro do cartão vira uma camada com um BURACO na
+   medida da janela (`--hx --hy --hw --hh` vêm do lobby.ts a cada quadro); a tela perde o degradê só enquanto há janela (`.stage3d`). */
+.car-stage { width: 100%; aspect-ratio: 200 / 72; max-height: calc(88 * var(--u)); border-radius: calc(6 * var(--u)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.scr-lobby .lobby-slots:not(.seats-1) .car-stage { max-height: calc(64 * var(--u)); }
+@media (max-height: 720px) { .scr-lobby .lobby-slots.seats-1 .car-stage { max-height: calc(72 * var(--u)); } }
+.stage3d .slot.has-stage { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; position: relative; isolation: isolate; }
+.stage3d .slot.has-stage::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass);
+  -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) var(--hx, 0px) var(--hy, 0px) / var(--hw, 0px) var(--hh, 0px) no-repeat;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) var(--hx, 0px) var(--hy, 0px) / var(--hw, 0px) var(--hh, 0px) no-repeat;
+  mask-composite: exclude;
+}
+/* O realce do carro em foco não pode velar a janela: vai para o anel dela. */
+.stage3d .slot.has-stage .car-hero, .stage3d .slot.has-stage .car-hero.focus { background: none; }
+.stage3d .slot.has-stage .car-hero.focus .car-stage { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 calc(18 * var(--u)) rgba(255, 90, 54, 0.3); }
