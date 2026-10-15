@@ -3,7 +3,7 @@
 // das montanhas tem o dobro de pontos.
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildClouds, CLOUD_FRAG } from '../src/render/sky';
+import { cloudAtlasImage, CLOUD_FRAG } from '../src/render/sky';
 import { buildRing, RING_FRAG, ringProfile } from '../src/render/terrain';
 
 /** Fração dos cantos cuja normal se afasta > 2° da normal da própria face (0 = tudo facetado). */
@@ -28,8 +28,23 @@ describe('horizonte suave', () => {
     expect(RING_FRAG).not.toMatch(/dFdx/);
   });
 
-  it('nuvens (alta e média/baixa) saem com normal suave', () => {
-    for (const detail of [0, 1]) expect(smoothFraction(buildClouds(detail)), `detalhe ${detail}`).toBeGreaterThan(0.5);
+  // V4 (docs/ondas/V4-pistas.md): as nuvens viraram impostores com a normal PINTADA num atlas (a malha é de quadros, a normal da face não diz nada).
+  // A regra continua a mesma — nuvem sem faceta —, medida onde a normal agora mora: entre pixels vizinhos do miolo (cobertura cheia) ela gira pouco.
+  it('nuvens: a normal pintada no atlas é lisa (no miolo, entre pixels vizinhos, gira < 12°; nenhum degrau de faceta)', () => {
+    const a = cloudAtlasImage();
+    const n = (i: number): THREE.Vector3 => {
+      const x = a.data[i * 4] / 127.5 - 1; const y = a.data[i * 4 + 1] / 127.5 - 1;
+      return new THREE.Vector3(x, y, Math.sqrt(Math.max(0, 1 - x * x - y * y)));
+    };
+    let worst = 0; let inner = 0;
+    for (let y = 1; y < a.height - 1; y += 2) for (let x = 1; x < a.width - 1; x += 2) {
+      const i = y * a.width + x;
+      if (a.data[i * 4 + 3] < 255 || a.data[(i + 1) * 4 + 3] < 255 || a.data[(i + a.width) * 4 + 3] < 255) continue;
+      inner++;
+      worst = Math.max(worst, n(i).angleTo(n(i + 1)), n(i).angleTo(n(i + a.width)));
+    }
+    expect(inner).toBeGreaterThan(10000);
+    expect((worst * 180) / Math.PI).toBeLessThan(12);
   });
 
   it('montanhas: normal suave e contorno com ≥ 300 pontos por volta', () => {

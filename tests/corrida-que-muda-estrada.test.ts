@@ -12,7 +12,9 @@ interface Inner {
   pools: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; night: boolean;
 }
 
-describe('M6 (b): a pista ao vivo', () => {
+// V4 (docs/ondas/V4-pistas.md): o asfalto e a zebra saem de pixels puros; o desenho do asfalto (1 milhão de pixels) é montado uma vez por processo —
+// ~0,2 s com a máquina livre, segundos sob carga —, daí o tempo-limite maior que os 5 s padrão.
+describe('M6 (b): a pista ao vivo', { timeout: 60_000 }, () => {
   let restore = (): void => {};
   beforeEach(() => { restore = fakeCanvasDocument(); });
   afterEach(() => restore());

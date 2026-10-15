@@ -259,19 +259,39 @@ export function landmarkSource(id: string): 'glb' | 'procedural' {
   return landmarkFiles.has(id) ? 'glb' : 'procedural';
 }
 
-/** Prédios e torres têm parâmetros (andares, raio) no próprio id: "bld:<tipo>:<andares>:<semente>". */
+/**
+ * Tinta de cada prédio de cidade por visual (V4, docs/ondas/V4-pistas.md): a linha 0 é a de antes (pela semente); as outras dão a cada visual uma
+ * família de cor (o branco e o creme da orla; o salmão e a areia; o azul e o verde-água claros; o amarelo-claro e o pêssego), e a semente escolhe na família.
+ */
+const BUILDING_TINTS: Record<string, readonly (readonly string[])[]> = {
+  glass: [['#a8c8e8', '#8fb0d0', '#c8d8e8', '#b8c8d0'], ['#9cc8bc', '#86b8ac', '#b0d4c8', '#94beb4'], ['#a8b0c0', '#bcc2cc', '#9aa4b6', '#c4cad4'], ['#dcc8a0', '#ccb890', '#e4d0aa', '#d2be96']],
+  glassgold: [['#ffe6a8', '#ffe6a8', '#ffe6a8', '#ffe6a8'], ['#f0d494', '#e8cc8c', '#f4dca0', '#ecd498'], ['#ffd8b8', '#f8d0b0', '#ffe0c4', '#f4ccac'], ['#e8dcc0', '#e0d4b8', '#ece2c8', '#e4d8bc']],
+  apt: [['#f2efe8', '#e8d8c0', '#d8e0e8', '#f0d8c8'], ['#d4c8b4', '#c8bca8', '#dcd0bc', '#c4b8a4'], ['#e0c4a4', '#d4b494', '#e8ccb0', '#d8bc9c'], ['#c4c8cc', '#b8bec4', '#ccd0d4', '#b4b8bc']],
+  aptbeach: [['#ffffff', '#f4ecd8', '#e8f0f4', '#f8e0d0'], ['#f6d4bc', '#ecdab8', '#f4cac4', '#f0e0c4'], ['#d8e8f0', '#d4ece0', '#e4e4ec', '#cfe0ec'], ['#f6ecc4', '#eef2f0', '#f8dcb4', '#f0e6dc']],
+  classic: [['#f2e8d4', '#ecdcc0', '#f4ead8', '#e8d4b8'], ['#e4d4c0', '#dcc8b0', '#ecdcc8', '#d8c4a8'], ['#f0e0c8', '#e8d0b0', '#f4e4cc', '#e4ccac'], ['#dcd8d0', '#d4d0c8', '#e4e0d8', '#ccc8c0']],
+  classicwarm: [['#e8b888', '#f0c8a0', '#e0a878', '#f2d0a8'], ['#e8a890', '#f0b8a0', '#e09c84', '#f4c4ac'], ['#f0d098', '#f4d8a8', '#e8c488', '#f8e0b0'], ['#d8b8a0', '#e0c4ac', '#d0ac94', '#e8ccb4']],
+  brick: [['#b8705a', '#a86a58', '#c8886a', '#9a6050'], ['#8f5a4a', '#865446', '#9a6250', '#7e5042'], ['#c89a78', '#c0906e', '#d0a482', '#b88a6a'], ['#a09088', '#988880', '#a89890', '#90827a']],
+};
+const BUILDING_NEON = ['#ff3fd0', '#3fe8ff', '#ffd23f', '#ff5a3a'];
+const tintOf = (type: string, seed: number, look: number): string => BUILDING_TINTS[type][look][seed % 4];
+
+/**
+ * Prédios e torres têm parâmetros (andares, raio) no próprio id: "bld:<tipo>:<andares>:<semente>[:<visual>]". O visual (V4, 0–3; sem ele, 0 = o de
+ * antes) muda a célula do atlas da fachada, a tinta, as varandas e o térreo, com a mesma pegada e a mesma altura (o layout o escolhe pela posição).
+ */
 function dynamicBuilder(id: string): (() => Model) | undefined {
-  const [fam, type, a, b] = id.split(':');
+  const [fam, type, a, b, c] = id.split(':');
   const n = Number(a); const seed = Number(b ?? 0);
+  const look = Math.max(0, Math.min(3, Math.floor(Number(c ?? 0)) || 0));
   if (fam === 'bld') {
     switch (type) {
-      case 'glass': return () => S.glassTower(seed, n, ['#a8c8e8', '#8fb0d0', '#c8d8e8', '#b8c8d0'][seed % 4]);
-      case 'glassgold': return () => S.glassTower(seed, n, '#ffe6a8');
-      case 'apt': return () => S.apartmentBlock(seed, n, ['#f2efe8', '#e8d8c0', '#d8e0e8', '#f0d8c8'][seed % 4]);
-      case 'aptbeach': return () => S.beachApartment(seed, n, ['#ffffff', '#f4ecd8', '#e8f0f4', '#f8e0d0'][seed % 4], 20, 14);
-      case 'classic': return () => S.classicBuilding(seed, n, ['#f2e8d4', '#ecdcc0', '#f4ead8', '#e8d4b8'][seed % 4]);
-      case 'classicwarm': return () => S.classicBuilding(seed, n, ['#e8b888', '#f0c8a0', '#e0a878', '#f2d0a8'][seed % 4]);
-      case 'brick': return () => S.brickMidrise(seed, n, ['#b8705a', '#a86a58', '#c8886a', '#9a6050'][seed % 4], ['#ff3fd0', '#3fe8ff', '#ffd23f', '#ff5a3a'][seed % 4]);
+      case 'glass': return () => S.glassTower(seed, n, tintOf(type, seed, look), look);
+      case 'glassgold': return () => S.glassTower(seed, n, tintOf(type, seed, look), look);
+      case 'apt': return () => S.apartmentBlock(seed, n, tintOf(type, seed, look), 18, 15, look);
+      case 'aptbeach': return () => S.beachApartment(seed, n, tintOf(type, seed, look), 20, 14, look);
+      case 'classic': return () => S.classicBuilding(seed, n, tintOf(type, seed, look), 21, 14, look);
+      case 'classicwarm': return () => S.classicBuilding(seed, n, tintOf(type, seed, look), 21, 14, look);
+      case 'brick': return () => S.brickMidrise(seed, n, tintOf(type, seed, look), BUILDING_NEON[(seed + look) % 4], 16, 14, look);
       case 'warehouse': return () => S.warehouse(seed, ['#c8ccd2', '#d8c8a8', '#a8b8c8'][seed % 3]);
       default: return undefined;
     }
@@ -425,6 +445,29 @@ function buildingId(biome: SceneryId, region: Region, trackId: string, variant: 
   }
   if (biome === 'tropical') return pickV(region === 'jp' ? ['house:japan', 'house:farm', 'house:japan', 'house:japan'] : ['house:farm', 'house:farm-pink', 'house:farm', 'house:white'], v);
   return pickV(['house:farm', 'house:white', 'house:farm-pink', 'house:farm'], v);
+}
+
+/**
+ * V4: o visual (0–3) de um prédio de cidade no id (`bld:<tipo>:<andares>:<semente>:<visual>`); o que não tem atlas de fachada (galpão, casas) fica
+ * como está. A ordem dos visuais ao longo da pista é uma permutação por pista (hash do id): dois prédios seguidos nunca repetem o visual, e quatro
+ * seguidos mostram os quatro (pistas-v4.test.ts).
+ */
+export function withBuildingLook(id: string, look: number): string {
+  const parts = id.split(':');
+  if (parts[0] !== 'bld' || parts.length !== 4 || !(parts[1] in BUILDING_TINTS)) return id;
+  return `${id}:${((look % 4) + 4) % 4}`;
+}
+
+/** A permutação dos 4 visuais de uma pista (determinística: hash do id da pista). */
+export function buildingLookOrder(trackId: string): [number, number, number, number] {
+  let h = 0;
+  for (let i = 0; i < trackId.length; i++) h = (Math.imul(h, 31) + trackId.charCodeAt(i)) | 0;
+  const order: [number, number, number, number] = [0, 1, 2, 3];
+  for (let i = 3; i > 0; i--) {
+    const j = Math.floor(hash2(h, 50 + i) * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  return order;
 }
 
 function towerId(biome: SceneryId, region: Region, variant: number): { id: string; extra?: SpriteVisual['models'] } {
