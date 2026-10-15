@@ -174,8 +174,14 @@ export function beachApartment(seed: number, floors: number, tint: string, L = 2
   const body = paint(bevelBox(D, H - 4, L, 0.7, FACADE_TILE.apartment), tint, tf(-D / 2, 4 + (H - 4) / 2, 0), true);
   const base = mergeRound(flat);
   const wall = facadeCell(mergeRound([body]), look);
-  bakeAO(base, { occluders: [wall], reach: 2.4, strength: 0.6, rays: 12 });
-  bakeAO(wall, { occluders: [base], reach: 2.4, strength: 0.6, rays: 12 });
+  if (look === 0) {
+    bakeAO(base, { occluders: [wall], reach: 2.4, strength: 0.6, rays: 12 });
+    bakeAO(wall, { occluders: [base], reach: 2.4, strength: 0.6, rays: 12 });
+  } else {
+    // V4: os visuais 1–3 levam o degradê de altura dos outros prédios (toRoundModel), não o raio de oclusão (~0,2 s por modelo com a máquina livre):
+    // com 4 visuais a Copacabana monta 3× mais prédios da orla, e o raio dobrava o tempo de montar a pista.
+    shadeY(wall, 0, H + 3, 0.82, 1.05);
+  }
   shadeY(base, -1, H + 3, 0.78, 1.06);
   const parts: ModelPart[] = [{ geometry: base, mat: 'flat', shadow: true }, { geometry: wall, mat: 'apartment', shadow: true }, { geometry: merge(glow), mat: 'glow' }];
   return { parts, blob: 0 };
