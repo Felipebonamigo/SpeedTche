@@ -14,6 +14,7 @@
 | 2 | **Véu magenta no entardecer e na noite**: carro branco rosa, asfalto roxo, pouco contraste | Modelo de bolso da luz do three (hemisférica + IBL do domo + sol + autoluz → Neutral → gradação; `tests/cor-brilho.test.ts`), que reproduz a captura (asfalto de Paraty: modelo 35,0,52 × imagem 32,0,53; carro branco 162,108,159 × 160,107,163): (a) a **luz que cai nos objetos é roxa/rosa saturada**: `hemiSky` `#8a6ad2` no entardecer e `#4a66b8`/`#5a5aa8` à noite (`palette.ts:310`, `:317`), sol `#ffab62` (`:309`) e a **IBL difusa** = o próprio domo magenta (`sky.ts:401-410`; na traseira do carro ela é a maior parcela: 0,20 de vermelho contra 0,05 de verde); (b) a tinta das sombras da gradação sai dessa hemisférica (`stylize.ts:89`) e o terminador do entardecer é rosa (`#ff3a5a`, `:111`); (c) o **pé do Neutral do three** (`NeutralToneMapping`: subtrai o MENOR canal dos escuros) transforma qualquer tinta de um escuro em cor saturada: o asfalto cinza-arroxeado (49,44,56) sai 23,13,37 — é o "R = 0"/"G = 0" que a M2 já tinha visto; (d) o albedo do asfalto puxa para o vinho/marinho (`palette.ts:244-246`, `:330`). | A cor forte fica no **céu, na névoa e no reflexo**; a luz que cai nos objetos tem saturação limitada: hemisférica e sol do entardecer/noite em tons quase neutros (o sol quente, a sombra fria), **IBL difusa dessaturada** por um uniforme da estilização (só o difuso; o reflexo do céu continua com cor), o **pé do Neutral aplicado à luminância** (sem mudar o matiz) no entardecer e na noite, terminador quente (laranja, não rosa) e asfalto neutro-quente. Tudo derivado da paleta (`light`): a corrida que muda (M6) interpola sem programa novo. **O dia não muda** (trava: Copacabana). |
 | 3 | **Lanternas chapadas**: círculos vermelhos uniformes | `cars/material.ts:174`: emissivo = cor da lente × 0,9 (dia) ou 1,3 (noite) (`cars.ts:262`): luminância 0,30 à noite, abaixo do limiar do bloom (1,6) — nunca brilha —, e a lente toda com o mesmo valor (`aMat.w` = 1 em todos os vértices). | Lente com **miolo e borda** (o `aMat.w` cai do centro da tampa para a borda: já é um leque com vértice central) e emissivo **HDR por período** com o miolo esquentando para laranja-branco: à noite passa do limiar (halo do bloom, com teto), de dia fica abaixo (discreto); o freio sempre mais forte. |
 | 4 | **Pintura sem reflexo** | O verniz é o `clearcoat` só na Alta, refletindo o PMREM de um gradiente liso (sem horizonte): na lataria branca, branco sobre branco; na Média nada. | **Verniz estilizado** no shader do carro (sem chamada nova, sem programa por quadro): reflexo analítico do céu do período (topo → horizonte) e do chão escuro abaixo da linha do horizonte, por Fresnel, só na lataria pintada; cores em uniformes compartilhados da estilização (`setStylizePalette`), força por degrau (Baixa 0). Ideia do protótipo `nc/estilo-carros` (`aplicar.ts`, tinta "céu em cima, chão dos lados"), sem o protótipo. |
+| 5 | **Chama do nitro: duas gotas brancas opacas e bulbosas** atrás do carro (acréscimo do coordenador; galeria `main-f241703`: Paraty, Fuji, Xingó) | É a **malha da chama** (`cars/flame.ts`), **não** a onda de choque da M5 (`fx/shockwave.ts`): o teste GL isola a malha (mesmo quadro, com e sem ela, os `fx-*` escondidos) e mede 46% dos pixels dela quase brancos de dia. (a) gota de barriga a 25% (raio 0,5 × largura 0,5 = 0,25 m), redonda vista de trás; (b) a normal ia ao mundo pela matriz direta (`mat3(m) * normal`) numa malha esticada 4,6× ao longo: as normais deitavam para trás e, de trás, a chama inteira "encarava" a câmera — o núcleo branco (`pow(vFacing, 2.2)`) cobria tudo; (c) ganho HDR 2,0–2,6 com o miolo puxado ao branco: estourava e acendia o bloom; (d) a tampa do bico, de frente para a câmera de corrida, entrava inteira no núcleo. | Língua que abre na boca e só afina (0,46 × 2,2 m: comprimento 7,5× o diâmetro); normal pela inversa da escala; corpo amarelo-laranja → laranja → vermelho que apaga até a ponta e tremula, em cores saturadas; núcleo azul-branco só na boca, mais fraco que o corpo; máximo 1,25× (sem HDR); força pela luz do período (`uFlameGain` 1 · 0,85 · 0,7); blend pré-multiplicado com a cobertura do fundo pela luz (`uFlameCover` 0,5 · 0,3 · 0,12: de dia o laranja se lê, à noite quase só soma); "Reduzir efeitos" mais curta (0,6×) e mais fraca (0,5×). Mesma malha (mesmos 144 triângulos), mesma chamada, mesmo programa (dois uniformes a mais). |
 
 ## 2. Testes escritos antes (cada um visto falhar pelo motivo certo)
 
@@ -32,6 +33,10 @@
 | GL: teto do bloom (halo de um ponto HDR 200 ≤ 3 × o de HDR 6) | halo proporcional ao HDR |
 | GL: Cânion e Sampa, região da pista à frente com faróis ÷ sem faróis, e pixels estourados | Cânion ~3× |
 | GL: o carro branco na captura (traseira) não é rosa/roxo no entardecer e à noite | croma 0,42 (Cânion) |
+| Chama: afina a partir do escape (raio máximo em t ≤ 0,15) e comprimento ≥ 5× o diâmetro | raio máximo 0,50 em t = 0,25 |
+| Chama: "Reduzir efeitos" mais curta (≤ 0,7×) e mais fraca (≤ 0,6×) | igual (1 > 0,7) |
+| Chama: força à noite ≤ 0,75× a do dia | sem uniforme (1 > 0,75) |
+| GL: a chama isolada, de trás na câmera de corrida, de dia e à noite: ≤ 5% quase branca e soma quente (R ≥ G ≥ B) | 46% quase branca, soma `rgb(185,174,164)` |
 
 ## 3. Restrições (não quebrar)
 
@@ -71,10 +76,31 @@ sobre a luminância); (5) `tests/car-material.test.ts`: chave do programa `speed
 
 **Depois** (mesmas medidas): teto do bloom 753 × 753 (1,0×); Cânion 1,07× (estourados +0,004%); Sampa 1,08× (+0,013%); carro branco no entardecer
 (Cânion) `rgb(243,207,185)`/`rgb(244,208,186)` (croma 0,24, quente, não rosa) e à noite (Sampa) `rgb(143,139,147)` (cinza; era `rgb(107,108,179)`, azul-roxo).
-Na captura 1280×720 do Cânion: carro `255,150,135` → `250,201,177`; asfalto `89,57,83` → `80,70,72`; sombra no asfalto `37,1,48` → `22,7,12`.
+Nas capturas 1280×720 (pixels, antes → depois): **Cânion** — o meio do clarão `255,247,219` → `143,86,72` (o carro à frente), a traseira do carro branco
+`255,150,135` → `243,209,190`, o asfalto `89,57,83` → `79,71,74`, a sombra no asfalto `37,1,48` → `17,7,12`; **Sampa** — a traseira do carro branco `88,80,143` →
+`126,118,122`, o asfalto `63,56,79` → `67,61,65`, a pista acesa pelo farol `88,88,89` → `104,88,68`; **lanterna** do jogador no Cânion: disco chapado
+`255,114,111` → coroa `255,110,107` e miolo `255,187,152`.
 
 **Contagens, sem FPS** (harness 1280×720, Alta): chamadas e triângulos **iguais** antes e depois nas 5 cenas — copacabana 73 / 274.172, canion 62 / 224.656,
 paraty 76 / 301.728, sampa_noite 71 / 301.953, split4 285 / 917.986. O verniz e a lente com miolo não criam chamada (aritmética no shader + 1 atributo de 1 byte por
 vértice); nenhum passe novo (o teto é dentro do filtro de brilho do bloom). Programas: a chave do carro (v4) e a da estilização (v2) mudaram (compilados na carga).
 `NC_REQUIRE_GL=1 npx vitest run tests/cor-brilho-gl.test.ts tests/corrida-que-muda-gl.test.ts tests/gl-render.test.ts`: `Test Files  3 passed (3)` ·
 `Tests  23 passed (23)` (5172 s, com a máquina a ~45 de carga; código do commit d10177b).
+
+**Chama do nitro (acréscimo do coordenador).** A gota branca é a **malha da chama**, não a onda de choque/halo da M5: o laboratório (`flameDiff`) desenha o mesmo
+quadro, no mesmo instante, com e sem a malha, com os `fx-*` escondidos — no 150dd01 a diferença é 46% de pixels quase brancos de dia. (O anel grande em volta
+do carro na folha `alpine` é a onda de choque do engate do nitro; ela não foi tocada.) Testes vistos falhar antes do código: `tests/cor-brilho.test.ts` §5 —
+`raio máximo 0.50 em t = 0.25: expected 0.25 to be less than or equal to 0.15`, "Reduzir efeitos" `expected 1 to be less than or equal to 0.7`, noite × dia
+`expected 1 to be less than or equal to 0.75`; GL no 150dd01: `dia: fração quase branca da chama (soma rgb(77,80,72)): expected 0.124…` (1ª versão) e, com o teste
+final, `soma rgb(185,174,164)): expected 0.4604 to be less than or equal to 0.05`.
+**Teste mudado de propósito** (o meu, antes do merge, razão no comentário): a noite era `sampa_noite` 1400, onde a chama fica abaixo do quadro — a "diferença"
+lá era o tempo andando entre os dois quadros (tremor do nitro); passou a Copacabana com o período forçado (mesmo enquadramento do dia), os dois quadros no mesmo
+`tick` e a caixa mais justa. Medido (laboratório, Copacabana 1500, câmera de corrida): **150dd01** dia 45,9% quase branca, soma `rgb(185,175,164)`; noite 39,3%,
+`rgb(58,99,138)` (azul) → **depois** dia 0%, `rgb(134,87,46)`; noite 0%, `rgb(81,75,61)`. A malha mantém 144 triângulos e a mesma chamada; o programa da chama é o
+mesmo (compila no 1º nitro como antes — não mudou nesta frente). Montagem: `scratch/cor-brilho/antes-depois-chama.png` (Fuji da galeria, Copacabana dia e
+noite, Sampa noite, Paraty, "Reduzir efeitos", traseira 3/4 e lado) e a folha das 8 chamas escolhidas (`chama/antes-escolhidas.png` × `chama/depois-escolhidas.png`).
+
+**Folha (`tools/folha-copas.ts`).** Só `combinacoes` (18 cenas), não `ambos`: com a máquina a 15–45 de carga e o cadeado global de captura, cada cena levou
+~10 min. Montagem `scratch/cor-brilho/antes-depois-combinacoes.png`. O "depois" da folha saiu da árvore congelada do c0a1c4a (antes da chama): as gotas brancas
+ainda aparecem nela; a chama nova está só na montagem dela.
+

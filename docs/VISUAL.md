@@ -769,10 +769,15 @@ Os defeitos da auditoria visual de 14/10/2026 (`docs/ondas/cor-brilho.md`, teste
 - **A luz que cai nos objetos é quase neutra; a cor forte fica no céu, na névoa e no reflexo.** Entardecer e noite: hemisférica e sol/lua pouco saturados
   (`palette.ts`), a IBL difusa do domo dessaturada (`uStylizeFill`, só o difuso), o pé do Neutral sobre a luminância (`stylizeNeutral`, `uGradeAdjust.z`)
   e o asfalto neutro-quente. De dia nada muda (trava). `lateness(light)` liga isso contínuo na corrida que muda.
-- **Lanternas**: a lente tem miolo e borda (`kit.ts`, `lensFalloff`: o emissivo cai do centro do leque para `LENS_RIM`) e brilho HDR por período
+- **Lanternas**: a lente tem miolo e borda (`kit.ts`, `lensRadius` → atributo `aLens`: o emissivo cai do centro do leque para `LENS_RIM`) e brilho HDR por período
   (`cars/material.ts`, `tailGlow`/`lampEmission`): acima do limiar do bloom à noite, abaixo de dia; o miolo esquenta para laranja-branco.
 - **Verniz estilizado** (`cars/material.ts`, `carVarnish`): a lataria pintada reflete o céu do período e o chão escuro abaixo da linha do horizonte, por
   Fresnel, com as cores de `setStylizePalette` (`uStylizeSky*`); 0 na Baixa. Sem amostra de textura nem chamada nova.
+- **Chama do nitro de fogo** (`cars/flame.ts`): língua que abre na boca do escape e só afina (`FLAME_SIZE` 0,46 × 2,2 m), corpo amarelo-laranja →
+  vermelho que apaga e tremula, núcleo azul-branco só na boca; normal pela inversa da escala (a direta deitava as normais e, de trás, a chama inteira
+  virava núcleo branco); sem ganho HDR (máx. 1,25×). Força e cobertura do fundo pela luz do período (`flameGain`, `flameCover`, blend pré-multiplicado:
+  de dia o laranja cobre metade do fundo e se lê, à noite quase só soma); "Reduzir efeitos" a encurta e enfraquece (`FLAME_REDUCED`). A cor escolhida
+  (N3) continua tingindo o corpo. A M5 (onda de choque, halo) não mudou: a gota branca era a malha da chama.
 
 ## Câmeras selecionáveis (frente `nc/cameras`)
 
