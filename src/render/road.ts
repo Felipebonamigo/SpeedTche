@@ -7,9 +7,10 @@ import * as THREE from 'three';
 import type { Segment, Track } from '../core/types';
 import { lightsAmount, mix, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
+import type { Quality } from '../game/contracts';
 import {
   ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintShoulder, paintStartDecal, PIT_REPEAT_M,
-  PIT_X0, PIT_X1, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND,
+  PIT_X0, PIT_X1, ROAD_ANISOTROPY, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND,
 } from './road-textures';
 import type { RoadFrame } from './roadframe';
 import { LAMP_HEAD_X } from './scenery/props';
@@ -204,7 +205,11 @@ export class Road {
   private readonly cBand = [new THREE.Color(), new THREE.Color()];
   private readonly dummy = new THREE.Object3D();
 
-  constructor(capacity: number, private readonly anisotropy: number) {
+  /** Anisotropia das texturas da pista: a da qualidade (`ROAD_ANISOTROPY`), limitada pelo que a placa aceita (`maxAnisotropy`). */
+  private anisotropy: number;
+
+  constructor(capacity: number, private readonly maxAnisotropy: number) {
+    this.anisotropy = Math.max(1, Math.min(8, maxAnisotropy));
     // polygonOffset: com a pista fechada (M6) um trecho cruza outro e as faixas de chão do primeiro passam por baixo do asfalto do segundo, no mesmo plano: a pista vence.
     this.asphaltMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, emissive: '#ffffff', emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     this.shoulderMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
@@ -254,6 +259,17 @@ export class Road {
     this.pit.mesh.position.y = 0.012;
     this.decal.mesh.position.y = 0.015;
     this.decal.mesh.renderOrder = 1;
+  }
+
+  /**
+   * V4: a anisotropia das texturas da pista pela qualidade (Baixa 4, Média 8, Alta e Ultra 16; limitada pela placa). Só parâmetro de amostragem: as
+   * texturas são reenviadas uma vez (nenhum programa compila).
+   */
+  setQuality(q: Quality): void {
+    const a = Math.max(1, Math.min(ROAD_ANISOTROPY[q], this.maxAnisotropy));
+    if (a === this.anisotropy) return;
+    this.anisotropy = a;
+    for (const t of this.textures) { t.anisotropy = a; t.needsUpdate = true; }
   }
 
   /**
