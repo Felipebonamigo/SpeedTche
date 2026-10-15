@@ -113,7 +113,7 @@ livre, segundos sob carga).
 Memória de vídeo a mais (conta, não medida em GPU): asfalto 2 → 4 MB por ponta da corrida que muda, atlas de fachada 4 × 2 de 256² → 512², atlas de nuvem 2 MB: ~+16 MB
 com os mipmaps. Programas: a fachada (chave `speed-tche-facade-atlas-v1`), a nuvem e o mar mudam de shader, compilados na carga como antes.
 
-**Galeria antes × depois:** `scratch/galeria/comparar-main-550e970-vs-pistas.png` (cenas 01–06 e 08). `7 de 13 cenas mudaram · 6 sem imagem num dos lados · contagens que subiram em 0` (as 6 sem imagem ficaram fora do `--so`: carros, menus, largada, derrapagem e 2 jogadores não são desta frente).
+**Galeria antes × depois:** `scratch/galeria/comparar-main-550e970-vs-pistas.png` (cenas 01–06 e 08). A galeria é do 2efa7a5; o 9e436bb, depois dela, só troca o raio de oclusão dos visuais 1–3 do prédio da orla pelo degradê de altura. `7 de 13 cenas mudaram · 6 sem imagem num dos lados · contagens que subiram em 0` (as 6 sem imagem ficaram fora do `--so`: carros, menus, largada, derrapagem e 2 jogadores não são desta frente).
 
 **O que ainda está feio (para o dono):**
 1. **Asfalto de dia à sombra é azul-marinho** (Copacabana, `(0,40,98)` na captura; `(18,54,106)` ao sol no modelo da cor-brilho). É a luz do dia — hemisférica azul +
