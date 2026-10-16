@@ -181,8 +181,10 @@ function overlapsOf(track: Track, layout: Layout): Found {
 
 // Teto, por pista, dos sprites do núcleo (sólidos ou não) que caem na pista de outro trecho (medido na M6 com o layout já limpo; só desce).
 // Nada a fazer no render: a colisão os quer onde estão. Pista fora da tabela = 0.
+// T4 (as praças na escala da pista): 3 subiram — lago_paranoa 25 → 26, baia_toquio 74 → 75, osaka_neon 135 → 138 (a praça mudou de lugar e o prédio
+// que ela tirava por acaso, em cima de outro trecho, voltou); total 1.006 → 1.011.
 const SOLID_CEILING: Readonly<Record<string, number>> = {
-  serra_dos_orgaos: 13, ilhabela: 11, campos_do_jordao: 9, ouro_preto: 90, serra_do_mar: 48, camboriu: 23, rio_do_rastro: 8, lago_paranoa: 25, chapada_veadeiros: 31, chapada_guimaraes: 6, maragogi: 21, joao_pessoa: 13, pedra_da_boca: 2, natal: 20, delta_parnaiba: 28, lencois: 22, serra_do_navio: 18, geoglifos: 7, jalapao: 40, rota_66: 30, canion: 35, las_vegas: 69, baia_toquio: 74, monte_fuji: 80, osaka_neon: 135, autobahn: 14, passo_alpino: 65, monaco_noite: 69,
+  serra_dos_orgaos: 13, ilhabela: 11, campos_do_jordao: 9, ouro_preto: 90, serra_do_mar: 48, camboriu: 23, rio_do_rastro: 8, lago_paranoa: 26, chapada_veadeiros: 31, chapada_guimaraes: 6, maragogi: 21, joao_pessoa: 13, pedra_da_boca: 2, natal: 20, delta_parnaiba: 28, lencois: 22, serra_do_navio: 18, geoglifos: 7, jalapao: 40, rota_66: 30, canion: 35, las_vegas: 69, baia_toquio: 75, monte_fuji: 80, osaka_neon: 138, autobahn: 14, passo_alpino: 65, monaco_noite: 69,
 };
 
 describe('M6 (a): o cenário da pista fechada', () => {

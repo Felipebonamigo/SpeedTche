@@ -10,7 +10,7 @@
 import { placeOf } from '../data/places';
 import { hashString } from '../rng';
 import type { Track } from '../types';
-import { centerline, sightNeed, SIGHT_MODEL, type Centerline } from './sightline';
+import { centerline, clearOfRoad, sightNeed, SIGHT_MODEL, type Centerline } from './sightline';
 import { FIRST_WINDOW, START_STANDS, startZoneEnd } from './startzone';
 
 /** O que o núcleo precisa saber de um marco para abrir a praça dele (o registro do renderizador tem o resto). */
@@ -65,6 +65,16 @@ export const LANDMARK_PLAZAS: Readonly<Record<string, PlazaSpec>> = {
   cupula_azul: near(1, 'land'), moinho_santorini: near(1, 'land'),
 };
 
+/**
+ * Meio comprimento (m, ao longo da pista) dos marcos compridos de perto e de longe (≥ 150 m: as pontes, as dunas): a praça não fica onde o resto
+ * da pista passa pela pegada deles (`clearOfRoad`). `tests/landmarks-pracas.test.ts` confere com a caixa do modelo (render/scenery/catalog.ts).
+ */
+export const LANDMARK_HALF_M: Readonly<Record<string, number>> = {
+  ponte_estaiada: 152, ponte_rio_negro: 710, ponte_palmas: 360, harbour_bridge: 235, dunas_itaunas: 155, terceira_ponte: 261,
+  ponte_hercilio_luz: 250, ponte_jk: 420, ponte_aracaju: 337, ponte_newton_navarro: 513, morro_do_careca: 165, duna_por_do_sol: 160,
+  rainbow_bridge: 235, ponte_storseisundet: 174,
+};
+
 /** Marco fora da tabela: duas praças de perto (o mais comum); o teste acusa a diferença. */
 const DEFAULT_PLAZA = near(2);
 
@@ -98,6 +108,11 @@ export const PLAZA_STEP = 64;
  * dentro da janela dele.
  */
 const PLAZA_SHIFT = 128;
+/**
+ * Folga (m) do resto da pista em volta do ponto de referência do marco (PLAZA_LAT): 90% da lateral. O layout pede 26 m da borda da pegada; o de
+ * perto tem a borda a ~30 m e o centro a ~50. Mais exigente (60 m no de perto) foi medido pior: sem lugar livre, a escolha volta ao de antes.
+ */
+const PLAZA_ROAD_GAP = { near: 45, far: 135 } as const;
 /** Quanto (segmentos) o layout pode pôr o marco longe do lugar da praça (render/scenery/layout.ts): ±4. */
 export const PLAZA_SLACK = 4;
 
@@ -201,7 +216,7 @@ function taken(plazas: readonly Plaza[], n: number, side: number, from: number, 
 function choose(track: Track, line: Centerline, done: readonly Plaza[], landmark: string, rep: number, place: 'near' | 'far', ideal: number, sides: ReadonlyArray<-1 | 1>, win: Window | null, shift: number): { plaza: Plaza; at: number } | null {
   const n = track.segments.length;
   const depth = SIGHT_MODEL.depthM[track.def.timeOfDay];
-  let best: { plaza: Plaza; at: number; seen: number; cost: number } | null = null;
+  let best: { plaza: Plaza; at: number; seen: number; cost: number; clear: boolean } | null = null;
   for (let o = 0; o <= 2 * PLAZA_SHIFT; o += 8) {
     const off = o === 0 ? 0 : (o % 16 === 8 ? 1 : -1) * Math.ceil(o / 16) * 8;
     const at = ideal + off;
@@ -221,10 +236,12 @@ function choose(track: Track, line: Centerline, done: readonly Plaza[], landmark
       const across = other[0] <= other[1] && other[0] - k + at <= to ? { from: other[0] - k + at, to: Math.min(other[1] - k + at, to) } : null;
       const cost = (to - from + 1) + (across ? across.to - across.from + 1 : 0) + Math.abs(off) / 2;
       const seen = Math.min(need.seenM, SIGHT_MODEL.needM);
-      if (!best || seen > best.seen || (seen === best.seen && cost < best.cost)) {
+      // Primeiro os lugares longe do resto da pista (o layout não põe o marco onde outro trecho passa perto: a praça ficaria sem ele).
+      const clear = clearOfRoad(line, k, side * PLAZA_LAT[place], PLAZA_ROAD_GAP[place], LANDMARK_HALF_M[landmark] ?? 0);
+      if (!best || (clear && !best.clear) || (clear === best.clear && (seen > best.seen || (seen === best.seen && cost < best.cost)))) {
         const f = ((from % n) + n) % n;
         const a = across ? { from: ((across.from % n) + n) % n, to: ((across.from % n) + n) % n + (across.to - across.from) } : null;
-        best = { plaza: { landmark, rep, place, side, at: wrap, from: f, to: f + (to - from), across: a }, at, seen, cost };
+        best = { plaza: { landmark, rep, place, side, at: wrap, from: f, to: f + (to - from), across: a }, at, seen, cost, clear };
       }
     }
   }

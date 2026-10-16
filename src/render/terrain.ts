@@ -15,7 +15,7 @@ import { smoothNormals } from './normals';
 import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
 import type { RoadFrame } from './roadframe';
-import { inClearing } from './scenery/clearings';
+import { clearingsOf, inClearing } from './scenery/clearings';
 import { windowTextures } from './textures';
 import { HEADING_PER_CURVE, SEGMENT_M, turnPerCurve, Y_SCALE } from './units';
 
@@ -455,6 +455,20 @@ function groundColorsOf(p: Palette): GroundColors {
   };
 }
 
+/**
+ * A quadra (centro em x, z; meia largura ~25 m) cai numa clareira de marco vista no espaço: do lado dele, entre a pista e a borda da clareira, de
+ * `back` antes a `ahead` depois do segmento dele (terrain.ts, `updateCityBlocks`).
+ */
+function inZone(zones: ReadonlyArray<{ x: number; z: number; c: number; s: number; side: number; lat: number; back: number; ahead: number }>, x: number, z: number): boolean {
+  for (const q of zones) {
+    const dx = x - q.x; const dz = z - q.z;
+    const lat = (dx * q.c + dz * q.s) * q.side;
+    const along = dx * q.s - dz * q.c;
+    if (lat > 0 && lat - 25 <= q.lat && along > -q.back - 25 && along < q.ahead + 25) return true;
+  }
+  return false;
+}
+
 export class Terrain {
   readonly group = new THREE.Group();
   /** Planos do horizonte e skyline: giram pelo rumo absoluto. */
@@ -868,6 +882,17 @@ export class Terrain {
     const d = this.dummy;
     const segs = track.segments;
     const turn = turnPerCurve(track);
+    // T4: a clareira também no espaço. Com o traçado do mapa a pista volta perto de si mesma, e uma quadra de outro trecho (a 285 m dele) caía na
+    // pegada do MASP: as clareiras que estão no quadro, no referencial do segmento do marco.
+    const zones: Array<{ x: number; z: number; c: number; s: number; side: number; lat: number; back: number; ahead: number }> = [];
+    for (const c of clearingsOf(track)) {
+      for (let j = 0; j < frame.count; j++) {
+        if (frame.segIndex[j] !== c.seg) continue;
+        const h = frame.heading[j];
+        zones.push({ x: frame.px[j], z: frame.pz[j], c: Math.cos(h), s: Math.sin(h), side: c.side, lat: c.lat, back: c.back * SEGMENT_M, ahead: c.ahead * SEGMENT_M });
+        break;
+      }
+    }
     for (let j = 0; j < frame.count; j += 2) {
       const s = segs[frame.segIndex[j]];
       const h = frame.heading[j];
@@ -883,8 +908,10 @@ export class Terrain {
         if (inside) dist = Math.min(dist, 0.9 * SEGMENT_M / (Math.abs(delta) + 1e-6));
         // Clareira de marco turístico (scenery/clearings.ts): a quadra não esconde o MASP nem a Ponte Estaiada.
         if (inClearing(track, s.index, side, dist - 25)) continue;
+        const bx = frame.px[j] + side * dist * cx; const bz = frame.pz[j] + side * dist * sz;
+        if (inZone(zones, bx, bz)) continue;
         const ws = 0.8 + hash2(s.index, side + 30) * 0.6;
-        d.position.set(frame.px[j] + side * dist * cx, frame.py[j] - 1, frame.pz[j] + side * dist * sz);
+        d.position.set(bx, frame.py[j] - 1, bz);
         d.rotation.set(0, -h + (hash2(s.index, side + 40) - 0.5) * 0.5, 0);
         d.scale.set(ws, 1, ws);
         d.updateMatrix();

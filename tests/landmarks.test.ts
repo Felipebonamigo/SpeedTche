@@ -320,10 +320,9 @@ describe('marcos turísticos: posição', () => {
         if (lat > 250) bad.push(`${c.placeId} ${id}#${seg}: borda a ${lat.toFixed(0)} m`);
       }
     }
-    // M6: as 5 pontes de longe que o traçado do mapa não deixa ver na faixa de dentro (a busca vai à faixa dobrada; ver landmarks-enquadramento.test.ts, M6_LIMITED).
-    const M6_FAR = ['sampa_noite ponte_estaiada#', 'floripa ponte_hercilio_luz#', 'aracaju ponte_aracaju#', 'baia_toquio rainbow_bridge#', 'lago_paranoa ponte_jk#'];
-    expect(bad.filter((b) => !M6_FAR.some((k) => b.startsWith(k)))).toEqual([]);
-    expect(M6_FAR.filter((k) => !bad.some((b) => b.startsWith(k))), 'saiam de M6_FAR').toEqual([]);
+    // A M6 deixou 5 pontes na faixa dobrada (Sampa, Hercílio Luz, Aracaju, Rainbow, JK): a praça do núcleo era aberta onde o resto da pista, já no
+    // traçado do mapa, passa pela pegada da ponte. A T4 tirou a praça dali (core/track/sightline.ts, `clearOfRoad`).
+    expect(bad).toEqual([]);
   }, 120000);
 
   it('é determinístico e as pistas existentes mostram os seus marcos (Copacabana: Cristo e Pão de Açúcar)', () => {

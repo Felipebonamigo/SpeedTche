@@ -8,15 +8,15 @@
 import { describe, expect, it } from 'vitest';
 import { placeOf } from '../src/core/data/places';
 import { getTrack, TRACKS } from '../src/core/track';
-import { LANDMARK_PLAZAS, landmarkPlazas, PLAZA_FRONT, PLAZA_LAT } from '../src/core/track/plazas';
-import { centerline, SIGHT_MODEL } from '../src/core/track/sightline';
+import { LANDMARK_HALF_M, LANDMARK_PLAZAS, landmarkPlazas, PLAZA_FRONT, PLAZA_LAT } from '../src/core/track/plazas';
+import { centerline, clearOfRoad, SIGHT_MODEL } from '../src/core/track/sightline';
 import { START_STANDS, startZoneEnd } from '../src/core/track/startzone';
 import type { Segment, Track } from '../src/core/types';
-import { LANDMARK_PREFIX } from '../src/render/scenery/catalog';
+import { LANDMARK_PREFIX, modelBounds } from '../src/render/scenery/catalog';
 import { LANDMARKS } from '../src/render/scenery/landmarks';
 import { sceneryLayout } from '../src/render/scenery/layout';
 import { LANDMARK_SIGHT_MIN, SIGHT_SPEED_MS, SIGHT_TAN_H, sightRoad, unrollTrack } from '../src/render/scenery/sight';
-import { HEADING_PER_CURVE, SEGMENT_M } from '../src/render/units';
+import { HEADING_PER_CURVE, SEGMENT_M, turnPerCurve } from '../src/render/units';
 
 /**
  * A frente de cada praça, do lado do marco, sem prédio (a folga de ±4 segmentos da busca do layout descontada): o de
@@ -31,8 +31,6 @@ const BLOCKERS = new Set(['building', 'tower', 'billboard']);
 const ROADSIDE = new Set(['city_night', 'coast']);
 const plazaTracks = TRACKS.filter((t) => ROADSIDE.has(t.scenery) && (placeOf(t.id)?.landmarks.length ?? 0) > 0);
 
-/** M6: os marcos de perto e de longe que a praça do núcleo (medida com o giro antigo) já não serve com o traçado do mapa; ficam onde o layout achou o melhor lugar. */
-const M6_NO_PLAZA: readonly string[] = ['curitiba opera_de_arame#', 'porto_seguro coqueiral#', 'maragogi jangada#', 'palmas ponte_palmas#'];
 
 describe('praças e mirantes: os marcos à vista de quem chega', () => {
   it('há pistas de cidade e de litoral com marcos para conferir', () => {
@@ -66,9 +64,9 @@ describe('praças e mirantes: os marcos à vista de quem chega', () => {
         }
       });
     }
-    // M6: as praças do núcleo foram abertas com o giro antigo (core/track/sightline.ts); com o traçado do mapa 4 marcos têm prédio na frente (ver landmarks-enquadramento.test.ts, M6_LIMITED).
-    expect(bad.filter((b) => !M6_NO_PLAZA.some((k) => b.startsWith(k)))).toEqual([]);
-    expect(M6_NO_PLAZA.filter((k) => !bad.some((b) => b.startsWith(k))), 'saiam de M6_NO_PLAZA').toEqual([]);
+    // M6 deixou 4 com prédio na frente (Ópera de Arame, coqueiral de Porto Seguro, jangada de Maragogi, ponte de Palmas): a praça era aberta com o
+    // giro antigo. A T4 levou a escala da pista ao núcleo (core/track/sightline.ts).
+    expect(bad).toEqual([]);
   }, 180000);
 
   it('todo marco perto/longe da cidade e do litoral fica na praça dele (o layout não precisou procurar outro lugar)', () => {
@@ -89,7 +87,7 @@ describe('praças e mirantes: os marcos à vista de quem chega', () => {
         }
       });
     }
-    expect(bad.filter((b) => !M6_NO_PLAZA.some((k) => b.startsWith(k)))).toEqual([]);
+    expect(bad).toEqual([]);
   }, 180000);
 
   it('o núcleo sabe quantas praças cada marco pede, de perto ou de longe e de que lado (= o registro; o do horizonte, nenhuma)', () => {
@@ -143,7 +141,6 @@ describe('a visada do núcleo (core/track/sightline.ts) é a conta do renderizad
 
   it('as mesmas unidades, o quadro no máximo o que conta, a névoa aquém da do período e o mínimo da tela com 10% de folga', () => {
     expect(SIGHT_MODEL.segmentM).toBe(SEGMENT_M);
-    expect(SIGHT_MODEL.headingPerCurve).toBe(HEADING_PER_CURVE);
     expect(SIGHT_MODEL.tanH).toBeLessThanOrEqual(SIGHT_TAN_H);
     expect(SIGHT_MODEL.tanH).toBeGreaterThan(SIGHT_TAN_H - 0.01);
     for (const time of ['day', 'dusk', 'night'] as const) {
@@ -157,11 +154,23 @@ describe('a visada do núcleo (core/track/sightline.ts) é a conta do renderizad
     expect(PLAZA_LAT.far / SIGHT_MODEL.tanH + SIGHT_MODEL.needM).toBeLessThan(SIGHT_MODEL.depthM.day);
   });
 
-  it('a linha central sem trigonometria é a do renderizador (≤ 1 cm em duas voltas de pistas de verdade)', () => {
-    for (const id of ['monaco_noite', 'roma', 'sampa_noite', 'maceio']) {
+  it('o giro por unidade de curva é um só, do núcleo: o 3D (render/units.ts) só o guarda em cache (T4)', async () => {
+    // Import dinâmico: antes da T4 o módulo não existia, e só este teste caía por isso.
+    const { HEADING_PER_CURVE: legacy, trackTurnPerCurve } = await import('../src/core/track/turn');
+    expect(legacy).toBe(HEADING_PER_CURVE);
+    for (const def of TRACKS) {
+      const track = getTrack(def.id);
+      expect(trackTurnPerCurve(track.segments), def.id).toBe(turnPerCurve(track));
+    }
+    expect(trackTurnPerCurve(fake('day').segments)).toBe(HEADING_PER_CURVE);
+  });
+
+  it('a linha central sem trigonometria é a do 3D, na escala da pista (≤ 1 cm em duas voltas, até nas curvas mais fechadas)', () => {
+    // Defeito da M6 (T4): o 3D passou a girar a escala da pista (turnPerCurve) e o núcleo continuava no giro antigo — as praças eram abertas para
+    // uma curva que o jogador não vê. aracaju e rota_66 têm a curva mais fechada (até 0,33 rad num segmento).
+    for (const id of ['monaco_noite', 'roma', 'sampa_noite', 'maceio', 'aracaju', 'rota_66', 'pampulha']) {
       const track = getTrack(id);
-      // O núcleo repete a escala legada (SIGHT_MODEL.headingPerCurve): a conta é a mesma, na mesma escala.
-      const a = centerline(track); const b = unrollTrack(track, HEADING_PER_CURVE);
+      const a = centerline(track); const b = unrollTrack(track);
       let worst = 0;
       for (let k = 0; k < a.px.length; k++) {
         worst = Math.max(worst, Math.abs(a.px[k] - b.px[k]), Math.abs(a.pz[k] - b.pz[k]));
@@ -169,6 +178,35 @@ describe('a visada do núcleo (core/track/sightline.ts) é a conta do renderizad
       }
       expect(worst, id).toBeLessThan(0.01);
     }
+  });
+
+  it('o lugar do marco é recusado onde outro trecho da pista passa perto (grampo), e a ponte pelo eixo inteiro (T4)', () => {
+    // Um estádio: 200 segmentos de reta, meia volta à direita em 20 (raio ~25 m), 200 de volta (a ~51 m da ida), meia volta, fecha.
+    const segments: Segment[] = [];
+    const curve = (i: number) => ((i >= 200 && i < 220) || i >= 420 ? 20 : 0);
+    for (let i = 0; i < 440; i++) segments.push({ index: i, z: i * 200, curve: curve(i), y0: 0, y1: 0, band: 0, pit: false, sprites: [] });
+    const stadium = { def: { id: 'estadio', scenery: 'city_night', timeOfDay: 'day' }, segments, length: 440 * 200, startIndex: 0 } as unknown as Track;
+    const line = centerline(stadium); const n = line.n;
+    // A volta fecha (a escala da pista: meia volta por grampo).
+    expect(Math.abs(line.px[2 * n] - line.px[0]) + Math.abs(line.pz[2 * n] - line.pz[0])).toBeLessThan(0.01);
+    // Do lado de dentro da ida (direita) a volta passa a ~51 m: um marco de perto a 50 m ficaria em cima dela; do lado de fora, livre.
+    expect(clearOfRoad(line, n + 100, 50, 45)).toBe(false);
+    expect(clearOfRoad(line, n + 100, -50, 45)).toBe(true);
+    // Uma ponte estreita a 30 m: o ponto do meio cabe numa folga de 25 m, o eixo dela não (os 26 m do layout mais a meia largura).
+    expect(clearOfRoad(line, n + 100, -30, 25)).toBe(true);
+    expect(clearOfRoad(line, n + 100, -30, 25, 250)).toBe(false);
+    expect(clearOfRoad(line, n + 100, -60, 45, 250)).toBe(true);
+  });
+
+  it('o núcleo sabe o meio comprimento dos marcos compridos (≥ 150 m) de perto e de longe: o da caixa do modelo (T4)', () => {
+    const want: Record<string, number> = {};
+    for (const [id, spec] of Object.entries(LANDMARK_PLAZAS)) {
+      if (spec.place === 'skyline' || !LANDMARKS[id]) continue;
+      const b = modelBounds(LANDMARK_PREFIX + id);
+      const half = Math.max(-b.minZ, b.maxZ);
+      if (half >= 150) want[id] = Math.round(half);
+    }
+    expect(LANDMARK_HALF_M).toEqual(want);
   });
 });
 

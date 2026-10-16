@@ -32,3 +32,8 @@ export function inClearing(track: Track, seg: number, side: number, dist: number
   }
   return false;
 }
+
+/** As clareiras da pista (vazio sem marco). */
+export function clearingsOf(track: Track): readonly Clearing[] {
+  return byTrack.get(track) ?? [];
+}
