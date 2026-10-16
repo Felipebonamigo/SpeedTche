@@ -213,3 +213,36 @@ render-normals cosmetics* cars`): `Test Files  27 passed (27)` · `Tests  618 pa
 0,99 m) e lê mais "protótipo de Le Mans" que Countach; no lod1 do hipercarro o painel preto de trás (3 segmentos) não acompanha a planta redonda nos
 cantos de baixo; na câmera de capô do hipercarro aparecem pedaços claros na borda de baixo (o vidro cortado da cabine em gota, a conferir); o farol em fenda quase não se vê à noite.
 Nas capturas: 52 chamadas de dia e 55 à noite, iguais antes e depois.
+
+### 11. Rodada de realismo do GT (16/10/2026)
+
+Folha: `scratch/real/folha-realismo.png` (HCT × GT de agora × GT realista: corrida de dia de fábrica e de rubi, 3/4 traseira, noite, garagem).
+
+O dono aprovou o GT e pediu "mais perto do real, igual os do Horizon Chase Turbo; até um pouco mais real". Antes de replicar para os 12, uma rodada
+no GT, medida contra a captura dele (`ref-hct.webp`, a câmera de corrida atrás de um supercarro vermelho ao entardecer). Cada item com teste visto
+falhar antes; o que a medida desmentiu ficou de fora.
+
+**O que mudou** (commits `31f8995`, `2f15bb3`):
+1. **A tinta guarda o matiz** (o maior ganho). Medido no laboratório GL (câmera de corrida de dia, GT de rubi sem faixa): a tampa saía **rosa**
+   (178,79,122; 19° fora do matiz da tinta) e o para-choque **magenta** (88,10,62; 32°) — o reflexo e a luz do céu azul tingiam a lataria inteira.
+   `carPaintHold` (`cars/material.ts`, `PAINT_HOLD = 0,7`, chave `speed-tche-car-v6`): depois de toda a luz, a cor da lataria pintada volta 70% para a
+   croma da tinta com a mesma luminância; o brilho estourado (realce do sol, linha do horizonte) fica branco. Depois: tampa 193,41,84 (7°), para-choque
+   109,4,46 (16°). Vale para todos os carros (um material só); o cromado, o perolado e o camaleão ficam de fora (mudam de cor de propósito).
+2. **Sombra de contato** (`blobAlpha`, `render/textures.ts`): 0,62 → 0,9 no meio da pegada, 0,23 → 0,37 rente à soleira, justa (some ~30 cm fora).
+3. **Mais baixo**: a saia do GT a 14 cm do chão (era 18). O para-lama já ficava a 2 cm do pneu (o arco é limitado pela borda do casco).
+4. **Forma**: `Hull.detail` (facetas do arco, topo fino com um ponto a mais em cada trecho de cima) e `Hull.crisp` (o ombro sai do vinco da cintura
+   acima dos 45° do vinco das normais: a linha da cintura fica nítida, com reflexo próprio). 3.804 → **4.388 △** (+584 por GT perto), lod1 1.500
+   (34%).
+
+**O que a medida desmentiu**: (a) "a lataria é chapada" — a face em pé já tinha 60% do brilho da deitada (o teste de razão passou antes de qualquer
+mudança e foi descartado; o problema era o matiz, não o claro e escuro); (b) "o para-lama longe da roda" — 2 cm, o teste passou antes e saiu.
+
+**Gate de contagem** (`lab.collect()`, 640×360, máximo por viewport; chamadas iguais em toda cena): com as estações dobradas (5.692 △) Sampa 4p
+estourava — Média 338.944 → 354.048 (limite 345.000), Alta/Ultra 372.559 → 387.663 (limite 380.000); a copa cabia (copa-4p Alta 294.481 →
+302.033 de 340.000). Ficou a versão de 4.388 △, que cabe sem mexer em limite nem no orçamento do casco (4.500): medida de novo, Sampa 4p Média **343.616** (de
+345.000: sobra 1.384, apertado), Alta **377.231** e Ultra 377.236 (de 380.000); copa-4p Média 268.558, Alta 296.817; Baixa igual (usa o lod1). Mais faces que isso pede subir o
+limite de Sampa 4p (decisão do dono: o `--bench` diz se o Deck aguenta).
+
+**Ainda longe do HCT** (próximos passos, por ganho): a lanterna de dia não tem o miolo laranja aceso do HCT (o cor-brilho segura o miolo abaixo do
+bloom de dia, de propósito); o vidro lê azul-marinho (o HCT pinta preto); a roda continua a `sport5` sem flanco de pneu nem aro fundo (o desenho é de
+todos os estilos, `wheels.ts`); o casco ainda é poligonal no ombro de trás.
