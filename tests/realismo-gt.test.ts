@@ -34,9 +34,10 @@ describe('GT: postura e forma', () => {
     expect(Math.min(...ys)).toBeLessThanOrEqual(0.15);
   });
 
-  it('mais faces no casco (5.000–8.000 △) e o lod1 ≤ 45% dele', () => {
-    expect(gt.triangles).toBeGreaterThanOrEqual(5000);
-    expect(gt.triangles).toBeLessThanOrEqual(8000);
+  it('mais faces no casco (≥ 4.300 △, era 3.804) dentro do orçamento do jogo (4.500) e o lod1 ≤ 45% dele', () => {
+    // 5.692 △ (estações dobradas) estourava o gate de Sampa 4p na Média em 2,6% (docs/ondas/V2-gt.md §11): ficou o arco de 9 facetas e o topo fino.
+    expect(gt.triangles).toBeGreaterThanOrEqual(4300);
+    expect(gt.triangles).toBeLessThanOrEqual(4500);
     expect(MODEL_BUILDERS.gt(1).triangles / gt.triangles).toBeLessThanOrEqual(0.45);
   });
 

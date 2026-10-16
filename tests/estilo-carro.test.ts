@@ -10,7 +10,7 @@ import { CAR_LIMITS } from '../src/render/cars/check';
 import type { CarModel } from '../src/render/cars/model';
 import { MODEL_BUILDERS, buildModel } from '../src/render/cars/models';
 
-const META = { shellMax: 8000, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.92, lodMax: 0.5, exhaustR: 0.055, glassMetal: 0.85, glassRough: 0.06 } as const;
+const META = { shellMax: 4500, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.92, lodMax: 0.5, exhaustR: 0.055, glassMetal: 0.85, glassRough: 0.06 } as const;
 /**
  * Estilos já no desenho HCT (V2, docs/ondas/V2-gt.md): a diretriz nova do dono ("um pouco mais realista que o Horizon Chase Turbo", 13–14/10)
  * substitui a cabine bolha de cartum da M4 — o vidro do HCT2 aprovado tem caimento de carro de verdade. Neles a bolha não vale; o caimento é
@@ -184,7 +184,7 @@ describe('estilo do carro: LOD de casco', () => {
 });
 
 describe('estilo do carro: o teto do casco subiu de propósito', () => {
-  it('CAR_LIMITS.maxShellTriangles = 8.000 (V2, realismo; era 4.500) e os 13 cabem', () => {
+  it('CAR_LIMITS.maxShellTriangles = 4.500 e os 13 cabem', () => {
     expect(CAR_LIMITS.maxShellTriangles).toBe(META.shellMax);
     for (const body of CAR_BODIES) expect(get(body).triangles, body).toBeLessThanOrEqual(META.shellMax);
   });

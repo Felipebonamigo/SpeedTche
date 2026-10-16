@@ -48,8 +48,8 @@ describe('carro em glTF: o validador da convenção', () => {
     for (let i = 0; i < mat.count; i++) mat.setW(i, 0);
     expect(checkCarModel(dark).join(' | ')).toMatch(/lanterna/);
 
-    const heavy = { ...MODEL_BUILDERS.micro(), triangles: CAR_LIMITS.maxShellTriangles + 100 }; // o teto subiu para 4.500 na M4 e para 8.000 na V2 (realismo)
-    expect(checkCarModel(heavy).join(' | ')).toMatch(/8\.100 triângulos/);
+    const heavy = { ...MODEL_BUILDERS.micro(), triangles: CAR_LIMITS.maxShellTriangles + 100 }; // o teto subiu para 4.500 na M4
+    expect(checkCarModel(heavy).join(' | ')).toMatch(/4\.600 triângulos/);
   });
 });
 

@@ -43,8 +43,9 @@ export function buildGt(lod: Lod = 0): CarModel {
     lod,
     zs: [-2.2, -2.17, -2.1, -2.0, -1.85, -1.6, -1.0, -0.4, 0.2, 0.8, 1.3, 1.7, 1.95, 2.08, 2.16, 2.2],
     axles, lift: 0.55, stripe: [GT_STRIPE_A[1], GT_STRIPE_A[0]], band: 0.07,
-    // Realismo (V2, §11): mais faces no lod0 (estações, arco, topo) e o vinco da cintura nítido.
-    detail: { subdiv: 2, facets: 12, fine: true }, crisp: true,
+    // Realismo (V2, §11): mais faces no lod0 (9 facetas no arco, o topo fino) e o vinco da cintura nítido. Dobrar as estações (subdiv 2, 5.692 △)
+    // estourava o gate de Sampa 4p (Média +2,6%); com isto, 4.388 △, dentro do orçamento de 4.500 e do gate.
+    detail: { facets: 9, fine: true }, crisp: true,
     yb: [[-2.2, 0.26], [-2.1, 0.18], [-1.9, 0.14], [1.9, 0.14], [2.1, 0.22], [2.2, 0.32]],
     yt: [[-2.2, 0.5], [-2.1, 0.54], [-1.9, 0.6], [-1.5, 0.7], [-0.9, 0.78], [-0.2, 0.8], [0.8, 0.82], [1.5, 0.86], [2.0, 0.86], [2.2, 0.8]],
     crown: [[-2.2, 0], [-2.1, 0.015], [-1.5, 0.035], [-0.5, 0.03], [2, 0.03], [2.2, 0]],

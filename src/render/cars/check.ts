@@ -13,11 +13,8 @@ export const CAR_LIMITS = {
   halfWidth: 1.0, halfLength: 2.35, maxHeight: 1.95, minGround: 0.04,
   minLength: 4.2, minLengthMicro: 3.2, minWidth: 1.8,
   minWheelRadius: 0.26,
-  /**
-   * Casco procedural ou do .glb. Subiu de 3.500 para 4.500 na M4, de propósito (roda grande, traseira-vitrine e aerofólio), e para 8.000 na rodada de
-   * realismo da V2 (docs/ondas/V2-gt.md §11: mais faces onde a silhueta e o reflexo mostram; o lod1 continua ≤ 45%); provisório até o bench do dono.
-   */
-  maxShellTriangles: 8000,
+  /** Casco procedural ou do .glb. Subiu de 3.500 para 4.500 na M4, de propósito (roda grande, traseira-vitrine e aerofólio); a bíblia diz "provisório" até o bench do dono. */
+  maxShellTriangles: 4500,
   /** Contrato do asset (docs/CONTRATO-DO-ASSET.md): atlas de paleta quadrado; o lod1 tem no máximo esta fração dos triângulos do lod0; espessura de um decal. */
   atlasSize: 256, lod1MaxRatio: 0.5, maxDecalThickness: 0.02,
 } as const;

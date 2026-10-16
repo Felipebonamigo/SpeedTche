@@ -104,7 +104,7 @@ Nenhum número abaixo foi inventado: ou sai do código/teste citado, ou está **
 | Faceta visível | ≤ 15° | o teste da M3 mede |
 | Saturação | o carro é o objeto mais saturado do quadro | alerta do `tools/referencias.mjs`, nunca meta (princípio 6) |
 | Névoa | nenhuma até ~80 m | — |
-| Casco do carro | ≤ 8.000 triângulos (3.500 → 4.500 na M4, → 8.000 na V2 realismo; provisório até o bench) | `CAR_LIMITS.maxShellTriangles`, `src/render/cars/check.ts` |
+| Casco do carro | ≤ 4.500 triângulos (subiu de 3.500 na M4; provisório até o bench) | `CAR_LIMITS.maxShellTriangles`, `src/render/cars/check.ts` |
 | Cenário | ≤ 900 triângulos por segmento | `tests/scenery-forma.test.ts` (custo do cenário por segmento) |
 | Marcos baixados | perto 2.500 (teto 3.500); longe 4.000 (5.000); horizonte 2.000 (2.500) | `docs/ARTE.md`, "Marcos baixados" |
 | Piso de desempenho | 60 fps, Steam Deck e PC médio, níveis Baixa e Média | `docs/DESEMPENHO.md` §4 (o bench dá o veredito) |

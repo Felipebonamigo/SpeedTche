@@ -186,8 +186,8 @@ describe('GT HCT: as faixas seguem a forma nova', () => {
 });
 
 describe('GT HCT: contrato e casco simples', () => {
-  it('cabe no orçamento (≤ 8.000 no casco desde a rodada de realismo, §11; era 4.200 no cartão), o lod1 tem ≤ 45% e os dois passam no validador do jogo', () => {
-    expect(gt.triangles).toBeLessThanOrEqual(8000);
+  it('cabe no orçamento (≤ 4.500 no casco, o do jogo, desde a rodada de realismo, §11; era 4.200 no cartão), o lod1 tem ≤ 45% e os dois passam no validador do jogo', () => {
+    expect(gt.triangles).toBeLessThanOrEqual(4500);
     expect(checkCarModel(gt)).toEqual([]);
     const low = MODEL_BUILDERS.gt(1);
     expect(low.triangles / gt.triangles).toBeLessThanOrEqual(0.45);
