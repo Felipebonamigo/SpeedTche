@@ -9,8 +9,10 @@ sem pagar licença. **Nada aqui é cópia**: cada carro lembra um arquétipo, mu
   "Marea", "Uno", "Mille", "Fiat", "VW", "Chevrolet", "Peugeot", nem trocadilho que leia o nome ("Palião", "Corça").
 - **Sem os sinais que identificam a marca**: nenhum logo, nenhuma grade-assinatura (a "boca" do modelo), nenhuma combinação de faixas, número de placa ou
   adesivo de um modelo real.
-- **Mudar a silhueta, não só a cor**: distância entre eixos, altura, caimento do teto, formato dos faróis e lanternas, vinco da cintura diferentes do
-  modelo-base. Regra prática: lado a lado com a foto do carro real, quem não conhece o Brasil não diz "é o mesmo carro".
+- **Reconhecível à primeira vista, sem ser o mesmo carro** (ajuste do dono, 16/10/2026: "eles têm que parecer mais com os carros que mencionei"): a silhueta, as
+  proporções, o conjunto de vidros e o desenho geral de faróis e lanternas ficam **perto** do arquétipo, para o brasileiro dizer "isso é um [modelo]" na hora.
+  O que muda é só o que a marca registra: logo, grade-assinatura, nome, o desenho gráfico exato do farol/lanterna e as faixas/adesivos. Teste prático: o
+  brasileiro reconhece o arquétipo; um advogado não encontra logo, nome nem a grade ou a lanterna reproduzidas ponto a ponto.
 - **A inspiração é o arquétipo**: hatch compacto dos anos 90–2000, sedã médio executivo, etc. É o que o Horizon Chase e os jogos de carro indie fazem.
 - **Antes da Steam**: passar a lista final por advogado de propriedade intelectual. Esta ficha não é parecer jurídico.
 
