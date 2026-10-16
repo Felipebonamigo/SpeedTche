@@ -31,8 +31,10 @@ Cada carro cai num estilo de carroceria que o jogo já tem (`CAR_BODIES`), entã
 | 8 | Kombi | **"Pão de Forma"** | pickup | à venda ($ 18 mil) | furgão baixo e largo, teto alto, duas janelas laterais; sem a "boca" característica |
 | 9 | Opala / Maverick (clássicos nacionais) | **"Gaúcho V8"** | muscle | conquista | capô longo, cabine recuada; o V8 grave de buzina e escapamento já existe no som do Trovão |
 | 10 | Jipe / Troller | **"Trilheiro"** | pickup | à venda ($ 22 mil) | capô reto, grade de barras próprias, estepe atrás; sem o desenho do Troller |
+| 11 | Chevette (cupê/hatch compacto, anos 70–80) | **"Lambari"** | classic | à venda ($ 9 mil) | cupê de traseira inclinada e vidro de trás grande; faróis redondos mais baixos e afastados, lanterna horizontal fina; para-choque de lâmina; sem a grade de barras do modelo real |
+| 12 | Fiat 147 (compacto quadradinho, anos 70–80) | **"Jabuti"** | micro | à venda ($ 7 mil) | caixa curta e alta de teto reto, farol quadrado pequeno com friso, lanterna vertical estreita, capô com vinco central; grade lisa de uma só barra |
 
-Três já estão cobertos pelo roster atual e **não precisam de carro novo**: o Saci Mirim (micro), o Tatu 4x4 (picape), o Boto Luxo (clássico). A proposta é
+Os clássicos dos anos 70–80 (Besouro, Lambari, Jabuti, Gaúcho V8) combinam com a **Copa Retrô** (ideia): uma copa só com eles, sem nitro de verdade. Três já estão cobertos pelo roster atual e **não precisam de carro novo**: o Saci Mirim (micro), o Tatu 4x4 (picape), o Boto Luxo (clássico). A proposta é
 **trocar o visual** deles quando fizer sentido, em vez de acumular carros: o Saci Mirim pode virar o "Furgãozinho da Firma" com o desenho novo.
 
 ## O carro da firma (#6) como conquista
@@ -55,7 +57,7 @@ Folclore brasileiro: o carro compacto com escada no teto, adesivo da empresa e, 
 
 ## O que preciso de você
 
-- Aprovar os 10 nomes (ou mandar outros) e a lista.
+- ~~Aprovar os nomes~~ **Aprovados em 16/10/2026** (os 10 da tabela; Chevette e Fiat 147 entraram no mesmo dia com os nomes Lambari e Jabuti, a confirmar).
 - Quem fica **livre** no começo: o primeiro carro do jogo hoje é o Falcão GT. Dá para o jogador **escolher** entre um GT e um hatch nacional logo no início.
 - A **conquista** do carro da firma e a do Gaúcho V8: aceitar a regra proposta ou mudar.
 - Se quer algum modelo que **não** está na lista (diga o nome do carro; eu proponho o arquétipo e o nome do jogo).
