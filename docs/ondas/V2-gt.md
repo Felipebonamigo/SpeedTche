@@ -246,3 +246,31 @@ limite de Sampa 4p (decisão do dono: o `--bench` diz se o Deck aguenta).
 **Ainda longe do HCT** (próximos passos, por ganho): a lanterna de dia não tem o miolo laranja aceso do HCT (o cor-brilho segura o miolo abaixo do
 bloom de dia, de propósito); o vidro lê azul-marinho (o HCT pinta preto); a roda continua a `sport5` sem flanco de pneu nem aro fundo (o desenho é de
 todos os estilos, `wheels.ts`); o casco ainda é poligonal no ombro de trás.
+
+### 12. Rodada de realismo 2: roda, vidro e lanterna (16/10/2026)
+
+Pedido do coordenador, na diretriz do dono ("mais perto do real do HCT"). Cada item com teste visto falhar antes. Folha (HCT × GT de agora × GT novo,
+corrida de dia de fábrica e de rubi, 3/4 traseira, noite, garagem): `scratch/real2/folha-roda-vidro.png`.
+
+1. **Roda** (`cars/wheels.ts`, todos os estilos; `tests/realismo-roda.test.ts`, 13 de 15 falhavam). Inscrição lisa no flanco (faixa de borracha mais clara e
+   fosca, `TIRE_LETTER`, do ombro ao aro; o pneu de faixa branca do `wire` já tem a dele); aro fundo (o barril desce até x = 0,04, era 0,18–0,30); e, nos
+   raios abertos (sport5, mag, multi, center, wire), o disco de freio (`BRAKE_DISC`) no fundo, visto entre os raios, com o cubo que o segura. Sem chamada
+   nova: é o mesmo lote de roda. **Custo e gate**: a primeira versão (18 lados) pesava +36 a +108 △ por roda e **estourou Sampa 4p** no viewport 3 (cada
+   viewport tem ~12 carros com roda detalhada: +5.040 △): Média 348.656 (limite 345.000), Alta/Ultra 382.271 (380.000). Cortei onde menos se vê: pneu e aro
+   de 16 lados (o mínimo da `car-round`; eram 18), disco de 8 lados e cubo de uma faixa só. Roda por estilo (antes → agora): sport5 374 → 418, mag 422 →
+   458, multi 404 → 448, center 416 → 460, wire 464 → 468, hubcap 426 → 416, aero 438 → 428, dish 414 → 404, steel 426 → 416 (a roda simples dos carros
+   longe, 144, não muda); orçamento da roda de volta a 480. **Medido** (`lab.collect()`, máximo por viewport, chamadas iguais): Sampa 4p Média **344.816**
+   (limite 345.000: sobram só **184 △**), Alta 378.431 e Ultra 378.436 (380.000: sobram 1.564); copa-4p Média 269.462, Alta 297.646 (340.000); Baixa igual.
+   Qualquer triângulo a mais em Sampa 4p Média precisa de limite novo (decisão do dono, com o `--bench`).
+2. **Vidro** (`cars/material.ts`, chave v7; GL: `cor-brilho-gl`, car-material). O reflexo do env map era o grosso da luz do vidro (azul-marinho chapado:
+   luma 0,125 embaixo, em cima só 1,7× mais claro). Medido: sem ele o vidro cai para (9,13,27). Agora o env map vale 15% no vidro (`wGlass`) e o céu entra
+   pelo Fresnel de expoente 7 (`carGlassSky`, `GLASS_SKY` 0,5, 40% da croma): fraco de frente, forte nas quinas (a câmera de corrida vê o vidro de trás de
+   raspão). Base do `GLASS_TINT` #151b25 → #080a0e. Medido: embaixo luma ≤ 0,07 e em cima ≥ 0,14 e ≥ 2× o de baixo. **Não fica preto puro**: o cenário
+   é azul (a mesma câmera lê o ônix como 64,86,128) e a saturação do vidro continua alta; o teste mede o claro e escuro, não o matiz. O bloom não foi tocado.
+   Vale também para o vidro azul (`GLASS`) dos outros estilos, que passa a refletir o céu pelo mesmo caminho.
+3. **Lanterna de dia** (`cars/material.ts`, `LAMP_HOT_FROM` 1,5 → 0,9; `cor-brilho.test.ts`). O miolo esquenta para laranja a partir do brilho 0,9: de dia
+   (1,6) o verde do miolo passa de 2% para ≥ 20% do vermelho; a borda continua vermelha, o miolo de dia segue abaixo de 0,8 × o limiar do bloom e à noite e
+   no freio nada muda (o teto de 0,6 já valia).
+
+**Ainda longe do HCT**: o contorno do pneu é de 16 lados; o disco de freio só se vê de perto e entre os raios; o cenário azul tinge o vidro; a roda é
+a mesma `sport5` do GT (o HCT2 tem 10 raios escuros e lábio usinado, que pede um desenho novo no catálogo).
