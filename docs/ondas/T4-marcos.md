@@ -83,7 +83,7 @@
 - Área: `tests/landmark* tests/scenery* cenario-fechado track* tracado-mapa terreno-curva-fechada sim-golden determinism ghost cloudsave
   content-version cidade-da-pista corrida-que-muda-terreno horizon-terreno render stars-save expedition-save`: 44 arquivos, 1081 ✓ e 1 estouro de
   tempo (`landmarks` "perLap", 120 s com carga); `landmarks.test.ts` sozinho: 23 ✓.
-- `gl-render`: ver o relatório da frente.
+- `tests/gl-render.test.ts` (swiftshader, carga ~21): 13 ✓.
 
 ### Capturas
 - Galeria (V7): `scratch/galeria/base-e31d139/` × `scratch/galeria/marcos/` (60b6817), `scratch/galeria/comparar-base-e31d139-vs-marcos.png`:
