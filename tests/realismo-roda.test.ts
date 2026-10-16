@@ -49,11 +49,11 @@ describe('roda: aro fundo e o disco de freio no fundo, entre os raios', () => {
 
 describe('roda: orçamento', () => {
   const OLD: Record<WheelDesign, number> = { sport5: 374, mag: 422, multi: 404, hubcap: 426, aero: 438, dish: 414, center: 416, wire: 464, steel: 426 };
-  it('até +110 △ por roda sobre a de antes e ≤ 580 △ (a de qualidade baixa, que vale para quem está longe, não muda: 144 △)', () => {
+  it('até +60 △ por roda sobre a de antes e dentro dos 480 △ de sempre (o gate de Sampa 4p não aceita mais: 16 lados no pneu pagam a inscrição e o disco); a de qualidade baixa, de quem está longe, não muda: 144 △', () => {
     for (const d of WHEEL_DESIGNS) {
       const n = buildWheel(d).triangles;
-      expect(n - OLD[d], d).toBeLessThanOrEqual(110);
-      expect(n, d).toBeLessThanOrEqual(580);
+      expect(n - OLD[d], d).toBeLessThanOrEqual(60);
+      expect(n, d).toBeLessThanOrEqual(480);
     }
     expect(buildSimpleWheel().triangles).toBe(144);
   });

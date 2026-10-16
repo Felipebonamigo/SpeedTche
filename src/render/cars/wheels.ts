@@ -17,8 +17,11 @@ export const WHEEL_DESIGNS: readonly WheelDesign[] = WHEEL_IDS;
 
 export interface WheelModel { design: WheelDesign; geometry: THREE.BufferGeometry; symmetry: number; triangles: number }
 
-/** Lados do pneu e do aro (torno). 18: o contorno lê redondo de perto (eram 12, um dodecágono na tela). */
-export const TIRE_SIDES = 18;
+/**
+ * Lados do pneu e do aro (torno). 16 (eram 12 até a onda I e 18 até a V2): a inscrição, o aro fundo e o disco de freio custaram +36 a +108 △ por roda e o
+ * gate de Sampa 4p não aceita tudo isso com 18 lados; com 16 a roda de perto fica no mesmo orçamento de antes (±40 △) e o contorno ainda lê redondo.
+ */
+export const TIRE_SIDES = 16;
 const SEGS = TIRE_SIDES;
 const X = (o: number) => ({ ...AXIS_X, o: [o, 0, 0] as const });
 
@@ -45,10 +48,10 @@ function tireAndRim(b: MeshBuilder, rim: number, lip: Brush, dish: Brush, whitew
   brushes.push(TIRE_SIDE, lip, lip, dish);
   lathe(b, X(0), p, SEGS, (i) => brushes[i]);
   if (disc) {
-    // Disco de freio: a face (x = 0,10) e a borda, do cubo até 82% do aro (12 lados: quase não se vê de perto), e o cubo que o segura.
+    // Disco de freio: a face (x = 0,10) e a borda, do cubo até 82% do aro (8 lados: no fundo do aro, entre os raios, ninguém conta os lados), e o cubo que o segura.
     const ro = rim * 0.82;
-    lathe(b, X(0), [[0.18, 0.1], [ro, 0.1], [ro, 0.06]], 12, () => BRAKE_DISC);
-    cylinder(b, X(0), 0.1, WELL_FLOOR, 0.22, 6, BRAKE_DISC, UNDER, UNDER);
+    lathe(b, X(0), [[0.18, 0.1], [ro, 0.1], [ro, 0.06]], 8, () => BRAKE_DISC);
+    lathe(b, X(0), [[0.1, WELL_FLOOR], [0.1, 0.22]], 6, () => BRAKE_DISC);
   }
   void dishT;
 }

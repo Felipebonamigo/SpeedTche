@@ -99,10 +99,10 @@ describe('modelos dos carros', () => {
     }
   });
 
-  it('orçamento: casco ≤ 4.500 triângulos (subiu de 3.500 na M4, de propósito), roda ≤ 580 (480 → 580 na V2, realismo 2: inscrição e disco de freio) e a roda da qualidade baixa ≤ 150', () => {
+  it('orçamento: casco ≤ 4.500 triângulos (subiu de 3.500 na M4, de propósito), roda ≤ 480 e a roda da qualidade baixa ≤ 150', () => {
     expect(CAR_LIMITS.maxShellTriangles).toBe(4500);
     for (const body of CAR_BODIES) expect((models.get(body) as CarModel).triangles, body).toBeLessThanOrEqual(CAR_LIMITS.maxShellTriangles);
-    for (const d of WHEEL_DESIGNS) expect(buildWheel(d).triangles, d).toBeLessThanOrEqual(580);
+    for (const d of WHEEL_DESIGNS) expect(buildWheel(d).triangles, d).toBeLessThanOrEqual(480);
     expect(buildSimpleWheel().triangles).toBeLessThanOrEqual(150);
   });
 
