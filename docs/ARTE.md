@@ -41,6 +41,10 @@ ponto `seat`, conferidos por `npm run check-car`). A frase "nada de gerar pela A
    `seat`, `lod0`/`lod1` (meshoptimizer do three) e reduz o `colormap` de 512² para 256². Depois: `npm run check-car` e as capturas.
    Prova sem baixar nada: `npx tsx scripts/make-test-car.ts` grava o carro de caixas do contrato (`scratch/car-caixas.glb`).
 
+6. **Carro modelado por nós, por script (Blender, módulo `bpy`)**: `tools/blender/` (README lá) — `npm run carros-blender` gera `src/assets/cars/cuiabano.glb` e `tupiniquim.glb` direto
+   do dado de projeto (`tools/blender/specs/`), já com os nós/materiais do contrato; depois `npm run check-car` e as capturas (`tools/blender/capturar.mjs`). O `convert-car` é só do kit do Kenney.
+   Silhueta do Cuiabano conferida contra o do Detonauto (`tools/blender/base/make_cuiabano_detonauto.py`, de Felipe, projeto irmão). Licença: criação própria (tabela abaixo).
+
 Código: `src/render/cars/gltf.ts` (leitura: UV, atlas, roda, LOD, contrato), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga),
 `models.ts` (um modelo por carro ou por estilo). O `Cars` (`src/render/cars.ts`) agrupa por **modelo**: um lote por modelo (mais um para o LOD1) e
 um material com o atlas para cada modelo que o tem.

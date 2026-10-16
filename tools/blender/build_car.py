@@ -1,6 +1,6 @@
 """Gera um carro nacional do Speed Tchê em .glb a partir de um spec (tools/blender/specs/<nome>.py).
 
-Uso:  /home/user/venv-bpy/bin/python -I tools/blender/build_car.py <nome> <saida.glb> [--preview <pasta>] [--subsurf N]
+Uso:  /home/user/venv-bpy/bin/python -I tools/blender/build_car.py <nome> <saida.glb> [--estilo cartoon|realista] [--preview <pasta>] [--views a,b]
 """
 import importlib
 import os
@@ -36,7 +36,11 @@ def main():
     args = sys.argv[1:]
     name, out = args[0], args[1]
     preview = args[args.index("--preview") + 1] if "--preview" in args else None
-    levels = int(args[args.index("--subsurf") + 1]) if "--subsurf" in args else 1
+    # --estilo cartoon (padrão, vai ao jogo: ≤ 4.500 △) | realista (mais subdivisão, para ver a diferença e para o Detonauto; fora do jogo)
+    estilo = args[args.index("--estilo") + 1] if "--estilo" in args else "cartoon"
+    levels = 1 if estilo == "cartoon" else 2
+    if estilo == "realista":
+        cl.EXTRA_CUTS, cl.ARCH_SEG = 1, 48
     sp = importlib.import_module(name).SPEC
     cl.reset_scene()
     r0 = build_lod(sp, 0, levels)

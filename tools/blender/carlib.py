@@ -11,6 +11,10 @@ import bpy
 from mathutils import Vector
 
 
+EXTRA_CUTS = 0   # estilo realista: remendos com mais cortes
+ARCH_SEG = 28    # lados do cilindro do vão de roda (lod0)
+
+
 # ───────────────────────────── curvas ─────────────────────────────
 def pchip(points):
     """Interpolação cúbica monótona (Fritsch-Carlson) por (x, y): sem ondulação entre pontos. Fora do intervalo, mantém o valor da ponta."""
@@ -238,7 +242,7 @@ def subsurf(ob, levels):
 
 # ───────────────────────────── vão de roda ─────────────────────────────
 def cut_wheel_arches(ob, sp, lod):
-    seg = 28 if lod == 0 else 14
+    seg = ARCH_SEG if lod == 0 else 14
     for (y, side) in sp["wheel_positions"]():
         r = sp["wheel"]["r"] + sp["wheel"]["arch_gap"]
         bm = bmesh.new()
@@ -301,6 +305,8 @@ def patch(name, outline, mat, target, axis, offset=0.006, cuts=1, plane_y=0.0, d
     else:
         vs = [bm.verts.new((plane_y, x, z)) for (x, z) in outline]
     bm.faces.new(vs)
+    if axis == "y" and plane_y > 0:  # a traseira olha para +Y: o contorno (x, z) anti-horário dá normal −Y, então inverte (sem isso o jogo esconde a face)
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     bmesh.ops.triangulate(bm, faces=bm.faces[:])
     for _ in range(cuts):
         bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=1, use_grid_fill=False)
@@ -416,6 +422,12 @@ def build_wheel(name, sp):
             return bm.verts.new((xo, rad * c - half * sn, rad * sn + half * c))
         v = [p(hub_r, -sw_in, x_out - 0.02), p(hub_r, sw_in, x_out - 0.02), p(rim_r * 0.84, sw_out, x_out - 0.012), p(rim_r * 0.84, -sw_out, x_out - 0.012)]
         bm.faces.new(v).material_index = 1
+    # tampa do cubo (calota): disco que sobe do prato
+    cap_r = hub_r * 1.6
+    cap = [pt(x_out - 0.012, cap_r, ang(k * (seg // 10 or 1))) for k in range(10)] if False else [pt(x_out - 0.012, cap_r, 2 * math.pi * k / 10) for k in range(10)]
+    cctr = bm.verts.new((x_out - 0.004, 0, 0))
+    for k in range(10):
+        bm.faces.new((cap[k], cap[(k + 1) % 10], cctr)).material_index = 1
     for f in bm.faces:  # orientação explícita: pneu para fora do eixo; aro, prato e raios para +X
         c = f.calc_center_median()
         if f.material_index == 0:
@@ -505,8 +517,10 @@ def add_patches(sp, body, lod, parent):
         center = not p.get("mirror", True)  # remendo no eixo do carro: a metade x >= 0 e o espelho dela (a triangulação sai simétrica)
         outline = half_outline(p["outline"]) if center else p["outline"]
         ob = patch(base + "_l", outline, p["mat"], body, p.get("axis", "y"),
-                   offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1),
-                   plane_y=-3.0 if face == "front" else 3.0, direction=1 if face == "front" else -1)
+                   offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1) + EXTRA_CUTS,
+                   plane_y=-3.0 if face == "front" else 3.0, direction=1 if face == "front" else -1) if face != "side" else \
+            patch(base + "_l", outline, p["mat"], body, "x", offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1),
+                  plane_y=3.0, direction=-1)
         groups.setdefault(p["group"], []).append(ob)
         if True:  # o outro lado é o ESPELHO da malha (e não o contorno espelhado, que triangula diferente)
             groups[p["group"]].append(mirrored_copy(ob, base + "_r"))
@@ -558,7 +572,7 @@ def finish_wheels_and_empties(sp):
     empty("seat", sp["seat"])
 
 
-def make_material_of(cowl, roof_f, roof_r, glass_b, side):
+def make_material_of(cowl, roof_f, roof_r, glass_b, side, black=()):
     """Regra de material da gaiola de um hatch: vidros entre as colunas, friso preto da cintura e do teto, para-choque embaixo nas pontas."""
     e = 1e-6
 
@@ -575,9 +589,9 @@ def make_material_of(cowl, roof_f, roof_r, glass_b, side):
         if strip == 4:
             if any(a - e <= y0 and y1 <= b + e for a, b in side) or (roof_r - e <= y0 and y1 <= glass_b + e):
                 return "glass"
-            return "trim"  # colunas B e C
+            return "trim" if any(a - e <= y0 and y1 <= b + e for a, b in black) else "paint"  # coluna B preta; A e C na cor do carro
         if strip == 5:
-            return "trim" if cab else "paint"  # friso do teto e coluna A
+            return "paint"
         if strip in (6, 7) and ((cowl - e <= y0 and y1 <= roof_f + e) or (roof_r - e <= y0 and y1 <= glass_b + e)):
             return "glass"
         return "paint"
@@ -594,3 +608,9 @@ def scaled_outline(outline, k):
     cx = sum(p[0] for p in outline) / len(outline)
     cz = sum(p[1] for p in outline) / len(outline)
     return [(cx + (x - cx) * k, cz + (z - cz) * k) for (x, z) in outline]
+
+
+def line_strip(points, width):
+    """Faixa fina ao longo de uma linha (lista de (a, z)): contorno com os pontos da linha em cima e embaixo (sem subdivisão: a projeção segue os pontos)."""
+    up = [(a, z + width) for (a, z) in points]
+    return list(points) + list(reversed(up))

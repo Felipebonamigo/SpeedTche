@@ -2,6 +2,8 @@
 
 ## Os carros
 
+> **V6c (16/10/2026): +2 livres, os hatches nacionais Cuiabano e Tupiniquim** (arte feita no Blender por script, `tools/blender/`; ficha em `docs/CARROS-NACIONAIS.md`, cartão `docs/ondas/V6c-nacionais.md`). São 16 carros, 9 livres e 7 à venda; a IA continua sorteando só os 7 livres de antes (`FORA_DA_IA` em `data/cars.ts`: pôr carro no pool muda toda corrida gravada). Medido com `npx tsx scripts/car-balance.ts` (109 pistas): Cuiabano 0,9883 e Tupiniquim 0,9934 do Falcão; a coluna "Grade" deles fica em branco (a IA não os usa). O texto abaixo ainda diz "catorze" onde falava dos catorze de antes.
+
 Catorze carros, pelo menos um por estilo de carroceria (`CarDef.body`, 13 estilos em `CAR_BODIES`;
 o Boitatá divide o `gt` com o Falcão). Sete são de todos desde o começo e sete se compram na
 carreira (`docs/CARREIRA.md`); comprado, o carro fica liberado no lobby, no torneio e no online. Os
@@ -35,6 +37,8 @@ todos os carros: o cérebro da IA no assento humano (habilidade 1 no solo, 0,97 
 | **Iara Turbo** | wedge | 24.000 | 327 | 700 | 2.300 | 0,62 | 0,85 | 0,967 (3) | 2,25 | quase a reta do Pororoca bebendo 40% menos × curva e freio |
 | Boitatá GT | gt | 30.000 | 321 | 780 | 2.800 | 0,84 | 0,90 | 0,905 (6) | 1,00 | forte em tudo × caro |
 | **Beija-Flor** | prototype | 40.000 | 312 | 800 | 3.100 | 1,00 | 1,35 | 0,899 (21) | 1,47 | a melhor curva × sede, reta e preço |
+| Cuiabano | hatch | — | 288 | 780 | 2.700 | 0,85 | 0,80 | 0,988 | — | o quadradão: estável e econômico, sem ponto forte (nacional, V6c) |
+| Tupiniquim | hatch | — | 279 | 860 | 2.900 | 0,95 | 0,90 | 0,993 | — | arranca e fecha a curva × a menor reta dos hatches e o tanque curto (nacional, V6c) |
 
 Em negrito, os seis da onda F. Cada um é o melhor ou está entre os melhores em alguma coisa e paga por
 isso em outra:

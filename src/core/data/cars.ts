@@ -104,14 +104,14 @@ export const CAR_BODIES: readonly CarBody[] = [
  * Livres que a IA ainda não usa (os nacionais da frente V6c): o sorteio do grid usa o tamanho do pool, e pôr carro novo nele mudaria TODA corrida
  * já gravada (`sim-golden`, fantasmas). Entram no pool quando o dono aprovar a mudança e a impressão for renovada de propósito.
  */
-const FORA_DA_IA: ReadonlySet<string> = new Set(['cuiabano', 'tupiniquim']);
+const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim'];
 
 /**
  * Carros da IA: os livres (os 4 originais e os 3 da onda F), nunca um à venda — o carro comprado é do jogador.
  * Com os 3 novos a grade mostra 7 estilos de carroceria em vez de 4; medido (docs/CARROS.md): a volta média da
  * IA foi de 86,20 s a 87,33 s e a calibragem da carreira seguiu valendo.
  */
-export const AI_CAR_POOL: readonly CarDef[] = CARS.filter((c) => c.price === 0 && !FORA_DA_IA.has(c.id));
+export const AI_CAR_POOL: readonly CarDef[] = CARS.filter((c) => c.price === 0 && !FORA_DA_IA.includes(c.id));
 
 export function carDef(id: string): CarDef {
   const c = CARS.find((x) => x.id === id);

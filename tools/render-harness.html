@@ -40,7 +40,7 @@ const cartoonFx = q.get('cartoon') === '1';
 // nitroat=<quadro>: o nitro engata nesse quadro (nitro=1 o liga desde o 1º, e o 1º quadro só guarda o estado: sem anel de engate).
 const nitroAt = Number(q.get('nitroat') ?? -1);
 const winSeconds = q.get('win') === null ? -1 : Number(q.get('win'));
-// carview=side|rear34|front34|rear: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
+// carview=side|rear34|front34|rear|front: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
 // showroom=1: os 13 estilos em grade na pista (carview escolhe o lado, padrão front34);
 // sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros;
 // ghost=1: fantasma do contra-relógio ao lado do carro do jogador; brake=1: lanternas de freio acesas.
@@ -143,6 +143,8 @@ if (carview !== null || showroom || sheet !== null) {
   }
   if (forceNitro) for (const c of state.cars) c.nitroTicks = 100;
 }
+// car=<id> sem carview: o carro do jogador 1 na corrida (câmera de corrida, noite com freio, medida do gate)
+if (q.get('car') && carview === null && !showroom && sheet === null && !paintSheet && !lookSheet) me.carId = q.get('car');
 if (q.get('msg')) { for (const s of messages.keys()) { push(s, q.get('msg'), 'big', 9); push(s, t('hud.lowFuel'), 'warn', 9); push(s, t('hud.pitStop'), 'info', 9); } }
 
 const canvas = document.getElementById('game');
@@ -170,7 +172,7 @@ window.addEventListener('resize', resize); resize();
 
 let frames = 0; let time = 0; let last = performance.now();
 const extraCam = carview !== null || showroom || sheet !== null ? new THREE.PerspectiveCamera(38, 1, 0.1, 4000) : null;
-const VIEWS = { side: [[-7.6, 1.25, 0.3], [0, 0.55, 0]], rear34: [[5.4, 2.0, 7.0], [0, 0.6, 0.4]], front34: [[-6.4, 1.9, -7.4], [0, 0.6, 0]], rear: [[0, 1.5, 8.6], [0, 0.6, 0]] };
+const VIEWS = { side: [[-7.6, 1.25, 0.3], [0, 0.55, 0]], rear34: [[5.4, 2.0, 7.0], [0, 0.6, 0.4]], front34: [[-6.4, 1.9, -7.4], [0, 0.6, 0]], rear: [[0, 1.5, 8.6], [0, 0.6, 0]], front: [[0, 1.5, -8.6], [0, 0.6, 0]] };
 // Quadros da folha de contato: o carro mais perto, para encher o quadro recortado.
 const SHEET_VIEWS = { side: [[-7.6, 1.0, 0.0], [0, 0.6, 0]], rear34: [[4.2, 2.2, 5.2], [0, 0.55, 0.2]], front34: [[-4.4, 2.0, -5.3], [0, 0.55, -0.1]], rear: [[0, 1.6, 6.6], [0, 0.6, 0]] };
 const SHOWROOM_VIEWS = { front34: [[-12, 7, -30], [0, 0.4, -9.5]], rear34: [[11, 8, 10], [0, 0.4, -9]], side: [[-22, 4, -9], [0, 0.4, -9]] };
