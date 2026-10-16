@@ -1,4 +1,4 @@
-// Rodas: pneu com ombro e flanco (torno de `TIRE_SIDES` = 18 lados; eram 12 até a onda I), aro com
+// Rodas: pneu com ombro, flanco e inscrição lisa; aro fundo com disco de freio (V2, §12) e (torno de `TIRE_SIDES` = 18 lados; eram 12 até a onda I), aro com
 // borda, poço escuro e o desenho de cada estilo (raios, calota, prato de rali, trava central, raios de
 // arame, roda de aço). Montadas em escala unitária (raio 1, largura 1, face de fora em +x) — a instância
 // escala para o raio e a largura do carro. `symmetry` é o ângulo que repete o desenho: o giro na tela é
@@ -7,7 +7,7 @@
 import type * as THREE from 'three';
 import { WHEEL_IDS, type WheelId } from '../../game/cosmetics';
 import { AXIS_X, beam, box, cylinder, lathe, MeshBuilder, type Brush, type P2, type P3 } from './kit';
-import { ACCENT, ALU, CHROME, GUNMETAL, TIRE, TIRE_SIDE, TRIM, UNDER, WHITE, WHITEWALL } from './paints';
+import { ACCENT, ALU, BRAKE_DISC, CHROME, GUNMETAL, TIRE, TIRE_LETTER, TIRE_SIDE, TRIM, UNDER, WHITE, WHITEWALL } from './paints';
 import { withBrush } from './kit';
 import { CREASE } from '../normals';
 
@@ -22,8 +22,13 @@ export const TIRE_SIDES = 18;
 const SEGS = TIRE_SIDES;
 const X = (o: number) => ({ ...AXIS_X, o: [o, 0, 0] as const });
 
-/** Pneu + aro + poço: `rim` = raio do aro (fração do pneu), `lip` = pincel da borda, `dish` = fundo. */
-function tireAndRim(b: MeshBuilder, rim: number, lip: Brush, dish: Brush, whitewall = false, dishT = 0.18): void {
+/**
+ * Pneu + aro + poço: `rim` = raio do aro (fração do pneu), `lip` = pincel da borda, `dish` = fundo.
+ * Realismo (V2, §12): o flanco leva a INSCRIÇÃO lisa (faixa de borracha mais clara, fosca, do ombro até `lo`; o pneu de faixa branca já tem a dele); o aro é
+ * FUNDO (o barril desce até x = 0,04) e, nos desenhos de raios abertos (`disc`), o disco de freio fica no fundo, visto entre os raios, com o cubo que o segura.
+ * `dishT` só vale para o disco cego dos desenhos fechados (calota, prato): o fundo agora é o mesmo para todos.
+ */
+function tireAndRim(b: MeshBuilder, rim: number, lip: Brush, dish: Brush, whitewall = false, dishT = 0.18, disc = true): void {
   // Lado de dentro simplificado (quase nunca aparece): do eixo direto ao flanco.
   const p: P2[] = [
     [0, -0.42], [0.84, -0.5], [1, -0.3], [1, 0.28], [0.96, 0.44], [0.86, 0.5],
@@ -32,11 +37,24 @@ function tireAndRim(b: MeshBuilder, rim: number, lip: Brush, dish: Brush, whitew
   if (whitewall) {
     p.push([0.8, 0.5], [0.68, 0.5]);
     brushes.push(TIRE_SIDE, WHITEWALL);
+  } else {
+    p.push([Math.min(0.82, Math.max(rim + 0.04, 0.74)), 0.5]);
+    brushes.push(TIRE_LETTER);
   }
-  p.push([rim, 0.5], [rim * 0.92, 0.47], [rim * 0.88, dishT], [0, dishT]);
+  p.push([rim, 0.5], [rim * 0.92, 0.47], [rim * 0.88, WELL_FLOOR], [0, WELL_FLOOR]);
   brushes.push(TIRE_SIDE, lip, lip, dish);
   lathe(b, X(0), p, SEGS, (i) => brushes[i]);
+  if (disc) {
+    // Disco de freio: a face (x = 0,10) e a borda, do cubo até 82% do aro (12 lados: quase não se vê de perto), e o cubo que o segura.
+    const ro = rim * 0.82;
+    lathe(b, X(0), [[0.18, 0.1], [ro, 0.1], [ro, 0.06]], 12, () => BRAKE_DISC);
+    cylinder(b, X(0), 0.1, WELL_FLOOR, 0.22, 6, BRAKE_DISC, UNDER, UNDER);
+  }
+  void dishT;
 }
+
+/** Fundo do aro (x): o barril desce até aqui; o disco de freio fica logo na frente dele. */
+const WELL_FLOOR = 0.04;
 
 /** Raios retos do cubo (r0) até o aro (r1), com espessura em x de t0 a t1. */
 function spokes(b: MeshBuilder, n: number, r0: number, r1: number, width: number, t0: number, t1: number, br: Brush, phase = 0): void {
@@ -89,7 +107,7 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
     }
     case 'hubcap': {
       // Calota lisa prateada com oito entradas escuras.
-      tireAndRim(b, 0.64, ALU, TRIM, false, 0.3);
+      tireAndRim(b, 0.64, ALU, TRIM, false, 0.3, false);
       lathe(b, X(0), [[0.6, 0.3], [0.58, 0.4], [0.3, 0.44], [0, 0.46]], SEGS, () => ALU);
       for (let k = 0; k < 8; k++) {
         const th = (k / 8) * Math.PI * 2;
@@ -100,7 +118,7 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
     }
     case 'aero': {
       // Disco aerodinâmico: face lisa clara com cinco cortes escuros em hélice.
-      tireAndRim(b, 0.74, GUNMETAL, TRIM, false, 0.3);
+      tireAndRim(b, 0.74, GUNMETAL, TRIM, false, 0.3, false);
       lathe(b, X(0), [[0.7, 0.3], [0.68, 0.4], [0.2, 0.45], [0, 0.46]], SEGS, (i) => (i === 0 ? GUNMETAL : WHITE_DISC));
       for (let k = 0; k < 5; k++) {
         const th = (k / 5) * Math.PI * 2;
@@ -112,7 +130,7 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
     }
     case 'dish': {
       // Roda de rali: prato branco inteiro com seis furos.
-      tireAndRim(b, 0.64, WHITE, UNDER, false, 0.3);
+      tireAndRim(b, 0.64, WHITE, UNDER, false, 0.3, false);
       lathe(b, X(0), [[0.6, 0.3], [0.58, 0.38], [0.2, 0.42], [0, 0.44]], SEGS, () => WHITE);
       for (let k = 0; k < 6; k++) {
         const th = (k / 6) * Math.PI * 2;
@@ -140,7 +158,7 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
     }
     case 'steel': {
       // Picape: roda de aço de prato fundo com seis porcas e pneu de flanco alto.
-      tireAndRim(b, 0.58, PAINT_RIM, UNDER, false, 0.3);
+      tireAndRim(b, 0.58, PAINT_RIM, UNDER, false, 0.3, false);
       lathe(b, X(0), [[0.55, 0.3], [0.52, 0.36], [0.26, 0.38], [0, 0.4]], SEGS, () => PAINT_RIM);
       for (let k = 0; k < 6; k++) {
         const th = (k / 6) * Math.PI * 2;
