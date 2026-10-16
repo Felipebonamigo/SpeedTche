@@ -58,6 +58,8 @@ saída do conversor (`scripts/convert-car.ts`), não o original.
 | Arquivo no jogo | Origem (página, arquivo, autor) | Licença | Data |
 |---|---|---|---|
 | `art/cars/falcao-kenney.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
+| `src/assets/cars/cuiabano.glb` | **Criação própria** (Felipe Bonamigo / Speed Tchê): modelado do zero por script no Blender (`tools/blender/`, `npm run carros-blender`, spec `tools/blender/specs/cuiabano.py`); só proporções de um arquétipo de hatch, sem malha, textura, logo nem nome de terceiro | Propriedade do estúdio (sem terceiros; não é modelo de marca) | 16/10/2026 |
+| `src/assets/cars/tupiniquim.glb` | **Criação própria** (Felipe Bonamigo / Speed Tchê): idem, spec `tools/blender/specs/tupiniquim.py` | Propriedade do estúdio (sem terceiros; não é modelo de marca) | 16/10/2026 |
 
 ## Cenário e horizonte — falta (os marcos turísticos já têm o caminho: abaixo)
 Mesmo caminho (convenção na seção Especificação do briefing); para árvores, prédios e horizonte o carregador ainda não existe.

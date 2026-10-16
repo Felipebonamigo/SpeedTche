@@ -49,6 +49,9 @@ const SPECS: Readonly<Record<string, HornSpec>> = {
   tatu: { wave: 'sawtooth', notes: [311.13, 369.99, 466.16], pulses: [{ at: 0, dur: 0.76 }], filter: { type: 'lowpass', freq: 1400 }, gain: 1 },
   // "fom-fom" de fusca.
   boto: { wave: 'sawtooth', notes: [329.63, 415.3], pulses: [{ at: 0, dur: 0.2 }, { at: 0.27, dur: 0.2 }], filter: { type: 'lowpass', freq: 1100 }, gain: 0.9 },
+  // Nacionais: o "fon-fon" curto do quadradão e os três "pi" do compacto.
+  cuiabano: { wave: 'square', notes: [392, 493.88], pulses: [{ at: 0, dur: 0.12 }, { at: 0.18, dur: 0.3 }], filter: { type: 'lowpass', freq: 2600 }, gain: 0.85 },
+  tupiniquim: { wave: 'triangle', notes: [587.33, 740], pulses: [{ at: 0, dur: 0.08 }, { at: 0.13, dur: 0.08 }, { at: 0.26, dur: 0.08 }], filter: { type: 'lowpass', freq: 3600 }, gain: 0.85 },
   // Três notas subindo.
   curupira: {
     wave: 'square', notes: [659.25],

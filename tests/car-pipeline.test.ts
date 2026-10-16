@@ -190,9 +190,9 @@ describe('pipeline de arte: os carros .glb (instalados em src/assets/cars/ e o c
     const { model, problems } = await parseCarGlb(car ? car.body : (name as never), ab(readFileSync(join(f.dir, f.file))), car ? { carId: car.id } : {});
     expect(problems).toEqual([]);
     expect(model && checkCarModel(model)).toEqual([]);
-    // Uma linha da tabela de licenças cita o arquivo e uma licença (CC0, CC-BY…).
+    // Uma linha da tabela de licenças cita o arquivo e uma licença (CC0, CC-BY… ou "Criação própria": carro modelado por nós, tools/blender/).
     const row = arte.split('\n').find((l) => l.startsWith('|') && l.includes(`${f.rel}/${f.file}`));
     expect(row, `docs/ARTE.md: linha da tabela de licenças com "${f.rel}/${f.file}"`).toBeTruthy();
-    expect(row).toMatch(/CC0|CC-BY|CC BY/);
+    expect(row).toMatch(/CC0|CC-BY|CC BY|Criação própria/);
   }, 60_000);
 });

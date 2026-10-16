@@ -17,7 +17,8 @@
     "relay": "node server/relay.mjs",
     "car-templates": "tsx scripts/export-car-templates.ts",
     "check-car": "tsx scripts/check-car-glb.ts",
-    "convert-car": "tsx scripts/convert-car.ts"
+    "convert-car": "tsx scripts/convert-car.ts",
+    "carros-blender": "sh tools/blender/build_all.sh"
   },
   "license": "MIT",
   "devDependencies": {

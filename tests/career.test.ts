@@ -68,10 +68,10 @@ function race(career: CareerState, positions: Record<number, number>) {
 // ───────────────────────────── Carros ─────────────────────────────
 
 describe('carros', () => {
-  it('são 14: os 7 livres são de todos e os 7 à venda custam mais de $ 10 mil (a lista toda: tests/cars.test.ts)', () => {
-    expect(CARS.length).toBe(14);
-    expect(new Set(CARS.map((c) => c.id)).size).toBe(14);
-    expect(CARS.filter((c) => c.price === 0).map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto']);
+  it('são 16: os 9 livres são de todos e os 7 à venda custam mais de $ 10 mil (a lista toda: tests/cars.test.ts)', () => {
+    expect(CARS.length).toBe(16);
+    expect(new Set(CARS.map((c) => c.id)).size).toBe(16);
+    expect(CARS.filter((c) => c.price === 0).map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
     expect(CARS.filter((c) => c.price > 0).length).toBe(7);
     for (const c of CARS.filter((x) => x.price > 0)) {
       expect(c.price).toBeGreaterThan(10_000);
