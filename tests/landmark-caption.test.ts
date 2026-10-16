@@ -273,7 +273,7 @@ describe('legenda dos marcos: as pistas de verdade', () => {
     }
     expect(total).toBeGreaterThanOrEqual(161);
     // M6: o traçado do mapa deixou 5 (pontes e castelos de longe) fora do quadro na volta 1; a T4 (as praças na escala da pista) trouxe 4 de volta.
-    // Sobra o castelo de Osaka: na volta 1 ele fica no quadro, mas a legenda não chega a disparar (landmarks-enquadramento: 1,6 s, ≥ 2,5 s nas outras).
+    // Sobra o castelo de Osaka: o enquadramento já passa do mínimo (2,6 s; era 0,4), mas na volta 1 a legenda não chega a disparar (causa não isolada).
     const M6_MISSED = ['osaka_neon castelo_osaka'];
     expect(missed.filter((m) => !M6_MISSED.includes(m)), `${missed.length} marcos sem legenda na volta 1`).toEqual([]);
     expect(M6_MISSED.filter((m) => !missed.includes(m)), 'saiam de M6_MISSED').toEqual([]);
