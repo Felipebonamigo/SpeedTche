@@ -90,52 +90,33 @@ const WINDOW_LIMITED: Readonly<Record<string, number>> = {
   'boa_esperanca farol_cape_point': 1.6,
   'great_ocean arco_great_ocean': 2.3,
   'alter_do_chao praia_de_rio': 2.3,
-  'ponte_rio_negro ponte_rio_negro': 1.65, // 2,4 antes da M6
+  'ponte_rio_negro ponte_rio_negro': 2.35, // 2,4 antes da M6, 1,65 na M6
 };
 
 /**
- * M6 (docs/ondas/M/M6.md, §8): com o traçado do mapa (o 3D gira a escala que fecha a pista; 36 das 109 pistas curvam 5× mais forte ou mais) os marcos abaixo deixaram de chegar ao
- * mínimo — a curva que vem esconde o marco ou o tira do quadro antes da hora, e a praça que o núcleo abriu (core/track/sightline.ts) foi medida com o giro antigo. Medido na M6: o melhor
- * lugar do layout (s, com 0,05 de folga). Com a escala nova no `sightline.ts` do núcleo 32 desses 33 caem para 13 (o ajuste é do núcleo: muda as praças e invalida recorde e fantasma das
- * pistas); quem passar do mínimo sai desta lista (o teste acusa).
+ * M6 (docs/ondas/M/M6.md, §8) e T4 (docs/ondas/T4-marcos.md): com o traçado do mapa (o 3D gira a escala que fecha a pista; 36 das 109 pistas curvam 5×
+ * mais forte ou mais) 27 pares pista × marco deixaram de chegar ao mínimo — a praça do núcleo era aberta com o giro antigo. A T4 levou a escala da
+ * pista ao núcleo (core/track/sightline.ts) e tirou a praça de onde outro trecho passa pela pegada (`clearOfRoad`): sobram estes 7 (o melhor lugar do
+ * layout, s, com 0,05 de folga; o convento da Penha, 2ª praça, entrou: a conta do núcleo vê os 264 m pedidos e o layout o põe na faixa dobrada).
+ * Quem passar do mínimo sai desta lista (o teste acusa).
  */
 const M6_LIMITED: Readonly<Record<string, number>> = {
-  'sampa_noite ponte_estaiada': 0.15,
-  'pampulha igreja_pampulha': 0.75,
-  'curitiba opera_de_arame': 0.95,
-  'floripa igreja_acoriana': 2.25,
-  'floripa ponte_hercilio_luz': 1.05,
-  'lago_paranoa ponte_jk': 0.0,
-  'torre_de_tv torre_tv_brasilia': 2.25,
-  'torre_de_tv catedral_brasilia': 1.15,
-  'brasilia congresso_nacional': 2.35,
-  'brasilia catedral_brasilia': 2.25,
-  'aracaju arcos_atalaia': 1.55,
-  'aracaju ponte_aracaju': 0.0,
-  'maragogi jangada': 0.45,
-  'maceio coqueiral': 1.95,
-  'olinda bonecos_olinda': 1.85,
-  'fortaleza_beira_mar jangada': 1.85,
-  'sao_luis casario_azulejos': 1.95,
-  'belem ver_o_peso': 1.85,
-  'manaus barco_regional': 2.05,
-  'palmas palacio_araguaia': 0.65,
-  'palmas ponte_palmas': 1.85,
-  'las_vegas torre_stratosphere': 1.15,
-  'baia_toquio rainbow_bridge': 0.0,
-  'osaka_neon castelo_osaka': 0.35,
-  'osaka_neon tsutenkaku': 1.25,
-  'paris arco_triunfo': 1.65,
-  'monaco_noite cassino_monte_carlo': 0.95,
+  'pampulha igreja_pampulha': 2.35, // 0,75 antes da T4
+  'lago_paranoa ponte_jk': 1.15, // 0,0
+  'aracaju arcos_atalaia': 2.25, // 1,55
+  'convento_penha convento_penha': 2.15, // ≥ 2,5 antes da T4 (2ª praça)
+  'las_vegas torre_stratosphere': 2.25, // 1,15
+  'baia_toquio rainbow_bridge': 1.85, // 0,0
+  'monaco_noite cassino_monte_carlo': 1.25, // 0,95
 };
 
 /**
  * Marcos que nem a volta inteira põe no mínimo, e por quê (s). A pirâmide do Luxor tem o facho de luz no céu: a caixa
  * dela vai a 807 m de altura e os pontos de amostra ficam a 160–690 m — à noite (a névoa a 390 m) só o mais baixo cabe
- * no quadro, e só com a câmera a 250 m ou mais dela: 1,5 s em qualquer lugar da volta (era 1,4).
+ * no quadro, e só com a câmera a 250 m ou mais dela: 1,7 s em qualquer lugar da volta (era 1,4; 1,8 na M6 e 1,7 depois da T4).
  */
 const SHAPE_LIMITED: Readonly<Record<string, number>> = {
-  'las_vegas piramide_luxor': 1.5,
+  'las_vegas piramide_luxor': 1.65,
   ...M6_LIMITED,
 };
 

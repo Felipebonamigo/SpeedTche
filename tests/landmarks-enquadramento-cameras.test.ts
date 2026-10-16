@@ -6,6 +6,7 @@
 // Alta por FOV: 36 → 3,09 / 103 / 9 · 40 → 3,33 / 83 / 7 · 44 → 3,54 / 70 / 5 · 46 → 3,64 / 66 / 4 · 50 → 3,82 / 52 / 3 · 54 → 3,98 / 46 / 3 · 58 → 4,13 / 41 / 3.
 // Nem o recuo (back), nem a mira (lookY, lookAhead) mexem na conta: só o FOV. A Alta ficou em 54°. (Com 36° ela perdia ~1,3 s por marco, quase todos os de lado;
 // Capô e Frente (FOV 72 e 78) veem igual ou melhor que a Baixa.) NÃO se refez o layout para a Alta: mudaria o cenário das 109 pistas.
+// T4 (15/10/2026, as praças do núcleo na escala da pista): Baixa 4,58 / 13 / 0 · Alta 4,19 / 22 / 0 · Capô 4,72 / 9 / 0 · Frente 4,87 / 7 / 0.
 import { describe, expect, it } from 'vitest';
 import { placeOf } from '../src/core/data/places';
 import { getTrack, TRACKS } from '../src/core/track';
@@ -37,18 +38,18 @@ function measure(): Record<CameraMode, Tally> {
 }
 
 describe('enquadramento dos marcos por câmera', () => {
-  it('a Alta fica a no máximo 1,3× a Baixa em marcos abaixo do mínimo e com 4 nunca vistos (FOV 54); Capô e Frente veem igual ou melhor', () => {
+  it('com as praças da T4: Baixa ≤ 13 marcos abaixo do mínimo, Alta (FOV 54) ≤ 22, nenhum nunca visto; Capô e Frente veem igual ou melhor', () => {
     const t = measure();
     for (const m of CAMERA_MODES) expect(t[m].n, m).toBe(292);
     const mean = (m: CameraMode) => t[m].sum / t[m].n;
-    // Baixa: as exceções já listadas em tests/landmarks-enquadramento.test.ts (36 instâncias abaixo do mínimo, 3 nunca vistas).
-    expect(t.low.below).toBeLessThanOrEqual(36);
-    expect(t.low.zero).toBeLessThanOrEqual(3);
-    expect(mean('low')).toBeGreaterThan(4.3);
+    // Baixa: as exceções já listadas em tests/landmarks-enquadramento.test.ts (36 instâncias abaixo do mínimo e 3 nunca vistas antes da T4; 13 e 0 depois).
+    expect(t.low.below).toBeLessThanOrEqual(13);
+    expect(t.low.zero).toBe(0);
+    expect(mean('low')).toBeGreaterThan(4.55);
     // Alta: o FOV foi aberto de 36 para 54 para trazer os marcos de volta (36 dava 103 abaixo do mínimo e 9 nunca vistos). Meta: no máximo 1,3× a Baixa, e 4 nunca vistos.
-    expect(t.high.below).toBeLessThanOrEqual(Math.floor(1.3 * 36));
-    expect(t.high.zero).toBeLessThanOrEqual(4);
-    expect(mean('high')).toBeGreaterThan(3.9);
+    expect(t.high.below).toBeLessThanOrEqual(22); // 46 antes da T4 (1,3× os 36 da Baixa)
+    expect(t.high.zero).toBe(0);
+    expect(mean('high')).toBeGreaterThan(4.15);
     // Presas ao carro (FOV largo): nunca pior que a Baixa.
     for (const m of ['hood', 'bumper'] as const) {
       expect(t[m].below, m).toBeLessThanOrEqual(t.low.below);

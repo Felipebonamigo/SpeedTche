@@ -3,17 +3,18 @@
 // e, quando a aproximação faz curva, do outro lado (a visada atravessa a parte de dentro da curva). É a mesma conta do
 // renderizador (render/scenery/sight.ts), simplificada: a câmera na linha central, um ponto do marco, a faixa dos
 // prédios no lugar da grade de alturas. O builder chama durante a montagem da pista (a colisão depende disto), então
-// tudo aqui é soma, produto e raiz — iguais em toda máquina (o giro por segmento é pequeno: série de Taylor).
+// tudo aqui é soma, produto e raiz — iguais em toda máquina (o giro de cada segmento vem da série de Taylor em passos
+// pequenos). O giro é o da pista (turn.ts, a mesma escala do 3D e do minimapa desde a M6; até a T4 era o legado).
 import type { Track } from '../types';
+import { trackTurnPerCurve } from './turn';
 
 /**
  * O que a conta precisa do renderizador e da conta de enquadramento (o núcleo não importa o renderizador;
  * `tests/landmarks-pracas.test.ts` confere cada número com render/units.ts e render/scenery/sight.ts).
  */
 export const SIGHT_MODEL = {
-  /** Metros por segmento e giro (rad) por unidade de curva por segmento (render/units.ts). */
+  /** Metros por segmento (render/units.ts). O giro por unidade de curva é o da pista (turn.ts, `trackTurnPerCurve`). */
   segmentM: 4,
-  headingPerCurve: 0.0035,
   /** Tangente da meia largura do quadro que conta (os 80% do meio, 16:9, FOV na velocidade da conta: SIGHT_TAN_H). */
   tanH: 1.04,
   /** Profundidade (m) até onde a névoa deixa ler o marco, por período (um pouco aquém da de sight.ts). */
@@ -35,27 +36,38 @@ export interface Centerline {
   readonly hc: Float64Array;
 }
 
-/** Giro de (s, c) por um ângulo pequeno `d` (|d| ≤ 0,03 rad: o erro da série é < 1e−13). */
+/** Maior passo da série (rad): com |d| ≤ 0,03 o erro dela é < 1e−13. */
+const STEP_RAD = 0.03;
+
+/**
+ * Giro de (s, c) por `d`. Com a escala da pista um segmento gira até ~0,34 rad (aracaju): o ângulo é dividido em passos
+ * de ≤ 0,03 rad, cada um pela série, e os passos se compõem (produto de giros) antes de girar (s, c).
+ */
 function rotate(s: number, c: number, d: number): [number, number] {
-  const d2 = d * d;
-  const cd = 1 - d2 / 2 + (d2 * d2) / 24;
-  const sd = d * (1 - d2 / 6 + (d2 * d2) / 120);
+  const ad = d < 0 ? -d : d;
+  const steps = ad > STEP_RAD ? Math.ceil(ad / STEP_RAD) : 1;
+  const e = d / steps; const e2 = e * e;
+  const ce = 1 - e2 / 2 + (e2 * e2) / 24;
+  const se = e * (1 - e2 / 6 + (e2 * e2) / 120);
+  let sd = se; let cd = ce;
+  for (let i = 1; i < steps; i++) { const t = sd * ce + cd * se; cd = cd * ce - sd * se; sd = t; }
   const ns = s * cd + c * sd; const nc = c * cd - s * sd;
   const m = Math.sqrt(ns * ns + nc * nc);
   return [ns / m, nc / m];
 }
 
-/** A pista desenrolada como o renderizador faz (render/scenery/sight.ts, unrollTrack), sem seno nem cosseno. */
+/** A pista desenrolada como o renderizador faz (render/scenery/sight.ts, unrollTrack, na escala da pista), sem seno nem cosseno. */
 export function centerline(track: Track): Centerline {
   const segs = track.segments; const n = segs.length;
   const len = 2 * n + 1;
   const px = new Float64Array(len); const pz = new Float64Array(len);
   const hs = new Float64Array(len); const hc = new Float64Array(len);
+  const turn = trackTurnPerCurve(segs);
   let s = 0; let c = 1;
   for (let k = 0; k < len; k++) {
     hs[k] = s; hc[k] = c;
     if (k + 1 === len) break;
-    const d = segs[k % n].curve * SIGHT_MODEL.headingPerCurve;
+    const d = segs[k % n].curve * turn;
     // Anda pelo rumo do meio do segmento e gira o rumo inteiro para o próximo.
     const [ms, mc] = rotate(s, c, d / 2);
     px[k + 1] = px[k] + SIGHT_MODEL.segmentM * ms; pz[k + 1] = pz[k] - SIGHT_MODEL.segmentM * mc;
@@ -110,4 +122,35 @@ export function sightNeed(line: Centerline, k: number, lat: number, depthM: numb
     }
   }
   return { seenM, cross };
+}
+
+/** Até quantos segmentos para cada lado a pegada é conferida contra a pista (o LANDMARK_VIEW do layout). */
+const ROAD_VIEW = 300;
+
+/** Até onde (m) o eixo de um marco comprido pode chegar do resto da pista: os 26 m do layout mais a meia largura da ponte (~10 m). */
+const AXIS_GAP_M = 36;
+
+/**
+ * O lugar do marco (o ponto a `lat` m do centro no segmento desenrolado `k`) está longe do resto da pista? Com o traçado do mapa a pista volta
+ * perto de si mesma (grampo, laço, o lado de dentro de uma curva longa): o layout (render/scenery/layout.ts) não põe pegada a menos de 26 m de
+ * nenhum trecho a ±300 segmentos, e a praça aberta ali fica sem marco. Pede que nenhum ponto da linha central chegue a menos de `minM` do
+ * ponto; num marco comprido e estreito (`halfM`: meia ponte, ao longo da pista), a menos de AXIS_GAP_M do eixo dele, de 20 em 20 m.
+ */
+export function clearOfRoad(line: Centerline, k: number, lat: number, minM: number, halfM = 0): boolean {
+  const { px, pz, hs, hc } = line;
+  const tx = px[k] + lat * hc[k]; const tz = pz[k] + lat * hs[k];
+  const lo = Math.max(0, k - ROAD_VIEW); const hi = Math.min(px.length - 1, k + ROAD_VIEW);
+  const steps = halfM > 0 ? Math.ceil(halfM / 20) : 0;
+  for (let a = -steps; a <= steps; a++) {
+    // Ao longo da pista no segmento k: frente = (sen, −cos).
+    const t = steps ? (a * halfM) / steps : 0;
+    const qx = tx + t * hs[k]; const qz = tz - t * hc[k];
+    const gap = steps ? AXIS_GAP_M : minM;
+    const gap2 = gap * gap;
+    for (let q = lo; q <= hi; q++) {
+      const dx = px[q] - qx; const dz = pz[q] - qz;
+      if (dx * dx + dz * dz < gap2) return false;
+    }
+  }
+  return true;
 }

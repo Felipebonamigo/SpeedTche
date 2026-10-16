@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { GEAR_TOP } from '../src/core/constants';
 import { CARS } from '../src/core/data/cars';
-import { getTrack } from '../src/core/track';
+import { getTrack, TRACKS } from '../src/core/track';
 import type { HumanEntry, RaceResultRow, Segment, SpriteRef } from '../src/core/types';
 import {
   onlineFingerprint, contentFingerprint, fingerprintContent, lapContent, lapFingerprint, PHYSICS_REVISION, trackLength,
@@ -250,5 +250,52 @@ describe('o visual do carro renova só a impressão do online (N3)', () => {
     const cat = JSON.parse(JSON.stringify(COSMETICS_CATALOG)) as { finishes: string[] };
     cat.finishes[2] = 'perola';
     expect(contentFingerprint({ ...fingerprintContent(), cosmetics: cat })).not.toBe(a);
+  });
+});
+
+// T4 (15/10/2026): as praças e os mirantes do núcleo passaram a ser abertos na escala do giro da pista (core/track/sightline.ts), a mesma do 3D desde
+// a M6, e longe do resto da pista. Os prédios do builder são sólidos: nas pistas de cidade e de litoral com marco de perto ou de longe o traçado
+// construído mudou, e o recorde e o fantasma delas viram "versão anterior" pela impressão da volta (nada é apagado). As outras ficam iguais.
+// Valores gravados em e31d139, antes da T4 (falcao): `npx tsx` com lapFingerprint(id, 'falcao') de cada pista.
+describe('as praças na escala da pista renovam a impressão só das pistas com praça (T4)', () => {
+  const AT_E31D139: Record<string, string> = Object.fromEntries((
+    'copacabana:9fb16efb paraty:b52254ae serra_dos_orgaos:57071ef5 ilhabela:e50dcefe campos_do_jordao:235229f9 sampa_noite:d6c21d37 ' +
+    'pampulha:a028d66a ouro_preto:2eab3054 serra_da_canastra:39fa8608 itaunas:cbb62468 convento_penha:d46af011 pedra_azul:d407d1b6 ' +
+    'foz_do_iguacu:8f359ade serra_do_mar:2a6c40f0 curitiba:6fd3a0a6 floripa:d774305e camboriu:2237e5b6 rio_do_rastro:11257b55 ' +
+    'orla_guaiba:06347d5e cuia_gaucha:acecd46d aparados_da_serra:9cff3f40 lago_paranoa:398e61b4 torre_de_tv:5518782b brasilia:0474a0dc ' +
+    'pirenopolis:cce705d8 caldas_novas:b2f5cf50 chapada_veadeiros:68462a5a bonito:c61bbcd5 campo_grande:a4872d5c estrada_parque:e0134609 ' +
+    'transpantaneira:715117d7 cuiaba:bd5123ab chapada_guimaraes:fd7fde35 porto_seguro:b005ac1c salvador:2417cacd chapada_diamantina:879783f0 ' +
+    'aracaju:75a6ec4f sao_cristovao:6e7480a4 xingo:f615b85e maragogi:854280b4 maceio:9aca5711 foz_sao_francisco:2c9235bb recife_antigo:d762ee31 ' +
+    'olinda:81bc1ee3 noronha:9d256619 joao_pessoa:76edb235 campina_grande:d09fec5d pedra_da_boca:7ed110d9 natal:4fc23a42 ponta_negra:ba02c440 ' +
+    'cajueiro_pirangi:b084f214 jericoacoara:52d97941 fortaleza_beira_mar:1e50f7e6 canoa_quebrada:fba01e11 delta_parnaiba:9152e6b2 ' +
+    'sete_cidades:6b84706d serra_capivara:cbfb0dd3 sao_luis:836f25ab chapada_das_mesas:92f362e6 lencois:632c0158 alter_do_chao:6cd35b26 ' +
+    'belem:ede7465f marajo:037a215f manaus:cb16b81c ponte_rio_negro:7c19e814 parintins:7eec8759 macapa:40ca4e97 pororoca_araguari:3d4ce433 ' +
+    'serra_do_navio:2109eb96 boa_vista:9f835346 monte_roraima:4b853e8d lago_caracarana:6e966cef porto_velho:6f78f7da forte_principe:80e0b376 ' +
+    'vale_guapore:c9026ba1 rio_branco:2a164be8 geoglifos:9dcc165b estrada_pacifico:dceaf221 jalapao:572ba045 palmas:64fe9278 ' +
+    'ilha_do_bananal:e1c7b913 rota_66:1ab6585a rochosas:ab46c86c canion:b8f33e07 las_vegas:358016d9 baia_toquio:1115a433 yanbaru:a978d81f ' +
+    'monte_fuji:90704e61 osaka_neon:9c4971e2 autobahn:2f94bd8a paris:8b9070da passo_alpino:117b655f monaco_noite:77153a4f kruger:a13d8d3c ' +
+    'karoo:371f9836 drakensberg:2ab614b9 boa_esperanca:1dbea2ad outback:d6291307 great_ocean:496e421f daintree:ec3459d7 sydney:3ff3d6c3 ' +
+    'atlantico:d1c55ddf laponia:e5b1cd09 trollstigen:50efa4e7 tromso:9beaea04 amalfi:111b7104 santorini:b581d6f6 etna:0e67305c roma:0dc887fe '
+  ).trim().split(' ').map((p) => p.split(':') as [string, string]));
+  const CHANGED = [
+    'paraty', 'ilhabela', 'sampa_noite', 'pampulha', 'itaunas', 'convento_penha', 'curitiba', 'floripa', 'camboriu', 'orla_guaiba',
+    'lago_paranoa', 'torre_de_tv', 'brasilia', 'cuiaba', 'porto_seguro', 'salvador', 'aracaju', 'maragogi', 'maceio', 'recife_antigo', 'olinda',
+    'joao_pessoa', 'jericoacoara', 'fortaleza_beira_mar', 'sao_luis', 'belem', 'manaus', 'ponte_rio_negro', 'boa_vista', 'palmas', 'las_vegas',
+    'baia_toquio', 'osaka_neon', 'paris', 'monaco_noite', 'sydney', 'santorini', 'roma',
+  ];
+
+  it(`${CHANGED.length} pistas mudaram de impressão (as com praça que mudou); as outras são as de antes`, () => {
+    expect(Object.keys(AT_E31D139).sort()).toEqual(TRACKS.map((t) => t.id).sort());
+    const changed = TRACKS.filter((t) => lapFingerprint(t.id, 'falcao') !== AT_E31D139[t.id]).map((t) => t.id);
+    expect(changed).toEqual(CHANGED);
+  });
+
+  it('recorde e fantasma de antes numa pista com praça viram "versão anterior"; numa sem praça, não; o save antigo é lido igual', () => {
+    const old = (track: string): BestLap => ({ ticks: 3000, name: 'Ana', carId: 'falcao', date: '2026-10-14', fp: AT_E31D139[track] });
+    expect(recordFromOtherVersion(old('pampulha'), 'pampulha')).toBe(true);
+    expect(recordFromOtherVersion(old('copacabana'), 'copacabana')).toBe(false);
+    const save = sanitizeSave({ bestLaps: { pampulha: old('pampulha'), copacabana: old('copacabana') } });
+    expect(save.bestLaps.pampulha).toEqual(old('pampulha'));
+    expect(save.bestLaps.copacabana).toEqual(old('copacabana'));
   });
 });
