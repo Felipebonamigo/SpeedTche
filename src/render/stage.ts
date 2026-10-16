@@ -397,7 +397,7 @@ export class Stage {
 
     this.paintStudio(slot, reveal);
     if (panel.kind === 'podium') this.posePodium(panel, slot, aspect, time, dt);
-    else this.poseCar(panel, slot, aspect, dt, reveal, workshop, slot.revealAt === null ? 0 : time - slot.revealAt, reduce);
+    else this.poseCar(panel, slot, aspect, dt, reveal, workshop, slot.revealAt === null ? 0 : time - slot.revealAt, reduce, time);
     this.poseEffects(panel, slot, reveal, workshop, time);
 
     const cam = slot.camera;
@@ -450,7 +450,7 @@ export class Stage {
     this.lights.rim.color.set('#ffffff').lerp(slot.ring, 0.3);
   }
 
-  private poseCar(panel: StagePanel, slot: Slot, aspect: number, dt: number, reveal: RevealPlan | null, workshop: WorkshopPlan | null, revealAge: number, reduce: boolean): void {
+  private poseCar(panel: StagePanel, slot: Slot, aspect: number, dt: number, reveal: RevealPlan | null, workshop: WorkshopPlan | null, revealAge: number, reduce: boolean, time = 0): void {
     this.plate.visible = true; this.contact.visible = true; this.podium.visible = false;
     const carId = panel.carId && CARS.some((c) => c.id === panel.carId) ? panel.carId : null;
     if (!carId) { this.cars.poseDisplay([]); this.cover.visible = false; return; }
@@ -458,7 +458,8 @@ export class Stage {
     const pose = focusPose(model, panel.focus, aspect);
     const k = slot.fresh ? 1 : 1 - Math.exp(-dt * 5);
     slot.fresh = false;
-    if (pose.yaw === null) slot.yaw += TURN_SPEED * dt;
+    // "Reduzir efeitos" (T8): o prato não gira; o carro fica parado no ângulo de mostra (o foco de uma peça ainda vira o carro para ela).
+    if (pose.yaw === null) slot.yaw += reduce ? 0 : TURN_SPEED * dt;
     else slot.yaw += wrapPi(pose.yaw - slot.yaw) * k;
     slot.az += wrapPi(pose.azimuth - slot.az) * k;
     slot.el += (pose.elevation - slot.el) * k;
@@ -467,9 +468,13 @@ export class Stage {
     // Pneus e freios em foco: as rodas da frente viram um pouco, para mostrar o aro.
     const steerTarget = panel.focus === 'tires' || panel.focus === 'brakes' ? 0.38 : 0;
     slot.steer += (steerTarget - slot.steer) * k;
-    const car: DisplayCar = { carId, paint: panel.paint, x: 0, y: PLATE_TOP, z: 0, yaw: slot.yaw, dip: workshop ? workshop.dip * DIP_METERS : 0, steer: slot.steer };
+    // O visual inteiro (T8): acabamento, roda, aro e faixa no casco; com o nitro em foco, a chama acesa na cor escolhida.
+    const car: DisplayCar = {
+      carId, paint: panel.paint, look: panel.look, x: 0, y: PLATE_TOP, z: 0, yaw: slot.yaw, dip: workshop ? workshop.dip * DIP_METERS : 0, steer: slot.steer,
+      flame: panel.focus === 'nitro' ? 1 : 0,
+    };
     this.cars.setHeadlights(reveal ? reveal.head : 0);
-    this.cars.poseDisplay([car]);
+    this.cars.poseDisplay([car], time, reduce);
     this.poseCover(model, slot, reveal, revealAge, reduce);
     this.contact.rotation.y = slot.yaw;
   }
@@ -553,7 +558,7 @@ export class Stage {
     const items: DisplayCar[] = [];
     for (const e of panel.podium) {
       const s = slots.find((x) => x.place === e.place);
-      if (s) items.push({ carId: e.carId, paint: e.paint, x: s.x, y: s.top, z: s.z, yaw: s.yaw });
+      if (s) items.push({ carId: e.carId, paint: e.paint, look: e.look ?? null, x: s.x, y: s.top, z: s.z, yaw: s.yaw });
     }
     this.cars.setHeadlights(0);
     this.cars.poseDisplay(items);

@@ -7,8 +7,10 @@
 // faz a coisa (ou depois de TIP_SHOW_TICKS) e a seguinte espera TIP_GAP_TICKS: ninguém é metralhado de texto.
 import './hud-tips.css';
 import '../tutorial/strings';
-import { AI_BRAKE_CURVE, NITRO_CHARGE_COST, SEGMENT_LENGTH, TICK_RATE } from '../core/constants';
-import { brakingTarget, wantsDrift } from '../core/sim/ai';
+import {
+  AI_BRAKE_CURVE, DRIFT_CHARGE_MIN_CURVE, DRIFT_LEVEL_TICKS, DRIFT_MIN_SPEED_FACTOR, DT, NITRO_CHARGE_COST, SEGMENT_LENGTH, TICK_RATE,
+} from '../core/constants';
+import { brakingTarget } from '../core/sim/ai';
 import { carStats, nitroMeterOf } from '../core/sim/stats';
 import { segmentAt } from '../core/track/builder';
 import type { CarState, PlayerInput, RaceState, Track } from '../core/types';
@@ -35,6 +37,8 @@ export const TIP_NITRO_AFTER_TICKS = 6 * TICK_RATE;
 const BRAKE_LOOKAHEAD = 36;
 /** A dica de frear só vale se o carro estiver acima do que dá para segurar na curva por esta folga. */
 const BRAKE_SLACK = 1.03;
+/** A dica de derrapar só vale se o trecho da curva der para a carga passar do nível 1 com esta folga (o jogador demora a apertar). */
+const DRIFT_TIP_SLACK = 1.2;
 /** O box está "perto" (a seta pulsa) a menos disto, em segmentos. */
 const PIT_NEAR_SEGMENTS = 30;
 
@@ -65,6 +69,24 @@ export function tipsEnabled(save: { racesRun: number }, mode: RaceMode, online: 
   return save.racesRun === 0 && !online && (mode === 'career' || mode === 'cup');
 }
 
+/**
+ * Derrapar aqui dá turbo? O carro está numa curva em que a carga sobe (|curva| ≥ DRIFT_CHARGE_MIN_CURVE), rápido o bastante para
+ * entrar na derrapagem, e o trecho do mesmo lado que falta dura, na velocidade de agora, o que a carga leva para chegar ao nível 1
+ * (com folga). Não é a regra da IA (`wantsDrift`: curva ≥ AI_BRAKE_CURVE por 18 segmentos), mais estreita do que o que a física
+ * paga: com ela a dica nunca aparecia na Orla de Copacabana, a 1ª corrida (T8; tests/dicas-copacabana.test.ts).
+ */
+function driftPays(track: Track, car: CarState, topSpeed: number): boolean {
+  const curve = segmentAt(track, car.z).curve;
+  if (Math.abs(curve) < DRIFT_CHARGE_MIN_CURVE || car.speed < topSpeed * DRIFT_MIN_SPEED_FACTOR) return false;
+  const ticksPerSegment = SEGMENT_LENGTH / (car.speed * DT);
+  const needed = Math.ceil((DRIFT_LEVEL_TICKS[0] * DRIFT_TIP_SLACK) / ticksPerSegment);
+  for (let i = 1; i < needed; i++) {
+    const c = segmentAt(track, car.z + i * SEGMENT_LENGTH).curve;
+    if (Math.abs(c) < DRIFT_CHARGE_MIN_CURVE || c * curve < 0) return false;
+  }
+  return true;
+}
+
 function pitAhead(track: Track, car: CarState): boolean {
   for (let i = 0; i < PIT_NEAR_SEGMENTS; i++) if (segmentAt(track, car.z + i * SEGMENT_LENGTH).pit) return true;
   return false;
@@ -89,13 +111,14 @@ export function observeTips(mem: TipMemory, state: RaceState, track: Track, inpu
     const used = car.nitroTicks > 0 || state.events.some((e) => e.type === 'nitro' && e.carId === car.id);
 
     const curve = Math.abs(segmentAt(track, car.z).curve);
+    // Sem teto (Infinity): sem curva forte à frente não há o que frear, nem acima da máxima (impulso da derrapagem, vácuo).
     const needBrake = racing && !car.inPit && car.nitroTicks === 0
-      && brakingTarget(track, car.z, stats, 1, BRAKE_LOOKAHEAD, 1) * stats.topSpeed * BRAKE_SLACK < car.speed;
+      && brakingTarget(track, car.z, stats, 1, BRAKE_LOOKAHEAD, Infinity) * stats.topSpeed * BRAKE_SLACK < car.speed;
     const wants: Record<TipId, boolean> = {
       launch: state.phase === 'countdown' && car.launch === 0,
       pit: racing && st.pitWanted && !car.inPit,
       brake: needBrake && !input.brake,
-      drift: racing && !car.inPit && car.driftDir === 0 && !input.brake && wantsDrift(track, car, stats),
+      drift: racing && !car.inPit && car.driftDir === 0 && !input.brake && driftPays(track, car, stats.topSpeed),
       nitro: racing && tick >= state.startTick + TIP_NITRO_AFTER_TICKS && !car.inPit && nitroMeterOf(state, car) >= NITRO_CHARGE_COST
         && car.nitroTicks === 0 && curve < AI_BRAKE_CURVE && car.speed >= stats.topSpeed * 0.4,
     };

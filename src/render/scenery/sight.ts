@@ -258,7 +258,9 @@ export const CAMERA_DYNAMICS = {
   tremor: { from: 0.9, offset: 0.02, roll: 0.003 },
   /**
    * Cresta de morro: o quanto a câmera flutua (m), a queda de inclinação que conta como cresta (e a mínima de reserva), a distância mínima entre duas
-   * (segmentos), o máximo por volta, e as janelas (m) de subida antes e de descida depois dela.
+   * (segmentos), o máximo por volta, e as janelas (m) de subida antes e de descida depois dela. Só da câmera (T8): o carro não sobe com ela — a
+   * elevação começa `rise` m ANTES do topo, com o carro ainda na subida, e um carro no ar sem pulo na física pareceria flutuar (a decisão está em
+   * docs/ondas/T8-pontas.md, item 3).
    */
   crest: { lift: 0.5, minDrop: 0.04, fallbackDrop: 0.02, spacing: 40, max: 4, rise: 10, fall: 25 },
   /** Órbita da vitória: guinada máxima (rad), duração (s), raio final (m), elevação (m), lateral livre (m) e a caixa do carro (m) com a folga da câmera. */

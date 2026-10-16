@@ -4,6 +4,7 @@
 // Sem WebGL (ou no Retrô, que não consulta o registro) o host fica transparente e vazio de carro; a tela não depende disso.
 import { CARS } from '../core/data/cars';
 import type { CarColors, Quality } from '../game/contracts';
+import type { CarLook } from '../core/types';
 import { t } from '../i18n';
 import '../dealership/strings';
 import { stageBus, type PodiumEntry, type StageHost, type StagePanel } from './stage-bus';
@@ -15,6 +16,8 @@ export interface ShowroomOptions {
   id?: string;
   carId?: string | null;
   paint?: CarColors | null;
+  /** O visual inteiro do assento para o carro (N3); vale mais que `paint` (T8). */
+  look?: CarLook | null;
   focus?: StageFocus;
   quality?: Quality;
   reduceEffects?: boolean;
@@ -100,6 +103,7 @@ function mount(host: HostEl, kind: StagePanel['kind'], opts: ShowroomOptions): S
   // `undefined` = "não mexe"; `null` é um valor (sem carro, de fábrica, sem foco).
   panel.set({
     carId: rest.carId === undefined ? panel.carId : rest.carId, paint: rest.paint === undefined ? panel.paint : rest.paint,
+    look: rest.look === undefined ? panel.look : rest.look,
     focus: rest.focus === undefined ? panel.focus : rest.focus, quality: rest.quality ?? panel.quality,
     reduceEffects: rest.reduceEffects ?? panel.reduceEffects, ring: rest.ring ?? panel.ring,
   });
@@ -119,12 +123,12 @@ export function mountShowroom(host: HTMLElement, opts: ShowroomOptions = {}): St
  * O pódio 3D: os três primeiros, pintados, sobre os blocos de ouro, prata e bronze. `entries` em qualquer ordem; só os lugares 1 a 3
  * entram, e um carro que não existe é erro (o pódio nunca desenha um carro "qualquer").
  */
-export function mountPodium(host: HTMLElement, entries: readonly PodiumEntry[], opts: Omit<ShowroomOptions, 'carId' | 'paint'> = {}): StageHandle {
+export function mountPodium(host: HTMLElement, entries: readonly PodiumEntry[], opts: Omit<ShowroomOptions, 'carId' | 'paint' | 'look'> = {}): StageHandle {
   const podium = entries
     .filter((e) => e.place >= 1 && e.place <= 3)
     .map((e) => {
       if (!CARS.some((c) => c.id === e.carId)) throw new Error(`Pódio com carro que não existe: ${e.carId}`);
-      return { place: e.place, carId: e.carId, paint: e.paint };
+      return { place: e.place, carId: e.carId, paint: e.paint, look: e.look ?? null };
     })
     .sort((a, b) => a.place - b.place)
     .slice(0, 3);

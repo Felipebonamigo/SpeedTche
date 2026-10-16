@@ -10,10 +10,10 @@ import { assistedHumans } from '../../access/humans';
 import { seatColor } from '../../core/data/drivers';
 import { ASSIST_LEVELS } from '../../core/sim/assist';
 import type { CarDef, CarLook, HumanEntry } from '../../core/types';
-import type { DeviceId, MenuContext, MenuNav, SaveData } from '../../game/contracts';
+import type { CarColors, DeviceId, MenuContext, MenuNav, SaveData } from '../../game/contracts';
 import { carAvailable } from '../../game/career-save';
 import '../../cosmetics/strings';
-import { stepLook, type LookField } from '../../game/cosmetics';
+import { factoryColors, lookColors, stepLook, type LookField } from '../../game/cosmetics';
 import { ORIGINAL_PAINT, seatLook, seatPaint, setSeatLook, stepSeatPaint, withLook } from '../../game/paints';
 import { NAME_MAX_LENGTH, saveSave } from '../../game/save';
 import { t } from '../../i18n';
@@ -25,8 +25,12 @@ import { commitSettings, raceOptionSelectors } from './options';
 import { lookButton, lookEditor, lookSummary, paintSelector } from './paint';
 import { carLocked, lockRow } from './progress';
 import { cosmeticUnlocked } from '../../game/progression';
+import { mountShowroom, type StageHandle } from '../../render/stage-mount';
 
 export const LOBBY_SEATS = 4;
+
+/** O carro trancado (O5) no palco 3D do lobby: grafite fosco, sem o visual do assento (T8). */
+export const LOCKED_PAINT: Readonly<CarColors> = Object.freeze({ color: '#3b404b', accent: '#2a2e36' });
 
 /** Carros escolhíveis no lobby: os livres e os comprados em alguma carreira (a mesma regra do online). */
 export function availableCars(ctx: Pick<MenuContext, 'cars' | 'save'>): CarDef[] {
@@ -176,6 +180,15 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
   let focusStartNext = false;
   /** Assentos com um carro trancado à mostra, onde o carro se escolhe aqui (refeito a cada render): esses não ficam PRONTOS. */
   const lockedSeats = new Set<number>();
+  /**
+   * O carro de cada assento no palco 3D (T8; `mountShowroom`, N2), como a garagem: fora do Retrô, na janela `.car-stage` do cartão. O painel
+   * leva a qualidade das Opções (a Baixa desenha sem pós) e o "reduzir efeitos" (o prato não gira). `stageEls`/`slotEls` medem o buraco no
+   * vidro de cada cartão (`syncHoles`), por onde o canvas aparece.
+   */
+  const use3d = ctx.settings.renderStyle !== 'retro';
+  const stages: Array<StageHandle | null> = [null, null, null, null];
+  const stageEls: Array<HTMLElement | null> = [null, null, null, null];
+  const slotEls: Array<HTMLElement | null> = [null, null, null, null];
 
   const saveCursors = () => {
     lobby.seats.forEach((s, i) => { const l = lists[i]; if (s && l && l.index >= 0) s.cursor = l.index; });
@@ -280,10 +293,26 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     const paintNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.look?.paint ?? ORIGINAL_PAINT : seatPaint(save, s.seat, carNow().id));
     // O visual inteiro (N3): o desenho do carro mostra a cor e o detalhe dele; no "Continuar", o da copa salva.
     const lookNow = () => (resume ? resumeRoster(lobby, save)[s.seat]?.look ?? null : seatLook(save, s.seat, carNow().id));
-    const heroBody = h('div', { class: 'car-hero-body' }, carCard(carNow(), cars, lookNow()));
-    const showCar = () => heroBody.replaceChildren(carCard(carNow(), cars, lookNow()));
     let paintItem: Selector | null = null;
     const lockedNow = () => carLocked(save, carNow());
+    // Carreira: carro e melhorias ficam na garagem. Copa retomada: o carro é o da copa salva.
+    const choosesCar = !(career || resume || hidesDriver || partner);
+    // O cartão mostra o carro (escolhido aqui ou o da copa retomada); nos outros casos vai uma nota no lugar dele.
+    const showsCar = !(career || hidesDriver || partner);
+    const grey = () => choosesCar && lockedNow();
+    const paint3d = (): CarColors | null => (grey() ? LOCKED_PAINT : lookColors(lookNow(), factoryColors(carNow())));
+    const card = (): HTMLElement => {
+      if (!use3d || !showsCar) return carCard(carNow(), cars, lookNow());
+      const win = h('div', { class: 'car-stage', attrs: { 'data-car': carNow().id, 'data-color': paint3d()?.color ?? carNow().color } });
+      stageEls[s.seat] = win;
+      stages[s.seat] = mountShowroom(win, {
+        id: `lobby:P${s.seat + 1}`, carId: carNow().id, paint: paint3d(), look: grey() ? null : lookNow(),
+        quality: ctx.settings.quality, reduceEffects: ctx.settings.reduceEffects, ring: color,
+      });
+      return carCard(carNow(), cars, lookNow(), win);
+    };
+    const heroBody = h('div', { class: 'car-hero-body' }, card());
+    const showCar = () => heroBody.replaceChildren(card());
     const changeCar = (dir: -1 | 1) => {
       if (s.ready) return;
       const was = lockedNow();
@@ -294,8 +323,6 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       showCar();
       paintItem?.refresh();
     };
-    // Carreira: carro e melhorias ficam na garagem. Copa retomada: o carro é o da copa salva.
-    const choosesCar = !(career || resume || hidesDriver || partner);
     const isLocked = choosesCar && lockedNow();
     if (isLocked) lockedSeats.add(s.seat);
     const carItem: FocusItem | null = !choosesCar ? null : {
@@ -344,7 +371,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     if (s.ready) ready.el.prepend(icon('check'));
     const team = lobbyTeamLabel(lobby.mode, rank)
       ?? (lobby.versus ? t('ui.lobby.teamN', { n: s.seat + 1 }) : t('core.team.human'));
-    const slot = h('div', { class: `slot occupied glass${s.ready ? ' ready' : ''}`, style: `--seat:${color}` },
+    const slot = h('div', { class: `slot occupied glass${s.ready ? ' ready' : ''}${use3d && showsCar ? ' has-stage' : ''}`, style: `--seat:${color}` },
       h('div', { class: 'slot-head' },
         h('span', { class: 'seat-badge', text: `P${s.seat + 1}` }),
         nameEl,
@@ -361,6 +388,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
         ready.el,
       ),
     );
+    slotEls[s.seat] = slot;
     return { el: slot, items: [nameRow, carItem, paintItem ?? lockItem, assistItem, lookItem, ready].filter((x): x is FocusItem => x !== null) };
   }
 
@@ -411,6 +439,8 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
     saveCursors();
     lists = [null, null, null, null];
     lockedSeats.clear();
+    stageEls.fill(null);
+    slotEls.fill(null);
     const limit = maxSeats(lobby, save);
     const slotsEl = h('div', { class: `lobby-slots seats-${limit}` });
     const slotItems: Array<FocusItem[]> = [];
@@ -459,6 +489,24 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       if (s && items) lists[seat] = createFocusList(items, { start: Math.min(s.cursor, items.length - 1), sfx: api.sfx });
     }
     body.replaceChildren(slotsEl, panelEl, ...(overlay ? [overlay] : []));
+    // O assento que saiu (ou que agora mostra uma nota no lugar do carro) solta o painel do palco; sem nenhum, a tela volta ao fundo do tema.
+    stages.forEach((st, seat) => { if (st && !stageEls[seat]) { st.release(); stages[seat] = null; } });
+    el.classList.toggle('stage3d', stages.some((st) => st !== null));
+  }
+
+  /** O buraco no vidro de cada cartão (máscara CSS, como a garagem): onde está a janela do palco o cartão não cobre o canvas. */
+  function syncHoles(): void {
+    slotEls.forEach((p, seat) => {
+      const win = stageEls[seat];
+      if (!p || !win || typeof p.getBoundingClientRect !== 'function' || typeof win.getBoundingClientRect !== 'function') return;
+      const a = p.getBoundingClientRect(); const b = win.getBoundingClientRect();
+      const x = Math.round(b.left - a.left - (p.clientLeft || 0)); const y = Math.round(b.top - a.top - (p.clientTop || 0));
+      const key = `${x},${y},${Math.round(b.width)},${Math.round(b.height)}`;
+      if (p.getAttribute('data-hole') === key) return;
+      p.setAttribute('data-hole', key);
+      p.style.setProperty('--hx', `${x}px`); p.style.setProperty('--hy', `${y}px`);
+      p.style.setProperty('--hw', `${Math.round(b.width)}px`); p.style.setProperty('--hh', `${Math.round(b.height)}px`);
+    });
   }
 
   const carOfSeat = (s: LobbySeat): CarDef => cars[s.carIndex] ?? cars[0];
@@ -500,6 +548,7 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
       s.cursor = list.index;
     },
     update() {
+      syncHoles();
       if (!armed) { armed = true; return; }
       const joining = input.joinPressed();
       if (joining) {
@@ -515,6 +564,10 @@ export function lobbyScreen(api: ScreenApi): ScreenInstance {
         if (me && editingSeat === seat) closeEditor(me);
         else if (seat >= 0 && editingSeat === null) leave(seat);
       }
+    },
+    destroy() {
+      for (const st of stages) st?.release();
+      stages.fill(null);
     },
   };
 }

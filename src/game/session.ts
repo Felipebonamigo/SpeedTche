@@ -191,6 +191,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   let tipsHud: TipsHud | null = null;
   /** Oferta de assistência depois de 2 eliminações seguidas (assist-offer.ts): a conta vive na sessão; `held` é a largada que a pergunta segurou. */
   const assistOffer = newAssistOffer();
+  if (settings.assistOfferDeclined) markOffered(assistOffer); // recusada antes (T8): não volta nem com o jogo reaberto
   let held: { event: MenuEvent; seats: number[] } | null = null;
   let idleTrack: Track = getTrack(TRACKS[0].id);
   let idleTimer = 0;
@@ -783,7 +784,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     const pending = held;
     held = null;
     if (!pending) return;
-    if (choice !== 'no') applySettings(applyAssistChoice(choice, settings, pending.seats));
+    applySettings(choice === 'no' ? { ...settings, assistOfferDeclined: true } : applyAssistChoice(choice, settings, pending.seats));
     if (pending.event.type === 'retryRace' && choice !== 'no') { menus.hide(); retryRace(true); return; }
     handleMenuEvent(pending.event);
   }

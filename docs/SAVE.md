@@ -183,3 +183,13 @@ novas são só ids a mais) e a chave nova ela não lê nem grava. O que se joga 
 Idioma: só na 1ª abertura (sem opções e sem save) as opções são gravadas com o idioma detectado (Steam → `app.getLocale` → navegador).
 
 Testes: `tests/progression-save.test.ts` (fixture literal da 0.1.4), `tests/progression*.test.ts`, `tests/idioma.test.ts`.
+
+## Recusa da oferta de assistência (T8)
+
+Campo aditivo `assistOfferDeclined` nas opções (`speed-tche.settings`): `true` quando o jogador respondeu "Seguir assim" à oferta de
+Freio automático / Amador depois de 2 eliminações seguidas (O3). A sessão marca a oferta como feita ao abrir, e ela não volta nem com o
+jogo reaberto. Aceitar não grava nada aqui (a escolha aceita já fica nas opções). Opções sem o campo (todas as de antes) abrem com
+`false`, a oferta de pé; lixo no campo vira `false`. A 0.1.4/0.1.5 leem as opções novas sem erro e sem perder nada do que conhecem (o
+saneador delas é lista branca e o campo novo não muda nenhum outro); se ela regravar as opções, o campo cai e a oferta pode aparecer
+mais uma vez — o único efeito. A sequência de eliminações continua só na sessão. Testes: `tests/oferta-assistencia-save.test.ts`
+(opções literais da 0.1.5) e `tests/oferta-assistencia-sessao.test.ts` (a sessão reaberta não oferece de novo).

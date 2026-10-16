@@ -71,7 +71,7 @@ await press('KeyS');
 await press('KeyD', 8);
 const shown = await slotPaints();
 check(JSON.stringify(shown) === JSON.stringify(['rubi:Rubi', 'cobalto:Cobalto']), `cartões mostram ${JSON.stringify(shown)}`);
-const preview = await page.evaluate(() => [...document.querySelectorAll('.slot.occupied .car-card')].map((c) => `${c.dataset.car}:${c.dataset.paint}:${c.querySelector('.car-svg path')?.getAttribute('fill')}`));
+const preview = await page.evaluate(() => [...document.querySelectorAll('.slot.occupied .car-card')].map((c) => `${c.dataset.car}:${c.dataset.paint}:${c.querySelector('.car-svg path')?.getAttribute('fill') ?? c.querySelector('.car-stage')?.dataset.color}`)); // T8: fora do Retrô, a janela do palco 3D
 check(preview[0] === 'falcao:rubi:#d7263d' && preview[1] === 'trovao:cobalto:#2346d6', `a prévia do carro troca de cor (${JSON.stringify(preview)})`);
 const saved = await savedPaints();
 check(saved?.[0]?.falcao === 'rubi' && saved?.[1]?.trovao === 'cobalto', `save guarda por assento e carro (${JSON.stringify(saved)})`);

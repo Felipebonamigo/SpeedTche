@@ -100,6 +100,8 @@ export interface DisplayCar {
   dip?: number;
   steer?: number;
   spin?: number;
+  /** A chama do nitro nos escapes, 0..1, na cor do look (a garagem a acende com o nitro em foco; T8). Ausente = apagada. */
+  flame?: number;
 }
 
 export class Cars {
@@ -638,12 +640,15 @@ export class Cars {
 
   /**
    * Posa carros no mundo do palco (substitui o que estava posado, inclusive o que a corrida deixou): casco inteiro (nunca o LOD1), rodas de
-   * desenho completo, mancha de contato no chão e nada de chama, estrela ou etiqueta. A frente do carro é -Z com `yaw = 0`.
+   * desenho completo, mancha de contato no chão e nada de estrela ou etiqueta; chama só a pedida (`flame`), na cor do look. `time` anima a
+   * chama; `reduce` (reduzir efeitos) a deixa menor, como na corrida. A frente do carro é -Z com `yaw = 0`.
    */
-  poseDisplay(items: readonly DisplayCar[]): void {
+  poseDisplay(items: readonly DisplayCar[], time = 0, reduce = false): void {
     const d = this.dummy;
     const w = this.wheelDummy;
     let nBlob = 0;
+    let nFlames = 0;
+    this.flameMaterial.uniforms.uTime.value = time;
     for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
     for (const wb of this.wheelBatches) wb.count = 0;
     for (const s of this.labels) if (s) s.visible = false;
@@ -677,6 +682,22 @@ export class Cars {
           this.put(wheels, this.mw, look, look.rimBit, look.rim);
         }
       }
+      const flame = Math.min(1, Math.max(0, it.flame ?? 0));
+      if (flame > 0) {
+        let e = 0;
+        for (const ex of model.exhausts) {
+          if (nFlames >= MAX_CARS * 2) break;
+          w.position.set(ex[0], ex[1], ex[2]);
+          w.rotation.set(0, 0, 0);
+          w.scale.set(FLAME_SIZE.width, FLAME_SIZE.width, FLAME_SIZE.length * (reduce ? FLAME_REDUCED.length : 1) * (0.55 + 0.45 * flame));
+          w.updateMatrix();
+          this.mw.multiplyMatrices(this.m, w.matrix);
+          this.flames.setMatrixAt(nFlames, this.mw);
+          this.flames.setColorAt(nFlames, look.flame);
+          this.flameExtra.setXYZ(nFlames, e * 3.1, flame * (reduce ? FLAME_REDUCED.level : 1), look.flameWhite);
+          nFlames++; e++;
+        }
+      }
     }
     for (const b of this.batches) {
       b.mesh.count = b.count;
@@ -689,7 +710,12 @@ export class Cars {
     }
     this.blob.count = nBlob; this.blob.visible = nBlob > 0;
     if (nBlob > 0) this.blob.instanceMatrix.needsUpdate = true;
-    this.flames.count = 0; this.flames.visible = false;
+    this.flames.count = nFlames; this.flames.visible = nFlames > 0;
+    if (nFlames > 0) {
+      this.flames.instanceMatrix.needsUpdate = true;
+      if (this.flames.instanceColor) this.flames.instanceColor.needsUpdate = true;
+      this.flameExtra.needsUpdate = true;
+    }
     this.stars.count = 0; this.stars.visible = false;
   }
 

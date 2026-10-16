@@ -127,19 +127,22 @@ teclas de no mínimo 12 px. As teclas são **as do jogador daquele assento** (`a
 |---|---|---|---|
 | Largada | na contagem, largada pendente | a largada é decidida | 1 |
 | Box (seta →) | depois do `fuel_low` | entra no box | 2 |
-| Frear | `brakingTarget` (a conta da IA) diz que está rápido demais para a curva forte que vem | freia | 3 |
-| Derrapar | dentro de uma curva forte longa (`wantsDrift`), sem derrapar, sem frear | derrapa | 3 |
+| Frear | `brakingTarget` (a conta da IA, sem teto) diz que está rápido demais para a curva forte que vem; sem curva à frente, nunca (nem acima da máxima) | freia | 3 |
+| Derrapar | numa curva em que a carga sobe (≥ `DRIFT_CHARGE_MIN_CURVE`) e cujo trecho do mesmo lado dura, na velocidade de agora, 1,2× o nível 1 da carga (`driftPays`), sem derrapar, sem frear | derrapa | 3 |
 | Nitro | barra cheia, reta, nitro nunca usado, 6 s depois da largada: "enche quando você derrapa, raspa, ultrapassa e larga bem" | usa o nitro | 2 |
 
 Ritmo: cada dica dura até 5 s (`TIP_SHOW_TICKS`) e a seguinte espera 2 s (`TIP_GAP_TICKS`); prioridade
-largada > box > frear > derrapar > nitro. `reduceEffects` tira a animação do cartão e o pulso da seta. A Copacabana de hoje
-tem curvas suaves (força ≤ 1,8, trechos de até 17 segmentos): as dicas de frear e de derrapar não disparam nela até o K5
-mexer no traçado; a regra vale para qualquer pista.
+largada > box > frear > derrapar > nitro. `reduceEffects` tira a animação do cartão e o pulso da seta. Na Orla de
+Copacabana (a 1ª corrida; T8) a dica de derrapar aparece nos trechos de curva ≥ 1,0 de 30 a 57 segmentos (antes usava a regra
+da IA, curva ≥ 1,5 por 18 segmentos, e a Copacabana do traçado M6 tem no máximo 17); a de frear aparece só para quem precisa:
+nível 1, o Falcão segura todas as curvas na máxima, o Trovão, o Pororoca e a Iara precisam aliviar na mais fechada
+(`tests/dicas-copacabana.test.ts`).
 
 ## Oferta de assistência (O3)
 
 Depois de **2 eliminações seguidas** (copa ou Expedição; classificar zera, outros modos não contam) a próxima largada
 (`startCup`, `continueCup`, `nextRace`, `retryRace`, `careerRace`) é segurada por uma tela: **Freio automático**
 (`seatAssists` = `brake` só para quem corre sem assistência), **Nível Amador** (`difficulty`) ou **Seguir assim**
-(Esc/B também). Cada opção só aparece se ainda ajuda. **Uma vez por sessão**, aceita ou recusada. A conta vive na
-sessão (`src/game/assist-offer.ts`), não no save: reiniciar o jogo a zera (atalho, com a saída no cabeçalho do módulo).
+(Esc/B também). Cada opção só aparece se ainda ajuda. **Uma vez por sessão**, aceita ou recusada; **recusada,
+nunca mais** (T8: `Settings.assistOfferDeclined`, campo aditivo, `docs/SAVE.md`). A sequência de eliminações vive na sessão
+(`src/game/assist-offer.ts`): reiniciar o jogo a zera.

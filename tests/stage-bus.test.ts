@@ -110,6 +110,19 @@ describe('mountShowroom (o que o lobby chama)', () => {
     expect(stageBus.live()).toHaveLength(0);
   });
 
+  it('T8: o look (visual inteiro) vai ao painel, e set({ look }) o troca; sem ele, null', () => {
+    const el = new FakeEl('div');
+    const look = { finish: 'perolado', wheel: 'aero', rim: 'grafite' };
+    const h = mountShowroom(el as unknown as HTMLElement, { id: 'lobby:P1', carId: 'falcao', look });
+    expect(h.panel.look).toEqual(look);
+    h.set({ look: null });
+    expect(h.panel.look).toBeNull();
+    h.release();
+    const h2 = mountShowroom(new FakeEl('div') as unknown as HTMLElement, { id: 'lobby:P2', carId: 'falcao' });
+    expect(h2.panel.look).toBeNull();
+    h2.release();
+  });
+
   it('o mesmo id de novo re-aponta o painel para o elemento novo (a garagem refaz o DOM a cada ação), sem duplicar', () => {
     const a = new FakeEl('div'); const b = new FakeEl('div');
     const h1 = mountShowroom(a as unknown as HTMLElement, { id: 'g:P1', carId: 'falcao' });
@@ -177,6 +190,18 @@ describe('mountPodium', () => {
     expect(stageBus.live()).toHaveLength(0 + 1);
     h.release();
     expect(stageBus.live()).toHaveLength(0);
+  });
+
+  it('T8: cada lugar leva o visual inteiro (look), não só a pintura', () => {
+    const el = new FakeEl('div');
+    const look = { finish: 'cromado', wheel: 'mag', rim: 'dourado', stripe: 'nenhuma', flame: 'rosa' };
+    const h = mountPodium(el as unknown as HTMLElement, [
+      { place: 1, carId: 'falcao', paint: null, look },
+      { place: 2, carId: 'trovao', paint: null },
+    ]);
+    expect(h.panel.podium[0].look).toEqual(look);
+    expect(h.panel.podium[1].look ?? null).toBeNull();
+    h.release();
   });
 
   it('só os três primeiros entram e carro que não existe é recusado', () => {

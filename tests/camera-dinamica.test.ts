@@ -1,6 +1,7 @@
 // M5: os deslocamentos dinâmicos da câmera de perseguição e os LIMITES deles, modelados em scenery/sight.ts (CAMERA_DYNAMICS):
 // câmera mais baixa em velocidade, mola de FOV no engate do nitro, tremor fino acima de 90%, órbita ao cruzar em 1º e a cresta de morro.
 // A base (CHASE_CAMERA) não muda. O que importa aqui é o que NUNCA pode acontecer: a câmera dentro do cenário, do chão ou do carro da frente.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TRACKS, getTrack } from '../src/core/track';
 import { CHASE_CAMERA } from '../src/render/camera';
@@ -260,6 +261,17 @@ describe('cristas de morro (só visuais)', () => {
     expect(crestLift(cs, at, track.length, 1)).toBeGreaterThanOrEqual(crestLift(cs, at, track.length, 0.7));
     // sem crista, sem elevação
     expect(crestLift([], at, track.length, 1)).toBe(0);
+  });
+
+  it('T8: a cresta é só da câmera — a elevação já sobe ANTES da cresta (o carro ainda subindo o morro), então não serve de "carro no ar"', () => {
+    const track = getTrack('palmas');
+    const cs = findCrests(track);
+    const c = cs[0];
+    const zAt = (m: number) => c.z + (m / SEGMENT_M) * 200;
+    // 5 m antes do topo o morro ainda sobe sob o carro, e a câmera já flutua: um carro que subisse junto sairia do chão na subida.
+    expect(crestLift(cs, zAt(-5), track.length, 1)).toBeGreaterThan(0.1);
+    // O renderizador dos carros não usa a elevação da cresta (o carro fica na pista; o pulo de verdade seria física, no núcleo).
+    expect(readFileSync('src/render/cars.ts', 'utf8')).not.toMatch(/crestLift|findCrests/);
   });
 
   it('a elevação é contínua: nenhum salto de mais de 3 cm entre dois pontos a 25 cm um do outro', () => {

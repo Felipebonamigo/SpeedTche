@@ -41,6 +41,7 @@ class FakeEl {
   setAttribute(k: string, v: string): void { this.attrs[k] = v; }
   getAttribute(k: string): string | null { return this.attrs[k] ?? null; }
   appendChild<T>(c: T): T { this.children.push(c); return c; }
+  remove(): void { /* os selos do palco (stage-mount.ts): o lobby solta o painel do assento que sai (T8) */ }
   append(...c: unknown[]): void { this.children.push(...c); }
   prepend(...c: unknown[]): void { this.children.unshift(...c); }
   replaceChildren(...c: unknown[]): void { this.children = [...c]; }

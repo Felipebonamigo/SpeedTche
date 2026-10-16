@@ -139,6 +139,42 @@ describe('oferta de assistência depois de 2 eliminações (O3)', () => {
     expect(s.race?.state.phase).toBe('countdown');
   }, 240_000);
 
+  it('T8: recusar fica salvo nas opções — o jogo reaberto (sessão nova, mesmo armazenamento) não oferece de novo', async () => {
+    const s = await newSession();
+    s.input.bindSeat(0, 'kb1');
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(s);
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(s);
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    expect(open).toBe('assistOffer');
+    s.handleMenuEvent({ type: 'assistOfferAnswer', choice: 'no' });
+    expect(JSON.parse(store.get(SETTINGS_KEY) ?? '{}').assistOfferDeclined).toBe(true);
+    s.input.dispose();
+    const again = await newSession();
+    again.input.bindSeat(0, 'kb1');
+    again.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(again);
+    again.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(again);
+    shown.length = 0;
+    again.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    expect(shown).not.toContain('assistOffer');
+    expect(again.race?.state.phase).toBe('countdown');
+  }, 300_000);
+
+  it('T8: aceitar não grava recusa (quem aceitou o Freio automático não "recusou")', async () => {
+    const s = await newSession();
+    s.input.bindSeat(0, 'kb1');
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(s);
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    eliminate(s);
+    s.handleMenuEvent({ type: 'startCup', cupId: CUPS[0].id, humans: HUMANS });
+    s.handleMenuEvent({ type: 'assistOfferAnswer', choice: 'brake' });
+    expect(JSON.parse(store.get(SETTINGS_KEY) ?? '{}').assistOfferDeclined).toBe(false);
+  }, 180_000);
+
   it('quem escolhe Amador muda só a dificuldade (e fica salvo nas opções)', async () => {
     const s = await newSession();
     s.input.bindSeat(0, 'kb1');
