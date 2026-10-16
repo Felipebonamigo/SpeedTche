@@ -173,6 +173,31 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     expect(errors).toEqual([]);
   });
 
+  it('V2 (realismo): a pintura vermelha continua vermelha ao sol — na câmera de corrida de dia a tampa do motor fica a ≤ 12° do matiz da tinta e o para-choque de trás a ≤ 20°, os dois com saturação ≥ 0,55 (era rosa e magenta: 19° e 32°)', async () => {
+    // A captura do HCT que o dono mandou (docs/ondas/V2-gt.md §11): a lataria vermelha lê vermelha, mais escura na face em pé, com o reflexo só no brilho.
+    // O nosso GT de rubi saía rosa na tampa e roxo no para-choque: o reflexo e a luz do céu azul tingiam a lataria inteira. O GT sem faixa (a faixa na tampa
+    // mudaria a conta).
+    const r = await lab((L) => {
+      L.freeze('copacabana', 300, { seg: 300, look: { paint: 'rubi', stripe: 'nenhuma' } });
+      return L.shoot('high', 3, [{ box: [-0.55, 0.8, 1.7, 0.55, 0.9, 2.05] }, { box: [0.5, 0.34, 2.19, 0.8, 0.43, 2.21] }]);
+    });
+    const hsv = ([r0, g0, b0]: readonly number[]): [number, number] => {
+      const mx = Math.max(r0, g0, b0); const mn = Math.min(r0, g0, b0); const d = mx - mn || 1;
+      const h = mx === r0 ? ((g0 - b0) / d) % 6 : mx === g0 ? (b0 - r0) / d + 2 : (r0 - g0) / d + 4;
+      return [((h * 60) + 360) % 360, mx ? (mx - mn) / mx : 0];
+    };
+    const [paintHue] = hsv([0xd7, 0x26, 0x3d]);
+    const off = (h: number): number => { const d = Math.abs(h - paintHue) % 360; return Math.min(d, 360 - d); };
+    const [deck, bumper] = r;
+    const [hd, sd] = hsv(deck.rgb); const [hb, sb] = hsv(bumper.rgb);
+    expect(off(hd), `tampa ${deck.rgb.join(',')}: matiz ${hd.toFixed(0)}° (tinta ${paintHue.toFixed(0)}°)`).toBeLessThanOrEqual(12);
+    expect(off(hb), `para-choque ${bumper.rgb.join(',')}: matiz ${hb.toFixed(0)}°`).toBeLessThanOrEqual(20);
+    expect(sd, `tampa: saturação ${sd.toFixed(2)}`).toBeGreaterThanOrEqual(0.55);
+    expect(sb, `para-choque: saturação ${sb.toFixed(2)}`).toBeGreaterThanOrEqual(0.55);
+    expect(bumper.mean, 'o para-choque não vira preto').toBeGreaterThan(0.12);
+    expect(errors).toEqual([]);
+  });
+
   it('o laboratório desenhou sem erro de shader', async () => {
     const p = await lab((L) => L.programs());
     expect(p.shaderErrors).toEqual([]);

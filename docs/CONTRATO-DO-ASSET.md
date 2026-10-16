@@ -35,7 +35,7 @@ Vem de `docs/ARTE.md`, "Carros — pronto", e do `src/render/cars/check.ts`.
   - vão do chão: o ponto mais baixo acima de 0,04;
   - comprimento > 4,2 (micro: > 3,2) e largura > 1,8;
   - raio da roda ≥ 0,26.
-- **Casco:** ≤ 4.500 triângulos (`CAR_LIMITS.maxShellTriangles`; subiu de 3.500 na M4, provisório até o bench do dono). Roda do procedural ≥ 0,19 do comprimento; cabine bolha: metade de cima do vidro ≥ 92% da largura máxima.
+- **Casco:** ≤ 8.000 triângulos (`CAR_LIMITS.maxShellTriangles`; 3.500 → 4.500 na M4, → 8.000 na rodada de realismo da V2; provisório até o bench do dono). Roda do procedural ≥ 0,19 do comprimento; cabine bolha: metade de cima do vidro ≥ 92% da largura máxima.
 - **Validação:** `npm run check-car -- x.glb` (o mesmo validador do jogo, procedural ou glTF; `x` é o id de um carro ou um estilo).
   O carro de caixas `npx tsx scripts/make-test-car.ts` usa todos os nós do contrato e passa sem aviso: é a fixture dos testes.
 - **Conversor** de carro de kit de paleta (Kenney): `npm run convert-car -- <kit/GLB format/sedan-sports.glb> falcao` (receita do colormap,

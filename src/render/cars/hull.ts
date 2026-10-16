@@ -11,7 +11,9 @@ import { loft, type Brush, type Lod, type MeshBuilder, type P2 } from './kit';
 
 /** Região de cada lado do anel (metade direita, de baixo para cima: 13 lados; a esquerda é o espelho). Os nomes são os do `BodyShape`. */
 const REGIONS: Region[] = ['under', 'well', 'well', 'sill', 'lower', 'lower', 'band', 'upper', 'upper', 'shoulder', 'top', 'stripe', 'center'];
-/** Pontos do anel: fundo, 12 de cada lado, centro do topo. */
+/** Com o topo fino (`detail.fine`): um trecho a mais no ombro → faixa, na faixa e na faixa → centro. */
+const REGIONS_FINE: Region[] = ['under', 'well', 'well', 'sill', 'lower', 'lower', 'band', 'upper', 'upper', 'shoulder', 'top', 'top', 'stripe', 'stripe', 'center', 'center'];
+/** Pontos do anel: fundo, 12 de cada lado, centro do topo (com o topo fino, 15 de cada lado). */
 export const HULL_RING = 26;
 const ARCH_FACETS = 8;
 const ARCH_FACETS_LOD = 4;
@@ -35,6 +37,13 @@ export interface HullSpec {
   lift?: number;
   /** Casco simples (lod1): menos facetas no arco, sem a rampa do para-lama, metade das estações do meio. */
   lod?: Lod;
+  /**
+   * Mais faces onde a silhueta e o reflexo mostram (V2, realismo; só no lod0): `subdiv` estações entre cada par de estações-chave, `facets` facetas no
+   * arco (padrão 8), `fine` um ponto a mais em cada trecho do topo (ombro → faixa → centro: o abaulado do capô e do teto deixa de ser poligonal).
+   */
+  detail?: { subdiv?: number; facets?: number; fine?: boolean };
+  /** Vinco da cintura NÍTIDO: o ombro sai do vinco num ângulo acima do vinco das normais (45°, normals.ts), em vez de dobrar macio. */
+  crisp?: boolean;
   brush: (region: Region, z: number, inArch: boolean) => Brush | null;
   capFront: Brush; capBack: Brush;
 }
@@ -52,8 +61,10 @@ export class Hull {
     const clear = spec.clear ?? 0.06;
     this.zFront = spec.zs[0]; this.zBack = spec.zs[spec.zs.length - 1];
     const lod = spec.lod ?? 0;
-    const facets = lod ? ARCH_FACETS_LOD : ARCH_FACETS;
-    const keyZs = lod ? spec.zs.filter((_, i, a) => i < 2 || i >= a.length - 2 || i % 2 === 0) : spec.zs;
+    const facets = lod ? ARCH_FACETS_LOD : spec.detail?.facets ?? ARCH_FACETS;
+    const sub = lod ? 1 : spec.detail?.subdiv ?? 1;
+    const keyZs = lod ? spec.zs.filter((_, i, a) => i < 2 || i >= a.length - 2 || i % 2 === 0)
+      : spec.zs.flatMap((z, i, a) => (i === 0 ? [z] : Array.from({ length: sub }, (_, k) => a[i - 1] + ((z - a[i - 1]) * (k + 1)) / sub)));
     const st: Station[] = keyZs.map((z) => ({ z, archY: null, bump: 0, axle: -1 }));
     spec.axles.forEach((ax, ai) => {
       const ra = ax.r + clear;
@@ -140,25 +151,38 @@ export class Hull {
     const dx = hwf - top; const dy = yte - yc;
     const [sx1r, sx2r] = this.spec.stripe ?? [0.34, 0.1];
     const sx1 = Math.min(sx1r, top * 0.8); const sx2 = Math.min(sx2r, sx1 * 0.4);
+    // Vinco nítido (`crisp`): o primeiro ponto do ombro mais para dentro e mais baixo, a dobra no vinco passa de 45° (e a de cima fica macia).
+    const [kx, ky] = this.spec.crisp ? [0.5, 0.28] : [0.4, 0.4];
     const right: P2[] = [
       [xin, p.yb], [xin, yw], [hwf - p.tuck, yw],
       [hwf - 0.012, yw + Math.min(0.7 * p.tuck, 0.35 * H)], [hwf, yw + 0.62 * H], [hwf, yc - bandEff], [hwf, yc],
-      [hwf - 0.4 * dx, yc + 0.4 * dy], [hwf - 0.78 * dx, yc + 0.86 * dy], [top, yte],
+      [hwf - kx * dx, yc + ky * dy], [hwf - 0.78 * dx, yc + 0.86 * dy], [top, yte],
       [sx1, topY(sx1)], [sx2, topY(sx2)],
     ];
+    // Topo fino (`detail.fine`, só no lod0): um ponto no meio de cada trecho de cima — do ombro à faixa, na faixa e da faixa ao centro.
+    if (this.fine) {
+      const mid = (a: number, b: number): P2 => { const x = (a + b) / 2; return [x, topY(x)]; };
+      right.splice(10, 0, mid(top, sx1));
+      right.splice(12, 0, mid(sx1, sx2));
+      right.push(mid(sx2, 0));
+    }
     const left = right.map(([x, y]) => [-x, y] as P2).reverse();
     return [[0, p.yb], ...right, [0, yCenter], ...left];
   }
 
+  /** Topo fino (`detail.fine`) só no lod0. */
+  private get fine(): boolean { return !this.spec.lod && !!this.spec.detail?.fine; }
+
   build(b: MeshBuilder): void {
     const rings = this.stations.map((s) => this.ring(s));
     const zs = this.stations.map((s) => s.z);
-    const half = HULL_RING / 2;
+    const regions = this.fine ? REGIONS_FINE : REGIONS;
+    const n = rings[0].length; const half = n / 2;
     loft(b, rings, zs, (k, i) => {
-      const e = k < half ? k : HULL_RING - 1 - k;
+      const e = k < half ? k : n - 1 - k;
       const s0 = this.stations[i]; const s1 = this.stations[i + 1];
       const inArch = s0.archY !== null && s1.archY !== null;
-      return this.spec.brush(REGIONS[e], (s0.z + s1.z) / 2, inArch);
+      return this.spec.brush(regions[e], (s0.z + s1.z) / 2, inArch);
     }, true, this.spec.capFront, this.spec.capBack);
   }
 

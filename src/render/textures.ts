@@ -83,20 +83,27 @@ export function chevronPanel(dir: -1 | 1): THREE.CanvasTexture {
  * Sombra de contato do carro: retângulo de cantos redondos com a borda esfumada (o formato da
  * pegada, mais escuro embaixo do carro e junto das rodas), num quadro 1:2 como o plano do carro.
  */
+/**
+ * Sombra de contato dos carros (o plano de 2,5 × 4,9 m embaixo de cada um): a opacidade em (px, pz), metros do centro do carro. Escura e justa na pegada
+ * (V2, realismo: no HCT o carro cola no asfalto; era 0,62 no meio e 0,23 rente à soleira), mais ainda sob as rodas, e some ~30 cm fora do carro.
+ */
+export function blobAlpha(px: number, pz: number): number {
+  const smooth = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  const qx = Math.abs(px) - 0.66; const qz = Math.abs(pz) - 1.85; const r = 0.25;
+  const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
+  const a = 0.9 * (1 - smooth(-0.15, 0.28, out));
+  // Mais escuro sob as rodas (os quatro cantos da pegada).
+  const wheel = Math.min(Math.hypot(Math.abs(px) - 0.8, Math.abs(pz) - 1.35), 1);
+  return Math.min(0.96, a + 0.1 * (1 - smooth(0.05, 0.4, wheel)) * (a > 0.05 ? 1 : 0));
+}
+
 export function blobTexture(): THREE.CanvasTexture {
   const W = 64; const H = 128;
   const [c, ctx] = canvas2d(W, H);
   const img = ctx.createImageData(W, H);
-  const smooth = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     // Coordenadas em metros do plano (2,5 × 4,9 m), centro no meio.
-    const px = ((x + 0.5) / W - 0.5) * 2.5; const pz = ((y + 0.5) / H - 0.5) * 4.9;
-    const qx = Math.abs(px) - 0.62; const qz = Math.abs(pz) - 1.78; const r = 0.28;
-    const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
-    let a = 0.62 * (1 - smooth(-0.22, 0.34, out));
-    // Mais escuro sob as rodas (os quatro cantos da pegada).
-    const wheel = Math.min(Math.hypot(Math.abs(px) - 0.8, Math.abs(pz) - 1.35), 1);
-    a = Math.min(0.8, a + 0.18 * (1 - smooth(0.05, 0.4, wheel)) * (a > 0.05 ? 1 : 0));
+    const a = blobAlpha(((x + 0.5) / W - 0.5) * 2.5, ((y + 0.5) / H - 0.5) * 4.9);
     const k = (y * W + x) * 4;
     img.data[k] = 0; img.data[k + 1] = 0; img.data[k + 2] = 0; img.data[k + 3] = Math.round(a * 255);
   }
