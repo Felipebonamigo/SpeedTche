@@ -18,6 +18,7 @@ import { arrowButton, button, createFocusList, lapsText, h, listNav, screenFrame
 import { icon, medal, type IconName } from './icons';
 import { availableCars, occupiedSeats, startCursor } from './lobby';
 import { commitSettings, raceOptionSelectors } from './options';
+import { carLocked, lockText } from './progress';
 import './lobby.css';
 import './party.css';
 
@@ -120,15 +121,18 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
   if (!party) return missingParty(api, 'tournament');
   const { ctx } = api;
   const draft = party.draft;
-  const cars = availableCars(ctx);
+  // O5: o seletor de cada piloto percorre os 14 carros; o trancado mostra o cadeado e segura o INICIAR (os nomes padrão começam nos livres).
+  const cars = ctx.cars;
   const carIds = cars.map((c) => c.id);
+  const freeIds = availableCars(ctx).map((c) => c.id);
+  const isLocked = (carId: string) => { const c = cars.find((x) => x.id === carId); return !c || carLocked(ctx.save, c); };
   const seats = occupiedSeats(api.lobby).map((s) => s.seat);
   const controllers = Math.max(1, seats.length);
   if (draft.players.length === 0) {
-    draft.players = defaultPlayers(Math.max(TOURNAMENT_MIN_PLAYERS, controllers), ctx.save.stats.players.map((p) => p.name), carIds);
+    draft.players = defaultPlayers(Math.max(TOURNAMENT_MIN_PLAYERS, controllers), ctx.save.stats.players.map((p) => p.name), freeIds);
   }
-  // Carro que deixou de existir ou não está liberado: volta ao primeiro.
-  for (const p of draft.players) if (!carIds.includes(p.carId)) p.carId = carIds[0];
+  // Carro que deixou de existir ou não está liberado: volta ao primeiro livre (a inscrição abre sempre num estado que larga).
+  for (const p of draft.players) if (isLocked(p.carId)) p.carId = freeIds[0];
   const cups = unlockedCups(api);
   if (!cups.some((c) => c.id === draft.cupId)) draft.cupId = cups[0]?.id ?? ctx.cups[0].id;
   const cupOf = () => cups.find((c) => c.id === draft.cupId) ?? ctx.cups[0];
@@ -151,21 +155,32 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
     });
     const carName = h('span', { class: 'tp-car-name', text: cars.find((c) => c.id === p.carId)?.name ?? p.carId });
     const swatch = h('i', { class: 'tp-swatch', style: `background:${cars.find((c) => c.id === p.carId)?.color ?? '#fff'}` });
+    const lockMark = h('span', { class: 'tp-lock', attrs: { 'aria-hidden': 'true' } }, icon('lock'));
+    const carBox = h('span', { class: 'sel-box tp-car' },
+      arrowButton(-1, () => { changeCar(-1); api.sfx('move'); }),
+      swatch, carName, lockMark,
+      arrowButton(1, () => { changeCar(1); api.sfx('move'); }),
+    );
+    const showLock = () => {
+      const on = isLocked(p.carId);
+      carBox.classList.toggle('is-locked', on);
+      lockMark.style.display = on ? '' : 'none';
+      carBox.setAttribute('data-locked', on ? '1' : '0');
+    };
     const changeCar = (dir: -1 | 1) => {
       const k = carIds.indexOf(p.carId);
       p.carId = carIds[(k + dir + carIds.length) % carIds.length];
       const def = cars.find((c) => c.id === p.carId);
       carName.textContent = def?.name ?? p.carId;
       swatch.style.background = def?.color ?? '#fff';
+      showLock();
+      refreshStatus();
     };
+    showLock();
     const row = h('div', { class: 'tp-row', attrs: { 'data-player': String(i) } },
       h('span', { class: 'tp-n mono', text: String(i + 1) }),
       input,
-      h('span', { class: 'sel-box tp-car' },
-        arrowButton(-1, () => { changeCar(-1); api.sfx('move'); }),
-        swatch, carName,
-        arrowButton(1, () => { changeCar(1); api.sfx('move'); }),
-      ),
+      carBox,
     );
     return { el: row, activate: () => { input.focus(); input.select(); }, adjust: changeCar };
   }
@@ -174,6 +189,13 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
   const tracksLine = h('p', { class: 'hint tp-tracks' });
   const error = h('p', { class: 'hint tp-error' });
   let startBtn: FocusItem | null = null;
+
+  /** O primeiro piloto com carro trancado (O5): a linha de erro diz o preço e o INICIAR fica desligado. */
+  function lockError(): string | null {
+    const p = draft.players.find((x) => isLocked(x.carId));
+    const car = p ? cars.find((c) => c.id === p.carId) : undefined;
+    return p && car ? `${p.name.trim() || car.name} · ${car.name}: ${lockText(car)}` : null;
+  }
 
   function refreshStatus(): void {
     const s = setup();
@@ -186,11 +208,12 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
     const rounds = s.trackIds.slice(0, s.rounds).map((id) => trackName(id)).join(', ');
     tracksLine.textContent = t('party.t.tracksLine', { tracks: rounds, final: trackName(s.trackIds[s.trackIds.length - 1]) });
     const err = setupError(s);
-    error.textContent = err ? t(err) : t('party.t.nameHint');
-    error.classList.toggle('bad', err !== null);
+    const locked = err ? null : lockError();
+    error.textContent = err ? t(err) : locked ?? t('party.t.nameHint');
+    error.classList.toggle('bad', err !== null || locked !== null);
     if (startBtn) {
-      startBtn.disabled = err !== null;
-      startBtn.el.classList.toggle('disabled', err !== null);
+      startBtn.disabled = err !== null || locked !== null;
+      startBtn.el.classList.toggle('disabled', err !== null || locked !== null);
     }
   }
 
@@ -199,7 +222,7 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
     const rows = draft.players.map(playerRow);
     const add = button(t('party.t.add'), () => {
       if (draft.players.length >= TOURNAMENT_MAX_PLAYERS) { api.sfx('back'); return; }
-      draft.players.push({ name: freshName(draft.players), carId: carIds[draft.players.length % carIds.length] });
+      draft.players.push({ name: freshName(draft.players), carId: freeIds[draft.players.length % freeIds.length] });
       focusAt = draft.players.length - 1;
       list = null;
       render();
@@ -228,7 +251,7 @@ export function tournamentScreen(api: ScreenApi): ScreenInstance {
     const laps = raceOptionSelectors(api, () => { commitSettings(api); refreshStatus(); }, { quickLaps: true, lapsLabel: t('party.t.laps') });
     const start = button(t('party.t.start'), () => {
       const s = setup();
-      if (setupError(s)) { api.sfx('back'); return; }
+      if (setupError(s) || lockError()) { api.sfx('back'); return; }
       api.emit({ type: 'startTournament', setup: s, seats });
     }, 'btn-primary btn-start');
     startBtn = start;

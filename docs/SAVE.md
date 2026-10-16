@@ -11,6 +11,7 @@ armazenamento cheio (risco "Save no navegador cheio" do roteiro, corrigido na on
 |---|---|---|---|
 | `speed-tche.save` | Progresso: copas, recordes, carreira, estatísticas, conquistas, copa em andamento, lobby | sim | **nunca** |
 | `speed-tche.settings` | Opções | sim | **nunca** |
+| `speed-tche.progress` | Maestria por perfil e carro (O5); o nível sai do `speed-tche.save` | sim | **nunca** |
 | `speed-tche.ghosts` | Fantasmas do contra-relógio (teto de 160 000 caracteres, `docs/FANTASMA.md`) | sim | sim, o gravado há mais tempo primeiro |
 | `speed-tche.errors` | Relatório de erros (últimos 50) | não (o Electron tem `logs/errors.log`) | sim, primeiro |
 | `speed-tche.playlog` | Diário de jogo (funil, até 150 corridas, 100 sessões e 50 respostas do questionário; só números, ids e datas, sem nomes). Vai para o arquivo (`saves/speed-tche.playlog.json`) e para a Steam Cloud. Teto de 250 000 caracteres (pior caso medido: 241 052) | sim | **nunca**: se não couber, a gravação se perde e o jogo avisa; o diário jamais descarta o log de erros nem o fantasma para caber (guardas em `errors.ts` e `ghost-store.ts`) |
@@ -164,3 +165,21 @@ Dois campos aditivos: `sessionStart` (retrato dos contadores na abertura da sess
 ## Estrelas (O4)
 
 Campo aditivo `stars: { profiles: [{ name, tracks: {pista: bits 1=classificou, 2=venceu o rival, 4=objetivo}, rivals: {chave: {you, rival}} }], last: [...] }`. Saneador `sanitizeStars` (`src/game/stars.ts`, chamado por `sanitizeSave`): descarta pista ou rival desconhecido, bits fora de `& 7`, contagens fora de 0..99999, perfil repetido e perfis acima de 32. Save sem o campo abre com `{profiles: [], last: []}`. A 0.1.3 abre o save novo sem erro e descarta `stars` na próxima gravação dela (lista branca de chaves). `last` é a última corrida, lida pelo Pagamento.
+
+## Progresso: nível do piloto e maestria por carro (O5)
+
+O nível do piloto não é gravado: sai das estatísticas por perfil (`stats.players`: 20 XP por corrida, 10 por volta, 20 por pódio,
+30 por vitória — `src/game/progression.ts`). Todo save antigo já abre com o nível que merece, e a 0.1.4, que continua somando as
+estatísticas, nunca o desfaz.
+
+A maestria por carro mora na chave própria `speed-tche.progress`: `{ "profiles": [ { "name": "Ana", "cars": { "falcao": 1234 } } ] }`.
+O saneador `sanitizeProgress` nunca lança e mantém até 32 perfis (do mais recente ao mais antigo), nome limpo sem repetir a chave do
+perfil, só carros que existem e XP inteiro de 1 a 99.999.999. A chave vai para o arquivo e para a Steam Cloud como toda `speed-tche.*`;
+save sem a chave = maestria 0.
+
+A 0.1.4 abre o save novo sem perda: o save principal não muda de formato (nenhum campo novo em `SaveData`/`Settings`; as conquistas
+novas são só ids a mais) e a chave nova ela não lê nem grava. O que se joga na 0.1.4 conta nível, não maestria.
+
+Idioma: só na 1ª abertura (sem opções e sem save) as opções são gravadas com o idioma detectado (Steam → `app.getLocale` → navegador).
+
+Testes: `tests/progression-save.test.ts` (fixture literal da 0.1.4), `tests/progression*.test.ts`, `tests/idioma.test.ts`.

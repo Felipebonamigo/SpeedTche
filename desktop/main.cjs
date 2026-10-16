@@ -127,8 +127,22 @@ ipcMain.handle('window:quit', () => app.quit());
 
 ipcMain.handle('steam:name', () => { try { return steam ? steam.localplayer.getName() : null; } catch { return null; } });
 ipcMain.handle('steam:achievement', (_e, id) => {
-  try { if (steam && typeof id === 'string' && id) return steam.achievement.activate(id) !== false; } catch { /* ignorado */ }
+  try {
+    if (!steam || typeof id !== 'string' || !id) return false;
+    // O5: o jogo reenvia ao abrir toda conquista guardada; a que a Steam já tem não é regravada (cada `activate` chama o StoreStats).
+    if (typeof steam.achievement.isActivated === 'function' && steam.achievement.isActivated(id)) return true;
+    return steam.achievement.activate(id) !== false;
+  } catch { /* ignorado */ }
   return false;
+});
+// O5: idioma da 1ª abertura (src/game/settings.ts: languageCandidates) — o do jogo na Steam ('brazilian', 'english'…) e o do sistema ('pt-BR'…).
+// `apps.currentGameLanguage` pode não existir numa versão do steamworks.js: a página segue para o próximo candidato.
+ipcMain.handle('app:locale', () => {
+  let steamLang = null;
+  try { if (steam && steam.apps && typeof steam.apps.currentGameLanguage === 'function') steamLang = steam.apps.currentGameLanguage() || null; } catch { steamLang = null; }
+  let appLocale = null;
+  try { appLocale = app.getLocale() || null; } catch { appLocale = null; }
+  return { steam: typeof steamLang === 'string' ? steamLang : null, app: typeof appLocale === 'string' ? appLocale : null };
 });
 ipcMain.handle('steam:richPresence', (_e, text) => { setRichPresence(text); });
 

@@ -301,7 +301,7 @@ conquista da lista tem linha nesta tabela.
 | `COPA_MEDITERRANEO` | Copa Mediterrâneo | Mediterranean Cup | Concluir a Copa Mediterrâneo. |
 | `EQUIPE_COMPLETA` | Equipe completa | Full Crew | Correr uma corrida com 4 jogadores. |
 | `SEM_BOX` | Sem box | No Pit Stop | Vencer sem parar no box. |
-| `NITRO_TRIPLO` | Nitro triplo | Triple Nitro | Usar 3 nitros numa mesma volta. |
+| `NITRO_TRIPLO` | Nitro triplo | Triple Nitro | Juntar 3 cargas de nitro na barra ao mesmo tempo (O5; antes: 3 nitros numa volta, comum com a barra da N1). |
 | `EMPURRAO` | Empurrão | Push | Dar um empurrão a um companheiro. |
 | `VOLTA_PERFEITA` | Volta perfeita | Perfect Lap | Completar uma volta sem sair do asfalto. |
 | `CAMPEAO` | Campeão | Champion | Vencer uma copa na dificuldade Campeão. |
@@ -311,7 +311,7 @@ conquista da lista tem linha nesta tabela.
 | `SEM_ARRANHAO` | Sem um arranhão | Not a Scratch | Terminar uma corrida contra a IA sem encostar em outro carro nem bater no cenário. |
 | `MARATONA` | Maratona | Marathon | Somar 1.000 km de corrida, juntando todos os jogadores. |
 | `MESTRE_DO_VACUO` | Mestre do vácuo | Slipstream Master | Passar 60 segundos no vácuo de outros carros numa mesma corrida. |
-| `NITRO_NA_BANDEIRA` | Nitro na bandeirada | Nitro Finish | Cruzar a linha de chegada com o nitro ligado. |
+| `NITRO_NA_BANDEIRA` | Nitro na bandeirada | Nitro Finish | Cruzar a chegada com o nitro ligado e a barra sem nenhuma carga (O5; antes: só o nitro ligado). |
 | `DEZ_VITORIAS` | Dez vitórias | Ten Wins | Somar 10 vitórias (o contra-relógio não conta). |
 | `GIRO_COMPLETO` | Giro completo | Grand Tour | Correr em todas as pistas do jogo (o contra-relógio não conta). |
 | `RIVAL_DERROTADO` | Rival derrotado | Rival Defeated | Concluir uma copa (normal ou da carreira) terminando à frente do rival da copa em todas as corridas. |
@@ -348,9 +348,23 @@ conquista da lista tem linha nesta tabela.
 | `REGIAO_NORDESTE` | Nordeste carimbado | Northeast Stamped | Carimbar no passaporte todos os estados da região (BA, SE, AL, PE, PB, RN, CE, PI e MA). |
 | `REGIAO_NORTE` | Norte carimbado | North Stamped | Carimbar no passaporte todos os estados da região (PA, AM, AP, RR, RO, AC e TO). |
 | `PASSAPORTE_COMPLETO` | Passaporte completo | Full Passport | Carimbar os 27 estados (a Expedição Brasil inteira). |
+| `PRIMEIRA_CORRIDA` | Primeira corrida | First Race | Correr a primeira corrida até a bandeirada, em qualquer modo (O5: cai nos primeiros minutos). |
+| `LARGADA_FOGUETE` | Largada-foguete | Rocket Start | Uma largada-foguete perfeita (O5: o "Como jogar" e a dica da 1ª corrida ensinam). |
+| `MINI_TURBO` | Mini-turbo | Mini-Turbo | Soltar uma derrapagem com carga e ganhar o mini-turbo (O5). |
+| `SUBIU_DE_NIVEL` | Subiu de nível | Level Up | Chegar ao nível 2 de piloto (O5: em geral na 2ª corrida). |
+| `PRIMEIRA_PECA` | Primeira peça | First Upgrade | Comprar a primeira melhoria na Expedição (O5, economia: conferida no fim da corrida e ao abrir). |
+| `CARRO_NOVO` | Carro novo | New Ride | Comprar um carro na Concessionária (O5, economia). |
+| `OFICINA_COMPLETA` | Oficina completa | Fully Tuned | Todas as peças de um carro no nível máximo dele (O5, economia). |
+| `COLECIONADOR` | Garagem completa | Collector | Os 7 carros à venda comprados (O5, coleção). |
+| `MAESTRIA_MAXIMA` | Mestre do carro | Car Master | Maestria 5 com um carro (O5, coleção). |
+| `NIVEL_MAXIMO` | Todos os títulos | All Titles | Nível 30 de piloto: todos os títulos (O5, coleção). |
 
 O jogo chama `getDesktop()?.achievement(id)` e também guarda o id em `SaveData.achievements`, para o
-desbloqueio contar fora da Steam e ser reenviado se a Steam estiver fechada na hora.
+desbloqueio contar fora da Steam. **Ao abrir** (O5), a sessão reenvia à Steam todo id guardado que está nesta lista
+(`resendAchievements`, `src/game/desktop.ts`): a conquista ganha com a Steam fechada, ou numa versão sem Steam, chega
+na abertura seguinte. O `main.cjs` não regrava a que a Steam já tem (`achievement.isActivated`, quando o steamworks.js
+o oferece), porque cada `activate` grava as estatísticas (`StoreStats`). As de economia e coleção são de estado (leem o
+save): saem no fim da corrida seguinte à compra e, para quem já as merecia na 0.1.4, na primeira abertura.
 
 ## Steam Input / controles
 

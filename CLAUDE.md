@@ -72,6 +72,17 @@ Revisão visual (RTX 4070 Ti, Unity/Unreal/Meshy) em `docs/CRONOGRAMA.md`, "Revi
 `Settings`, `SaveData`). `src/game/session.ts` liga tudo. Textos visíveis: `registerStrings('<ns>', {pt, en})` num
 `strings.ts` da própria pasta; `tests/i18n.test.ts` exige PT e EN completos.
 
+## Princípio do estúdio: divertido e bonito
+
+Decisão do Felipe (16/10/2026): **todo jogo nosso tem que ser divertido e bonito, sempre**. Vale para toda tarefa, não só para as de arte.
+
+- **Divertido primeiro.** Se não prende no protótipo feio, arte e polimento não salvam. Antes de chamar um sistema de pronto, pergunte
+  se jogar ele dá vontade de "mais uma".
+- **Bonito é requisito, aprovado por captura** (nunca só por teste verde), e a captura é olhada antes de se afirmar qualquer coisa visual.
+- **Desempenho protege os dois:** quadro travado não é divertido nem bonito.
+- Ao fechar um bloco, diga em uma linha o que ele mudou na diversão e no visual. Se não mudou nada, diga isso.
+- Na dúvida entre "correto" e "gostoso de jogar", o Felipe decide jogando: leve a versão jogável para ele ver, não só o relatório.
+
 ## Regras de trabalho
 - Defeito corrigido vira teste, escrito antes e visto falhar. Nada publicado com teste vermelho.
 - Dependência de produção é só `three`. Sem pacote novo para o que já se faz com Three/WebAudio/DOM. Modelos, céu,

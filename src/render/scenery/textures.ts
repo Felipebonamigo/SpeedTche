@@ -1,10 +1,11 @@
-// Texturas do cenário (canvas → CanvasTexture): fachadas de 4 × 4 janelas por repetição (cor + mapa
-// de luz das janelas acesas à noite) e o atlas de painéis (8 outdoors de marcas inventadas, faixa da
+// Texturas do cenário (canvas → CanvasTexture): fachadas de 4 × 4 janelas por repetição, em atlas de 4 visuais por estilo (cor + mapa
+// de luz das janelas acesas à noite; V4) e o atlas de painéis (8 outdoors de marcas inventadas, faixa da
 // largada, placa do box, chevrons, xadrez). Criadas uma vez por Scenery e liberadas no dispose.
 // Marcas: todas fictícias (a exceção é a PADELIZOU, do próprio dono) — nada de logotipo real.
 import * as THREE from 'three';
 import { hash2 } from '../noise';
 import { canvas2d } from '../textures';
+import { FACADE_CELL_SPAN } from './geom';
 import { PANEL_ATLAS_SIZE, PANEL_RECTS } from './props';
 
 export interface FacadeTextures { map: THREE.CanvasTexture; light: THREE.CanvasTexture }
@@ -28,17 +29,32 @@ function lightColor(seed: number): string {
   return h < 0.62 ? '#ffd79a' : h < 0.82 ? '#ffe8c4' : '#cfe4ff';
 }
 
-export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'house'): FacadeTextures {
-  const [mc, m] = canvas2d(S, S);
-  const [lc, l] = canvas2d(S, S);
-  l.fillStyle = '#000000'; l.fillRect(0, 0, S, S);
+export type FacadeStyle = 'office' | 'apartment' | 'classic' | 'house';
+
+/**
+ * V4 (docs/ondas/V4-pistas.md): a fachada é um atlas 2 × 2 de 4 visuais por estilo (janela, varanda, veneziana, ar-condicionado…), e o
+ * material amostra a célula com `fract` (runtime.ts, `applyFacadeAtlas`). Contrato da uv: `u = local + célula × FACADE_CELL_SPAN` (local em
+ * repetições da fachada, sempre < 64); célula 0 = o desenho de antes da V4 (os marcos, que não deslocam a uv, continuam iguais).
+ */
+export { FACADE_CELL_SPAN };
+/** Quantos visuais por estilo (as células do atlas). */
+export const FACADE_LOOKS = 4;
+
+/** Onde a célula `look` fica no canvas do atlas (com o `flipY` da textura, a célula (cx, cy) da uv é o quadrante de baixo para cima). */
+function cellOrigin(look: number): [number, number] {
+  const cx = look % 2; const cy = Math.floor(look / 2);
+  return [cx * S, (1 - cy) * S];
+}
+
+/** O desenho de antes da V4 (célula 0), deslocado para (ox, oy). */
+function drawClassicCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, style: FacadeStyle, ox: number, oy: number): void {
   const seedBase = { office: 11, apartment: 23, classic: 37, house: 53 }[style];
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
-    const x = c * CELL; const y = r * CELL;
+    const x = ox + c * CELL; const y = oy + r * CELL;
     const seed = seedBase * 100 + r * 4 + c;
     const lit = hash2(seed, 7) < (style === 'office' ? 0.55 : 0.5);
     if (style === 'office') {
-      if (r === 0 && c === 0) { m.fillStyle = '#c9d0d8'; m.fillRect(0, 0, S, S); }
+      if (r === 0 && c === 0) { m.fillStyle = '#c9d0d8'; m.fillRect(ox, oy, S, S); }
       const g = m.createLinearGradient(0, y, 0, y + CELL);
       g.addColorStop(0, '#46607e'); g.addColorStop(0.55, '#6a86a6'); g.addColorStop(1, '#9ab2cc');
       m.fillStyle = g; m.fillRect(x + 3, y + 3, CELL - 6, CELL - 14);
@@ -50,7 +66,7 @@ export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'hous
         l.fillRect(x + 4, y + 4 + (CELL - 16) * (1 - part), CELL - 8, (CELL - 16) * part);
       }
     } else if (style === 'apartment') {
-      if (r === 0 && c === 0) { m.fillStyle = '#f2f0ea'; m.fillRect(0, 0, S, S); }
+      if (r === 0 && c === 0) { m.fillStyle = '#f2f0ea'; m.fillRect(ox, oy, S, S); }
       const wx = x + 13; const wy = y + 12; const ww = CELL - 26; const wh = CELL - 26;
       m.fillStyle = '#d8d4cc'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
       m.fillStyle = '#2a3340'; m.fillRect(wx, wy, ww, wh);
@@ -67,9 +83,9 @@ export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'hous
       m.fillStyle = '#c8c4bc'; m.fillRect(x, y + CELL - 5, CELL, 5);
     } else if (style === 'classic') {
       if (r === 0 && c === 0) {
-        m.fillStyle = '#efe6d4'; m.fillRect(0, 0, S, S);
+        m.fillStyle = '#efe6d4'; m.fillRect(ox, oy, S, S);
         m.fillStyle = 'rgba(120,100,70,0.12)';
-        for (let k = 0; k < S; k += 16) m.fillRect(0, k, S, 1);
+        for (let k = 0; k < S; k += 16) m.fillRect(ox, oy + k, S, 1);
       }
       const wx = x + 18; const wy = y + 8; const ww = CELL - 36; const wh = CELL - 18;
       m.fillStyle = '#f8f2e6'; m.fillRect(wx - 4, wy - 6, ww + 8, wh + 8);
@@ -82,7 +98,7 @@ export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'hous
         for (let k = 0; k < 6; k++) m.fillRect(wx - 5 + k * ((ww + 10) / 5), wy + wh - 10, 1.5, 10);
       }
     } else {
-      if (r === 0 && c === 0) { m.fillStyle = '#f4f0e8'; m.fillRect(0, 0, S, S); }
+      if (r === 0 && c === 0) { m.fillStyle = '#f4f0e8'; m.fillRect(ox, oy, S, S); }
       if ((c + r * 3) % 4 === 3) continue; // parede cega aqui e ali
       const wx = x + 20; const wy = y + 16; const ww = CELL - 40; const wh = CELL - 30;
       m.fillStyle = '#ffffff'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
@@ -91,6 +107,197 @@ export function facadeTextures(style: 'office' | 'apartment' | 'classic' | 'hous
       m.fillStyle = '#4a6a8a'; m.fillRect(wx - 11, wy - 2, 8, wh + 4); m.fillRect(wx + ww + 3, wy - 2, 8, wh + 4);
       if (lit) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
     }
+  }
+}
+
+/** Vidro escuro com o céu refletido em cima (o gradiente que faz a janela parecer vidro, não buraco). */
+function glass(m: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, top: string, bottom: string): void {
+  const g = m.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, top); g.addColorStop(1, bottom);
+  m.fillStyle = g; m.fillRect(x, y, w, h);
+}
+
+/** Os visuais novos (células 1–3) de cada estilo. Cada célula = 4 colunas × 4 andares, como a de antes (a uv em metros não muda). */
+function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, style: FacadeStyle, look: number, ox: number, oy: number): void {
+  const seedBase = { office: 11, apartment: 23, classic: 37, house: 53 }[style] * 1000 + look * 97;
+  const lit = (seed: number, p = 0.5): boolean => hash2(seed, 7) < p;
+  const wall = (c: string): void => { m.fillStyle = c; m.fillRect(ox, oy, S, S); };
+  if (style === 'apartment') {
+    if (look === 1) {
+      // Fita de vidro (o prédio modernista da orla): janela corrida por andar, peitoril claro e montantes.
+      wall('#f0ede6');
+      for (let r = 0; r < 4; r++) {
+        const y = oy + r * CELL;
+        m.fillStyle = '#dcd6cc'; m.fillRect(ox, y + CELL - 20, S, 16);
+        glass(m, ox, y + 10, S, CELL - 32, '#4c6272', '#24323e');
+        for (let k = 0; k < 16; k++) {
+          const x = ox + k * 16;
+          m.fillStyle = '#e8e4dc'; m.fillRect(x, y + 10, 2, CELL - 32);
+          if (lit(seedBase + r * 16 + k, 0.45)) { l.fillStyle = lightColor(seedBase + r * 16 + k); l.fillRect(x + 2, y + 11, 14, CELL - 34); }
+        }
+        m.fillStyle = 'rgba(255,255,255,0.14)'; m.fillRect(ox, y + 12, S, 4);
+      }
+    } else if (look === 2) {
+      // Janelões com venezianas e guarda-corpo de ferro corrido.
+      wall('#ece6da');
+      const shut = ['#8a5a3a', '#e6e0d4', '#4f7a5a', '#6a8aa8'];
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+        const x = ox + c * CELL; const y = oy + r * CELL; const seed = seedBase + r * 4 + c;
+        const wx = x + 12; const wy = y + 6; const ww = CELL - 24; const wh = CELL - 16;
+        m.fillStyle = '#d4ccbc'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 3);
+        glass(m, wx, wy, ww, wh, '#3c4a58', '#1e2630');
+        // Veneziana: desce de cima até uma altura que varia (louvered: riscos horizontais).
+        const down = hash2(seed, 21) < 0.6 ? 0.25 + 0.6 * hash2(seed, 22) : 0;
+        if (down > 0) {
+          m.fillStyle = shut[(seed + look) % shut.length]; m.fillRect(wx, wy, ww, wh * down);
+          m.fillStyle = 'rgba(0,0,0,0.18)';
+          for (let k = 3; k < wh * down; k += 4) m.fillRect(wx, wy + k, ww, 1);
+        }
+        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + wh * down + 1, ww - 2, wh * (1 - down) - 2); }
+        // Guarda-corpo corrido do andar.
+        m.fillStyle = '#3a3e44'; m.fillRect(x, y + CELL - 22, CELL, 3);
+        for (let k = 0; k < 8; k++) m.fillRect(x + 3 + k * 8, y + CELL - 22, 2, 16);
+        l.fillStyle = '#000000'; for (let k = 0; k < 8; k++) l.fillRect(x + 3 + k * 8, y + CELL - 22, 2, 16);
+        m.fillStyle = '#d8d2c6'; m.fillRect(x, y + CELL - 6, CELL, 6);
+      }
+    } else {
+      // Pares de janelas entre pilastras, ar-condicionado debaixo de algumas e cortina em outras.
+      wall('#e8e2d6');
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+        const x = ox + c * CELL; const y = oy + r * CELL; const seed = seedBase + r * 4 + c;
+        m.fillStyle = '#d6cebf'; m.fillRect(x, y, 6, CELL);
+        for (const [wx, ww] of [[x + 12, 20], [x + 36, 20]] as const) {
+          const wy = y + 10; const wh = 30;
+          m.fillStyle = '#f6f2ea'; m.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+          glass(m, wx, wy, ww, wh, '#4a5868', '#28323e');
+          const curtain = hash2(seed + wx, 31) < 0.35;
+          if (curtain) { m.fillStyle = '#d8c8a4'; m.fillRect(wx, wy, ww * 0.45, wh); m.fillRect(wx + ww * 0.6, wy, ww * 0.4, wh); }
+          if (lit(seed + wx)) { l.fillStyle = lightColor(seed + wx); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+        }
+        if (hash2(seed, 41) < 0.5) {
+          const ax = x + (hash2(seed, 42) < 0.5 ? 14 : 38);
+          m.fillStyle = '#b8bcc0'; m.fillRect(ax, y + 44, 16, 9);
+          m.fillStyle = '#7a8086'; for (let k = 0; k < 4; k++) m.fillRect(ax + 2 + k * 4, y + 46, 2, 5);
+        }
+        m.fillStyle = '#cfc8ba'; m.fillRect(x, y + CELL - 6, CELL, 6);
+      }
+    }
+  } else if (style === 'office') {
+    if (look === 1) {
+      // Pele de vidro verde-escura, montantes finos de alumínio.
+      wall('#b8c2c4');
+      for (let r = 0; r < 4; r++) {
+        const y = oy + r * CELL;
+        glass(m, ox, y + 2, S, CELL - 10, '#5f8a86', '#2a4a4c');
+        m.fillStyle = '#9fb0b2'; m.fillRect(ox, y + CELL - 8, S, 6);
+        for (let k = 0; k < 8; k++) {
+          const x = ox + k * 32;
+          m.fillStyle = '#c4ccce'; m.fillRect(x, y, 2, CELL);
+          if (lit(seedBase + r * 8 + k, 0.5)) { l.fillStyle = lightColor(seedBase + r * 8 + k); l.fillRect(x + 3, y + 4, 28, CELL - 14); }
+        }
+        m.fillStyle = 'rgba(255,255,255,0.12)'; m.fillRect(ox, y + 4, S, 6);
+      }
+    } else if (look === 2) {
+      // Concreto aparente e janela quadrada recuada (com a sombra do recuo).
+      wall('#bdb8ae');
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+        const x = ox + c * CELL; const y = oy + r * CELL; const seed = seedBase + r * 4 + c;
+        m.fillStyle = '#8e8a82'; m.fillRect(x + 8, y + 8, CELL - 16, CELL - 20);
+        glass(m, x + 12, y + 12, CELL - 20, CELL - 26, '#5a7088', '#2a3848');
+        m.fillStyle = 'rgba(0,0,0,0.22)'; m.fillRect(x + 12, y + 12, CELL - 20, 4);
+        if (lit(seed, 0.55)) { l.fillStyle = lightColor(seed); l.fillRect(x + 13, y + 13, CELL - 22, CELL - 28); }
+        m.fillStyle = 'rgba(80,70,60,0.10)'; m.fillRect(x, y + CELL - 3, CELL, 3);
+      }
+    } else {
+      // Brises verticais claros sobre vidro bronze.
+      wall('#d8d4cc');
+      for (let r = 0; r < 4; r++) {
+        const y = oy + r * CELL;
+        glass(m, ox, y + 3, S, CELL - 12, '#9a8460', '#4a3c28');
+        m.fillStyle = '#c8c2b6'; m.fillRect(ox, y + CELL - 9, S, 7);
+        for (let k = 0; k < 16; k++) {
+          const x = ox + k * 16;
+          if (lit(seedBase + r * 16 + k, 0.5)) { l.fillStyle = lightColor(seedBase + r * 16 + k); l.fillRect(x + 7, y + 4, 9, CELL - 14); }
+          m.fillStyle = '#e4e0d6'; m.fillRect(x, y, 6, CELL);
+          m.fillStyle = 'rgba(0,0,0,0.12)'; m.fillRect(x + 6, y, 2, CELL);
+          l.fillStyle = '#000000'; l.fillRect(x, y, 6, CELL);
+        }
+      }
+    }
+  } else if (style === 'classic') {
+    wall(look === 3 ? '#e2d4bc' : '#ece2cc');
+    m.fillStyle = 'rgba(120,100,70,0.10)';
+    for (let k = 0; k < S; k += 16) m.fillRect(ox, oy + k, S, 1);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+      const x = ox + c * CELL; const y = oy + r * CELL; const seed = seedBase + r * 4 + c;
+      const wx = x + 18; const wy = y + 12; const ww = CELL - 36; const wh = CELL - 22;
+      if (look === 1) {
+        // Janela em arco com pedra de fecho.
+        m.fillStyle = '#f8f2e6'; m.beginPath(); m.arc(wx + ww / 2, wy + 2, ww / 2 + 4, Math.PI, 0); m.fill(); m.fillRect(wx - 4, wy + 2, ww + 8, wh);
+        m.fillStyle = '#283036'; m.beginPath(); m.arc(wx + ww / 2, wy + 2, ww / 2, Math.PI, 0); m.fill(); m.fillRect(wx, wy + 2, ww, wh - 4);
+        m.fillStyle = '#d8ccb4'; m.fillRect(wx + ww / 2 - 3, wy - ww / 2 - 4, 6, 7);
+        if (lit(seed)) { l.fillStyle = lightColor(seed); l.beginPath(); l.arc(wx + ww / 2, wy + 2, ww / 2 - 1, Math.PI, 0); l.fill(); l.fillRect(wx + 1, wy + 2, ww - 2, wh - 5); }
+      } else if (look === 2) {
+        // Venezianas verdes abertas dos dois lados e grade de ferro.
+        m.fillStyle = '#f8f2e6'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
+        m.fillStyle = '#283036'; m.fillRect(wx, wy, ww, wh);
+        m.fillStyle = '#3f6a4a'; m.fillRect(wx - 12, wy - 2, 8, wh + 4); m.fillRect(wx + ww + 4, wy - 2, 8, wh + 4);
+        m.fillStyle = 'rgba(0,0,0,0.2)'; for (let k = 2; k < wh; k += 4) { m.fillRect(wx - 12, wy + k, 8, 1); m.fillRect(wx + ww + 4, wy + k, 8, 1); }
+        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+        m.fillStyle = '#26282c'; m.fillRect(wx - 4, wy + wh - 12, ww + 8, 2);
+        for (let k = 0; k < 5; k++) m.fillRect(wx - 3 + k * ((ww + 6) / 4), wy + wh - 12, 1.5, 12);
+      } else {
+        // Pilastras e frontão triangular sobre a janela.
+        m.fillStyle = '#d4c6aa'; m.fillRect(x, y, 7, CELL);
+        m.fillStyle = '#f4ecdc'; m.fillRect(wx - 3, wy - 2, ww + 6, wh + 4);
+        m.fillStyle = '#283036'; m.fillRect(wx, wy, ww, wh);
+        m.fillStyle = '#f4ecdc'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
+        m.fillStyle = '#cdbd9e'; m.beginPath(); m.moveTo(wx - 6, wy - 3); m.lineTo(wx + ww / 2, wy - 11); m.lineTo(wx + ww + 6, wy - 3); m.fill();
+        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+      }
+    }
+  } else {
+    if (look === 1) {
+      // Tijolo aparente (claro: a tinta do prédio dá a cor) e janela de moldura branca.
+      wall('#f2ece4');
+      m.fillStyle = 'rgba(90,60,40,0.16)';
+      for (let y = 0; y < S; y += 6) { m.fillRect(ox, oy + y, S, 1); for (let x = (y / 6) % 2 ? 0 : 7; x < S; x += 14) m.fillRect(ox + x, oy + y, 1, 6); }
+    } else wall(look === 2 ? '#f6f0e4' : '#ece8e0');
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+      const x = ox + c * CELL; const y = oy + r * CELL; const seed = seedBase + r * 4 + c;
+      if (look === 3) {
+        // Reboco liso com janela de correr larga e baixa.
+        const wx = x + 8; const wy = y + 18; const ww = CELL - 16; const wh = 22;
+        m.fillStyle = '#9aa0a6'; m.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+        glass(m, wx, wy, ww, wh, '#4c5a68', '#26303a');
+        m.fillStyle = '#9aa0a6'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
+        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+        continue;
+      }
+      if ((c + r * 3) % 5 === 4) continue; // parede cega
+      const wx = x + 18; const wy = y + 12; const ww = CELL - 36; const wh = CELL - 28;
+      m.fillStyle = '#ffffff'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
+      glass(m, wx, wy, ww, wh, '#4a5868', '#262e38');
+      m.fillStyle = '#ffffff'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
+      if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+      if (look === 2) {
+        // Floreira com flores e o toldinho listrado.
+        m.fillStyle = '#7a5a40'; m.fillRect(wx - 4, wy + wh + 3, ww + 8, 5);
+        for (let k = 0; k < 6; k++) { m.fillStyle = ['#e8402a', '#ff7ab6', '#ffd23f'][(seed + k) % 3]; m.fillRect(wx - 3 + k * ((ww + 4) / 5), wy + wh, 3, 3); }
+        for (let k = 0; k < 4; k++) { m.fillStyle = k % 2 ? '#f4f0e8' : '#c8402a'; m.fillRect(wx - 4 + k * ((ww + 8) / 4), wy - 9, (ww + 8) / 4, 5); }
+      }
+    }
+  }
+}
+
+export function facadeTextures(style: FacadeStyle): FacadeTextures {
+  const [mc, m] = canvas2d(S * 2, S * 2);
+  const [lc, l] = canvas2d(S * 2, S * 2);
+  l.fillStyle = '#000000'; l.fillRect(0, 0, S * 2, S * 2);
+  for (let look = 0; look < FACADE_LOOKS; look++) {
+    const [ox, oy] = cellOrigin(look);
+    if (look === 0) drawClassicCell(m, l, style, ox, oy);
+    else drawNewCell(m, l, style, look, ox, oy);
   }
   return { map: tex(mc, true), light: tex(lc, true) };
 }

@@ -4,9 +4,12 @@
 import {
   CAR_HALF_WIDTH, CAR_LENGTH, COLLISION_COOLDOWN_TICKS, COLLISION_SLOP_X, COLLISION_SLOP_Z, TICK_RATE,
 } from '../core/constants';
+import { hasUpgrades, partMaxLevel, UPGRADE_PARTS } from '../core/career';
+import { CARS } from '../core/data/cars';
 import { BRAZIL_REGIONS, CUPS } from '../core/data/cups';
 import { wrappedDelta } from '../core/sim/collisions';
 import { computeModifiers } from '../core/sim/coop';
+import { nitroCharges } from '../core/sim/stats';
 import { TRACKS } from '../core/track';
 import type { CarState, ChampionshipState, HumanEntry, RaceResultRow, RaceState, SimEvent, Track } from '../core/types';
 import { getLanguage, t } from '../i18n';
@@ -14,6 +17,7 @@ import '../i18n/core';
 import '../stats/strings';
 import type { RaceMode, SaveData } from './contracts';
 import { ACHIEVEMENTS } from './desktop';
+import { levelOf, masteryOf, MAX_LEVEL, MAX_MASTERY, xpOfStats, type ProgressData, type ProgressNews } from './progression';
 import { rivalBeatenEveryRace } from './rivals';
 import './strings';
 
@@ -23,6 +27,8 @@ export const DRAFT_MASTER_TICKS = 60 * TICK_RATE;
 export const MARATHON_METERS = 1_000_000;
 /** DEZ_VITORIAS. */
 export const WINS_TARGET = 10;
+/** NITRO_TRIPLO (O5, com a barra da N1): cargas juntas na barra ao mesmo tempo. */
+export const TRIPLE_NITRO_CHARGES = 3;
 /**
  * Folga do contato visto pelo estado: resolveCarCollisions (src/core/sim/collisions.ts) separa os dois
  * carros no mesmo tick até encostarem, mais a folga COLLISION_SLOP_X/Z — então depois do passo uma batida
@@ -50,6 +56,14 @@ export interface SeatTelemetry {
   nitroAtFinish: boolean;
   /** Estava em último ao fechar a primeira volta. */
   lastAfterFirstLap: boolean;
+  /** Largada-foguete perfeita (evento `launch`, O5). */
+  perfectLaunch: boolean;
+  /** Mini-turbos soltos (eventos `drift_boost`, O5). */
+  miniTurbos: number;
+  /** Mais cargas inteiras vistas na barra ao mesmo tempo, correndo (O5: NITRO_TRIPLO). */
+  maxCharges: number;
+  /** Cruzou a chegada com o nitro ligado e menos de uma carga na barra (O5: NITRO_NA_BANDEIRA). */
+  nitroEmptyAtFinish: boolean;
 }
 
 export interface RaceTelemetry {
@@ -79,7 +93,7 @@ export function newTelemetry(): RaceTelemetry {
 function blankSeat(startProgress: number): SeatTelemetry {
   return {
     nitros: 0, towsGiven: 0, towsReceived: 0, collisions: 0, crashes: 0, pitStops: 0, draftTicks: 0, startProgress,
-    nitroAtFinish: false, lastAfterFirstLap: false,
+    nitroAtFinish: false, lastAfterFirstLap: false, perfectLaunch: false, miniTurbos: 0, maxCharges: 0, nitroEmptyAtFinish: false,
   };
 }
 
@@ -102,6 +116,7 @@ export function observeTick(tel: RaceTelemetry, state: RaceState, track: Track):
     const seat = tel.seats.get(car.seat);
     if (!seat) continue;
     if (computeModifiers(state, track, car).draft) seat.draftTicks++;
+    seat.maxCharges = Math.max(seat.maxCharges, nitroCharges(state, car));
     observeContacts(tel, state, track, car, seat);
   }
 }
@@ -141,11 +156,17 @@ function observeEvent(state: RaceState, e: SimEvent, human: (carId: number) => S
     }
     case 'crash': { const s = human(e.carId); if (s) s.crashes++; break; }
     case 'pit_enter': { const s = human(e.carId); if (s) s.pitStops++; break; }
+    case 'launch': { const s = human(e.carId); if (s) s.perfectLaunch = true; break; }
+    case 'drift_boost': { const s = human(e.carId); if (s) s.miniTurbos++; break; }
     case 'finish': {
       // O carro já está como terminado aqui; o nitro do tick da chegada é o que vale.
       const car = state.cars[e.carId];
       const s = car && car.seat >= 0 ? tel.seats.get(car.seat) : undefined;
-      if (car && s && car.nitroTicks > 0) s.nitroAtFinish = true;
+      if (car && s && car.nitroTicks > 0) {
+        s.nitroAtFinish = true;
+        // A barra (N1): "gastou tudo até a bandeirada" = nenhuma carga inteira sobrando no tick da chegada.
+        if (nitroCharges(state, car) === 0) s.nitroEmptyAtFinish = true;
+      }
       break;
     }
     case 'lap': {
@@ -168,10 +189,12 @@ export interface AchievementUnlock {
 /**
  * Conquistas desbloqueadas por esta corrida (ids ainda não presentes no save), com quem as ganhou.
  * `cupChamp`: a copa (normal ou da carreira) já com esta corrida somada, para RIVAL_DERROTADO.
+ * `progress`: o que a corrida rendeu a cada humano local em nível e maestria (O5, progression.ts: settleProgress).
  */
 export function unlockAchievements(
   save: SaveData, mode: RaceMode, state: RaceState, results: RaceResultRow[], humans: HumanEntry[], telemetry: RaceTelemetry,
   trackNight: boolean, cupJustCompleted: string | null, difficulty: string, cupChamp: ChampionshipState | null = null,
+  progress: readonly ProgressNews[] = [],
 ): AchievementUnlock[] {
   const out = new Map<string, Set<number>>();
   const add = (id: string, seats: readonly number[]) => {
@@ -191,16 +214,30 @@ export function unlockAchievements(
   if (humans.length === 4) add('EQUIPE_COMPLETA', everyone);
   for (const r of humanRows) {
     const seat = telemetry.seats.get(r.seat);
+    // O5: a primeira corrida corrida até o fim (qualquer modo; o race_over é o fim).
+    add('PRIMEIRA_CORRIDA', [r.seat]);
     if (r.position === 1 && !telemetry.pitted.has(r.seat) && !timeTrial) add('SEM_BOX', [r.seat]);
-    if ((telemetry.maxNitrosInLap.get(r.seat) ?? 0) >= 3) add('NITRO_TRIPLO', [r.seat]);
     if (telemetry.gaveTow.has(r.seat)) add('EMPURRAO', [r.seat]);
     if (telemetry.perfectLap.has(r.seat)) add('VOLTA_PERFEITA', [r.seat]);
     if (!seat) continue;
     if (vsAi && r.finished && seat.collisions === 0 && seat.crashes === 0) add('SEM_ARRANHAO', [r.seat]);
     if (seat.draftTicks >= DRAFT_MASTER_TICKS) add('MESTRE_DO_VACUO', [r.seat]);
-    if (seat.nitroAtFinish) add('NITRO_NA_BANDEIRA', [r.seat]);
+    // O5, com a barra da N1 (o nitro aceso ~13% do tempo tornou comuns "3 nitros numa volta" e "nitro ligado na chegada"):
+    // juntar 3 cargas, e chegar com o nitro ligado tendo gasto a barra inteira.
+    if (seat.maxCharges >= TRIPLE_NITRO_CHARGES) add('NITRO_TRIPLO', [r.seat]);
+    if (seat.nitroEmptyAtFinish) add('NITRO_NA_BANDEIRA', [r.seat]);
+    if (seat.perfectLaunch) add('LARGADA_FOGUETE', [r.seat]);
+    if (seat.miniTurbos > 0) add('MINI_TURBO', [r.seat]);
     if (!timeTrial && r.position === 1 && seat.lastAfterFirstLap) add('DO_ULTIMO_AO_PRIMEIRO', [r.seat]);
   }
+  // O5: nível e maestria, por assento (o que a corrida rendeu a ele).
+  for (const n of progress) {
+    if (n.level.after >= 2) add('SUBIU_DE_NIVEL', [n.seat]);
+    if (n.level.after >= MAX_LEVEL) add('NIVEL_MAXIMO', [n.seat]);
+    if (n.mastery.after >= MAX_MASTERY) add('MAESTRIA_MAXIMA', [n.seat]);
+  }
+  // O5: economia e coleção leem o save (a compra é na garagem; a conquista sai no fim da corrida seguinte, e na abertura).
+  for (const id of economyAchievements(save)) add(id, everyone);
   const podium = humanRows.filter((r) => r.position <= 3);
   if (vsAi && podium.length >= 3) add('PODIO_DE_EQUIPE', podium.map((r) => r.seat));
   // As cumulativas leem o save já com esta corrida somada (a sessão grava as estatísticas antes).
@@ -231,8 +268,41 @@ export function unlockAchievements(
 export function evaluateAchievements(
   save: SaveData, mode: RaceMode, state: RaceState, results: RaceResultRow[], humans: HumanEntry[], telemetry: RaceTelemetry,
   trackNight: boolean, cupJustCompleted: string | null, difficulty: string, cupChamp: ChampionshipState | null = null,
+  progress: readonly ProgressNews[] = [],
 ): string[] {
-  return unlockAchievements(save, mode, state, results, humans, telemetry, trackNight, cupJustCompleted, difficulty, cupChamp).map((u) => u.id);
+  return unlockAchievements(save, mode, state, results, humans, telemetry, trackNight, cupJustCompleted, difficulty, cupChamp, progress).map((u) => u.id);
+}
+
+// ───────────────────────────── Economia, coleção e progresso: de estado (O5) ─────────────────────────────
+
+/**
+ * Economia e coleção pelo que o save guarda (só leitura: nada aqui toca carteira nem garagem). Os ids que o save ainda não tem.
+ * PRIMEIRA_PECA: alguma melhoria na garagem da Expedição; CARRO_NOVO: um carro comprado (`carsUnlocked`); OFICINA_COMPLETA: todas as peças
+ * de um carro no máximo dele; COLECIONADOR: os carros à venda todos comprados.
+ */
+export function economyAchievements(save: Pick<SaveData, 'achievements' | 'career' | 'carsUnlocked'>): string[] {
+  const out: string[] = [];
+  const garages = save.career?.drivers.map((d) => d.garage) ?? [];
+  if (garages.some((g) => Object.values(g.upgrades).some((u) => hasUpgrades(u)))) out.push('PRIMEIRA_PECA');
+  if (save.carsUnlocked.length > 0) out.push('CARRO_NOVO');
+  const full = (carId: string, up: Record<string, number> | undefined) => !!up && UPGRADE_PARTS.every((p) => (up[p] ?? 0) >= partMaxLevel(carId, p));
+  if (garages.some((g) => Object.entries(g.upgrades).some(([carId, up]) => full(carId, up)))) out.push('OFICINA_COMPLETA');
+  if (CARS.filter((c) => c.price > 0).every((c) => save.carsUnlocked.includes(c.id))) out.push('COLECIONADOR');
+  return out.filter((id) => !save.achievements.includes(id));
+}
+
+/**
+ * As conquistas de estado na ABERTURA do jogo (o save de quem jogou a 0.1.4 já merece algumas): economia e coleção, a primeira corrida,
+ * e nível e maestria de qualquer perfil. Os ids que o save ainda não tem; a sessão os grava e os manda à Steam.
+ */
+export function openAchievements(save: Pick<SaveData, 'achievements' | 'career' | 'carsUnlocked' | 'racesRun' | 'stats'>, progress: ProgressData): string[] {
+  const out = new Set(economyAchievements(save));
+  if (save.racesRun > 0) out.add('PRIMEIRA_CORRIDA');
+  const levels = save.stats.players.map((p) => levelOf(xpOfStats(p)).level);
+  if (levels.some((l) => l >= 2)) out.add('SUBIU_DE_NIVEL');
+  if (levels.some((l) => l >= MAX_LEVEL)) out.add('NIVEL_MAXIMO');
+  if (progress.profiles.some((p) => Object.values(p.cars).some((xp) => masteryOf(xp).level >= MAX_MASTERY))) out.add('MAESTRIA_MAXIMA');
+  return [...out].filter((id) => !save.achievements.includes(id));
 }
 
 // ───────────────────────────── Textos ─────────────────────────────

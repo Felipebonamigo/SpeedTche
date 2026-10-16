@@ -1,6 +1,8 @@
 // Ponte tipada com o Electron (desktop/preload.cjs expõe `window.desktop`). Fora do Electron — navegador,
 // Node nos testes — `getDesktop()` devolve null e o jogo segue com a Fullscreen API do próprio navegador.
 // A lista de funções aqui e a do preload.cjs têm que andar juntas.
+import { DEFAULT_SAVE, type SaveData } from './contracts';
+import { cleanName, profileKey } from './stats';
 
 export interface DesktopApi {
   toggleFullscreen(): Promise<void>;
@@ -34,17 +36,24 @@ export interface DesktopApi {
   openFolder(kind: 'saves' | 'logs' | 'bench'): Promise<boolean>;
   /** Avisa quando a tela cheia muda (inclusive por F11 tratado no processo principal). */
   onFullscreen(cb: (v: boolean) => void): void;
+  /**
+   * O5, OPCIONAL (um preload antigo sem ela continua valendo): o idioma do jogo na Steam (`apps.currentGameLanguage()`: 'brazilian',
+   * 'english'…) e o do sistema (`app.getLocale()`: 'pt-BR'…), null quando não há.
+   */
+  locale?(): Promise<{ steam: string | null; app: string | null }>;
 }
 
 declare global {
   interface Window { desktop?: DesktopApi }
 }
 
-/** Exportada para tests/desktop-storage.test.ts conferir que o preload.cjs expõe exatamente estas. */
+/** As obrigatórias: sem uma delas a ponte não vale (`isDesktopApi`). tests/desktop-storage.test.ts confere o preload.cjs com estas e as opcionais. */
 export const API_FUNCTIONS: ReadonlyArray<keyof DesktopApi> = [
   'toggleFullscreen', 'setFullscreen', 'isFullscreen', 'quit', 'steamName', 'achievement', 'richPresence',
   'saveFile', 'openFile', 'storeReadAll', 'storeWrite', 'logAppend', 'copyText', 'benchWrite', 'openFolder', 'onFullscreen',
 ];
+/** As opcionais (O5): o jogo pergunta antes de usar; um preload que não as tem não derruba a ponte. */
+export const OPTIONAL_API_FUNCTIONS: ReadonlyArray<keyof DesktopApi> = ['locale'];
 
 /** Verdadeiro só se o objeto tem TODAS as funções — um preload desatualizado não passa. */
 function isDesktopApi(v: unknown): v is DesktopApi {
@@ -147,6 +156,55 @@ export const ACHIEVEMENTS = [
   { id: 'REGIAO_NORDESTE', pt: 'Nordeste carimbado', en: 'Northeast Stamped' },
   { id: 'REGIAO_NORTE', pt: 'Norte carimbado', en: 'North Stamped' },
   { id: 'PASSAPORTE_COMPLETO', pt: 'Passaporte completo', en: 'Full Passport' },
+  // ── O5: as que caem nos primeiros 15 minutos, as de economia e coleção (docs/ondas/O/O5.md §4.4; nomes a confirmar pelo dono).
+  { id: 'PRIMEIRA_CORRIDA', pt: 'Primeira corrida', en: 'First Race' },
+  { id: 'LARGADA_FOGUETE', pt: 'Largada-foguete', en: 'Rocket Start' },
+  { id: 'MINI_TURBO', pt: 'Mini-turbo', en: 'Mini-Turbo' },
+  { id: 'SUBIU_DE_NIVEL', pt: 'Subiu de nível', en: 'Level Up' },
+  { id: 'PRIMEIRA_PECA', pt: 'Primeira peça', en: 'First Upgrade' },
+  { id: 'CARRO_NOVO', pt: 'Carro novo', en: 'New Ride' },
+  { id: 'OFICINA_COMPLETA', pt: 'Oficina completa', en: 'Fully Tuned' },
+  { id: 'COLECIONADOR', pt: 'Garagem completa', en: 'Collector' },
+  { id: 'MAESTRIA_MAXIMA', pt: 'Mestre do carro', en: 'Car Master' },
+  { id: 'NIVEL_MAXIMO', pt: 'Todos os títulos', en: 'All Titles' },
 ] as const satisfies ReadonlyArray<AchievementDef>;
 
 export type AchievementId = (typeof ACHIEVEMENTS)[number]['id'];
+
+// ───────────────────────────── Steam ao abrir (O5) ─────────────────────────────
+
+/**
+ * Reenvia à Steam toda conquista guardada no save que está na lista da Steam (O5; era DEFEITO: o README prometia, nenhum código fazia).
+ * Uma de cada vez (o IPC não recebe 67 de uma vez); recusa ou erro de uma não para as outras. Devolve quantas a Steam aceitou.
+ */
+export async function resendAchievements(api: Pick<DesktopApi, 'achievement'>, ids: readonly string[]): Promise<number> {
+  const known = new Set<string>(ACHIEVEMENTS.map((a) => a.id));
+  let accepted = 0;
+  for (const id of ids) {
+    if (!known.has(id)) continue;
+    try { if (await api.achievement(id)) accepted++; } catch { /* Steam fechada ou IPC caído: a próxima abertura manda de novo */ }
+  }
+  return accepted;
+}
+
+/**
+ * O nome da Steam no P1 (O5): só quando o P1 ainda tem o nome padrão ("P1") e o perfil "P1" não tem corrida nas estatísticas — senão o
+ * histórico, o nível e as estrelas dele ficariam num perfil que ninguém mais usa. Limpo como o lobby limpa (12 caracteres). Verdadeiro se mudou.
+ */
+export function adoptSteamName(save: Pick<SaveData, 'seatNames' | 'stats'>, steamName: unknown): boolean {
+  if (typeof steamName !== 'string') return false;
+  const name = cleanName(steamName);
+  const fallback = DEFAULT_SAVE.seatNames[0];
+  if (!name || save.seatNames[0] !== fallback) return false;
+  const p1 = save.stats.players.find((p) => profileKey(p.name) === profileKey(fallback));
+  if (p1 && p1.races > 0) return false;
+  save.seatNames[0] = name;
+  return true;
+}
+
+/** Na criação da sessão, no Electron: reenvio das conquistas guardadas e o nome da Steam no P1 (`persist` grava o save se o nome mudou). */
+export async function syncSteamOnOpen(api: DesktopApi | null, save: Pick<SaveData, 'achievements' | 'seatNames' | 'stats'>, persist: () => void): Promise<void> {
+  if (!api) return;
+  const name = api.steamName().then((n) => { if (adoptSteamName(save, n)) persist(); }, () => undefined);
+  await Promise.all([resendAchievements(api, [...save.achievements]), name]);
+}
