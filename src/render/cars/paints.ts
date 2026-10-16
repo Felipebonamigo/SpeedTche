@@ -46,7 +46,7 @@ export const WHITEWALL = brush('#ecebe4', { rough: 0.7 });
 export const INTERIOR = brush('#23252a', { rough: 0.85 });
 // Estilo HCT (V2, docs/ondas/V2-gt.md): pincéis SEM luz nem camada (os de luz e de faixa continuam os de cima; tests/car-round.test.ts).
 /** Vidro escuro neutro (o HCT2 aprovado): reflete o céu como o `GLASS`, sem o azul liso. */
-export const GLASS_TINT = brush('#151b25', { rough: 0.04, metal: 0.9 });
+export const GLASS_TINT = brush('#080a0e', { rough: 0.04, metal: 0.9 });
 /** Reflexo do céu nas janelas laterais do vidro escuro: mais contido que o `GLINT`. */
 export const GLINT_SOFT = brush('#c6d4e2', { rough: 0.04, metal: 1 });
 /** Reflexo no para-brisa e no vidro de trás: o céu de cima, mais apagado ainda. */

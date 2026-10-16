@@ -342,6 +342,19 @@ describe('3. lanternas: emissivas de verdade, com miolo e borda, fortes à noite
     expect(lo / hi, `borda ${lo.toFixed(2)} × miolo ${hi.toFixed(2)}`).toBeLessThanOrEqual(0.45);
   });
 
+  it('V2 (realismo 2): de dia o miolo da lanterna já esquenta para laranja (verde ≥ 20% do vermelho; era 2%), a borda continua vermelha e o miolo segue abaixo do limiar do bloom', { timeout: 120_000 }, () => {
+    // No HCT a lanterna acesa de dia tem o miolo laranja visível. O teto (0,8 × o limiar do bloom de dia) é o do teste seguinte e não muda.
+    for (const s of SCENERIES) {
+      const p = palette(s, 'day');
+      const u = uniformsAt(p.light);
+      const core = lampEmission(TAIL.rgb, 1, u.uTailGlow.value);
+      const rim = lampEmission(TAIL.rgb, K.LENS_RIM ?? 0.4, u.uTailGlow.value);
+      expect(core[1] / core[0], `${s}: miolo ${core.map((v) => v.toFixed(2)).join(',')}`).toBeGreaterThanOrEqual(0.2);
+      expect(rim[1] / rim[0], `${s}: borda ${rim.map((v) => v.toFixed(2)).join(',')}`).toBeLessThanOrEqual(0.08);
+      expect(lum(core), `${s}: miolo de dia ${lum(core).toFixed(2)} × limiar ${p.bloom[2]}`).toBeLessThanOrEqual(0.8 * p.bloom[2]);
+    }
+  });
+
   it('à noite o miolo da lanterna passa do limiar do bloom (o halo existe); de dia fica abaixo (sem halo); o freio é sempre mais forte', { timeout: 120_000 }, () => {
     const bad: string[] = [];
     for (const s of SCENERIES) {

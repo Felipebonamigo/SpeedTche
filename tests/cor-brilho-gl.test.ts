@@ -198,6 +198,20 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     expect(errors).toEqual([]);
   });
 
+  it('V2 (realismo 2): o vidro de trás lê preto-azulado profundo com o céu refletido mais forte no alto — de dia, câmera de corrida: embaixo luma ≤ 0,07, em cima luma ≥ 0,14 e ≥ 2× o de baixo (era 0,125 e 1,7×: azul-marinho chapado)', async () => {
+    // O HCT pinta o vidro de preto com o reflexo do céu em faixa clara. O nosso lia azul-marinho (15,33,75): o reflexo do env map era o grosso da luz do
+    // vidro, em toda a face. Sem ele o vidro cai para (9,13,27), o preto-azulado do cenário (a saturação fica alta de qualquer jeito: o cenário é azul; por isso o teste mede o claro e escuro, não o matiz). O carro de ônix sem faixa (a lataria não entra nas caixas).
+    const r = await lab((L) => {
+      L.freeze('copacabana', 300, { seg: 300, look: { paint: 'onix', stripe: 'nenhuma' } });
+      return L.shoot('high', 3, [{ box: [-0.5, 0.95, 1.2, 0.5, 1.05, 1.6] }, { box: [-0.5, 1.1, 0.9, 0.5, 1.16, 1.2] }]);
+    });
+    const [low, high] = r;
+    expect(low.mean, `vidro embaixo ${low.rgb.join(',')}`).toBeLessThanOrEqual(0.07);
+    expect(high.mean, `vidro em cima ${high.rgb.join(',')}`).toBeGreaterThanOrEqual(0.14);
+    expect(high.mean / low.mean, `em cima ${high.mean.toFixed(3)} ÷ embaixo ${low.mean.toFixed(3)}`).toBeGreaterThanOrEqual(2);
+    expect(errors).toEqual([]);
+  });
+
   it('o laboratório desenhou sem erro de shader', async () => {
     const p = await lab((L) => L.programs());
     expect(p.shaderErrors).toEqual([]);
