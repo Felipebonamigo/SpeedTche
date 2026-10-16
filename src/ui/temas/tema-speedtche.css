@@ -178,3 +178,56 @@
 :root[data-tema="speedtche"] .slot { border-radius: var(--r); }
 :root[data-tema="speedtche"] .rec-tab.on { background: var(--a-grad); }
 :root[data-tema="speedtche"] .party-card.focus { border-color: #ffb27a; }
+
+/* ── Progresso (O5) no visual do tema (T8): o cadeado, o distintivo do nível, o XP e o que liberou. Só repinta (cor, fundo, contorno,
+   sombra, raio): o tamanho de tudo continua o de progress.css, que guarda a estrutura. Texto com contraste ≥ 4,5:1 sobre o vidro
+   (tests/tema-o5.test.ts); os números em itálico com contorno escuro por baixo da tinta, como o HUD da V5. ── */
+/* Cadeado (lobby): a linha em vidro escuro com listras finas de "fechado", o fio no laranja do acento e o texto em creme itálico. */
+:root[data-tema="speedtche"] .sel.sel-lock {
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 0 calc(5 * var(--u)), transparent calc(5 * var(--u)) calc(10 * var(--u))), rgba(8, 10, 18, 0.74);
+  border-color: rgba(255, 154, 61, 0.42);
+}
+:root[data-tema="speedtche"] .sel.sel-lock.focus {
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.06) 0 calc(5 * var(--u)), transparent calc(5 * var(--u)) calc(10 * var(--u))), linear-gradient(100deg, rgba(255, 138, 31, 0.42), rgba(255, 61, 127, 0.3));
+  border-color: rgba(255, 190, 140, 0.7);
+}
+:root[data-tema="speedtche"] .sel-lock .lock-icon, :root[data-tema="speedtche"] .tp-lock, :root[data-tema="speedtche"] .lock-note.online-lock .ico { color: #ffb27a; }
+:root[data-tema="speedtche"] .sel-lock .lock-value, :root[data-tema="speedtche"] .lock-note.online-lock .lock-value { color: #ffe3c8; font-style: italic; }
+:root[data-tema="speedtche"] .lock-note.online-lock { color: #ffe3c8; }
+/* O carro trancado: silhueta em grafite, nome e barras apagados; no 3D o palco já o pinta de grafite (LOCKED_PAINT) e a janela ganha o fio. */
+:root[data-tema="speedtche"] .car-hero.is-locked .car-svg { filter: grayscale(1) brightness(0.55) drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)); }
+:root[data-tema="speedtche"] .car-hero.is-locked .car-name { color: #c3cbd8; }
+:root[data-tema="speedtche"] .car-hero.is-locked .car-bar-fill { background: linear-gradient(100deg, #5b6476, #7a8396); }
+:root[data-tema="speedtche"] .car-hero.is-locked .car-stage { box-shadow: inset 0 0 0 1px rgba(255, 154, 61, 0.5); }
+/* Torneio: o carro trancado no seletor do piloto. */
+:root[data-tema="speedtche"] .tp-car.is-locked .tp-car-name { color: #c3cbd8; font-style: italic; }
+:root[data-tema="speedtche"] .tp-car.is-locked { border-radius: calc(4 * var(--u)); background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 0 calc(5 * var(--u)), transparent calc(5 * var(--u)) calc(10 * var(--u))); }
+/* Distintivo do nível: disco de vidro escuro com brilho em cima; a moldura sobe de fio cinza a anel de pôr do sol. */
+:root[data-tema="speedtche"] .lvl-badge {
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.16), rgba(8, 10, 18, 0.88) 68%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 calc(4 * var(--u)) calc(12 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+:root[data-tema="speedtche"] .lvl-badge .lvl-n {
+  color: #ffffff; font-style: italic; paint-order: stroke fill; -webkit-text-stroke: calc(2 * var(--u)) #140c2c;
+  text-shadow: calc(1.5 * var(--u)) calc(2 * var(--u)) 0 #ff3d7f;
+}
+:root[data-tema="speedtche"] .lvl-badge[data-frame="base"] { border-color: rgba(255, 255, 255, 0.32); }
+:root[data-tema="speedtche"] .lvl-badge[data-frame="bronze"] { border-color: #d08b5b; box-shadow: 0 0 0 1px #4a2410, 0 0 calc(10 * var(--u)) rgba(208, 139, 91, 0.35); }
+:root[data-tema="speedtche"] .lvl-badge[data-frame="prata"] { border-color: #e3e8f0; box-shadow: 0 0 0 1px #3b4250, 0 0 calc(10 * var(--u)) rgba(227, 232, 240, 0.35); }
+:root[data-tema="speedtche"] .lvl-badge[data-frame="ouro"] { border-color: #ffd23f; box-shadow: 0 0 0 1px #6b4a00, 0 0 calc(12 * var(--u)) rgba(255, 210, 63, 0.5); }
+:root[data-tema="speedtche"] .lvl-badge[data-frame="nitro"] {
+  border-color: transparent;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.16), rgba(8, 10, 18, 0.88) 68%) padding-box, conic-gradient(#ff8a1f, #ff3d7f, #2f7bff, #ff8a1f) border-box;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 calc(14 * var(--u)) rgba(47, 123, 255, 0.55);
+}
+/* XP na linha do humano (resultado): creme em itálico com contorno; subiu de nível, no amarelo de sol com a sombra rosa. */
+:root[data-tema="speedtche"] .xp-tag { color: #ffd9b8; font-style: italic; paint-order: stroke fill; -webkit-text-stroke: calc(1 * var(--u)) #140c2c; }
+:root[data-tema="speedtche"] .xp-tag.up { color: #ffd23f; text-shadow: calc(1 * var(--u)) calc(1.5 * var(--u)) 0 #ff3d7f; }
+/* O que liberou (quadro de conquistas): o cartão em vidro com o traço de pôr do sol à esquerda (sombra interna: a borda não muda). */
+:root[data-tema="speedtche"] .ach-chip.prog-chip {
+  border-radius: calc(4 * var(--u)); background: linear-gradient(100deg, rgba(255, 138, 31, 0.2), rgba(8, 10, 18, 0.62) 60%);
+  box-shadow: inset calc(3 * var(--u)) 0 0 #ff9a3d;
+}
+:root[data-tema="speedtche"] .ach-chip.prog-chip strong { color: #ffe3c8; font-style: italic; }
+:root[data-tema="speedtche"] .results-ach-head .results-ach-title { color: #ffbd85; }
+:root[data-tema="speedtche"] .results-ach-head .prog-chip-compact { box-shadow: inset calc(3 * var(--u)) 0 0 #ff3d7f; }
