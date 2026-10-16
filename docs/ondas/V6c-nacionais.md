@@ -85,3 +85,31 @@ Os dois `.glb` são criação própria e só servem a outros jogos do estúdio s
 
 ### 8. Commits (em `nc/nacionais`, nada empurrado)
 Ver `git log` do branch; o trabalho fecha com este cartão e a passagem para o Detonauto.
+
+## Rodada 2 (16/10/2026) — "mais bem desenhados": o detalhe que lê de longe
+
+Parecer do coordenador/dono sobre a 1ª folha: reconhecível, mas plano e sem charme. Mesmas regras (teto 4.500 △, lod1 ≤ 45%, marca, sem push, sem suíte inteira).
+
+**O que mudou** (`tools/blender/`; os dois carros regenerados por `npm run carros-blender`):
+- **Faróis em camadas** (`lamp_stack`): caixa escura, aro claro, refletor, coroa da lente e miolo — a coroa é o material `headlight_dim` (emissivo 0,45) e o miolo o `headlight` (1,0), como a lente do GT que vai do miolo à borda.
+  **Lanternas**: moldura + coroa `taillight_dim` + miolo `taillight` em cada cubo do Cuiabano e no "L" do Tupiniquim. O farol em cunha do Tupiniquim agora fica INTEIRO na face da frente (antes dobrava o canto e lia como "seta branca").
+- **Para-choques com volume** (banda `bumper` 2,2 cm acima da pele, com friso claro `chrome`, entrada de ar e placa mais altas), **friso da cintura**, **soleira**, **alargamento dos para-lamas** (anel de plástico sobre cada vão), tampa de combustível, marcador âmbar,
+  vinco da tampa traseira, maçanetas com volume, espelhos com pedestal, **ponteiras de escapamento** cromadas.
+- **Personalidade**: teto +4 cm (1,60 e 1,63 m no total), roda de raio 0,375 m (era 0,36), vincos de caixa no teto e no capô (vinco 1,0 no friso do teto e no ombro).
+- **Faixas do projeto**: o Cuiabano leva a **faixa A** (`stripe_a`, friso lateral na porta, cor de destaque `#263238`); o Tupiniquim leva a **faixa B** (`stripe_b`, o vinco que sobe à coluna C, destaque `#eceff1`). O jogo as aplica sozinho (o `.glb` de um carro decide as próprias faixas: `liveries` vêm das camadas que a malha tem).
+- **Cor**: o amarelo do Cuiabano lia verde-oliva; `#f9d71c` → `#ffc400` (lê amarelo-ouro de 3/4 e de lado; de trás, na sombra da pista, ainda escurece). `carPaintHold` não existe neste branch (só no do GT): ajuste feito por captura.
+- **Roda do projeto, não roda própria** (novo): o nó `wheel_fr` leva `extras.project_wheel`; `gltf.ts` então NÃO monta `wheelModel` do arquivo e o renderizador usa o catálogo do estilo (`WHEEL_LISTS.hatch`, 10 raios) — acompanha a roda nova do GT quando o `nc/gt-hct` entrar, e a escolha de roda do jogador vale nos dois carros. Sem a marca, vale a roda do arquivo (Kenney).
+- **Silhueta 2D dos menus**: `icons.ts` ganhou `CAR_SHAPES` (por id do carro, antes do estilo), **gerada do casco** por `tools/blender/silhueta.py` (perfil do teto, vidros, rodas e portas saem do spec; nada desenhado à mão).
+
+**Números**: casco Cuiabano **4.348 △** (era 3.104), Tupiniquim **3.912 △** (era 2.824); lod1 752 e 716 (≤ 45%). O Cuiabano está a 152 △ do teto: a próxima rodada de detalhe precisa de poda, não de teto novo. Custo no gate remedido (`node tools/blender/medir.mjs`, jogador 1 troca de carro): copa-4p 221 chamadas em todos; △ Tornado 645.011 → Cuiabano 647.323 (**+2.312**) e Tupiniquim 646.451 (**+1.440**); sampa-4p 217 chamadas; 781.204 → 783.516 (+2.312) e 782.644 (+1.440).
+`NC_REQUIRE_GL=1 npx vitest run tests/gl-render.test.ts tests/stage-gl.test.ts --testTimeout=3000000 --hookTimeout=1500000`: `Test Files  2 passed (2)` · `Tests  25 passed (25)` (o gate de contagem passou).
+
+**Testes antes** (`tests/carros-nacionais.test.ts`, vistos falhar): `Tests  3 failed | 15 passed (18)` — `a folga do orçamento tem de virar detalhe: expected 3104 to be greater than 3600` (e 2824, os dois), e a silhueta `expected '<svg …' not to be '<svg …'` (era a do hatch). Depois de implementar,
+o Tupiniquim (3.496) ainda reprovava o piso de 3.600 e ganhou mais detalhe (não se afrouxou o teste): `Tests  48 passed | 1 skipped (49)` nos três arquivos de carro. Teste novo da rodada: coroa+miolo (≥ 2 materiais `taillight*` e `headlight*`), faixa do projeto (`stripe_a|b` e `liveries[0] ≠ 0`), roda do projeto (`wheelModel` indefinido).
+Área: `Test Files  24 passed (24)` · `Tests  469 passed | 1 skipped (470)`; `tsc --noEmit -p .` sem saída.
+
+**Imagens** (`scratch/nacionais/`): `folha-cuiabano.png`, `folha-tupiniquim.png` (8 vistas cada), `folha-cuiabano-x-tupiniquim-x-tornado-x-gt.png` (3/4 frente, 3/4 trás e corrida; Falcão GT como régua), `folha-detonauto-x-speedtche.png` (Detonauto realista × cartoon × realista;
+o realista do Speed Tchê tem agora 12.724 △).
+
+**Ainda abaixo do GT/Tornado** (honesto): a pintura é lisa (sem a lente translúcida nem o brilho do verniz do GT novo); as ponteiras do escape ficam brancas e salientes demais; o vidro continua sem borracha desenhada; faixa e frisos são remendos planos (não relevo); o
+Cuiabano visto de trás na sombra ainda escurece o amarelo. O que falta para parecer feito "à mão" é modelagem de relevo (nervuras, caixa de farol embutida no casco), não só remendos: pede espaço de △ que o teto de 4.500 não dá.

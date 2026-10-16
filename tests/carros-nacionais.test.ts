@@ -10,6 +10,7 @@ import { parseCarGlb } from '../src/render/cars/gltf';
 import { buildModel } from '../src/render/cars/models';
 import { installNodeImage } from '../scripts/lib/node-image';
 import { setLanguage, t } from '../src/i18n';
+import { carSilhouetteMarkup } from '../src/ui/screens/icons';
 import '../src/i18n/core';
 
 beforeAll(installNodeImage);
@@ -44,6 +45,16 @@ describe('carros nacionais: o asset do Blender', () => {
         expect(model.lod1, 'sem nó lod1').toBeDefined();
         expect(model.lod1!.triangles).toBeLessThanOrEqual(Math.floor(model.triangles * 0.45));
         expect(model.triangles, 'casco magro demais para ser desenho de verdade').toBeGreaterThan(2500);
+      });
+
+      it('rodada 2: detalhe que lê de longe (casco entre 3.600 e 4.500 △), lanterna com coroa e miolo, faixa do projeto, roda do projeto', () => {
+        expect(model.triangles, 'a folga do orçamento tem de virar detalhe').toBeGreaterThan(3600);
+        const mats = json.materials.map((m) => (m.name ?? '').toLowerCase());
+        expect(mats.filter((m) => m.startsWith('taillight')).length, 'lanterna: coroa (fraca) + miolo (forte)').toBeGreaterThanOrEqual(2);
+        expect(mats.filter((m) => m.startsWith('headlight')).length, 'farol: coroa + miolo').toBeGreaterThanOrEqual(2);
+        expect(mats.some((m) => m.startsWith('stripe_a') || m.startsWith('stripe_b')), 'faixa A ou B do projeto').toBe(true);
+        expect(model.liveries[0], 'o jogo aplica a faixa do arquivo').not.toBe(0);
+        expect(model.wheelModel, 'a roda é a do projeto (catálogo do estilo), não uma roda própria').toBeUndefined();
       });
 
       it('eixos e pegada do estilo hatch (o núcleo e os rastros não mudam): mesma posição e bitola das rodas', () => {
@@ -125,6 +136,14 @@ describe('carros nacionais: ligação ao jogo', () => {
     expect(free).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
     for (const id of IDS) expect(CARS.find((c) => c.id === id)?.body).toBe('hatch');
     expect(AI_CAR_POOL.map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto']);
+  });
+
+  it('a silhueta 2D dos menus é de cada carro (não a do hatch genérico) e os dois diferem', () => {
+    const strip = (m: string) => m.replace(/id="[^"]*"|url\(#[^)]*\)/g, '');
+    const [c, t2] = IDS.map((id) => strip(carSilhouetteMarkup(CARS.find((x) => x.id === id)!)));
+    const hatch = strip(carSilhouetteMarkup({ body: 'hatch', color: CARS.find((x) => x.id === 'cuiabano')!.color, accent: CARS.find((x) => x.id === 'cuiabano')!.accent }));
+    expect(c).not.toBe(hatch);
+    expect(t2).not.toBe(c);
   });
 
   it('texto em PT e EN para cada um', () => {

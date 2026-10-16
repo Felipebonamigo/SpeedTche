@@ -48,7 +48,7 @@ export const CARS: CarDef[] = [
   },
   // ── Livres, inspirados em hatches nacionais (docs/CARROS-NACIONAIS.md): carros de arte feita no Blender (tools/blender/), só dado ──
   {
-    id: 'cuiabano', name: 'Cuiabano', color: '#f9d71c', accent: '#263238', price: 0, body: 'hatch',
+    id: 'cuiabano', name: 'Cuiabano', color: '#ffc400', accent: '#263238', price: 0, body: 'hatch',
     topSpeed: REFERENCE_SPEED * 0.96, accel: 780, brake: 2700, handling: 0.85, fuelPerUnit: BASE_FUEL * 0.8,
     blurb: 'Quadradão honesto: estável e econômico. Nada é o melhor nem o pior.',
   },

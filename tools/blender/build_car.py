@@ -47,6 +47,7 @@ def main():
     r1 = build_lod(sp, 1, 0)
     cl.finish_wheels_and_empties(sp)
     print("lod0 triângulos:", tri_count(r0), "| lod1:", tri_count(r1))
+    print("  partes lod0:", {ob.name: sum(len(p.vertices) - 2 for p in ob.data.polygons) for ob in r0.children if ob.type == "MESH"})
     cl.export_glb(out)
     if preview:
         import preview as pv

@@ -65,6 +65,10 @@ MATERIALS = {
     "bumper": ((0.07, 0.07, 0.075), 0.0, 0.62, None),
     "headlight": ((1.0, 0.93, 0.78), 0.0, 0.2, 1.0),
     "taillight": ((1.0, 0.07, 0.05), 0.0, 0.25, 1.0),
+    "headlight_dim": ((1.0, 0.93, 0.78), 0.0, 0.2, 0.45),   # coroa da lente do farol (fraca); o miolo é o `headlight` (forte)
+    "taillight_dim": ((1.0, 0.07, 0.05), 0.0, 0.25, 0.42),  # coroa da lanterna (o miolo é o `taillight`): como o GT, lente que vai do miolo à borda
+    "stripe_a": ((1.0, 1.0, 1.0), 0.0, 0.45, None),         # faixa A do projeto (cor de destaque do carro)
+    "stripe_b": ((1.0, 1.0, 1.0), 0.0, 0.45, None),         # faixa B
     "amber": ((1.0, 0.55, 0.06), 0.0, 0.3, None),
     "reflector": ((0.55, 0.55, 0.55), 0.7, 0.3, None),
     "plate": ((0.92, 0.92, 0.88), 0.0, 0.5, None),
@@ -548,6 +552,11 @@ def add_misc(sp, lod):
         return None
     bm = bmesh.new()
     mats = []
+    if sp.get("exhaust_tip"):
+        ex = sp["exhaust"]
+        mats.append("chrome")
+        for sd in (1, -1):
+            cylinder_part(bm, (sd * ex[0], ex[1] + 0.03, ex[2]), 0.042, 0.14, axis="y", seg=8, mat_index=0)
     for (nm, mat, c, size, taper) in sp["misc"]:
         if mat not in mats:
             mats.append(mat)
@@ -560,6 +569,8 @@ def finish_wheels_and_empties(sp):
     w = sp["wheel"]
     for nm, (y, sd) in zip(("wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"), sp["wheel_positions"]()):
         ob = build_wheel(nm, sp)
+        if sp.get("project_wheel"):
+            ob["project_wheel"] = True  # o jogo usa a roda do catálogo do estilo; este desenho só dá posição e tamanho
         ob.location = (sd * sp["axle_x"], y, w["r"])
         if sd < 0:  # roda da direita (x < 0 no Blender = direita do carro): a face de fora olha para -X
             ob.rotation_euler = (0, 0, math.pi)
@@ -614,3 +625,28 @@ def line_strip(points, width):
     """Faixa fina ao longo de uma linha (lista de (a, z)): contorno com os pontos da linha em cima e embaixo (sem subdivisão: a projeção segue os pontos)."""
     up = [(a, z + width) for (a, z) in points]
     return list(points) + list(reversed(up))
+
+
+# ───────────────────────────── conjuntos de detalhe (rodada 2) ─────────────────────────────
+def lamp_stack(group, name, outline, layers, end="front", base=0.004, step=0.005, lod1_from=None):
+    """Farol ou lanterna em camadas, de fora para dentro (moldura, aro, refletor, coroa, miolo): cada camada é o contorno reduzido em torno do centro,
+    uma casca mais alta que a anterior. `layers`: lista de (material, escala). Devolve dicts de remendo para o spec."""
+    out = []
+    for i, (mat, k) in enumerate(layers):
+        out.append(dict(group=group, name=f"{name}{i}", mat=mat, outline=scaled_outline(outline, k), end=end, offset=base + step * i,
+                        cuts=1, lod1=(lod1_from is not None and i == lod1_from)))
+    return out
+
+
+def arch_flares(sp, width=0.045, off=0.010):
+    """Alargamento dos para-lamas: anel de plástico escuro por cima do vão de cada roda (frente e trás), projetado na lateral."""
+    r_in = sp["wheel"]["r"] + sp["wheel"]["arch_gap"] + 0.002
+    cz = sp["wheel"]["r"]
+    out = []
+    for (y, sd) in sp["wheel_positions"]():
+        if sd < 0:
+            continue
+        outer = [(y + (r_in + width) * math.cos(a), cz + (r_in + width) * math.sin(a)) for a in [math.radians(8 + 164 * k / 12) for k in range(13)]]
+        inner = [(y + r_in * math.cos(a), cz + r_in * math.sin(a)) for a in [math.radians(8 + 164 * k / 12) for k in range(13)]]
+        out.append(dict(end="side", group="details", name=f"flare{int(y * 100)}", mat="bumper", axis="x", outline=outer + list(reversed(inner)), offset=off, cuts=1, lod1=False))
+    return out

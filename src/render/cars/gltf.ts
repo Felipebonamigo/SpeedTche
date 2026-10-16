@@ -274,10 +274,14 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
   const model: CarModel = {
     body, shell, wheel: style.wheel, axles: [front, rear], exhausts: exhausts.length ? exhausts : style.exhausts,
     height: shell.boundingBox?.max.y ?? 0, liveries, triangles: b.triangles, contract,
-    wheelModel: {
-      design: style.wheel, geometry: wb.build(CREASE.wheel), triangles: wb.triangles,
-      symmetry: (Math.PI * 2) / (Number.isFinite(spokes) && spokes > 0 ? spokes : DEFAULT_SPOKES),
-    },
+    // `extras.project_wheel` no nó wheel_fr: a roda é a do catálogo do estilo (WHEEL_LISTS: acompanha a roda nova do projeto e a escolha
+    // do jogador); o arquivo só dá posição e tamanho. Sem a marca, vale a roda do arquivo (o caso do Kenney e dos carros de arte própria de roda).
+    ...((nodes.get('wheel_fr')?.userData as { project_wheel?: unknown } | undefined)?.project_wheel ? {} : {
+      wheelModel: {
+        design: style.wheel, geometry: wb.build(CREASE.wheel), triangles: wb.triangles,
+        symmetry: (Math.PI * 2) / (Number.isFinite(spokes) && spokes > 0 ? spokes : DEFAULT_SPOKES),
+      },
+    }),
     ...(carId ? { carId } : {}), ...(lod1 ? { lod1 } : {}), ...(map ? { map } : {}), ...(normalMap ? { normalMap } : {}),
   };
   return { model, problems: [...problems, ...checkCarModel(model)], warnings: [...new Set(warnings)] };
