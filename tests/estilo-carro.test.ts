@@ -11,6 +11,12 @@ import type { CarModel } from '../src/render/cars/model';
 import { MODEL_BUILDERS, buildModel } from '../src/render/cars/models';
 
 const META = { shellMax: 4500, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.92, lodMax: 0.5, exhaustR: 0.055, glassMetal: 0.85, glassRough: 0.06 } as const;
+/**
+ * Estilos já no desenho HCT (V2, docs/ondas/V2-gt.md): a diretriz nova do dono ("um pouco mais realista que o Horizon Chase Turbo", 13–14/10)
+ * substitui a cabine bolha de cartum da M4 — o vidro do HCT2 aprovado tem caimento de carro de verdade. Neles a bolha não vale; o caimento é
+ * conferido em tests/estilo-carro-gt.test.ts. O resto (roda, lanterna, difusor, asa, vidro reflexivo, lod1, teto do casco) vale para os 13.
+ */
+const HCT: readonly CarBody[] = ['gt'];
 /** Estilos com aerofólio de brinquedo; clássico, sedã, picape, micro e o roadster (cockpit aberto, com as corcovas) ficam sem, de propósito (decisão de forma). */
 const WING: readonly CarBody[] = ['gt', 'muscle', 'hatch', 'rally', 'hyper', 'wedge', 'prototype', 'electric'];
 
@@ -126,7 +132,7 @@ describe('estilo do carro: traseira-vitrine', () => {
 });
 
 describe('estilo do carro: cabine bolha e vidro com reflexo', () => {
-  it.each(CAR_BODIES.map((b) => [b] as const))('%s: o alto do vidro tem ≥ 92% da largura do vidro (cabine bolha)', (body) => {
+  it.each(CAR_BODIES.filter((b) => !HCT.includes(b)).map((b) => [b] as const))('%s: o alto do vidro tem ≥ 92% da largura do vidro (cabine bolha)', (body) => {
     expect(bubble(get(body))).toBeGreaterThanOrEqual(META.bubble);
   });
 

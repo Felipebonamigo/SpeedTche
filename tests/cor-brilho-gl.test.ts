@@ -19,7 +19,7 @@ type Probe = { box: [number, number, number, number, number, number] } | { point
 interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number] }
 interface FlameStat { changed: number; whiteOfChanged: number; addRgb: [number, number, number]; addLuma: number; x0: number; y0: number; x1: number; y1: number }
 interface Lab {
-  freeze(track: string, ticks: number, opts?: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night' }): void;
+  freeze(track: string, ticks: number, opts?: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night'; seg?: number; look?: { paint?: string; stripe?: string } }): void;
   headlights(on: boolean): void;
   shoot(q: Quality, frames: number, probes: Probe[]): ProbeStat[];
   bloomHalo(hdr: number, bloom: [number, number, number], px?: number): { halo: number; core: number };
@@ -153,6 +153,23 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     expect(m?.changed ?? 0, 'a boca aparece na caixa').toBeGreaterThan(0.02);
     expect(mr - mb, `boca de dia: soma rgb(${mr},${mg},${mb}) — metal aquecido é R − B ≥ 40`).toBeGreaterThanOrEqual(40);
     expect(mr >= mg && mg >= mb, `boca de dia: soma rgb(${mr},${mg},${mb}) — R ≥ G ≥ B`).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  it('V2: o sol não acende um ponto branco com halo no carro na câmera de corrida de dia (Copacabana, seg 300, o GT de ônix sem faixa: ≤ 0,5% estourado no teto, ≤ 0,2% no vidro de trás, ≤ 0,1% no carro; era 13,6% no teto)', async () => {
+    // A folha do GT (V2) mostrou um ponto branco com halo no alto do vidro de trás. Medido no laboratório (docs/ondas/V2-gt.md, §10): some sem o sol e
+    // some sem o verniz (clearcoat) — é o realce do sol, um ponto de luz, no verniz quase espelho da dobra do teto (e, menor, no cromo e no vidro).
+    // O carro de ônix e sem faixa deixa só o realce estourar (a lataria branca do Falcão, ou a faixa dourada do ônix ao sol, estourariam pela cor).
+    const r = await lab((L) => {
+      L.freeze('copacabana', 300, { seg: 300, look: { paint: 'onix', stripe: 'nenhuma' } });
+      return L.shoot('high', 3, [{ box: [-0.3, 1.0, 0.7, 0.3, 1.2, 1.1] }, { box: [-0.55, 0.86, 0.85, 0.55, 1.16, 1.62] }, { box: [-0.9, 0.3, -2.2, 0.9, 1.25, 2.3] }]);
+    });
+    // Sem o teto do realce: 13,6% da caixa do teto estourada (o ponto e o halo). Com ele sobra a linha fina do reflexo do CÉU na quina do teto preto (o env
+    // map, sem teto de propósito): ~0,3%, sem halo.
+    const [roof, glass, car] = r;
+    expect(roof.white, `teto e alto do vidro: ${(roof.white * 100).toFixed(2)}% estourados (${roof.x0},${roof.y0})`).toBeLessThanOrEqual(0.005);
+    expect(glass.white, `vidro de trás: ${(glass.white * 100).toFixed(2)}% estourados`).toBeLessThanOrEqual(0.002);
+    expect(car.white, `o carro todo: ${(car.white * 100).toFixed(2)}% estourados`).toBeLessThanOrEqual(0.001);
     expect(errors).toEqual([]);
   });
 

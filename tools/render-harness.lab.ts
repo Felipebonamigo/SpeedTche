@@ -237,12 +237,20 @@ function liveScene(quality: Quality, trackId: string, fractions: number[], repea
 export type Probe = { box: [number, number, number, number, number, number] } | { point: [number, number, number]; r: number };
 export interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number] }
 
-/** Corrida parada no quadro: o mundo não anda (os carros ficam onde a corrida os deixou); `x` põe o jogador numa faixa, `parked` o para. */
-function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night' } = {}): void {
-  setup(trackId, 1, ticks, opts.tod);
+/**
+ * Corrida parada no quadro: o mundo não anda (os carros ficam onde a corrida os deixou); `x` põe o jogador numa faixa, `parked` o para; `seg` o leva ao
+ * início do segmento (o `seg=` do render-harness.html: a folha do GT e a galeria) e tira os outros da frente; `look` é o visual do jogador (N3).
+ */
+function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night'; seg?: number; look?: CarLook } = {}): void {
+  setup(trackId, 1, ticks, opts.tod, opts.look ? [opts.look] : undefined);
   if (!current) throw new Error('lab.setup primeiro');
   const me = current.state.cars.find((c) => c.seat >= 0);
   if (!me) throw new Error('sem humano');
+  if (opts.seg !== undefined) {
+    const len = current.track.length;
+    me.z = (opts.seg * 200) % len;
+    for (const c of current.state.cars) if (c !== me) c.z = (me.z + len / 2 + c.id * 300) % len;
+  }
   if (opts.x !== undefined) me.x = opts.x;
   me.steerPose = 0;
   if (opts.parked) { me.speed = 0; me.nitroTicks = 0; me.skidTicks = 0; me.driftTicks = 0; }
@@ -390,6 +398,8 @@ const lab = {
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
   renderer, setup, render, idle, programs, collect, blob, fxScene, liveScene,
+  /** A cena (para um teste ligar e desligar uma luz, ou o reflexo do céu, e isolar a causa de um brilho). */
+  scene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),
   info: () => renderer.debugInfo(),
   dynamic: (on: boolean, pin: number | null) => { renderer.setDynamicResolution(on); renderer.pinDynamicScale(pin); },

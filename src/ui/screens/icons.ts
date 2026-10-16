@@ -103,14 +103,15 @@ interface Shape {
 
 /** Os 13 estilos. A leitura de cada um (docs/CARROS.md): o que o diferencia de perfil. */
 const SHAPES: Readonly<Record<CarBody, () => Shape>> = {
-  // GT: capô longo, cabine recuada, traseira fastback com rabeta; baixo e largo.
+  // GT (V2, estilo HCT): motor central em cunha — bico baixo, para-lamas que sobem sobre as rodas, cabine avançada, tampa do motor longa,
+  // entrada de ar no flanco, asa com suporte; a faixa lateral segue o vinco, que sobe para trás (o perfil do modelo 3D, docs/ondas/V2-gt.md).
   gt: () => ({
-    body: 'M10 52 L9 42 L14 35 L40 33 L78 20 L110 19 L138 31 L178 35 L190 40 L192 47 L188 52 Z',
-    glass: 'M52 32 L80 22.5 L108 22 L128 31 Z',
-    accent: 'M12 43 L188 44 L188 46.5 L12 45.5 Z',
-    extra: `<path d="M98 22 L101 22 L101 32 L97 32 Z" fill="${DARK}" opacity=".55"/>`,
-    wheels: wheel(46, 55, 12) + wheel(156, 55, 12),
-    head: [184, 38, 7, 4], tail: [9, 37, 5, 5], shadow: [100, 90],
+    body: 'M10 46 L10 33 L24 31.5 L34 29 L45 26.5 L56 25 L66 22 L104 21.3 L134 31.5 L147 30 L158 29.6 L169 32 L180 38 L190 41.5 L191 47 L188 51.5 L12 51.5 Z',
+    glass: 'M68 23.2 L103 22.6 L131 31.6 L64 31 Z',
+    accent: 'M14 35.5 L188 42.5 L188 45 L14 38 Z',
+    extra: `<path d="M68 41 L87 40 L87 48 L68 48.5 Z" fill="${DARK}"/><path d="M8 25 L27 25 L27 27.5 L8 27.5 Z M17 27.5 L19.5 27.5 L19.5 31.5 L17 31.5 Z" fill="${DARK}"/>`,
+    wheels: wheel(45, 55, 12) + wheel(156, 55, 12),
+    head: [183, 38.5, 6, 3], tail: [8, 35, 4, 5], shadow: [100, 90],
   }),
   // Muscle: caixote de capô comprido e traseira curta (três volumes), tomada de ar no capô, faixas por cima.
   muscle: () => ({
