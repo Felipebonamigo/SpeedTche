@@ -173,3 +173,43 @@ armadilha conhecida do PLAYBOOK §5. Cada um rodado sozinho, verde: `gl-render` 
 `landmarks-enquadramento` 6/6, `landmarks` 23/23. Na suíte inteira o **gate de contagem** (`gl-render`, "dentro dos limites provisórios") passou, e
 `stage-gl` (garagem, pódio, revelação), `cor-brilho-gl`, `corrida-que-muda-gl` e `efeitos-gl` passaram inteiros. O pulado é o de sempre
 (`car-pipeline`, o carro do Kenney fora do git).
+
+### 10. Etapa 2 (15–16/10/2026): o reflexo do sol, a cunha e o hipercarro
+
+**Commits** (em `nc/gt-hct`, nada empurrado): `fa55659` mescla do `main` 3662d4a (0.1.5, HUD V5, efeitos V8; sem conflito) · `9008d5f` teto no realce
+do sol · `845db36` cunha e hipercarro no estilo HCT · o registro (este).
+
+**O ponto branco com halo** (câmera de corrida de dia) não era o vidro: era o realce DIRETO do sol no verniz do arco pintado do teto (some sem o sol e
+sem o verniz; o reflexo do céu não muda nada). Correção em `cars/material.ts`: o realce direto (o do verniz também) tem teto, `SUN_SPEC_CAP = 0,5`,
+aplicado depois de `lights_fragment_begin` e antes do reflexo do céu (chave do programa `speed-tche-car-v5`). Um piso de rugosidade para a luz
+direta foi tentado e piorou (38,8% de branco). Teste no laboratório GL (`cor-brilho-gl`, Copacabana seg 300, ônix sem faixa): **13,64%** de pixels
+brancos na sonda do teto sem a correção, **0,30%** com ela (limite 0,5%; vidro 0,2%; carro todo 0,1%).
+
+**Cunha (`wedge`, Iara Turbo)** e **hipercarro (`hyper`, Pororoca V10)** reescritos sobre `Hull` + `shaped.ts`, com os mesmos eixos, escapes, rodas,
+pinturas e pincéis nomeados (`car-round`). Peças novas: `boxLamp` (lanterna retangular embutida: barras de moldura que saem 4,5 cm da pele, poço de
+paredes escuras, lentes em leque 3 cm atrás da borda; no lod1 uma caixa só) e `lensRect` (lente plana em leque); o `Hull` ganhou `cabinBase`/`cabinEnd`
+(a base do para-brisa acompanha o capô fundo entre para-lamas altos) e `ramp` (rampa do para-lama mais longa: a cunha de capô baixo subia o
+para-lama dianteiro em 20 cm de z). O `render-harness` aceita `car=` também na corrida e na câmera de capô (para a folha de cada estilo).
+
+| | △ casco antes → depois | lod1 | chamadas |
+|---|---|---|---|
+| wedge | 3.098 → **3.322** (+224) | 1.386 → 1.374 (**41%**) | iguais |
+| hyper | 3.298 → **3.132** (−166) | 1.466 → 1.344 (**43%**) | iguais |
+
+Áreas (m²; farol, lanterna, escamoteável, A, B, acento): wedge 0,254 · 0,340 · 0,554 · 2,549 · 0,343 · 0; hyper 0,024 · 0,176 · 0 · 2,091 · 0,332 ·
+2,437 (o farol em fenda fica perto do piso do `car-round`, 0,0216).
+
+**Testes** (`tests/estilo-carro-hct.test.ts`, era `estilo-carro-gt`; sondas em `tests/hct-probe.ts`): um bloco comum (vidro com caimento e escuro,
+4 lentes de lanterna em leque com moldura ≥ 1 cm além da lente e ≥ 3 cm além da pele, faixa A de cima ≥ 75% e B de lado ≥ 80% subindo ≥ 12 cm, ≤ 4.200
+△, lod1 ≤ 45% com luz e faixas) e a identidade de cada um (cunha reta, escamoteável rente, lâminas na frente da lanterna, entrada de ar; hipercarro
+baixo de cabine avançada, farol em fenda, asa em cisne, 7 aletas). Vistos falhar nos modelos de antes: `Tests  8 failed | 22 passed (30)` — os que
+passavam já nos velhos são guarda da identidade, não motor da mudança. Depois: 30/30; área (`tests/car-* estilo-carro* camera* stage-* cor-brilho
+render-normals cosmetics* cars`): `Test Files  27 passed (27)` · `Tests  618 passed | 1 skipped (619)`; `tsc --noEmit` sem saída.
+
+**Folhas** atual × novo, 7 vistas cada (as 6 do GT e, como os dois só têm um carro cada, a 7ª é a frente à noite — o escamoteável aceso da cunha):
+`scratch/wh/folha-iara.png`, `scratch/wh/folha-pororoca.png`.
+
+**O que falta**: a silhueta 2D (`icons.ts`) dos dois continua a velha; o para-lama dianteiro dos dois é alto (o pneu grande obriga a borda a
+0,99 m) e lê mais "protótipo de Le Mans" que Countach; no lod1 do hipercarro o painel preto de trás (3 segmentos) não acompanha a planta redonda nos
+cantos de baixo; na câmera de capô do hipercarro aparecem pedaços claros na borda de baixo (o vidro cortado da cabine em gota, a conferir); o farol em fenda quase não se vê à noite.
+Nas capturas: 52 chamadas de dia e 55 à noite, iguais antes e depois.

@@ -151,9 +151,9 @@ faces planas como o low-poly do jogo. O que distingue cada um de perfil:
 | sedan | três volumes, quatro portas (duas janelas, linhas de porta), porta-malas saliente |
 | electric | uma gota lisa de curvas, sem grade, faixa de luz na frente e atrás, rodas carenadas |
 | rally | hatch alto, aerofólio grande, tomada no teto, número na porta, para-barros, faróis de milha, pneu de cravos |
-| hyper | rente ao chão e comprido, entrada de ar lateral, asa enorme, difusor, aro escuro |
+| hyper | (V2, estilo HCT) rente ao chão, cintura de garrafa, faróis em fenda no bico, entrada de ar enorme no flanco, lâmina de acento na saia, asa em pescoço de cisne, difusor de carbono, aro escuro |
 | classic | comprido e arredondado, rabo de peixe, teto em duas cores, para-choques cromados, pneu faixa branca |
-| wedge | uma reta só do bico baixo à traseira alta e reta, venezianas no vidro de trás, faixa em diagonal |
+| wedge | (V2, estilo HCT) o capô sobe em reta do bico ao para-brisa, faróis escamoteáveis, entrada de ar com frisos, venezianas na tampa, grade-lanterna atrás de lâminas pretas |
 | pickup | cabine alta, caçamba aberta com santantônio, vão livre alto, pneu de cravos, saia em duas cores |
 | prototype | baixíssimo, bolha de cabine, para-lamas saltados, barbatana e asa na cauda longa |
 | micro | metade do comprimento, uma bolha alta, rodinhas nos cantos, teto na cor de destaque (o gorro do Saci) |
@@ -225,9 +225,9 @@ construtor é erro (`buildModel`), e `tests/car-models.test.ts` confere que as 1
 | `sedan` | sedã econômico | três volumes (capô, cabine, porta-malas), friso cromado das janelas, placas, calotas | `hubcap` |
 | `electric` | fastback elétrico | arco único e liso, bico fechado, teto de vidro, faixa de luz na frente e atrás, sem escapamento | `aero` |
 | `rally` | carro de rali | suspensão alta, para-lamas em caixa, asa na tampa, 4 faróis de milha, painel de número, para-barros | `dish` (branca) |
-| `hyper` | hipercarro em cunha | muito baixo, cabine-bolha avançada, entradas laterais enormes, asa em pescoço de cisne, difusor | `center` |
+| `hyper` | **estilo HCT (V2, 15/10/2026)**: hipercarro (LaFerrari, P1, Pagani), casco por linhas | baixíssimo, cintura de garrafa, cabine em gota avançada de vidro escuro, faróis em fenda no bico, entradas enormes no flanco, lâmina de acento na saia, painel preto com 4 lanternas retangulares **embutidas** e colmeia sobre o escape central, difusor de carbono de 7 aletas, asa em pescoço de cisne na cor de detalhe | `center` |
 | `classic` | esportivo dos anos 60 | capô longo abaulado, para-lamas bojudos, boca oval cromada, para-choques cromados partidos, faixa branca no pneu | `wire` |
-| `wedge` | cunha dos anos 80 | planos retos, para-lamas dianteiros que sobem sobre as rodas, faróis escamoteáveis (sobem à noite), frisos nas portas, venezianas e grade preta atrás | `aero` |
+| `wedge` | **estilo HCT (V2, 15/10/2026)**: cunha dos anos 80 (Countach, Testarossa, Esprit), casco por linhas | o meio do capô sobe em reta do bico ao para-brisa entre para-lamas de rampa longa, faróis escamoteáveis rentes ao capô (sobem à noite), entrada de ar da Testarossa com frisos na cor do carro, tampa de trás pintada com venezianas, grade-lanterna: 4 lanternas retangulares **embutidas** atrás de 3 lâminas pretas | `aero` |
 | `pickup` | picape | cabine simples alta, caçamba aberta (com o interior), santantônio com faróis, grade e para-choques cromados | `steel` |
 | `prototype` | protótipo de endurance | bico rente entre para-lamas altos, cockpit-bolha, barbatana de tubarão, asa de ponta a ponta | `center` |
 | `micro` | microcarro | 3,4 m (o único mais curto), cabine alta e redonda, "olhos" redondos, teto em outra cor | `hubcap` |
@@ -409,7 +409,7 @@ falso: a prévia muda, o save guarda e volta), `tests/paint-session.test.ts` (se
 
 ## Rodas, traseira e cabine (M4)
 
-Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo (menos no `gt` do estilo HCT, V2: vidro escuro com caimento de carro de verdade, `docs/ondas/V2-gt.md`). O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.
+Rodas de 0,189–0,194 do comprimento, com o para-lama subindo para cobrir o pneu; todo estilo tem escapes largos e difusor, e os esportivos (gt, muscle, hatch, rally, hyper, wedge, prototype, electric) têm aerofólio de brinquedo. Cabine bolha e vidro com reflexo (menos no `gt`, no `wedge` e no `hyper` do estilo HCT, V2: vidro escuro com caimento de carro de verdade, `docs/ondas/V2-gt.md`). O movimento (guinada da derrapagem, rodopio, quique, squash & stretch, estrelinhas) é só visual, em `cars/motion.ts`, lido do estado existente.
 
 ## Garagem e Concessionária (N2)
 
