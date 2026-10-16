@@ -31,11 +31,12 @@ describe('shader dos carros: acabamentos', () => {
     expect(FINISH_IDS.length - 1).toBeLessThanOrEqual(FINISH_MASK);
   });
 
-  it('a chave do programa mudou (v5) e a estilização continua composta na chave', () => {
+  it('a chave do programa mudou (v7) e a estilização continua composta na chave', () => {
     const key = material.customProgramCacheKey();
     // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado;
     // v5 (V2): o sol com rugosidade mínima na luz direta (o ponto branco com halo no teto do GT).
-    expect(key).toContain('speed-tche-car-v5');
+    // v6 (V2, realismo): a pintura guarda o matiz (`carPaintHold`). v7 (V2, realismo 2): o céu refletido no vidro (`uGlassSky`).
+    expect(key).toContain('speed-tche-car-v7');
     expect(key).not.toContain('speed-tche-car-v1');
   });
 
@@ -129,5 +130,31 @@ describe('shader dos carros: o realce do sol tem teto (V2)', () => {
     expect(cap).toBeLessThan(ibl);
     expect(coat).toBeLessThan(ibl);
     expect(count(frag, 'uSunCap )')).toBe(2);
+  });
+});
+
+describe('shader dos carros: a pintura guarda o matiz (V2, realismo)', () => {
+  const { frag } = compiled();
+  it('depois do verniz e antes da saída, a lataria pintada volta ao matiz da tinta (uPaintHold), menos no brilho estourado; uma vez só', () => {
+    const varnish = at(frag, 'outgoingLight = carVarnish(');
+    const hold = at(frag, 'outgoingLight = carPaintHold(');
+    const out = at(frag, '#include <opaque_fragment>');
+    expect(hold).toBeGreaterThan(varnish);
+    expect(hold).toBeLessThan(out);
+    expect(count(frag, 'outgoingLight = carPaintHold(')).toBe(1);
+    expect(frag).toContain('uniform float uPaintHold;');
+  });
+});
+
+describe('shader dos carros: o céu refletido no vidro (V2, realismo 2)', () => {
+  const { frag } = compiled();
+  it('o vidro (rugosidade baixa, metal alto, sem luz) reflete o céu pelo Fresnel depois do verniz, numa chamada só, e o reflexo do env map dele é mais fraco', () => {
+    const varnish = at(frag, 'outgoingLight = carVarnish( outgoingLight, normal, vViewPosition, uVarnish');
+    const sky = at(frag, 'outgoingLight = carGlassSky( outgoingLight, normal, vViewPosition, uGlassSky * wGlass );');
+    expect(sky).toBeGreaterThan(varnish);
+    expect(sky).toBeLessThan(at(frag, '#include <opaque_fragment>'));
+    expect(frag).toContain('uniform float uGlassSky;');
+    expect(frag).toContain('float wGlass = ');
+    expect(frag).toContain('radiance *= mix( 1.0, 0.15, wGlass );');
   });
 });

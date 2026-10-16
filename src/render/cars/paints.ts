@@ -38,11 +38,15 @@ export const TAIL_DIM = brush('#5a1210', { rough: 0.2, tail: 0.25 });
 export const REVERSE = brush('#e8e8e8', { rough: 0.2, tail: 0.1 });
 export const TIRE = brush('#141416', { rough: 0.94 });
 export const TIRE_SIDE = brush('#1d1e21', { rough: 0.88 });
+/** Inscrição lisa do flanco (V2, realismo 2): a faixa de borracha mais clara, fosca, sem texto. */
+export const TIRE_LETTER = brush('#2c2d31', { rough: 0.9 });
+/** Disco de freio no fundo do aro (V2, realismo 2): aço polido, escuro. */
+export const BRAKE_DISC = brush('#6b7078', { rough: 0.38, metal: 0.9 });
 export const WHITEWALL = brush('#ecebe4', { rough: 0.7 });
 export const INTERIOR = brush('#23252a', { rough: 0.85 });
 // Estilo HCT (V2, docs/ondas/V2-gt.md): pincéis SEM luz nem camada (os de luz e de faixa continuam os de cima; tests/car-round.test.ts).
 /** Vidro escuro neutro (o HCT2 aprovado): reflete o céu como o `GLASS`, sem o azul liso. */
-export const GLASS_TINT = brush('#151b25', { rough: 0.04, metal: 0.9 });
+export const GLASS_TINT = brush('#080a0e', { rough: 0.04, metal: 0.9 });
 /** Reflexo do céu nas janelas laterais do vidro escuro: mais contido que o `GLINT`. */
 export const GLINT_SOFT = brush('#c6d4e2', { rough: 0.04, metal: 1 });
 /** Reflexo no para-brisa e no vidro de trás: o céu de cima, mais apagado ainda. */

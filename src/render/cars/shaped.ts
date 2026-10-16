@@ -7,7 +7,7 @@
 // Coordenadas do carro: x para a direita, y para cima, −z é a frente; metros.
 import * as THREE from 'three';
 import type { Hull } from './hull';
-import { AXIS_NZ, AXIS_Z, lathe, type Brush, type MeshBuilder, type P2, type P3 } from './kit';
+import { AXIS_NZ, AXIS_Z, box, lathe, type Brush, type MeshBuilder, type P2, type P3 } from './kit';
 import { TRIM } from './paints';
 
 /** Normal (não unitária) de um polígono 3D pelos três primeiros pontos. */
@@ -210,4 +210,47 @@ export function headlampPod(b: MeshBuilder, hull: Hull, poly: ReadonlyArray<read
     prism(b, on(along(a, c, [1, 0]), H + 0.002), [0, 0.012, 0], br.lens, br.side, null);
     prism(b, on(along([a[0] + w, a[1]], d, [0, 1]), H + 0.002), [0, 0.012, 0], br.lens, br.side, null);
   });
+}
+
+/**
+ * Lanterna RETANGULAR embutida (V2, cunha e hipercarro; lado direito, quem chama espelha): moldura preta de barras que sai `protrude` m além da
+ * pele (a ponta mais saliente entre x0 e x1), poço com as paredes de dentro escuras e, `recess` m atrás da borda, `cells` lentes lado a lado —
+ * cada uma um LEQUE de quatro cantos com o vértice no centro (miolo e borda do `aLens`). As barras entram 3 cm na carroceria: a pele recua
+ * para o lado (planta redonda) e a moldura não pode boiar. No casco simples (lod1) é uma caixa só, com a face de trás acesa e chapada.
+ */
+export interface BoxLamp { x0: number; x1: number; y0: number; y1: number; cells: number; protrude: number; recess: number; frame?: number; dome?: number }
+export function boxLamp(b: MeshBuilder, hull: Hull, l: BoxLamp, lens: Brush, bezel: Brush, well: Brush): { zLip: number; zLens: number } {
+  const skin = [l.x0, (l.x0 + l.x1) / 2, l.x1].flatMap((x) => [l.y0, l.y1].map((y) => hull.endZ(x, y, 'back')));
+  const zLip = Math.max(...skin) + l.protrude; const zLens = zLip - l.recess; const zIn = Math.min(...skin) - 0.03;
+  const f = l.frame ?? 0.02;
+  const bar = (x0: number, x1: number, y0: number, y1: number, inner: Partial<Record<'ns' | 'ps' | 'nv' | 'pv', Brush>>): void =>
+    box(b, [(x0 + x1) / 2, (y0 + y1) / 2, (zIn + zLip) / 2], [x1 - x0, y1 - y0, zLip - zIn], bezel, { nu: null, ...inner });
+  if (b.lod) {
+    box(b, [(l.x0 + l.x1) / 2, (l.y0 + l.y1) / 2, (zIn + zLens) / 2], [l.x1 - l.x0, l.y1 - l.y0, zLens - zIn], bezel, { nu: null, pu: lens });
+    return { zLip, zLens };
+  }
+  bar(l.x0, l.x1, l.y1 - f, l.y1, { nv: well });
+  bar(l.x0, l.x1, l.y0, l.y0 + f, { pv: well });
+  const w = (l.x1 - l.x0 - f * (l.cells + 1)) / l.cells;
+  for (let k = 0; k <= l.cells; k++) {
+    const xa = l.x0 + k * (w + f);
+    bar(xa, xa + f, l.y0 + f, l.y1 - f, k === 0 ? { ps: well } : k === l.cells ? { ns: well } : { ns: well, ps: well });
+  }
+  for (let k = 0; k < l.cells; k++) {
+    const xa = l.x0 + f + k * (w + f); const xb = xa + w;
+    lensRect(b, [[xa, l.y0 + f, zLens], [xb, l.y0 + f, zLens], [xb, l.y1 - f, zLens], [xa, l.y1 - f, zLens]], [0, 0, 1], lens, l.dome ?? 0.003);
+  }
+  return { zLip, zLens };
+}
+
+/** Lente plana em LEQUE (o vértice do centro levantado `dome` m na direção `facing`): o miolo e a borda do `aLens` em qualquer polígono convexo. */
+export function lensRect(b: MeshBuilder, poly: readonly P3[], facing: P3, br: Brush, dome = 0.002): void {
+  const n = poly.length;
+  const mean = (k: 0 | 1 | 2): number => poly.reduce((s, p) => s + p[k], 0) / n + facing[k] * dome;
+  const c: P3 = [mean(0), mean(1), mean(2)];
+  for (let k = 0; k < n; k++) {
+    const p = poly[k]; const q = poly[(k + 1) % n];
+    const nn = normalOf([c, p, q]);
+    if (nn.x * facing[0] + nn.y * facing[1] + nn.z * facing[2] >= 0) b.tri(c, p, q, br); else b.tri(c, q, p, br);
+  }
 }

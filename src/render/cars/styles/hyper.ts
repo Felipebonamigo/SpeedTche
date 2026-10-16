@@ -1,64 +1,94 @@
-// Hipercarro: cunha muito baixa, bico rente ao chão entre para-lamas altos, cabine-bolha avançada,
-// tampa do motor com venezianas, entradas de ar laterais enormes, asa traseira em pescoço de cisne,
-// difusor grande, escape central duplo e rodas de trava central (traseiras maiores).
-import { BodyShape, bubble, buildCabin, cabinGlassTop, type Axle, type CabinSpec } from '../body';
-import { calipers, lampPair, mirrors, onTop, splitter } from '../details';
-import { beam, cuboid, MeshBuilder, roundBar, type Lod } from '../kit';
+// Hipercarro no estilo HCT "rodada 2" (V2, docs/ondas/V2-gt.md; referências de forma: LaFerrari, McLaren P1, Pagani). Casco por linhas
+// (`Hull`) muito baixo: bico rente ao chão entre para-lamas altos, cintura de garrafa (estreita nas portas, larga sobre as rodas de trás),
+// cabine em gota bem avançada com para-brisa deitado e a tampa do motor longa e pintada, com venezianas por fora das faixas. Faróis em
+// FENDA no bico (um projetor em leque por lado), entradas de ar enormes no flanco e a lâmina de acento na saia. A traseira é a estrela:
+// painel preto, duas lanternas retangulares EMBUTIDAS por lado (moldura que sobra 4,5 cm, lente acesa no fundo com miolo e borda), grade
+// de colmeia no meio, o escape central duplo de sempre, difusor de carbono de sete aletas e a asa em pescoço de cisne na cor de detalhe.
+// Faixas: A = duas faixas do bico à cauda (capô, teto e tampa); B = no vinco da cintura, subindo para trás.
+// Mesmos eixos, pegada, escapes, roda e pinturas do hipercarro de antes.
+import { buildCabin, cabinGlassTop, type Axle, type CabinSpec, type Region } from '../body';
+import { calipers, mirrors, splitter } from '../details';
+import { Hull } from '../hull';
+import { beam, MeshBuilder, type Brush, type Lod, type P3 } from '../kit';
+import { finish, type CarModel } from '../model';
+import {
+  ACCENT, CARBON, GLASS_TINT, GLINT_SKY, GLINT_SOFT, GRILLE, HEAD, INTERIOR, LIVERY_A, LIVERY_B, PAINT, PIANO, STRIPE_A, STRIPE_B, TAIL, TAIL_WELL,
+  TRIM, TRIM_SOFT, UNDER,
+} from '../paints';
 import { buildRear, exhaustPoint } from '../rear';
-import { finish, regions, type CarModel } from '../model';
-import { ACCENT, CARBON, GLASS, GRILLE, HEAD, HEAD_HOUSING, LIVERY_A, LIVERY_B, PAINT, STRIPE_A, TAIL, TRIM, UNDER } from '../paints';
+import { boxLamp, endDecal, glassGlints, lensRect, meshGrille, sideDecal, sideLine, topPatch } from '../shaped';
+
+/** Faixa A (x de dentro, x de fora): as duas faixas do bico à cauda, no casco e no teto (a asa é da cor de detalhe). */
+export const HYPER_STRIPE_A: readonly [number, number] = [0.08, 0.34];
+/** A cabine, em z: a base do para-brisa e o fim da tampa do motor. */
+export const HYPER_CABIN: readonly [number, number] = [-1.02, 1.45];
 
 export function buildHyper(lod: Lod = 0): CarModel {
   const b = new MeshBuilder(lod);
   const axles: [Axle, Axle] = [{ z: -1.42, r: 0.44, x: 0.8, w: 0.32 }, { z: 1.38, r: 0.46, x: 0.79, w: 0.36 }];
-  const shape = new BodyShape({
-    secs: [
-      { z: -2.2, yb: 0.15, yt: 0.33, hw: 0.8, crown: 0.02, sh: 0.22, tuck: 0.04, belt: 0.5 },
-      { z: -2.0, yb: 0.12, yt: 0.44, hw: 0.9, crown: 0.02, sh: 0.22, tuck: 0.05 },
-      { z: -1.5, yb: 0.12, yt: 0.56, hw: 0.94, crown: 0.02, sh: 0.22, tuck: 0.06 },
-      { z: -0.9, yb: 0.12, yt: 0.62, hw: 0.95, crown: 0.03, sh: 0.2, tuck: 0.07 },
-      { z: 0.2, yb: 0.13, yt: 0.68, hw: 0.96, crown: 0.05, sh: 0.18, tuck: 0.09, belt: 0.45 },
-      { z: 1.3, yb: 0.14, yt: 0.77, hw: 0.96, crown: 0.04, sh: 0.16, tuck: 0.08 },
-      { z: 2.0, yb: 0.18, yt: 0.8, hw: 0.94, crown: 0.03, sh: 0.14 },
-      { z: 2.2, yb: 0.24, yt: 0.75, hw: 0.88, crown: 0.02, sh: 0.14 },
-    ],
-    axles, rise: [0.2, 0.1], flare: [0.02, 0.03], band: 0.05, clear: 0.05,
+  const [C0, C3] = HYPER_CABIN;
+  const underCabin = (z: number): boolean => z > C0 + 0.02 && z < C3 - 0.02;
+  const STD: Record<Region, Brush> = { under: UNDER, well: UNDER, sill: CARBON, lower: PAINT, band: STRIPE_B, upper: PAINT, shoulder: PAINT, top: PAINT, stripe: STRIPE_A, center: PAINT };
+  const hull = new Hull({
     lod,
-    brush: regions({ sill: CARBON }),
-    capFront: PAINT, capBack: TRIM,
+    zs: [-2.2, -2.17, -2.1, -2.0, -1.85, -1.6, -1.0, -0.4, 0.2, 0.8, 1.3, 1.7, 1.95, 2.08, 2.16, 2.2],
+    axles, lift: 0.3, stripe: [HYPER_STRIPE_A[1], HYPER_STRIPE_A[0]], band: 0.06, clear: 0.05,
+    yb: [[-2.2, 0.2], [-2.1, 0.15], [-1.9, 0.13], [1.9, 0.15], [2.1, 0.2], [2.2, 0.27]],
+    yt: [[-2.2, 0.32], [-2.0, 0.39], [-1.6, 0.49], [-1.0, 0.59], [-0.2, 0.66], [0.8, 0.72], [1.6, 0.77], [2.0, 0.79], [2.2, 0.77]],
+    crown: [[-2.2, 0], [-2.1, 0.01], [-1.5, 0.025], [-0.5, 0.03], [2, 0.03], [2.2, 0]],
+    hw: [[-2.2, 0.74], [-2.14, 0.84], [-2.04, 0.9], [-1.85, 0.94], [-1.4, 0.95], [-0.7, 0.9], [0, 0.86], [0.6, 0.9], [1.3, 0.955], [1.9, 0.955], [2.1, 0.91], [2.2, 0.84]],
+    yc: [[-2.2, 0.27], [-1.97, 0.3], [-1.0, 0.4], [0, 0.5], [1.0, 0.58], [1.9, 0.63], [2.2, 0.63]],
+    sh: [[-2.2, 0.18], [-1.9, 0.24], [-1.3, 0.28], [-0.6, 0.2], [0.2, 0.14], [1.2, 0.18], [2.0, 0.18], [2.2, 0.15]],
+    tuck: [[-2.2, 0.05], [-1.8, 0.08], [0, 0.13], [1.8, 0.09], [2.2, 0.06]],
+    flare: [0.025, 0.04], rise: [0.04, 0.06],
+    brush: (r, z) => (underCabin(z) && (r === 'top' || r === 'stripe' || r === 'center') ? INTERIOR : STD[r]),
+    capFront: PAINT, capBack: PAINT,
   });
-  shape.build(b);
-  // Cabine-bolha avançada e tampa do motor em fastback.
-  const cab: CabinSpec = bubble({
-    secs: [
-      { z: -1.08, hwb: 0.7, yb: 0.64, hwt: 0.7, yt: 0.64 },
-      { z: -0.28, hwb: 0.8, yb: 0.68, hwt: 0.56, yt: 1.07, crown: 0.04 },
-      { z: 0.34, hwb: 0.8, yb: 0.71, hwt: 0.52, yt: 1.05, crown: 0.04 },
-      { z: 1.55, hwb: 0.7, yb: 0.79, hwt: 0.7, yt: 0.79 },
-    ],
-    top: (gap, region) => (gap === 1 ? (region === 'stripe' ? STRIPE_A : PAINT) : gap === 2 ? (region === 'stripe' ? STRIPE_A : PAINT) : GLASS),
-    side: (gap) => (gap === 2 ? PAINT : GLASS),
-  });
+  hull.build(b);
+
+  // Cabine em gota bem avançada: para-brisa muito deitado, teto curto e baixo, a tampa do motor pintada descendo até a traseira.
+  const c0 = hull.cabinEnd(C0); const c1 = hull.cabinBase(-0.3); const c2 = hull.cabinBase(0.32); const c3 = hull.cabinEnd(C3);
+  const cab: CabinSpec = {
+    secs: [c0, { ...c1, hwt: 0.54, yt: 1.05, crown: 0.03 }, { ...c2, hwt: 0.5, yt: 1.03, crown: 0.03 }, c3],
+    top: (gap, region) => (gap === 0 ? GLASS_TINT : region === 'stripe' ? STRIPE_A : PAINT),
+    side: (gap) => (gap === 2 ? PAINT : GLASS_TINT),
+    stripe: [HYPER_STRIPE_A[1], HYPER_STRIPE_A[0]], edge: 0.1, glint: GLINT_SOFT,
+  };
   buildCabin(b, cab);
-  b.mirrored(() => beam(b, [0.7, 0.65, -1.06], cabinGlassTop(cab, -0.32), 0.05, 0.035, CARBON));
-  // Venezianas na tampa do motor.
-  b.fine(() => { for (let i = 0; i < 4; i++) onTop(b, shape, 0, 1.62 + i * 0.12, 0.9, 0.05, 0.03, TRIM); });
-  // Entradas de ar laterais: cunha escura antes da roda traseira, com a lâmina de acento em cima.
-  b.mirrored(() => {
-    cuboid(b, [
-      [0.9, 0.3, 0.2], [0.975, 0.3, 0.2], [0.975, 0.58, 0.2], [0.9, 0.58, 0.2],
-      [0.9, 0.3, 0.86], [0.975, 0.3, 0.86], [0.975, 0.66, 0.86], [0.9, 0.66, 0.86],
-    ], GRILLE, { ps: UNDER });
-    beam(b, [0.975, 0.6, -0.1], [0.975, 0.68, 0.86], 0.03, 0.04, ACCENT);
+  b.mirrored(() => beam(b, [c0.hwb, c0.yb + 0.01, C0], cabinGlassTop(cab, -0.28), 0.05, 0.035, CARBON));
+  glassGlints(b, { z: c0.z, y: c0.yb, hw: c0.hwb }, { z: c1.z, y: 1.05, hw: 0.5 }, -1, GLINT_SKY, 0.03);
+  mirrors(b, 0.8, c1.yb + 0.12, -0.72, PAINT, 0.85);
+  // Venezianas na tampa do motor, por fora das faixas.
+  b.fine(() => {
+    topPatch(b, hull, [[0.4, 1.5], [0.66, 1.5], [0.66, 1.92], [0.4, 1.92]], TRIM, 0.006);
+    for (const z of [1.56, 1.64, 1.72, 1.8]) topPatch(b, hull, [[0.4, z], [0.66, z], [0.66, z + 0.025], [0.4, z + 0.025]], CARBON, 0.018);
   });
-  // Frente: fendas de farol nos para-lamas, entrada central, divisor largo.
-  lampPair(b, 0.62, 0.46, -1.98, 0.36, 0.05, 0.95, HEAD, true, HEAD_HOUSING, 0.05);
-  roundBar(b, [0, 0.25, -2.18], [0.9, 0.1, 0.08], GRILLE, { r: 0.04, axis: 'z' });
-  b.mirrored(() => roundBar(b, [0.66, 0.24, -2.1], [0.34, 0.12, 0.08], GRILLE, { r: 0.045, axis: 'z' }));
-  splitter(b, 0.14, -2.16, 1.72, 0.26, CARBON);
-  mirrors(b, 0.84, 0.8, -0.72, PAINT, 0.85);
-  // Traseira-vitrine: asa em pescoço de cisne (acento), lanternas grandes, difusor e escape central duplo largo.
-  lampPair(b, 0.55, 0.66, 2.19, 0.62, 0.15, 0, TAIL, false, TRIM, 0.04);
+
+  // Lateral: a entrada de ar enorme antes da roda de trás (escura, com duas aletas de carbono), junta de porta e a lâmina de acento na saia.
+  sideDecal(b, hull, [[0.05, 0.27], [0.92, 0.25], [0.92, 0.44], [0.3, 0.42]], GRILLE, 0.012);
+  b.fine(() => {
+    for (const z of [0.42, 0.68]) sideLine(b, hull, [[z, 0.27], [z + 0.06, 0.42]], 0.02, CARBON, 0.02);
+    sideLine(b, hull, [[-0.72, 0.21], [-0.7, 0.46]], 0.012, TRIM);
+  });
+  sideLine(b, hull, [[-0.9, 0.205], [0.9, 0.215]], 0.035, ACCENT, 0.02);
+
+  // Frente: faróis em fenda no bico (carcaça preta e um projetor em leque por lado), tomada central de colmeia, entradas nos cantos, tomadas
+  // no capô por fora das faixas e o divisor de carbono.
+  const nose = (x: number, y: number): P3 => [x, y, hull.endZ(x, y, 'front') - 0.012];
+  endDecal(b, hull, 'front', 0.4, 0.8, (t) => 0.255 + 0.02 * t, (t) => 0.31 + 0.02 * t, 0.008, PIANO, b.lod ? 2 : 4);
+  b.mirrored(() => lensRect(b, [nose(0.44, 0.27), nose(0.76, 0.288), nose(0.76, 0.318), nose(0.44, 0.3)], [0, 0, -1], HEAD, 0.002));
+  b.fine(() => {
+    meshGrille(b, hull, 'front', 0, 0.3, 0.17, 0.27, 2, GRILLE, TRIM_SOFT);
+    endDecal(b, hull, 'front', 0.48, 0.78, () => 0.17, () => 0.23, 0.012, GRILLE, 3);
+    topPatch(b, hull, [[0.42, -1.72], [0.6, -1.76], [0.62, -1.5], [0.44, -1.48]], TRIM, 0.008);
+  });
+  splitter(b, 0.13, -2.15, 1.7, 0.16, CARBON);
+
+  // Traseira-vitrine: painel preto, duas lanternas embutidas por lado, grade de colmeia no meio (sobre o escape central), difusor de carbono e a
+  // asa em pescoço de cisne.
+  endDecal(b, hull, 'back', 0, 0.84, () => 0.4, () => 0.72, 0.006, PIANO, b.lod ? 3 : 8);
+  b.mirrored(() => boxLamp(b, hull, { x0: 0.24, x1: 0.85, y0: 0.53, y1: 0.73, cells: 2, protrude: 0.045, recess: 0.03 }, TAIL, PIANO, TAIL_WELL));
+  b.fine(() => meshGrille(b, hull, 'back', 0, 0.2, 0.55, 0.71, 3, TRIM, TRIM_SOFT));
   const rear = buildRear(b, {
     exhausts: [{ x: 0.13, y: 0.46, z: 2.25, r: 0.075, len: 0.15 }, { x: -0.13, y: 0.46, z: 2.25, r: 0.075, len: 0.15 }],
     diffuser: { y: 0.22, z: 2.1, w: 1.5, fins: 7, fin: CARBON },

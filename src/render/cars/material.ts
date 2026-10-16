@@ -32,6 +32,10 @@ export interface CarUniforms {
   uVarnish: { value: number };
   /** Teto do realce da luz direta (o sol) no verniz, no vidro e no cromo: ver `SUN_SPEC_CAP`. */
   uSunCap: { value: number };
+  /** Quanto a lataria pintada volta ao matiz da tinta depois de toda a luz: ver `PAINT_HOLD`. */
+  uPaintHold: { value: number };
+  /** Força do céu refletido no vidro (Fresnel; V2, realismo 2): ver `GLASS_SKY`. */
+  uGlassSky: { value: number };
 }
 
 /**
@@ -44,13 +48,31 @@ export interface CarUniforms {
 export const SUN_SPEC_CAP = 0.5;
 
 /**
+ * A pintura guarda o matiz (V2, realismo; docs/ondas/V2-gt.md §11). O reflexo do céu azul (o env map, o verniz estilizado) e a luz dele somam azul em toda a
+ * lataria: o GT de rubi saía ROSA na tampa e ROXO no para-choque na câmera de corrida de dia (medido: 18° e 63° fora do matiz da tinta). No HCT a lataria
+ * vermelha lê vermelha e o reflexo fica no brilho. Depois de toda a luz, a cor da lataria pintada volta `PAINT_HOLD` do caminho para a CROMA da tinta com
+ * a mesma luminância — o claro e o escuro, o realce e a sombra continuam onde estão, só o matiz deixa de ser o do céu. O brilho estourado (o realce do sol
+ * e o do horizonte, luminância ≥ ~1) fica como está: o reflexo continua branco. Provisório: medido no laboratório GL (tests/cor-brilho-gl.test.ts).
+ */
+export const PAINT_HOLD = 0.7;
+
+/**
+ * O vidro preto-azulado com o céu refletido (V2, realismo 2; §12). O vidro lia azul-marinho (15,33,75 na câmera de corrida de dia, luma 0,125): o reflexo do
+ * env map, em toda a face, era o grosso da luz do vidro. Medido: sem ele o vidro cai para (9,13,27), o preto-azulado do cenário. Agora o reflexo do env map
+ * no vidro vale 15% (`wGlass`) e o céu entra pelo Fresnel de expoente 7 (`carGlassSky`: o gradiente do verniz, com 40% da croma, sem amostra nem chamada):
+ * fraco de frente, forte nas quinas, onde o vidro deita (a câmera de corrida vê o vidro de trás quase de raspão, por isso o Fresnel pesa tanto). O reflexo
+ * em faixa continua nas faixas de reflexo da cabine (`GLINT_SKY`). `GLASS_SKY` é a força, como o `uVarnish` é a da lataria. Provisório: medido no GL.
+ */
+export const GLASS_SKY = 0.5;
+
+/**
  * Lanterna (cor-brilho, docs/ondas/cor-brilho.md): o miolo esquenta para laranja-branco quando o brilho passa de `LAMP_HOT_FROM` (à noite e no freio),
  * a borda continua vermelha. `w` é o peso do emissivo: o do pincel (`aMat.w`) × o da lente, que cai do centro (1) para a borda (`LENS_RIM`, atributo `aLens`).
  */
 export const LAMP_HOT: readonly [number, number, number] = [1, 0.6, 0.15];
 /** De que peso em diante a lente esquenta (o miolo; a coroa em volta fica vermelha). */
 const LAMP_CORE_FROM = 0.75;
-const LAMP_HOT_FROM = 1.5;
+const LAMP_HOT_FROM = 0.9;
 const LAMP_HOT_MAX = 0.6;
 
 /**
@@ -132,6 +154,8 @@ uniform float uBrakeGlow;
 uniform float uEnvBoost;
 uniform float uVarnish;
 uniform float uSunCap;
+uniform float uPaintHold;
+uniform float uGlassSky;
 uniform vec3 uStylizeSkyTop;
 uniform vec3 uStylizeSkyHorizon;
 uniform vec3 uStylizeGround;
@@ -151,6 +175,27 @@ vec3 carVarnish( vec3 col, vec3 n, vec3 viewPos, float k ) {
   vec3 refl = mix( uStylizeGround, sky, smoothstep( -0.025, 0.025, r.y ) );
   float f = 0.05 + 0.95 * pow( 1.0 - ndv, 3.0 );
   return mix( col, refl, clamp( k * f, 0.0, 1.0 ) );
+}
+// Céu no vidro (GLASS_SKY em material.ts): o gradiente do verniz, mas só nas quinas (Fresnel de expoente 7) e com o azul puxado para o cinza (40% da croma).
+vec3 carGlassSky( vec3 col, vec3 n, vec3 viewPos, float k ) {
+  vec3 v = normalize( viewPos );
+  float ndv = clamp( dot( n, v ), 0.0, 1.0 );
+  vec3 r = inverseTransformDirection( reflect( -v, n ), viewMatrix );
+  vec3 sky = mix( uStylizeSkyHorizon, uStylizeSkyTop, smoothstep( 0.03, 0.65, r.y ) );
+  vec3 refl = mix( uStylizeGround, sky, smoothstep( -0.025, 0.025, r.y ) );
+  refl = mix( vec3( dot( refl, vec3( 0.2126, 0.7152, 0.0722 ) ) ), refl, 0.4 );
+  return mix( col, refl, clamp( k * ( 0.03 + 0.97 * pow( 1.0 - ndv, 7.0 ) ), 0.0, 1.0 ) );
+}
+// A pintura guarda o matiz (PAINT_HOLD em material.ts): a cor vai para a croma da tinta (\`paint\`, o albedo) com a luminância que a luz deu, menos no
+// brilho estourado. \`k\` = força × peso da lataria pintada.
+vec3 carPaintHold( vec3 col, vec3 paint, float k ) {
+  const vec3 W = vec3( 0.2126, 0.7152, 0.0722 );
+  float lc = dot( col, W );
+  vec3 chroma = paint / max( dot( paint, W ), 1.0e-3 );
+  vec3 held = chroma * lc;
+  // Acima de 1 a croma da tinta estoura um canal sozinho: divide pelo maior canal acima de 1 (mantém o matiz, o tom mapping cuida do resto).
+  held /= max( 1.0, max( held.r, max( held.g, held.b ) ) );
+  return mix( col, held, k * ( 1.0 - smoothstep( 0.55, 1.1, lc ) ) );
 }
 varying vec4 vMat;
 varying float vPaintW;
@@ -180,6 +225,8 @@ float wChrome = vFin * step( abs( vFinish - 4.0 ), 0.5 );
 float wCham = vFin * step( abs( vFinish - 5.0 ), 0.5 );
 float roughnessFactor = vMat.x;
 float fMetal = vMat.y;
+// Vidro: rugosidade baixa, metal alto, sem luz (o mesmo critério dos testes: tests/estilo-carro.test.ts).
+float wGlass = step( vMat.x, 0.081 ) * step( 0.6, vMat.y ) * ( 1.0 - step( 0.01, vMat.z + vMat.w ) ) * ( 1.0 - vPaintW );
 roughnessFactor = mix( roughnessFactor, 0.30, wMetallic ); fMetal = mix( fMetal, 0.55, wMetallic );
 roughnessFactor = mix( roughnessFactor, 0.28, wPearl ); fMetal = mix( fMetal, 0.25, wPearl );
 roughnessFactor = mix( roughnessFactor, 0.88, wMatte ); fMetal = mix( fMetal, 0.0, wMatte );
@@ -225,7 +272,7 @@ float fFlake = 0.0;
 export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uniforms: CarUniforms } {
   const uniforms: CarUniforms = {
     uSelfLight: { value: 0.2 }, uHeadGlow: { value: 0.4 }, uTailGlow: { value: 0.9 }, uBrakeGlow: { value: 3.2 },
-    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') }, uSunCap: { value: SUN_SPEC_CAP },
+    uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') }, uSunCap: { value: SUN_SPEC_CAP }, uPaintHold: { value: PAINT_HOLD }, uGlassSky: { value: GLASS_SKY },
   };
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true, roughness: 0.4, metalness: 0.2, // normal suave da malha (kit.ts), não sombreado plano
@@ -266,6 +313,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         #if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
           // Peças metálicas (cromo, aro) e vidro refletem mais o céu; a pintura, pouco (a cor manda).
           radiance *= uEnvBoost * ( 0.35 + fMetal );
+          radiance *= mix( 1.0, 0.15, wGlass );
           #ifdef USE_CLEARCOAT
             clearcoatRadiance *= uEnvBoost * 0.55;
           #else
@@ -276,11 +324,15 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
         #endif`)
       // Verniz: só a lataria pintada (pintura e faixas), menos no fosco e no cromado (que já é espelho), depois de toda a luz e antes da saída.
       .replace('#include <opaque_fragment>', `outgoingLight = carVarnish( outgoingLight, normal, vViewPosition, uVarnish * vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ) );
+        // O vidro reflete o céu pelo Fresnel (GLASS_SKY): o reflexo do env map dele caiu acima, a base é preta.
+        outgoingLight = carGlassSky( outgoingLight, normal, vViewPosition, uGlassSky * wGlass );
+        // A pintura guarda o matiz (PAINT_HOLD): só a lataria pintada, menos o cromado (espelho) e o camaleão e o perolado (que mudam de cor de propósito).
+        outgoingLight = carPaintHold( outgoingLight, diffuseColor.rgb, uPaintHold * vPaintW * ( 1.0 - wChrome ) * ( 1.0 - wCham ) * ( 1.0 - wPearl ) );
         #include <opaque_fragment>`);
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
-  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`).
-  material.customProgramCacheKey = () => 'speed-tche-car-v5';
+  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`). v6 (V2, realismo): a pintura guarda o matiz. v7 (V2, realismo 2): o céu refletido no vidro.
+  material.customProgramCacheKey = () => 'speed-tche-car-v7';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };

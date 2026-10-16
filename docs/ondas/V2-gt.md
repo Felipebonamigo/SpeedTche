@@ -173,3 +173,104 @@ armadilha conhecida do PLAYBOOK §5. Cada um rodado sozinho, verde: `gl-render` 
 `landmarks-enquadramento` 6/6, `landmarks` 23/23. Na suíte inteira o **gate de contagem** (`gl-render`, "dentro dos limites provisórios") passou, e
 `stage-gl` (garagem, pódio, revelação), `cor-brilho-gl`, `corrida-que-muda-gl` e `efeitos-gl` passaram inteiros. O pulado é o de sempre
 (`car-pipeline`, o carro do Kenney fora do git).
+
+### 10. Etapa 2 (15–16/10/2026): o reflexo do sol, a cunha e o hipercarro
+
+**Commits** (em `nc/gt-hct`, nada empurrado): `fa55659` mescla do `main` 3662d4a (0.1.5, HUD V5, efeitos V8; sem conflito) · `9008d5f` teto no realce
+do sol · `845db36` cunha e hipercarro no estilo HCT · o registro (este).
+
+**O ponto branco com halo** (câmera de corrida de dia) não era o vidro: era o realce DIRETO do sol no verniz do arco pintado do teto (some sem o sol e
+sem o verniz; o reflexo do céu não muda nada). Correção em `cars/material.ts`: o realce direto (o do verniz também) tem teto, `SUN_SPEC_CAP = 0,5`,
+aplicado depois de `lights_fragment_begin` e antes do reflexo do céu (chave do programa `speed-tche-car-v5`). Um piso de rugosidade para a luz
+direta foi tentado e piorou (38,8% de branco). Teste no laboratório GL (`cor-brilho-gl`, Copacabana seg 300, ônix sem faixa): **13,64%** de pixels
+brancos na sonda do teto sem a correção, **0,30%** com ela (limite 0,5%; vidro 0,2%; carro todo 0,1%).
+
+**Cunha (`wedge`, Iara Turbo)** e **hipercarro (`hyper`, Pororoca V10)** reescritos sobre `Hull` + `shaped.ts`, com os mesmos eixos, escapes, rodas,
+pinturas e pincéis nomeados (`car-round`). Peças novas: `boxLamp` (lanterna retangular embutida: barras de moldura que saem 4,5 cm da pele, poço de
+paredes escuras, lentes em leque 3 cm atrás da borda; no lod1 uma caixa só) e `lensRect` (lente plana em leque); o `Hull` ganhou `cabinBase`/`cabinEnd`
+(a base do para-brisa acompanha o capô fundo entre para-lamas altos) e `ramp` (rampa do para-lama mais longa: a cunha de capô baixo subia o
+para-lama dianteiro em 20 cm de z). O `render-harness` aceita `car=` também na corrida e na câmera de capô (para a folha de cada estilo).
+
+| | △ casco antes → depois | lod1 | chamadas |
+|---|---|---|---|
+| wedge | 3.098 → **3.322** (+224) | 1.386 → 1.374 (**41%**) | iguais |
+| hyper | 3.298 → **3.132** (−166) | 1.466 → 1.344 (**43%**) | iguais |
+
+Áreas (m²; farol, lanterna, escamoteável, A, B, acento): wedge 0,254 · 0,340 · 0,554 · 2,549 · 0,343 · 0; hyper 0,024 · 0,176 · 0 · 2,091 · 0,332 ·
+2,437 (o farol em fenda fica perto do piso do `car-round`, 0,0216).
+
+**Testes** (`tests/estilo-carro-hct.test.ts`, era `estilo-carro-gt`; sondas em `tests/hct-probe.ts`): um bloco comum (vidro com caimento e escuro,
+4 lentes de lanterna em leque com moldura ≥ 1 cm além da lente e ≥ 3 cm além da pele, faixa A de cima ≥ 75% e B de lado ≥ 80% subindo ≥ 12 cm, ≤ 4.200
+△, lod1 ≤ 45% com luz e faixas) e a identidade de cada um (cunha reta, escamoteável rente, lâminas na frente da lanterna, entrada de ar; hipercarro
+baixo de cabine avançada, farol em fenda, asa em cisne, 7 aletas). Vistos falhar nos modelos de antes: `Tests  8 failed | 22 passed (30)` — os que
+passavam já nos velhos são guarda da identidade, não motor da mudança. Depois: 30/30; área (`tests/car-* estilo-carro* camera* stage-* cor-brilho
+render-normals cosmetics* cars`): `Test Files  27 passed (27)` · `Tests  618 passed | 1 skipped (619)`; `tsc --noEmit` sem saída.
+
+**Folhas** atual × novo, 7 vistas cada (as 6 do GT e, como os dois só têm um carro cada, a 7ª é a frente à noite — o escamoteável aceso da cunha):
+`scratch/wh/folha-iara.png`, `scratch/wh/folha-pororoca.png`.
+
+**O que falta**: a silhueta 2D (`icons.ts`) dos dois continua a velha; o para-lama dianteiro dos dois é alto (o pneu grande obriga a borda a
+0,99 m) e lê mais "protótipo de Le Mans" que Countach; no lod1 do hipercarro o painel preto de trás (3 segmentos) não acompanha a planta redonda nos
+cantos de baixo; na câmera de capô do hipercarro aparecem pedaços claros na borda de baixo (o vidro cortado da cabine em gota, a conferir); o farol em fenda quase não se vê à noite.
+Nas capturas: 52 chamadas de dia e 55 à noite, iguais antes e depois.
+
+### 11. Rodada de realismo do GT (16/10/2026)
+
+Folha: `scratch/real/folha-realismo.png` (HCT × GT de agora × GT realista: corrida de dia de fábrica e de rubi, 3/4 traseira, noite, garagem).
+
+O dono aprovou o GT e pediu "mais perto do real, igual os do Horizon Chase Turbo; até um pouco mais real". Antes de replicar para os 12, uma rodada
+no GT, medida contra a captura dele (`ref-hct.webp`, a câmera de corrida atrás de um supercarro vermelho ao entardecer). Cada item com teste visto
+falhar antes; o que a medida desmentiu ficou de fora.
+
+**O que mudou** (commits `31f8995`, `2f15bb3`):
+1. **A tinta guarda o matiz** (o maior ganho). Medido no laboratório GL (câmera de corrida de dia, GT de rubi sem faixa): a tampa saía **rosa**
+   (178,79,122; 19° fora do matiz da tinta) e o para-choque **magenta** (88,10,62; 32°) — o reflexo e a luz do céu azul tingiam a lataria inteira.
+   `carPaintHold` (`cars/material.ts`, `PAINT_HOLD = 0,7`, chave `speed-tche-car-v6`): depois de toda a luz, a cor da lataria pintada volta 70% para a
+   croma da tinta com a mesma luminância; o brilho estourado (realce do sol, linha do horizonte) fica branco. Depois: tampa 193,41,84 (7°), para-choque
+   109,4,46 (16°). Vale para todos os carros (um material só); o cromado, o perolado e o camaleão ficam de fora (mudam de cor de propósito).
+2. **Sombra de contato** (`blobAlpha`, `render/textures.ts`): 0,62 → 0,9 no meio da pegada, 0,23 → 0,37 rente à soleira, justa (some ~30 cm fora).
+3. **Mais baixo**: a saia do GT a 14 cm do chão (era 18). O para-lama já ficava a 2 cm do pneu (o arco é limitado pela borda do casco).
+4. **Forma**: `Hull.detail` (facetas do arco, topo fino com um ponto a mais em cada trecho de cima) e `Hull.crisp` (o ombro sai do vinco da cintura
+   acima dos 45° do vinco das normais: a linha da cintura fica nítida, com reflexo próprio). 3.804 → **4.388 △** (+584 por GT perto), lod1 1.500
+   (34%).
+
+**O que a medida desmentiu**: (a) "a lataria é chapada" — a face em pé já tinha 60% do brilho da deitada (o teste de razão passou antes de qualquer
+mudança e foi descartado; o problema era o matiz, não o claro e escuro); (b) "o para-lama longe da roda" — 2 cm, o teste passou antes e saiu.
+
+**Gate de contagem** (`lab.collect()`, 640×360, máximo por viewport; chamadas iguais em toda cena): com as estações dobradas (5.692 △) Sampa 4p
+estourava — Média 338.944 → 354.048 (limite 345.000), Alta/Ultra 372.559 → 387.663 (limite 380.000); a copa cabia (copa-4p Alta 294.481 →
+302.033 de 340.000). Ficou a versão de 4.388 △, que cabe sem mexer em limite nem no orçamento do casco (4.500): medida de novo, Sampa 4p Média **343.616** (de
+345.000: sobra 1.384, apertado), Alta **377.231** e Ultra 377.236 (de 380.000); copa-4p Média 268.558, Alta 296.817; Baixa igual (usa o lod1). Mais faces que isso pede subir o
+limite de Sampa 4p (decisão do dono: o `--bench` diz se o Deck aguenta).
+
+**Ainda longe do HCT** (próximos passos, por ganho): a lanterna de dia não tem o miolo laranja aceso do HCT (o cor-brilho segura o miolo abaixo do
+bloom de dia, de propósito); o vidro lê azul-marinho (o HCT pinta preto); a roda continua a `sport5` sem flanco de pneu nem aro fundo (o desenho é de
+todos os estilos, `wheels.ts`); o casco ainda é poligonal no ombro de trás.
+
+### 12. Rodada de realismo 2: roda, vidro e lanterna (16/10/2026)
+
+Pedido do coordenador, na diretriz do dono ("mais perto do real do HCT"). Cada item com teste visto falhar antes. Folha (HCT × GT de agora × GT novo,
+corrida de dia de fábrica e de rubi, 3/4 traseira, noite, garagem): `scratch/real2/folha-roda-vidro.png`.
+
+1. **Roda** (`cars/wheels.ts`, todos os estilos; `tests/realismo-roda.test.ts`, 13 de 15 falhavam). Inscrição lisa no flanco (faixa de borracha mais clara e
+   fosca, `TIRE_LETTER`, do ombro ao aro; o pneu de faixa branca do `wire` já tem a dele); aro fundo (o barril desce até x = 0,04, era 0,18–0,30); e, nos
+   raios abertos (sport5, mag, multi, center, wire), o disco de freio (`BRAKE_DISC`) no fundo, visto entre os raios, com o cubo que o segura. Sem chamada
+   nova: é o mesmo lote de roda. **Custo e gate**: a primeira versão (18 lados) pesava +36 a +108 △ por roda e **estourou Sampa 4p** no viewport 3 (cada
+   viewport tem ~12 carros com roda detalhada: +5.040 △): Média 348.656 (limite 345.000), Alta/Ultra 382.271 (380.000). Cortei onde menos se vê: pneu e aro
+   de 16 lados (o mínimo da `car-round`; eram 18), disco de 8 lados e cubo de uma faixa só. Roda por estilo (antes → agora): sport5 374 → 418, mag 422 →
+   458, multi 404 → 448, center 416 → 460, wire 464 → 468, hubcap 426 → 416, aero 438 → 428, dish 414 → 404, steel 426 → 416 (a roda simples dos carros
+   longe, 144, não muda); orçamento da roda de volta a 480. **Medido** (`lab.collect()`, máximo por viewport, chamadas iguais): Sampa 4p Média **344.816**
+   (limite 345.000: sobram só **184 △**), Alta 378.431 e Ultra 378.436 (380.000: sobram 1.564); copa-4p Média 269.462, Alta 297.646 (340.000); Baixa igual.
+   Qualquer triângulo a mais em Sampa 4p Média precisa de limite novo (decisão do dono, com o `--bench`).
+2. **Vidro** (`cars/material.ts`, chave v7; GL: `cor-brilho-gl`, car-material). O reflexo do env map era o grosso da luz do vidro (azul-marinho chapado:
+   luma 0,125 embaixo, em cima só 1,7× mais claro). Medido: sem ele o vidro cai para (9,13,27). Agora o env map vale 15% no vidro (`wGlass`) e o céu entra
+   pelo Fresnel de expoente 7 (`carGlassSky`, `GLASS_SKY` 0,5, 40% da croma): fraco de frente, forte nas quinas (a câmera de corrida vê o vidro de trás de
+   raspão). Base do `GLASS_TINT` #151b25 → #080a0e. Medido: embaixo luma ≤ 0,07 e em cima ≥ 0,14 e ≥ 2× o de baixo. **Não fica preto puro**: o cenário
+   é azul (a mesma câmera lê o ônix como 64,86,128) e a saturação do vidro continua alta; o teste mede o claro e escuro, não o matiz. O bloom não foi tocado.
+   Vale também para o vidro azul (`GLASS`) dos outros estilos, que passa a refletir o céu pelo mesmo caminho.
+3. **Lanterna de dia** (`cars/material.ts`, `LAMP_HOT_FROM` 1,5 → 0,9; `cor-brilho.test.ts`). O miolo esquenta para laranja a partir do brilho 0,9: de dia
+   (1,6) o verde do miolo passa de 2% para ≥ 20% do vermelho; a borda continua vermelha, o miolo de dia segue abaixo de 0,8 × o limiar do bloom e à noite e
+   no freio nada muda (o teto de 0,6 já valia).
+
+**Ainda longe do HCT**: o contorno do pneu é de 16 lados; o disco de freio só se vê de perto e entre os raios; o cenário azul tinge o vidro; a roda é
+a mesma `sport5` do GT (o HCT2 tem 10 raios escuros e lábio usinado, que pede um desenho novo no catálogo).
