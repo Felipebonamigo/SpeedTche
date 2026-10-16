@@ -11,7 +11,7 @@ import { mix, sceneryLook, type Palette } from '../palette';
 import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
 import { getModel, landmarkOf } from './catalog';
-import type { MatKey, Model } from './geom';
+import { FACADE_CELL_SPAN, type MatKey, type Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
 import { bladeTexture, cutoutMaterial } from './cutout';
@@ -68,6 +68,37 @@ interface Batch {
   white: Uint8Array | null;
   /** O mesmo lote: a fase do vento escrita no alfa da cor de cada instância (0 = rígido; wind.ts). */
   phase: Float32Array | null;
+}
+
+const MAP_SAMPLE = 'texture2D( map, vMapUv )';
+const EMISSIVE_SAMPLE = 'texture2D( emissiveMap, vEmissiveMapUv )';
+/**
+ * V4: a fachada é um atlas 2 × 2 (textures.ts): a célula vem da uv (`u = local + célula × FACADE_CELL_SPAN`) e a repetição é por `fract`, com a
+ * derivada da uv contínua (`textureGrad`), para o mip não costurar a borda de cada repetição. A uv sem deslocamento (os marcos) cai na célula 0.
+ */
+const FACADE_ATLAS_GLSL = /* glsl */ `
+vec4 facadeAtlas( sampler2D tex, vec2 uv ) {
+  float cell = clamp( floor( uv.x / ${FACADE_CELL_SPAN.toFixed(1)} ), 0.0, 3.0 );
+  vec2 local = vec2( uv.x - cell * ${FACADE_CELL_SPAN.toFixed(1)}, uv.y );
+  vec2 origin = vec2( mod( cell, 2.0 ), floor( cell * 0.5 ) ) * 0.5;
+  return textureGrad( tex, origin + fract( local ) * 0.5, dFdx( local ) * 0.5, dFdy( local ) * 0.5 );
+}`;
+export const FACADE_ATLAS_KEY = 'speed-tche-facade-atlas-v1';
+
+/** Compõe a amostra do atlas com o `onBeforeCompile` e a chave que o material já tem (o estilizador). Falha alto se o three mudar as linhas. */
+export function applyFacadeAtlas(m: THREE.Material): void {
+  const prev = m.onBeforeCompile;
+  const prevKey = m.customProgramCacheKey;
+  m.onBeforeCompile = (shader, renderer) => {
+    prev.call(m, shader, renderer);
+    const mapChunk = THREE.ShaderChunk.map_fragment; const emChunk = THREE.ShaderChunk.emissivemap_fragment;
+    if (!mapChunk.includes(MAP_SAMPLE) || !emChunk.includes(EMISSIVE_SAMPLE)) throw new Error('fachada: o three mudou o map_fragment/emissivemap_fragment (amostra da textura não achada)');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', () => `#include <common>\n${FACADE_ATLAS_GLSL}`)
+      .replace('#include <map_fragment>', () => mapChunk.replace(MAP_SAMPLE, () => 'facadeAtlas( map, vMapUv )'))
+      .replace('#include <emissivemap_fragment>', () => emChunk.replace(EMISSIVE_SAMPLE, () => 'facadeAtlas( emissiveMap, vEmissiveMapUv )'));
+  };
+  m.customProgramCacheKey = () => `${prevKey.call(m)}|${FACADE_ATLAS_KEY}`;
 }
 
 /** Mancha de sombra: disco horizontal de raio 1. */
@@ -156,6 +187,7 @@ export class Scenery {
       const glass = style === 'office';
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: t.map, emissiveMap: t.light, emissive: '#ffffff', emissiveIntensity: 0, roughness: glass ? 0.34 : 0.78, metalness: glass ? 0.22 : 0 });
       applyStylize(mat, 'facade');
+      applyFacadeAtlas(mat); // depois do estilizador: a luz de borda dele vem logo depois do `emissivemap_fragment`, que o atlas troca
       this.facadeMats.push(mat);
       return mat;
     };

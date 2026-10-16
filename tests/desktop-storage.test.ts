@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_FUNCTIONS } from '../src/game/desktop';
+import { API_FUNCTIONS, OPTIONAL_API_FUNCTIONS } from '../src/game/desktop';
 
 interface StorageModule {
   isSaveKey(key: unknown): boolean;
@@ -123,9 +123,16 @@ describe('ponte preload ↔ main ↔ desktop.ts', () => {
   const preload = read('preload.cjs');
   const main = read('main.cjs');
 
-  it('o preload expõe exatamente as funções de DesktopApi', () => {
+  it('o preload expõe exatamente as funções de DesktopApi (as obrigatórias e as opcionais da O5)', () => {
     const exposed = [...preload.matchAll(/^\s{2}(\w+): \(/gm)].map((m) => m[1]).sort();
-    expect(exposed).toEqual([...API_FUNCTIONS].sort());
+    expect(exposed).toEqual([...API_FUNCTIONS, ...OPTIONAL_API_FUNCTIONS].sort());
+  });
+
+  it('O5: o idioma da Steam e do sistema (app:locale) e o reenvio sem regravar a conquista que a Steam já tem', () => {
+    expect(OPTIONAL_API_FUNCTIONS).toContain('locale');
+    expect(preload).toMatch(/locale: \(\) => ipcRenderer\.invoke\('app:locale'\)/);
+    expect(main).toMatch(/ipcMain\.handle\('app:locale'[\s\S]{0,600}currentGameLanguage[\s\S]{0,400}app\.getLocale\(\)/);
+    expect(main).toMatch(/ipcMain\.handle\('steam:achievement'[\s\S]{0,400}isActivated[\s\S]{0,200}activate\(id\)/);
   });
 
   it('todo canal que o preload chama tem handler no main', () => {
