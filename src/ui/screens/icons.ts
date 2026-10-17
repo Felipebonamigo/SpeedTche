@@ -101,6 +101,29 @@ interface Shape {
   shadow: [number, number];
 }
 
+/**
+ * Silhuetas próprias de carros de arte (por id do carro, antes do estilo): geradas do MESMO casco do `.glb` por `tools/blender/silhueta.py`
+ * (perfil do teto, vidros, rodas e portas saem do spec do carro; não são desenhadas à mão).
+ */
+const CAR_SHAPES: Readonly<Record<string, () => Shape>> = {
+  cuiabano: () => ({
+    body: 'M174.9 41.8 L169.6 36.0 L164.2 35.1 L158.8 34.4 L153.5 34.2 L148.2 34.1 L142.8 34.1 L137.4 34.0 L132.1 33.9 L126.8 33.8 L121.4 32.9 L116.1 26.8 L110.7 18.5 L105.4 12.1 L100.0 11.0 L94.7 11.0 L89.3 11.0 L84.0 11.0 L78.6 11.0 L73.3 11.0 L67.9 11.0 L62.6 11.0 L57.2 11.0 L51.9 11.0 L46.5 11.0 L41.2 11.1 L35.8 17.3 L30.5 27.2 L25.1 33.0 L25.1 53.4 L30.5 58.4 L35.8 59.0 L41.2 59.3 L46.5 59.3 L51.9 59.3 L57.2 59.3 L62.6 59.3 L67.9 59.3 L73.3 59.3 L78.6 59.3 L84.0 59.3 L89.3 59.3 L94.7 59.3 L100.0 59.3 L105.4 59.3 L110.7 59.3 L116.1 59.3 L121.4 59.3 L126.8 59.3 L132.1 59.3 L137.4 59.3 L142.8 59.3 L148.2 59.3 L153.5 59.3 L158.8 59.1 L164.2 59.0 L169.6 58.1 L174.9 52.6 Z',
+    glass: 'M123.8 35.5 L114.1 25.6 L104.4 13.3 L94.7 12.8 L85.0 12.8 L75.3 12.8 L65.6 12.8 L55.9 12.8 L46.2 12.8 L36.5 17.8 L26.9 33.8 L26.9 31.7 L36.5 30.7 L46.2 30.6 L55.9 30.6 L65.6 30.7 L75.3 30.7 L85.0 30.8 L94.7 30.9 L104.4 31.0 L114.1 31.6 L123.8 32.4 Z',
+    accent: 'M167.9 51.8 L150.9 50.6 L133.9 50.2 L117.0 49.6 L100.0 49.2 L83.0 49.1 L66.1 49.0 L49.1 49.0 L32.1 49.1 L32.1 51.6 L49.1 51.4 L66.1 51.5 L83.0 51.5 L100.0 51.6 L117.0 52.1 L133.9 52.6 L150.9 53.1 L167.9 54.2 Z',
+    extra: `<path d="M127.0 34.4 L127.0 55.8 M83.5 34.4 L83.5 55.8 M62.5 34.4 L62.5 55.8" stroke="#000" stroke-opacity=".35" stroke-width="1"/>`,
+    wheels: wheel(147, 55, 12) + wheel(51, 55, 12),
+    head: [169, 41.1, 6, 3.5], tail: [24, 32.7, 4, 8], shadow: [100, 82],
+  }),
+  tupiniquim: () => ({
+    body: 'M174.6 43.5 L169.2 38.2 L163.9 37.4 L158.6 36.8 L153.2 36.3 L147.9 35.9 L142.6 35.6 L137.3 35.3 L132.0 34.9 L126.6 34.2 L121.3 29.8 L116.0 22.5 L110.7 15.3 L105.3 11.2 L100.0 10.5 L94.7 10.1 L89.4 9.8 L84.0 9.6 L78.7 9.6 L73.4 9.7 L68.1 9.8 L62.7 9.9 L57.4 10.2 L52.1 10.5 L46.8 10.8 L41.4 11.9 L36.1 18.4 L30.8 26.8 L25.5 32.0 L25.5 53.7 L30.8 58.3 L36.1 59.0 L41.4 59.3 L46.8 59.3 L52.1 59.3 L57.4 59.3 L62.7 59.3 L68.1 59.3 L73.4 59.3 L78.7 59.3 L84.0 59.3 L89.4 59.3 L94.7 59.3 L100.0 59.3 L105.3 59.3 L110.7 59.3 L116.0 59.3 L121.3 59.3 L126.6 59.3 L132.0 59.3 L137.3 59.3 L142.6 59.3 L147.9 59.3 L153.2 59.3 L158.6 59.2 L163.9 59.0 L169.2 58.1 L174.6 53.4 Z',
+    glass: 'M127.7 36.2 L117.6 26.6 L107.6 14.1 L97.6 12.1 L87.6 11.5 L77.6 11.4 L67.6 11.5 L57.6 11.9 L47.6 12.5 L37.6 18.0 L27.5 32.4 L27.5 29.9 L37.6 29.3 L47.6 29.7 L57.6 30.1 L67.6 30.7 L77.6 31.2 L87.6 31.7 L97.6 32.3 L107.6 32.9 L117.6 33.7 L127.7 34.4 Z',
+    accent: 'M167.6 52.7 L150.7 51.8 L133.8 51.2 L116.9 50.6 L100.0 49.9 L83.1 49.4 L66.2 49.0 L49.3 48.5 L32.5 48.3 L32.5 50.7 L49.3 51.0 L66.2 51.4 L83.1 51.9 L100.0 52.4 L116.9 53.0 L133.8 53.6 L150.7 54.2 L167.6 55.2 Z',
+    extra: `<path d="M124.8 34.4 L124.8 55.8 M82.8 34.4 L82.8 55.8 M61.8 34.4 L61.8 55.8" stroke="#000" stroke-opacity=".35" stroke-width="1"/>`,
+    wheels: wheel(147, 55, 12) + wheel(52, 55, 12),
+    head: [169, 41.1, 6, 3.5], tail: [24, 32.7, 4, 8], shadow: [100, 82],
+  }),
+};
+
 /** Os 13 estilos. A leitura de cada um (docs/CARROS.md): o que o diferencia de perfil. */
 const SHAPES: Readonly<Record<CarBody, () => Shape>> = {
   // GT (V2, estilo HCT): motor central em cunha — bico baixo, para-lamas que sobem sobre as rodas, cabine avançada, tampa do motor longa,
@@ -241,8 +264,8 @@ function darker(hex: string, f = 0.62): string {
 }
 
 /** Marcação SVG da silhueta (pura, testável sem DOM). */
-export function carSilhouetteMarkup(car: Pick<CarDef, 'color' | 'body' | 'accent'>): string {
-  const s = (SHAPES[car.body] ?? SHAPES.gt)();
+export function carSilhouetteMarkup(car: Pick<CarDef, 'color' | 'body' | 'accent'> & { id?: string }): string {
+  const s = ((car.id ? CAR_SHAPES[car.id] : undefined) ?? SHAPES[car.body] ?? SHAPES.gt)();
   const accent = car.accent ?? darker(car.color);
   const id = `carShine${++shineSeq}`;
   const rect = ([x, y, w, hh]: [number, number, number, number], fill: string) => `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="1" fill="${fill}"/>`;

@@ -19,13 +19,13 @@ const ORIGINALS = ['falcao', 'trovao', 'tornado', 'camelo', 'sucuri', 'carcara',
 const NEW_CARS = CARS.filter((c) => !ORIGINALS.includes(c.id));
 
 describe('carros: dados', () => {
-  it('são 14, com id e nome únicos, e todo estilo de carroceria tem pelo menos um carro', () => {
-    expect(CARS.length).toBe(14);
+  it('são 16, com id e nome únicos, e todo estilo de carroceria tem pelo menos um carro', () => {
+    expect(CARS.length).toBe(16);
     expect(new Set(CARS.map((c) => c.id)).size).toBe(CARS.length);
     expect(new Set(CARS.map((c) => c.name)).size).toBe(CARS.length);
     for (const b of CAR_BODIES) expect(CARS.filter((c) => c.body === b).length, `estilo ${b} sem carro`).toBeGreaterThan(0);
     for (const c of CARS) expect(c.id, 'id minúsculo, sem acento (vai no save e no online)').toMatch(/^[a-z]+$/);
-    expect(NEW_CARS.map((c) => c.body).sort()).toEqual(['classic', 'micro', 'pickup', 'prototype', 'roadster', 'wedge']);
+    expect(NEW_CARS.map((c) => c.body).sort()).toEqual(['classic', 'hatch', 'hatch', 'micro', 'pickup', 'prototype', 'roadster', 'wedge']);
   });
 
   it('atributos na faixa do jogo; cor e cor de destaque em hex', () => {
@@ -43,10 +43,10 @@ describe('carros: dados', () => {
     for (const c of NEW_CARS) expect(c.accent, c.id).toBeDefined();
   });
 
-  it('preços: 7 livres e 7 à venda (de $ 10 mil a $ 50 mil, em milhares); livres primeiro, depois do mais barato ao mais caro', () => {
+  it('preços: 9 livres e 7 à venda (de $ 10 mil a $ 50 mil, em milhares); livres primeiro, depois do mais barato ao mais caro', () => {
     const free = CARS.filter((c) => c.price === 0);
     const paid = CARS.filter((c) => c.price > 0);
-    expect(free.map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto']);
+    expect(free.map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
     expect(paid.length).toBe(7);
     for (const c of paid) {
       expect(c.price % 1000, c.id).toBe(0);

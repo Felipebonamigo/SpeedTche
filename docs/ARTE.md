@@ -41,6 +41,10 @@ ponto `seat`, conferidos por `npm run check-car`). A frase "nada de gerar pela A
    `seat`, `lod0`/`lod1` (meshoptimizer do three) e reduz o `colormap` de 512² para 256². Depois: `npm run check-car` e as capturas.
    Prova sem baixar nada: `npx tsx scripts/make-test-car.ts` grava o carro de caixas do contrato (`scratch/car-caixas.glb`).
 
+6. **Carro modelado por nós, por script (Blender, módulo `bpy`)**: `tools/blender/` (README lá) — `npm run carros-blender` gera `src/assets/cars/cuiabano.glb` e `tupiniquim.glb` direto
+   do dado de projeto (`tools/blender/specs/`), já com os nós/materiais do contrato; depois `npm run check-car` e as capturas (`tools/blender/capturar.mjs`). O `convert-car` é só do kit do Kenney.
+   Silhueta do Cuiabano conferida contra o do Detonauto (`tools/blender/base/make_cuiabano_detonauto.py`, de Felipe, projeto irmão). Licença: criação própria (tabela abaixo).
+
 Código: `src/render/cars/gltf.ts` (leitura: UV, atlas, roda, LOD, contrato), `check.ts` (validador), `template.ts` (modelo-base), `assets.ts` (carga),
 `models.ts` (um modelo por carro ou por estilo). O `Cars` (`src/render/cars.ts`) agrupa por **modelo**: um lote por modelo (mais um para o LOD1) e
 um material com o atlas para cada modelo que o tem.
@@ -58,6 +62,8 @@ saída do conversor (`scripts/convert-car.ts`), não o original.
 | Arquivo no jogo | Origem (página, arquivo, autor) | Licença | Data |
 |---|---|---|---|
 | `art/cars/falcao-kenney.glb` | Kenney Car Kit 3.1, `Models/GLB format/sedan-sports.glb` — Kenney (www.kenney.nl), https://kenney.nl/assets/car-kit (`kenney_car-kit.zip`, `License.txt` dentro do pacote) | CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/) | 10/10/2026 |
+| `src/assets/cars/cuiabano.glb` | **Criação própria** (Felipe Bonamigo / Speed Tchê): modelado do zero por script no Blender (`tools/blender/`, `npm run carros-blender`, spec `tools/blender/specs/cuiabano.py`); só proporções de um arquétipo de hatch, sem malha, textura, logo nem nome de terceiro | Propriedade do estúdio (sem terceiros; não é modelo de marca) | 16/10/2026 |
+| `src/assets/cars/tupiniquim.glb` | **Criação própria** (Felipe Bonamigo / Speed Tchê): idem, spec `tools/blender/specs/tupiniquim.py` | Propriedade do estúdio (sem terceiros; não é modelo de marca) | 16/10/2026 |
 
 ## Cenário e horizonte — falta (os marcos turísticos já têm o caminho: abaixo)
 Mesmo caminho (convenção na seção Especificação do briefing); para árvores, prédios e horizonte o carregador ainda não existe.

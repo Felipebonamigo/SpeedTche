@@ -20,8 +20,8 @@ function features(carId: string): number[] {
 const distance = (a: number[], b: number[]) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0);
 
 describe('buzina por carro: os tons', () => {
-  it('H1: as 14 buzinas existem, são curtas, agudas o bastante para soar e não estouram o ganho', () => {
-    expect(CARS).toHaveLength(14);
+  it('H1: as 16 buzinas existem, são curtas, agudas o bastante para soar e não estouram o ganho', () => {
+    expect(CARS).toHaveLength(16);
     for (const car of CARS) {
       const tones = hornTones(car.id, 0, 1);
       expect(tones.length, car.id).toBeGreaterThanOrEqual(1);
@@ -38,7 +38,7 @@ describe('buzina por carro: os tons', () => {
     }
   });
 
-  it('H2: as 14 buzinas são distintas entre si, inclusive os carros que dividem a carroceria', () => {
+  it('H2: as 16 buzinas são distintas entre si, inclusive os carros que dividem a carroceria', () => {
     for (let i = 0; i < CARS.length; i++) {
       for (let j = i + 1; j < CARS.length; j++) {
         expect(distance(features(CARS[i].id), features(CARS[j].id)), `${CARS[i].id} × ${CARS[j].id}`).toBeGreaterThan(0.3);

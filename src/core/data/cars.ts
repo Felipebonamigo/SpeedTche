@@ -46,6 +46,17 @@ export const CARS: CarDef[] = [
     topSpeed: REFERENCE_SPEED * 1.02, accel: 600, brake: 2200, handling: 0.7, fuelPerUnit: BASE_FUEL * 0.8,
     blurb: 'Cruzador: desliza na reta e economiza. Demora a embalar e freia mal.',
   },
+  // ── Livres, inspirados em hatches nacionais (docs/CARROS-NACIONAIS.md): carros de arte feita no Blender (tools/blender/), só dado ──
+  {
+    id: 'cuiabano', name: 'Cuiabano', color: '#ffc400', accent: '#263238', price: 0, body: 'hatch',
+    topSpeed: REFERENCE_SPEED * 0.96, accel: 780, brake: 2700, handling: 0.85, fuelPerUnit: BASE_FUEL * 0.8,
+    blurb: 'Quadradão honesto: estável e econômico. Nada é o melhor nem o pior.',
+  },
+  {
+    id: 'tupiniquim', name: 'Tupiniquim', color: '#d84315', accent: '#eceff1', price: 0, body: 'hatch',
+    topSpeed: REFERENCE_SPEED * 0.93, accel: 860, brake: 2900, handling: 0.95, fuelPerUnit: BASE_FUEL * 0.9,
+    blurb: 'Compacto e arisco: arranca e fecha a curva. Falta reta, e o tanque seca.',
+  },
   // ── À venda na carreira ──
   {
     id: 'curupira', name: 'Curupira S', color: '#455a64', accent: '#ff5722', price: 12_000, body: 'roadster',
@@ -90,11 +101,17 @@ export const CAR_BODIES: readonly CarBody[] = [
 ];
 
 /**
+ * Livres que a IA ainda não usa (os nacionais da frente V6c): o sorteio do grid usa o tamanho do pool, e pôr carro novo nele mudaria TODA corrida
+ * já gravada (`sim-golden`, fantasmas). Entram no pool quando o dono aprovar a mudança e a impressão for renovada de propósito.
+ */
+const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim'];
+
+/**
  * Carros da IA: os livres (os 4 originais e os 3 da onda F), nunca um à venda — o carro comprado é do jogador.
  * Com os 3 novos a grade mostra 7 estilos de carroceria em vez de 4; medido (docs/CARROS.md): a volta média da
  * IA foi de 86,20 s a 87,33 s e a calibragem da carreira seguiu valendo.
  */
-export const AI_CAR_POOL: readonly CarDef[] = CARS.filter((c) => c.price === 0);
+export const AI_CAR_POOL: readonly CarDef[] = CARS.filter((c) => c.price === 0 && !FORA_DA_IA.includes(c.id));
 
 export function carDef(id: string): CarDef {
   const c = CARS.find((x) => x.id === id);

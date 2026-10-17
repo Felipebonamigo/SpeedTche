@@ -175,7 +175,7 @@ describe('Garagem em 3D: a janela do palco no lugar do SVG', () => {
 });
 
 describe('Garagem: só os carros do piloto (a compra mudou para a Concessionária)', () => {
-  it('←→ percorre os carros que o piloto tem: os 7 livres; nunca mostra "À VENDA" nem compra', () => {
+  it('←→ percorre os carros que o piloto tem: os 9 livres; nunca mostra "À VENDA" nem compra', () => {
     const r = rig(garageScreen, { money: 999_999 });
     const seen = new Set<string>();
     for (let i = 0; i < 16; i++) {
@@ -192,8 +192,8 @@ describe('Garagem: só os carros do piloto (a compra mudou para a Concessionári
   it('um carro comprado (na Concessionária) entra na volta da garagem', () => {
     const r = rig(garageScreen, { owned: ['curupira'] });
     const seen = new Set<string>();
-    for (let i = 0; i < 10; i++) { seen.add(names(r).toUpperCase()); press(r, 'kb1', 'right'); }
-    expect(seen.size).toBe(8);
+    for (let i = 0; i < 12; i++) { seen.add(names(r).toUpperCase()); press(r, 'kb1', 'right'); }
+    expect(seen.size).toBe(10);
     expect(seen.has(carName('curupira').toUpperCase())).toBe(true);
   });
 

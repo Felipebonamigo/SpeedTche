@@ -60,6 +60,9 @@ const BODY_BASE: Readonly<Record<CarBody, EngineTimbre>> = {
 const CAR_TWEAKS: Readonly<Record<string, Partial<EngineTimbre>>> = {
   boitata: { pitch: 0.9, cutoff: 300, span: 1700, q: 1.6, lope: 0.3, lopeRate: 1.2, whine: 0.15, whineRatio: 3, gain: 1.05 },
   pororoca: { pitch: 0.95 },
+  // Os dois hatches nacionais (dividem a carroceria com o Tornado): quatro cilindros mais grave e quadrado, e outro mais agudo e arisco.
+  cuiabano: { pitch: 1.1, main: 'square', subMix: 0.55, cutoff: 300, span: 1700, q: 1.2, lope: 0.14, lopeRate: 1, gain: 0.95 },
+  tupiniquim: { pitch: 1.5, main: 'triangle', sub: 'sawtooth', subMix: 0.3, cutoff: 460, span: 2600, q: 2.2, whine: 0.2, whineRatio: 2, gain: 0.9 },
 };
 
 const DEFAULT_ID = 'falcao';
