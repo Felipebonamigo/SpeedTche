@@ -113,3 +113,64 @@ o realista do Speed Tchê tem agora 12.724 △).
 
 **Ainda abaixo do GT/Tornado** (honesto): a pintura é lisa (sem a lente translúcida nem o brilho do verniz do GT novo); as ponteiras do escape ficam brancas e salientes demais; o vidro continua sem borracha desenhada; faixa e frisos são remendos planos (não relevo); o
 Cuiabano visto de trás na sombra ainda escurece o amarelo. O que falta para parecer feito "à mão" é modelagem de relevo (nervuras, caixa de farol embutida no casco), não só remendos: pede espaço de △ que o teto de 4.500 não dá.
+
+## Lote 2 (17/10/2026) — Caipora, Pampeiro, Barão (à venda) e Furgãozinho da Firma (conquista)
+
+> **Base:** `main` local 803dabe (já com o GT realista: roda nova, vidro, lanterna, `carPaintHold`). Mesmas regras: teto 4.500 △ (lod1 ≤ 45%), marca da ficha, sem push, sem suíte inteira, **nenhum entra no sorteio da IA** (`FORA_DA_IA`).
+> O worktree é o `nc/nacionais`; o commit do lote é `5e307cb` (+ o do cartão e das cores, abaixo no `git log`).
+
+### 1. Os quatro carros (`tools/blender/specs/`, `npm run carros-blender`, mesma biblioteca `carlib.py`)
+| Carro | Estilo | Entra | Preço | Casco | lod1 | Desenho (o que lê de longe; nada de marca) |
+|---|---|---|---|---|---|---|
+| **Caipora** | `hatch` | à venda | $ 9.000 | **4.118 △** | 784 | corpo redondo (teto abaulado, ombro cheio), farol e lanterna **em gota**, para-choque com faixa lisa na cor de destaque (faixa A), vidro de trás inclinado |
+| **Pampeiro** | `hatch` | à venda | $ 13.000 (a ficha dizia 12 mil: o Curupira S já custa 12 e o preço é único por teste) | **3.826 △** | 700 | mais largo e baixo, **farol alongado que sobe pelo canto até o para-lama** (peça frontal + peça lateral), teto com leve caimento, grade baixa de uma barra só, faixa B fina |
+| **Barão** | `sedan` | à venda | $ 14.000 | **4.236 △** | 751 | três volumes, **porta-malas alto** com deque, **lanterna de ponta a ponta** (duas lentes com friso cromado no meio), faixa lateral fina (faixa A), 4 portas |
+| **Furgãozinho da Firma** | `micro` | **conquista** | nominal $ 39.000 (nunca cobrado) | **4.392 △** | 772 | micro quadrado e alto, **escada de alumínio sobre o bagageiro** que passa da traseira, **adesivo fictício** na porta (placa branca, tarja e duas linhas de "texto": nenhum logo, nome, telefone ou marca real), lanterna vertical estreita |
+Todos: aprovados no `npm run check-car` (eixos e bitola iguais aos do estilo; roda do projeto, `project_wheel`), rodas do estilo pelo catálogo (`hubcap` no sedã, `multi` nos hatches e no micro), nó de escapamento e `seat`, material por papel.
+Nenhum passou do teto, então **nada a propor sobre o limite**: o Furgão é o mais carregado (a escada e o bagageiro custam 180 △: 15 caixas de 12); o Caipora precisou de poda (4.544 → 4.124, camadas do farol sem cortes extras) para caber.
+
+### 2. Loja, preço, equilíbrio e a IA
+- **Loja da Expedição**: Caipora, Pampeiro e Barão entram na Concessionária em ordem de preço (Caipora 9.000, Curupira S 12.000, Pampeiro 13.000, Barão 14.000, Sucuri E 16.000…), com a revelação de sempre; o de conquista **não aparece** (`dealer` filtra `conquest`), `buyCar` o recusa (`'unknown'`) e a meta "junte para comprar" (`goals.ts`) nunca o sugere.
+- **Números** (`npx tsx scripts/car-balance.ts`, 109 pistas, tempo relativo ao Falcão): Pampeiro **0,9495**, Barão **0,9585**, Caipora **0,9887**, Furgão **0,9925**. Pampeiro: 2º melhor freio (3.100) × arrancada fraca e sede (0,88); Barão: a maior reta dos baratos (321 km/h) × arrancada 640, freio 2.350 e curva 0,68; Caipora: o mais econômico à venda (0,52) e curva fácil × a menor reta (282);
+  Furgão: o melhor freio do jogo (3.150) × a menor reta (279). As travas de equilíbrio de `tests/cars.test.ts` e `tests/career.test.ts` (cada carro à venda vence um livre em algum atributo e perde em outro; nenhum domina nem é inútil) seguem verdes; o carro de conquista fica fora dos duelos de preço por não ter preço de verdade (`DUELISTS`).
+- **A IA continua com os 7 livres de antes** (`FORA_DA_IA`; sorteio, `sim-golden` e fantasmas intactos, `tests/sim-golden` verde). Carro novo só aparece em corrida se um humano o escolher.
+
+### 3. A conquista "Hora de entrega" e o carro dela (save aditivo, sem campo novo)
+- **Regra implementada: 10 vitórias sem comprar nenhum carro** (`totals.wins ≥ 10` e nenhum carro COMPRADO em `carsUnlocked`; o próprio Furgão, quando liberado, não conta como compra). Sai no fim da corrida (como a `DEZ_VITORIAS`) e na abertura do jogo para quem já está nesse estado.
+  **A alternativa da ficha ("5 vitórias seguidas no Saci Mirim") NÃO foi feita**: pede um contador de sequência por carro que o save de hoje não tem, e a ordem era não mexer no save. Se o dono quiser, é um campo `stats.streaks` aditivo (valor padrão vazio) — decisão dele.
+- **Carro de conquista** (`CarDef.conquest = 'HORA_DE_ENTREGA'`, `price` nominal > 0 só para o carro nascer trancado): `carAvailable` o libera quando o save tem a conquista (corrida avulsa, torneio, online); `syncConquestCars` (idempotente; no fim da corrida, na abertura e na abertura da garagem) soma o id a `carsUnlocked` e à garagem de todo piloto da Expedição.
+  Antes da conquista o lobby mostra o cadeado com **"Conquista "Hora de entrega": 10 vitórias sem comprar carro"** (em vez de "Compre na Expedição por $ X"). `CARRO_NOVO` e `COLECIONADOR` ignoram o de conquista (um não vira o outro sem querer).
+- Entra na lista da Steam (`ACHIEVEMENTS`, 67 → **68**; `desktop/README.md`, textos PT e EN em `src/stats/strings.ts`).
+- **Buzina** do Furgão: a mais fraca do jogo (ganho 0,35: um "fon-fon" curto de onda quadrada, 349/440 Hz). Timbre de motor próprio (agudo, áspero, ronco rápido) e, para os outros três, timbre e buzina próprios (`engine-timbre.ts`, `horn.ts`).
+
+### 4. A escada que balança e cai no nitro — sem chamada de desenho nova
+- O vértice da escada (material `ladder`) leva um marcador em `aPaint.w = 0,5` (o farol escamoteável usa 1: o shader passou a `step(0,9, w)` para ele); o movimento sai de bits altos de `instExtra.w` da MESMA instância do casco (bits 15–21: lado em 4 bits com sinal, escorregão em 3), calculados por uma mola pura (`src/render/cars/ladder.ts`) a partir do rolamento do carro (curva) e do nitro.
+  Na curva ela acompanha o rolamento e **balança** (mola sub-amortecida, até 7 cm); no nitro **escorrega 30 cm para trás** e volta devagar; com "Reduzir efeitos" fica quieta. A chave do programa do carro subiu para `speed-tche-car-v8`. Nenhum lote novo, nenhuma chamada nova, nenhum outro carro muda (vértice sem marcador = deslocamento zero).
+- Visto na captura `furgao-corrida-nitro.png`: a escada pendurada na ponta do teto com o nitro aceso. O balanço na curva está coberto pelo teste da mola (a captura é de um quadro só).
+
+### 5. Testes antes (vistos falhar) e verificação
+- `tests/carros-conquista.test.ts` (novo): `Tests  7 failed | 3 passed (10)` — `buyCar` devolvia 'ok' para o furgão (`expected 'ok' not to be 'ok'`), a conquista não estava na lista (`expected [ 'PRIMEIRA_VITORIA', …(66) ] to include 'HORA_DE_ENTREGA'`), `carAvailable` trancado (`expected false to be true`), `syncConquestCars` inexistente e as 10 vitórias não davam a conquista (`expected [ 'PRIMEIRA_CORRIDA', 'DEZ_VITORIAS' ] to include 'HORA_DE_ENTREGA'`; `CARRO_NOVO` aparecia com o furgão liberado). Os 3 verdes eram travas (loja, IA, save antigo).
+- `tests/escada-do-furgao.test.ts` (novo): `Error: Cannot find module '../src/render/cars/ladder'` (a mola não existia); depois de implementar, uma falha de teste minha (a quantização de 3 bits: 0,5 → 0,571) virou valores na grade de 1/7 — ajuste de teste, dito.
+- `tests/carros-nacionais.test.ts` generalizado para os 6 carros (estilo certo, eixos do estilo, comprimento, vão de roda, simetria, partes, marca, detalhe e silhueta): a silhueta dos 4 novos reprovava (`caipora: expected '<svg …' not to be '<svg …'`) até `CAR_SHAPES` ser gerado do casco (`tools/blender/silhueta.py`).
+- Ajustes de teste de propósito, de outros arquivos: 16 → 20 carros, 9 livres + 11 de preço, conquistas 67 → 68, a vitrine começa em $ 9 mil (4 arquivos de teste), a vitrine tem 10 carros (sem o de conquista), `car-material` v7 → v8, `cadeado` (depois do Curupira S vem o Pampeiro), `goals` (a coleção ignora o de conquista),
+  `car-models` (o estilo `sedan` agora tem 2 carros e o 2º, o Barão, tem arquivo próprio com a faixa dele: o teste "dois carros do mesmo estilo nunca saem com a mesma pintura" pula o sedã, e a lista de pinturas do sedã procedural ficou `[0, 0, B, A]` para o estilo não exigir faixa B dos arquivos de caixas dos testes de contrato), e o piso de △ de detalhe.
+- `npx tsc --noEmit -p .`: sem saída. Área (57 arquivos, `car-*`, `cars`, `estilo-carro*`, `stage-*`, `garage-stage`, `carros-*`, `escada-do-furgao`, `voice-*`, `career*`, `progress*`, `cadeado`, `online-cars`, `i18n`, `determinism`, `sim-golden`, `cosmetics`, `paint`, `achievements-o5`, `stats`, `goals`, `desktop*`, `save*`, `lobby*`, `expedi*`): `Test Files  57 passed (57)` · `Tests  979 passed | 1 skipped (980)`.
+  `NC_REQUIRE_GL=1 gl-render` + `stage-gl`: `Test Files  2 passed (2)` · `Tests  25 passed (25)` (o gate de contagem passou).
+
+### 6. Custo no gate (`node tools/blender/medir.mjs`; jogador 1 troca de carro, o resto igual; △ sobre o Tornado procedural)
+| cena | Tornado | Caipora | Pampeiro | Barão | Furgão | (Cuiabano) |
+|---|---|---|---|---|---|---|
+| copa-4p | 645.563 △ · 221 chamadas | +1.852 | +1.268 | +1.960 | +2.272 | +2.312 |
+| sampa-4p | 781.756 △ · 217 chamadas | +1.852 | +1.268 | +1.960 | +2.272 | +2.312 |
+**Chamadas iguais em todos.** O custo só existe com o carro NA TELA (de perto, lod0; longe, o lod1 de ~700–780 △ é mais barato que o do procedural). O gate (`gl-render`) usa os carros padrão da cena (Falcão, Trovão, Tornado, Camelo), então ele não muda: passou.
+**Pior caso real**: 4 jogadores, os 4 num Furgão, todos de perto, sobem ~ +9.100 △ em Sampa 4p (1,2% dos ~782 mil medidos aqui); como o gate de Sampa 4p **Média** tem só ~184 △ de folga, esse caso passaria do limite provisório. Proposta (não feita: não mexi no gate): ou subir o teto de Sampa 4p Média em ~10 mil △ (explicado no cartão do gate), ou poda de ~700 △ no Furgão e no Barão (calotas, soleira e friso cromado saem do lod0 de perto) — decisão do dono.
+
+### 7. Imagens (em `scratch/lote2/`, fora do git; abertas e conferidas)
+`folha-caipora.png`, `folha-pampeiro.png`, `folha-barao.png`, `folha-furgao.png` (8 vistas cada; o Furgão tem a 9ª, `furgao-corrida-nitro.png`) · `folha-comparacao-A-hatches.png` (Caipora × Pampeiro × Tornado × Falcão GT realista) · `folha-comparacao-B-sedan-micro.png` (Barão × Furgão × Camelo X × Saci Mirim). Como a garagem só mostra carro do piloto, a captura põe o carro à venda/de conquista na garagem do P1 (`capturar.mjs`).
+Cores: Pampeiro `#cfd8dc` (era `#8e9aaf`: lia cinza chumbo) e Barão `#a1887f` (era `#5d4037`: lia preto) foram trocadas por captura; o Caipora é verde `#43a047` com faixa `#fff59d`; o Furgão branco `#f5f5f5` com detalhe azul `#1565c0`.
+
+### 8. O que ainda não está bom (honesto)
+- Os quatro leem como o arquétipo à primeira vista (hatch redondo, hatch europeu baixo, sedã de porta-malas alto, furgão com escada), **mas continuam mais lisos que o Tornado e o Falcão GT**: sem a lente translúcida, sem o verniz do GT, frisos e faixas como remendo plano. O teto de 4.500 △ já está quase cheio (Furgão 4.392, Caipora 4.118): mais charme pede poda, não teto.
+- Barão e Furgão visto de lado são os mais "chapados" (uma só tinta). O adesivo do Furgão é uma placa com três barras, não texto: de propósito (sem nada que se leia como marca).
+- A conquista da sequência no Saci Mirim não foi feita (item 3). O Furgão (0,9925 do Falcão) anda entre o Caipora e o Saci Mirim: nada de brinde lento.
+- Acervo `acervo-3d`: **sem push**; instrução do item 7 do lote 1 vale também para os quatro novos `.glb`.

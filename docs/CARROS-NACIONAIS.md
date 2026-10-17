@@ -63,3 +63,8 @@ Folclore brasileiro: o carro compacto com escada no teto, adesivo da empresa e, 
 - Quem fica **livre** no começo: o primeiro carro do jogo hoje é o Falcão GT. Dá para o jogador **escolher** entre um GT e um hatch nacional logo no início.
 - A **conquista** do carro da firma e a do Gaúcho V8: aceitar a regra proposta ou mudar.
 - Se quer algum modelo que **não** está na lista (diga o nome do carro; eu proponho o arquétipo e o nome do jogo).
+
+## Estado (V6c, `docs/ondas/V6c-nacionais.md`)
+
+Feitos no Blender (`tools/blender/`): **#1 Cuiabano**, **#2 Tupiniquim** (livres) e, no lote 2, **#3 Caipora** ($ 9 mil), **#4 Pampeiro** ($ 13 mil: o Curupira S já custa 12), **#5 Barão** ($ 14 mil) e **#6 Furgãozinho da Firma**
+(conquista "Hora de entrega" = 10 vitórias sem comprar carro; a variante "5 seguidas no Saci Mirim" espera um contador no save). Faltam #7 a #12 (Besouro, Pão de Forma, Gaúcho V8, Trilheiro, Lambari, Jabuti).

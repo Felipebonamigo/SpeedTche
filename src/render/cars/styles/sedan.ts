@@ -64,5 +64,5 @@ export function buildSedan(lod: Lod = 0): CarModel {
     exhausts: [{ x: 0.5, y: 0.27, z: 2.25, r: 0.075 }],
     diffuser: { y: 0.24, z: 2.08, w: 1.1, fins: 4 },
   });
-  return finish('sedan', b, { wheel: 'hubcap', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [0, LIVERY_B, LIVERY_A] });
+  return finish('sedan', b, { wheel: 'hubcap', axles, exhausts: rear.exhausts.map(exhaustPoint), rear, liveries: [0, 0, LIVERY_B, LIVERY_A] }); // o 2º sedã (Barão, V6c) tem arquivo próprio (barao.glb, faixa dele): o procedural dele nunca é desenhado e não pede faixa ao estilo
 }

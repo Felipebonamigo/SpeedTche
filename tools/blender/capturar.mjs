@@ -48,6 +48,9 @@ for (const car of cars) {
     for (let i = 0; i < 4; i++) s.input.unbindSeat(i);
     s.input.bindSeat(0, 'kb1');
     s.handleMenuEvent({ type: 'startCareer', humans: [{ seat: 0, name: 'Piloto 1', carId, teamId: 0, color: '#ffd23f' }], resume: false });
+    // carro à venda ou de conquista: a garagem só mostra os do piloto, então a captura o põe na garagem e reabre a tela
+    const g = s.debugSave().career?.drivers[0]?.garage;
+    if (g && !g.owned.includes(carId)) { g.owned.push(carId); g.carId = carId; s.menus.show('garage'); }
   }, car);
   for (let i = 1; i <= 12; i++) await p.evaluate((t) => window.nc.session.frame(t), i * 200);
   await p.waitForTimeout(800);

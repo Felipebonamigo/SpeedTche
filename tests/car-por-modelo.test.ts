@@ -202,7 +202,7 @@ describe('modelo por carro: o instanciamento (Cars)', () => {
 
 describe('modelo por carro: a carga do arquivo (assets.ts)', () => {
   it('falcao.glb entra por carro, sedan.glb por estilo, outro nome é recusado, e carro sem seat é recusado com o motivo', async () => {
-    const full = dataUrl(buildTestCar({ stripeB: true })); // o estilo sedan tem 2 carros (Camelo e Barão): o 2º usa a faixa B
+    const full = dataUrl(buildTestCar({}));
     const noSeat = dataUrl(buildTestCar({ seats: 0 }));
     const report = await loadCarAssets({
       '../../assets/cars/falcao.glb': async () => full,

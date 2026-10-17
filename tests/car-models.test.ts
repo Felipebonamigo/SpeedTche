@@ -125,6 +125,7 @@ describe('pintura dos carros', () => {
     expect(a.livery).not.toBe(b.livery);
     // Vale para qualquer estilo com dois carros e ao menos duas pinturas na lista.
     for (const body of CAR_BODIES) {
+      if (body === 'sedan') continue; // o 2º sedã (Barão, V6c) tem arquivo próprio com a faixa dele; o procedural dele não é desenhado
       const same = CARS.filter((c) => c.body === body);
       const liv = (models.get(body) as CarModel).liveries;
       if (same.length >= 2 && liv.length >= 2) expect(carPaint(same[0], CARS, liv).livery, body).not.toBe(carPaint(same[1], CARS, liv).livery);

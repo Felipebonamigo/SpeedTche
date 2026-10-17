@@ -69,12 +69,12 @@ export const CARS: CarDef[] = [
     blurb: 'Leve e sem teto: o melhor freio da garagem e curva fácil. Pouca reta.',
   },
   {
-    id: 'pampeiro', name: 'Pampeiro', color: '#8e9aaf', accent: '#d32f2f', price: 13_000, body: 'hatch',
+    id: 'pampeiro', name: 'Pampeiro', color: '#cfd8dc', accent: '#d32f2f', price: 13_000, body: 'hatch',
     topSpeed: REFERENCE_SPEED * 1.0, accel: 760, brake: 3100, handling: 0.88, fuelPerUnit: BASE_FUEL * 0.88,
     blurb: 'Hatch europeu: firme na freada e na curva, bom de reta. Gosta de gasolina.',
   },
   {
-    id: 'barao', name: 'Barão', color: '#5d4037', accent: '#d7ccc8', price: 14_000, body: 'sedan',
+    id: 'barao', name: 'Barão', color: '#a1887f', accent: '#efebe9', price: 14_000, body: 'sedan',
     topSpeed: REFERENCE_SPEED * 1.07, accel: 640, brake: 2350, handling: 0.68, fuelPerUnit: BASE_FUEL * 0.78,
     blurb: 'O carro do tio: reta boa e tanque que dura. Pesado na arrancada e na curva.',
   },
