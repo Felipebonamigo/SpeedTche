@@ -229,3 +229,29 @@ describe('picape HCT (pickup, Tatu 4x4)', () => {
     expect(m.rear?.exhausts).toEqual([{ x: -0.62, y: 0.4, z: 2.2, r: 0.085 }]);
   });
 });
+
+describe('clássico HCT (classic, Boto Luxo)', () => {
+  const m = buildModel('classic');
+  const P = probe(m);
+  hctCommon('classic', { tailCenters: 4, bandFront: -1.95, bandBack: 1.95, maxTris: 4500 });
+
+  it('bico estreito (≤ 0,77 m de meia largura nos primeiros 10 cm) e para-lamas bojudos (≥ 0,90 m sobre a roda dianteira)', () => {
+    let nose = 0; let fender = 0;
+    for (let i = 0; i < P.pos.count; i++) {
+      if (!P.painted(i)) continue; // só a lataria (os para-choques cromados partidos passam de 0,77)
+      const z = P.pos.getZ(i); const x = Math.abs(P.pos.getX(i));
+      if (z <= -2.1) nose = Math.max(nose, x);
+      if (z > -1.65 && z < -1.15 && P.pos.getY(i) > 0.5) fender = Math.max(fender, x);
+    }
+    expect(nose).toBeLessThanOrEqual(0.77);
+    expect(fender).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it('faróis redondos em leque nos para-lamas, o friso cromado na cintura (≥ 0,02 m²) e os escapes gêmeos longos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.4).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) > 0.8 && t.c[1] > 0.5 && t.c[1] < 0.75 && t.c[2] > -1.9 && t.c[2] < 1.9);
+    expect(chrome.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.02);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.26, 0.26]);
+  });
+});
