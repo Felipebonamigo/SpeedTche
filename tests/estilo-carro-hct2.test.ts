@@ -125,3 +125,28 @@ describe('muscle HCT (muscle, Trovão V12)', () => {
     expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.52, 0.52]);
   });
 });
+
+describe('elétrico HCT (electric, Sucuri E)', () => {
+  const m = buildModel('electric');
+  const P = probe(m);
+  hctCommon('electric', { tailCenters: 4, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('teto de vidro inteiro (≥ 1,0 m² de vidro olhando para cima) e a faixa de luz da traseira vai de ponta a ponta (≥ 1,5 m)', () => {
+    const roof = P.T.filter((t) => P.isGlass(t.i) && t.n[1] > 0.5).reduce((s, t) => s + t.area, 0);
+    expect(roof).toBeGreaterThanOrEqual(1.0);
+    const xs = P.T.filter((t) => P.isTail(t.i) && t.n[2] > 0.5).flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('bico fechado com a faixa de luz diurna e faróis finos em leque nas pontas (dois leques por lado), sem grade', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.05 && p[2] < -2.0).length, `lado ${side}`).toBeGreaterThanOrEqual(2);
+    // Grade = lamelas foscas (rugosidade > 0,5: TRIM e GRILLE); o painel preto brilhante da frente (PIANO) não é grade.
+    const grille = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && P.mat.getX(t.i) > 0.5 && t.n[2] < -0.7 && t.c[2] < -2.0 && t.c[1] > 0.4).reduce((s, t) => s + t.area, 0);
+    expect(grille, 'sem grade').toBeLessThanOrEqual(0.05);
+  });
+
+  it('sem escapamento: os dois bocais do jato de sempre no difusor (x = ±0,3)', () => {
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.3, 0.3]);
+  });
+});
