@@ -8,7 +8,7 @@ import { probe } from './hct-probe';
 describe('protótipo HCT (prototype, Beija-Flor)', () => {
   const m = buildModel('prototype');
   const P = probe(m);
-  hctCommon('prototype', { tailCenters: 6, bandFront: -1.95, bandBack: 1.95, maxTris: 4500 });
+  hctCommon('prototype', { tailCenters: 6, bandFront: -2.12, bandBack: 1.95, maxTris: 4500 });
 
   it('baixíssimo: teto ≤ 1,08 m e o bico abaixo de 0,40 m nos primeiros 12 cm', () => {
     const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.4 && t.c[2] < 0.6 && t.c[1] > 0.85).map((t) => t.c[1]);

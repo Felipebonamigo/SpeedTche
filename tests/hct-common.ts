@@ -73,6 +73,18 @@ export function hctCommon(body: CarBody, o: HctOpts): void {
     }
   });
 
+  it(`${body}: o pneu não fura a lataria — sobre cada roda o casco passa do topo do pneu (em z de −0,2 a +0,2 do eixo, em toda a largura do pneu)`, () => {
+    // Defeito da primeira versão do protótipo: o ombro inclinado sobre o pneu ficava abaixo do topo dele e o pneu aparecia (um pedaço preto) por cima do para-lama.
+    for (const ax of m.axles) {
+      for (const dz of [-0.2, -0.1, 0, 0.1, 0.2]) {
+        const top = ax.r + Math.sqrt(ax.r * ax.r - dz * dz);
+        for (let x = ax.x - ax.w / 2 + 0.02; x <= ax.x + ax.w / 2 - 0.02; x += 0.04) {
+          expect(P.fromAbove(x, ax.z + dz)?.y ?? 0, `x = ${x.toFixed(2)}, z = ${(ax.z + dz).toFixed(2)}`).toBeGreaterThanOrEqual(top);
+        }
+      }
+    }
+  });
+
   it(`${body}: ≤ ${o.maxTris ?? 4200} △ no casco, lod1 ≤ 45% com luz e as duas faixas, os dois no validador do jogo`, () => {
     expect(m.triangles).toBeLessThanOrEqual(o.maxTris ?? 4200);
     expect(checkCarModel(m)).toEqual([]);
