@@ -150,3 +150,32 @@ describe('elétrico HCT (electric, Sucuri E)', () => {
     expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.3, 0.3]);
   });
 });
+
+describe('hatch HCT (hatch, Tornado RS)', () => {
+  const m = buildModel('hatch');
+  const P = probe(m);
+  hctCommon('hatch', { tailCenters: 2, bandFront: -1.9, bandBack: 1.9, maxTris: 4500 });
+
+  it('compacto e alto: teto entre 1,30 e 1,45 m, a cabine vai até o fim do carro (vidro de trás passa de z = 1,85) e o rabo é quase vertical', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 1.2 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    const rearGlass = P.T.filter((t) => P.isGlass(t.i) && t.c[2] > 1.2).map((t) => Math.max(P.pos.getZ(t.i), P.pos.getZ(t.i + 1), P.pos.getZ(t.i + 2)));
+    expect(Math.max(...rearGlass)).toBeGreaterThanOrEqual(1.85);
+  });
+
+  it('aerofólio de teto de acento com abas (≥ 1,2 m de largura, acima de 1,3 m) e o escape central duplo de sempre', () => {
+    const w = P.T.filter((t) => P.accent(t.i) && t.c[1] > 1.3);
+    expect(w.length).toBeGreaterThan(4);
+    const xs = w.flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(1.2);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.17, 0.17]);
+  });
+
+  it('faróis de canto retangulares em leque, grade colmeia com o friso de acento e piscas laterais âmbar', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3 && p[1] > 0.5).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const amber = P.T.filter((t) => Math.abs(P.col.getX(t.i) - 1) < 0.01 && Math.abs(P.col.getY(t.i) - 0.38) < 0.15 && P.mat.getZ(t.i) > 0.3 && P.mat.getZ(t.i) < 0.6);
+    expect(amber.length).toBeGreaterThan(0);
+  });
+});
