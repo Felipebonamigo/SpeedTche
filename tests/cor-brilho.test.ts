@@ -38,7 +38,9 @@ const sstep = (e0: number, e1: number, x: number): number => { const t = Math.mi
 
 // O que a implementação nova expõe (ainda não existe quando o teste é escrito): lido por acesso dinâmico, com o valor de HOJE como reserva, para
 // que os critérios falhem pela MEDIDA e não por "não existe".
-interface GradingNew { toe?: number; fill?: number }
+// `road` (V4b, docs/ondas/V4b-sombra.md): a luz AMBIENTE (hemisférica + IBL do céu) só no material da pista de dia: `mix` = quanto dela vira cinza (a luminância
+// dela × `tint`, um tom quente de luminância 1 e ganho embutido); 0 = igual a hoje (entardecer e noite).
+interface GradingNew { toe?: number; fill?: number; road?: { tint: V; mix: number } }
 const gradeOf = (p: Palette): ReturnType<typeof gradingFor> & GradingNew => gradingFor(p) as ReturnType<typeof gradingFor> & GradingNew;
 
 // ───────────────────────────── modelo de bolso da luz (independente do código) ─────────────────────────────
@@ -104,17 +106,23 @@ type Face = 'shadow' | 'sun' | 'top';
  * A cor final (sRGB 0..255) de uma superfície de albedo `hex` sob a luz do período: `shadow` = a traseira de costas para o sol (o que a câmera de
  * perseguição vê com o sol à frente), `sun` = um lado a 45° do sol, `top` = virada para cima (capô, asfalto). `car` liga a autoluz do material dos carros.
  */
-function shade(p: Palette, s: SceneryId, t: TimeOfDay, hex: string, face: Face, car: boolean): V {
+function shade(p: Palette, s: SceneryId, t: TimeOfDay, hex: string, face: Face, car: boolean, opts: { road?: boolean; sun?: boolean } = {}): V {
   const A = lin(hex);
   const sun = sunSetup(t, s).dir.clone();
   const sunH = new THREE.Vector3(sun.x, 0, sun.z).normalize();
   const n = face === 'top' ? new THREE.Vector3(0, 1, 0) : face === 'shadow' ? sunH.clone().negate() : sunH.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 4);
   const g = gradeOf(p);
-  const hemi = mul(mixv(lin(p.hemiGround), lin(p.hemiSky), 0.5 + 0.5 * n.y), p.hemiIntensity);
-  const sunE = mul(lin(p.sunLight), p.sunIntensity * Math.max(0, n.dot(sun)));
+  let hemi = mul(mixv(lin(p.hemiGround), lin(p.hemiSky), 0.5 + 0.5 * n.y), p.hemiIntensity);
+  const sunE = mul(lin(p.sunLight), p.sunIntensity * Math.max(0, n.dot(sun)) * (opts.sun === false ? 0 : 1));
   const envRaw = envAround(p, n, sun);
   const fill = g.fill ?? 1;
-  const env = mul(mixv([lum(envRaw), lum(envRaw), lum(envRaw)], envRaw, fill), p.envIntensity);
+  let env = mul(mixv([lum(envRaw), lum(envRaw), lum(envRaw)], envRaw, fill), p.envIntensity);
+  if (opts.road && g.road) { // a luz ambiente da pista de dia: a luminância dela no tom quente (a hemisférica e a IBL; o sol não)
+    // ... só no albedo escuro: o tom quente desfaz a tinta azul das sombras, que pesa nos escuros; numa faixa branca deixaria laranja (corte pela luminância do albedo)
+    const w = g.road.mix * (1 - sstep(0.22, 0.5, lum(A)));
+    const grey = (c: V): V => mixv(c, mul(g.road!.tint, lum(c)), w);
+    hemi = grey(hemi); env = grey(env);
+  }
   const self = car ? mul(A, (0.05 + 0.15 * p.light) * (1 - 0.65 * lum(A))) : [0, 0, 0] as V;
   const radiance = add(add(mul(mulv(add(hemi, sunE), A), 1 / Math.PI), mulv(env, A)), self);
   return graded(neutral(radiance, g.exposure, g.toe ?? 0), p).map(srgb8) as V;
@@ -196,6 +204,104 @@ describe('2. véu magenta: a luz do entardecer e da noite deixa a pintura com a 
       expect(h[0], `${s}: horizonte R > B`).toBeGreaterThan(h[2]);
       expect(chroma(lin(p.fog).map(srgb8) as V), `${s}: névoa com cor`).toBeGreaterThan(0.25);
     }
+  });
+});
+
+// ───────────────────────────── 2b. asfalto de dia à sombra (V4b) ─────────────────────────────
+// A cor-brilho travou "o dia não muda" (Copacabana, o melhor quadro) e com ela o azul-marinho do asfalto à sombra, `(0,40,98)` na captura: a luz que cai nele é
+// a hemisférica + a IBL do céu (azuis) e o pé do Neutral zera o vermelho; com a textura nova da V4 (pedrisco, trilhas, remendos) o marinho engole o desgaste.
+// O dono liberou a trava SÓ para a pista, de dia (docs/ondas/V4b-sombra.md). O que muda de propósito: a luz AMBIENTE do material da pista (hemisférica + IBL
+// do céu) vira cinza quente da mesma luminância (`gradingFor(p).road`). O que continua travado: o resto do dia (o teste "o dia não muda" acima, que mede o
+// MESMO asfalto sob a luz dos outros materiais), o entardecer e a noite (a pista não muda), o piso de contraste com as faixas.
+
+const wcagLum = (c: V): number => { const f = (v: number): number => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+/** Razão de contraste do WCAG entre duas cores 0..255 (1 = iguais). */
+const wcag = (a: V, b: V): number => { const x = wcagLum(a); const y = wcagLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const luma8 = (c: V): number => lum(c);
+
+describe('2b. asfalto de dia à sombra: cinza quente, não azul-marinho (só a pista; V4b)', () => {
+  const DAY = SCENERIES.map((s) => [s, palette(s, 'day')] as const);
+  const roadShade = (s: SceneryId, p: Palette, road: boolean, sun: boolean, hex = p.asphalt): V => shade(p, s, 'day', hex, 'top', false, { road, sun });
+
+  it('à sombra e ao sol, nos 6 biomas: o azul não passa do vermelho em mais de 20 e a cor é de saturação baixa (máx − mín ≤ 32, em 0..255)', () => {
+    const bad: string[] = [];
+    for (const [s, p] of DAY) for (const sun of [false, true]) {
+      const c = roadShade(s, p, true, sun);
+      if (c[2] - c[0] > 20 || Math.max(...c) - Math.min(...c) > 32) bad.push(`${s} ${sun ? 'ao sol' : 'à sombra'} rgb(${c.join(',')})`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('a luminância parecida (0,8× a 1,7× a de hoje): o asfalto não vira um buraco preto nem um clarão', () => {
+    const bad: string[] = [];
+    for (const [s, p] of DAY) for (const sun of [false, true]) {
+      const before = luma8(roadShade(s, p, false, sun)); const now = luma8(roadShade(s, p, true, sun));
+      if (now < 0.8 * before || now > 1.7 * before) bad.push(`${s} ${sun ? 'ao sol' : 'à sombra'}: luma ${before.toFixed(0)} → ${now.toFixed(0)}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('o piso de contraste com as faixas se mantém: a faixa branca contra o asfalto, à sombra e ao sol, ≥ 3:1 (WCAG) e ≥ 0,6× o de hoje', () => {
+    const bad: string[] = [];
+    for (const [s, p] of DAY) for (const sun of [false, true]) {
+      const before = wcag(roadShade(s, p, false, sun, p.lane), roadShade(s, p, false, sun));
+      const now = wcag(roadShade(s, p, true, sun, p.lane), roadShade(s, p, true, sun));
+      if (now < 3 || now < 0.6 * before) bad.push(`${s} ${sun ? 'ao sol' : 'à sombra'}: ${before.toFixed(2)} → ${now.toFixed(2)}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('a faixa branca e a zebra clara não esquentam: o albedo claro fica como estava (±2 por canal), à sombra e ao sol', () => {
+    for (const [s, p] of DAY) for (const sun of [false, true]) {
+      const before = roadShade(s, p, false, sun, p.lane); const now = roadShade(s, p, true, sun, p.lane);
+      now.forEach((v, k) => expect(Math.abs(v - before[k]), `${s} ${sun ? 'ao sol' : 'à sombra'} faixa rgb(${now.join(',')}) × ${before.join(',')}`).toBeLessThanOrEqual(2));
+    }
+  });
+
+  it('só a luz ambiente da pista de dia muda: entardecer e noite (mix 0) dão a MESMA cor do asfalto, com e sem a luz da pista', () => {
+    for (const s of SCENERIES) for (const t of LATE) {
+      const p = palette(s, t);
+      expect(gradeOf(p).road?.mix ?? 0, `${s}:${t} mix`).toBe(0);
+      for (const sun of [false, true]) expect(shade(p, s, t, p.asphalt, 'top', false, { road: true, sun }), `${s}:${t}`).toEqual(shade(p, s, t, p.asphalt, 'top', false, { road: false, sun }));
+    }
+  });
+
+  it('a luz da pista não vaza para o resto do dia: a gradação do dia (pé do Neutral e saturação da IBL) segue a de antes, e a luz ambiente da pista de dia tem mix 1', () => {
+    for (const s of SCENERIES) {
+      const g = gradeOf(palette(s, 'day'));
+      expect(g.toe ?? 0, `${s}: pé`).toBe(0); expect(g.fill ?? 1, `${s}: fill`).toBe(1);
+      expect(g.road?.mix, `${s}: mix de dia`).toBe(1);
+    }
+  });
+
+  it('no shader: só a família da pista tem o trecho da luz ambiente cinza, depois da IBL e antes da luz ser usada; o uniforme é compartilhado e o setStylizePalette o escreve', () => {
+    const frag = (family: S.StylizeFamily): string => {
+      const m = new THREE.MeshStandardMaterial(); S.applyStylize(m, family);
+      const sh = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader } as unknown as THREE.WebGLProgramParametersWithUniforms;
+      m.onBeforeCompile(sh, {} as THREE.WebGLRenderer);
+      expect(sh.uniforms).toHaveProperty('uStylizeRoad');
+      return sh.fragmentShader;
+    };
+    const road = frag('road');
+    expect(road).toContain('STYLIZE_ROAD_CODE');
+    expect(road, 'o efeito cai com a luminância do albedo (a faixa branca não esquenta)').toContain('smoothstep( 0.22, 0.5, dot( diffuseColor.rgb');
+    expect(road.indexOf('STYLIZE_ROAD_CODE'), 'depois do trecho da IBL (lights_fragment_maps)').toBeGreaterThan(road.indexOf('iblIrradiance = mix('));
+    for (const f of ['ground', 'scenery', 'facade', 'car', 'ghost'] as const) expect(frag(f), f).not.toContain('STYLIZE_ROAD_CODE');
+    const u = (S.stylizeUniforms as unknown as Record<string, { value: THREE.Vector4 }>).uStylizeRoad;
+    expect(u?.value, 'uStylizeRoad').toBeInstanceOf(THREE.Vector4);
+    S.setStylizePalette(palette('coast', 'day'));
+    const g = gradeOf(palette('coast', 'day')).road!;
+    expect([u!.value.x, u!.value.y, u!.value.z, u!.value.w].map((v) => +v.toFixed(5))).toEqual([...g.tint, g.mix].map((v) => +v.toFixed(5)));
+    S.setStylizePalette(palette('coast', 'dusk'));
+    expect(u!.value.w, 'entardecer: mix 0').toBe(0);
+  });
+
+  it('continua contínua na corrida que muda: o mix cai de 1 a 0 junto com a luz (1 → 0,7), sem degrau', () => {
+    const p = palette('coast', 'day');
+    const at = (light: number): number => gradeOf({ ...p, light }).road?.mix ?? -1;
+    expect(at(1)).toBe(1); expect(at(0.7)).toBe(0);
+    let prev = 1;
+    for (let l = 1; l >= 0.7; l -= 0.01) { const m = at(l); expect(m, `light ${l.toFixed(2)}`).toBeLessThanOrEqual(prev + 1e-9); expect(prev - m, `degrau em ${l.toFixed(2)}`).toBeLessThan(0.2); prev = m; }
   });
 });
 

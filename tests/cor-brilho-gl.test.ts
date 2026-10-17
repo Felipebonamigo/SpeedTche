@@ -212,6 +212,26 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     expect(errors).toEqual([]);
   });
 
+  it('V4b: o asfalto de dia (Copacabana, seg 300, à sombra e ao sol) é cinza quente, não azul-marinho (B − R ≤ 20), e a faixa branca da pista continua branca (R − B ≤ 15)', async () => {
+    // Medido na captura: o asfalto à sombra de dia saía (0,43,104). A luz ambiente cinza da pista (`uStylizeRoad`) tem de valer só para o ASFALTO: a faixa branca
+    // está no mesmo material (a textura leva as linhas), e o mesmo tom quente a deixaria alaranjada (197,167,123 na 1ª versão, sem o corte pela luminância do albedo).
+    const r = await lab((L) => {
+      L.freeze('copacabana', 300, { seg: 300, x: 0, parked: true });
+      return L.shoot('high', 4, [
+        { box: [-5, 0, -9, -2, 0.02, -5] }, { box: [2, 0, -9, 5, 0.02, -5] }, { box: [-5, 0, -14, -2, 0.02, -10] }, { box: [2, 0, -14, 5, 0.02, -10] },
+        { point: [6.55, 0.02, -7], r: 1 }, { point: [-6.55, 0.02, -7], r: 1 },
+      ]);
+    });
+    const [asphalt, line] = [r.slice(0, 4), r.slice(4)];
+    console.log(`[V4b] asfalto ${asphalt.map((s) => `(${s.rgb.join(',')})`).join(' ')} · faixa ${line.map((s) => `(${s.rgb.join(',')})`).join(' ')}`);
+    for (const [i, s] of asphalt.entries()) expect(s.rgb[2] - s.rgb[0], `asfalto ${i} rgb(${s.rgb.join(',')}) em ${s.x0},${s.y0}–${s.x1},${s.y1}`).toBeLessThanOrEqual(20);
+    for (const [i, s] of line.entries()) {
+      expect(Math.max(...s.rgb), `faixa ${i} rgb(${s.rgb.join(',')}) em ${s.x0},${s.y0}: achou a linha`).toBeGreaterThan(110);
+      expect(s.rgb[0] - s.rgb[2], `faixa ${i} rgb(${s.rgb.join(',')}): R − B`).toBeLessThanOrEqual(15);
+    }
+    expect(errors).toEqual([]);
+  });
+
   it('o laboratório desenhou sem erro de shader', async () => {
     const p = await lab((L) => L.programs());
     expect(p.shaderErrors).toEqual([]);
