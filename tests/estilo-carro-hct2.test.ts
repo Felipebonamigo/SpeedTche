@@ -255,3 +255,30 @@ describe('clássico HCT (classic, Boto Luxo)', () => {
     expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.26, 0.26]);
   });
 });
+
+describe('microcarro HCT (micro, Saci Mirim)', () => {
+  const m = buildModel('micro');
+  const P = probe(m);
+  hctCommon('micro', { tailCenters: 2, bandFront: -1.5, bandBack: 1.5, maxTris: 4500 });
+
+  it('curto (≤ 3,5 m) e gordinho, de cabine alta e redonda com o teto na camada A (a cor do teto) e ≥ 1,40 m de altura', () => {
+    const zs = Array.from({ length: P.pos.count }, (_, i) => P.pos.getZ(i));
+    expect(Math.max(...zs) - Math.min(...zs)).toBeLessThanOrEqual(3.5);
+    const roof = P.fromAbove(0, 0.2);
+    expect(roof?.y ?? 0).toBeGreaterThanOrEqual(1.4);
+    expect(P.isA(roof?.i ?? 0)).toBe(true);
+  });
+
+  it('"olhos" redondos grandes em leque nos para-lamas (um por lado, lente de ≥ 12 cm de raio), bigode cromado e pisca âmbar', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) {
+      const mine = heads.filter((p) => side * p[0] > 0.3);
+      expect(mine.length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+      const lit = P.T.filter((t) => P.isHead(t.i) && side * t.c[0] > 0.3 && t.n[2] < -0.5);
+      const xs = lit.flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+      expect((Math.max(...xs) - Math.min(...xs)) / 2, `lado ${side}`).toBeGreaterThanOrEqual(0.12);
+    }
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) < 0.3 && t.c[2] < -1.55 && t.c[1] > 0.4 && t.c[1] < 0.55);
+    expect(chrome.length).toBeGreaterThan(2);
+  });
+});
