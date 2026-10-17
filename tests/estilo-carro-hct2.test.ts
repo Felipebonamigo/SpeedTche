@@ -5,11 +5,6 @@ import { buildModel } from '../src/render/cars/models';
 import { hctCommon } from './hct-common';
 import { probe } from './hct-probe';
 
-const yRange = (P: ReturnType<typeof probe>, idx: number[]): number => {
-  const ys = idx.map((i) => P.pos.getY(i));
-  return Math.max(...ys) - Math.min(...ys);
-};
-
 describe('protótipo HCT (prototype, Beija-Flor)', () => {
   const m = buildModel('prototype');
   const P = probe(m);
@@ -42,5 +37,35 @@ describe('protótipo HCT (prototype, Beija-Flor)', () => {
     expect(w, 'asa').toBeTruthy();
     if (w) expect(w.max[0] - w.min[0]).toBeGreaterThanOrEqual(1.8);
   });
-  void yRange;
+});
+
+describe('roadster HCT (roadster, Curupira S)', () => {
+  const m = buildModel('roadster');
+  const P = probe(m);
+  hctCommon('roadster', { tailCenters: 4, bandFront: -1.95, bandBack: 1.95, noGlass: true, aSkip: [-0.6, 0.95], maxTris: 4500 });
+
+  it('cockpit aberto: do alto, no meio, o que se vê é o assoalho do interior (não pintado, abaixo de 0,85 m), e o piloto de capacete de acento fica à esquerda', () => {
+    const h = P.fromAbove(0, 0.1);
+    expect(h).not.toBeNull();
+    expect(P.painted(h?.i ?? 0)).toBe(false);
+    expect(h?.y ?? 9).toBeLessThanOrEqual(0.85);
+    const helmet = P.T.filter((t) => P.accent(t.i) && t.c[1] > 0.85 && t.c[2] > 0 && t.c[2] < 0.8);
+    expect(helmet.length).toBeGreaterThan(4);
+    expect(helmet.reduce((s, t) => s + t.c[0], 0) / helmet.length).toBeLessThan(-0.2);
+  });
+
+  it('para-brisa baixo (até 1,10 m, começa depois de z = −0,75) e o santantônio duplo atrás dos bancos acima de 1,05 m', () => {
+    const g = P.T.filter((t) => P.isGlass(t.i) && t.c[2] < 0.2);
+    expect(g.length).toBeGreaterThan(3);
+    expect(Math.max(...g.map((t) => t.c[1]))).toBeLessThanOrEqual(1.1);
+    expect(Math.min(...g.map((t) => t.c[2]))).toBeGreaterThan(-0.75);
+    const bars = P.T.filter((t) => t.c[1] > 1.05 && t.c[2] > 0.6 && t.c[2] < 0.95);
+    expect(bars.length).toBeGreaterThan(4);
+  });
+
+  it('faróis redondos em leque nos para-lamas (um por lado, ≥ 0,066 m² de luz) e escapes gêmeos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.4, 0.4]);
+  });
 });
