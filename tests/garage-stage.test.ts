@@ -280,16 +280,16 @@ describe('T8: a garagem mostra o visual inteiro, não só as cores', () => {
 });
 
 describe('Concessionária: os carros à venda, a compra e a revelação', () => {
-  const forSale = CARS.filter((c) => c.price > 0);
+  const forSale = CARS.filter((c) => c.price > 0 && !c.conquest);
 
-  it('mostra só os carros à venda (7), em ordem de preço, com o preço; o palco recebe o primeiro', () => {
+  it('mostra só os carros à venda (10, sem o de conquista), em ordem de preço, com o preço; o palco recebe o primeiro', () => {
     const r = rig(dealershipScreen);
     const seen: string[] = [];
     for (let i = 0; i < forSale.length; i++) { seen.push(names(r).toUpperCase()); press(r, 'kb1', 'right'); }
     expect(seen).toEqual(forSale.map((c) => c.name.toUpperCase()));
     expect(names(r).toUpperCase()).toBe(forSale[0].name.toUpperCase()); // deu a volta
     expect(stageBus.panel('dealership:P1').carId).toBe(forSale[0].id);
-    expect(tagText(r)).toContain('12.000');
+    expect(tagText(r)).toContain('9.000'); // o Caipora abre a vitrine
   });
 
   it('sem dinheiro não compra, não muda a carreira e não revela', () => {

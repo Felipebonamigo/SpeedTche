@@ -73,6 +73,7 @@ MATERIALS = {
     "reflector": ((0.55, 0.55, 0.55), 0.7, 0.3, None),
     "plate": ((0.92, 0.92, 0.88), 0.0, 0.5, None),
     "chrome": ((0.62, 0.64, 0.66), 0.9, 0.25, None),
+    "ladder": ((0.78, 0.80, 0.83), 0.85, 0.3, None),        # escada de alumínio do carro da firma (o jogo a balança nas curvas e a derruba no nitro)
     "tire": ((0.03, 0.03, 0.032), 0.0, 0.85, None),
     "rim": ((0.62, 0.64, 0.68), 0.75, 0.32, None),
     "hub": ((0.12, 0.12, 0.13), 0.3, 0.5, None),
@@ -583,13 +584,13 @@ def finish_wheels_and_empties(sp):
     empty("seat", sp["seat"])
 
 
-def make_material_of(cowl, roof_f, roof_r, glass_b, side, black=()):
+def make_material_of(cowl, roof_f, roof_r, glass_b, side, black=(), bumper_nose=-1.86, bumper_tail=None):
     """Regra de material da gaiola de um hatch: vidros entre as colunas, friso preto da cintura e do teto, para-choque embaixo nas pontas."""
     e = 1e-6
 
     def material_of(y0, y1, strip, j):
-        nose = y1 <= -1.86 + e
-        tail = y0 >= glass_b - e
+        nose = y1 <= bumper_nose + e
+        tail = y0 >= (glass_b if bumper_tail is None else bumper_tail) - e
         if (nose or tail) and strip in (0, 1):
             return "bumper"
         if strip == 0:
@@ -628,13 +629,13 @@ def line_strip(points, width):
 
 
 # ───────────────────────────── conjuntos de detalhe (rodada 2) ─────────────────────────────
-def lamp_stack(group, name, outline, layers, end="front", base=0.004, step=0.005, lod1_from=None):
+def lamp_stack(group, name, outline, layers, end="front", base=0.004, step=0.005, lod1_from=None, cuts=1):
     """Farol ou lanterna em camadas, de fora para dentro (moldura, aro, refletor, coroa, miolo): cada camada é o contorno reduzido em torno do centro,
     uma casca mais alta que a anterior. `layers`: lista de (material, escala). Devolve dicts de remendo para o spec."""
     out = []
     for i, (mat, k) in enumerate(layers):
         out.append(dict(group=group, name=f"{name}{i}", mat=mat, outline=scaled_outline(outline, k), end=end, offset=base + step * i,
-                        cuts=1, lod1=(lod1_from is not None and i == lod1_from)))
+                        cuts=cuts, lod1=(lod1_from is not None and i == lod1_from)))
     return out
 
 
@@ -650,3 +651,57 @@ def arch_flares(sp, width=0.045, off=0.010):
         inner = [(y + r_in * math.cos(a), cz + r_in * math.sin(a)) for a in [math.radians(8 + 164 * k / 12) for k in range(13)]]
         out.append(dict(end="side", group="details", name=f"flare{int(y * 100)}", mat="bumper", axis="x", outline=outer + list(reversed(inner)), offset=off, cuts=1, lod1=False))
     return out
+
+
+def teardrop(cx, cz, r, tdx, tdz, n=16):
+    """Contorno em gota: círculo de raio r com a ponta esticada na direção (tdx, tdz) (comprimento da ponta = |tdx, tdz|)."""
+    L = math.hypot(tdx, tdz)
+    ang = math.atan2(tdz, tdx)
+    pts = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        stretch = max(0.0, math.cos(a - ang)) ** 4 * L
+        pts.append((cx + (r + stretch) * math.cos(a), cz + (r + stretch) * math.sin(a)))
+    return pts
+
+
+def std_details(sp, door_ys, belt_pts, nose_z, tail_z, bf=(1.66, 0.40), br=(1.50, 0.40), flap=None, plate_f_z=0.47, plate_r_z=0.60, zdoor=(0.32, 0.93)):
+    """Detalhes que todo carro leva (rodada 2): para-choques com volume e friso claro, entrada de ar e placas, friso da cintura, soleira, frisos de porta,
+    alargamento dos para-lamas. `belt_pts`: [(y, z)] da cintura; `bf`/`br`: (largura, altura) do para-choque da frente e de trás."""
+    return [
+        dict(group="details", name="para_choque_f", mat="bumper", outline=rounded_rect(0.0, bf[1], bf[0], 0.19, 0.05), offset=0.022, mirror=False, cuts=1, lod1=False),
+        dict(group="details", name="friso_f", mat="chrome", outline=rounded_rect(0.0, bf[1] + 0.107, bf[0] - 0.16, 0.016, 0.006), offset=0.027, mirror=False, cuts=1, lod1=False),
+        dict(group="details", name="entrada", mat="trim", outline=rounded_rect(0.0, bf[1] - 0.015, bf[0] * 0.5, 0.09, 0.03), offset=0.027, mirror=False, cuts=1, lod1=False),
+        dict(group="details", name="placa_f", mat="plate", outline=rounded_rect(0.0, plate_f_z, 0.28, 0.085, 0.01), offset=0.030, mirror=False, cuts=0, lod1=False),
+        dict(end="rear", group="details", name="para_choque_t", mat="bumper", outline=rounded_rect(0.0, br[1], br[0], 0.19, 0.05), offset=0.022, mirror=False, cuts=1, lod1=False),
+        dict(end="rear", group="details", name="friso_t", mat="chrome", outline=rounded_rect(0.0, br[1] + 0.107, br[0] - 0.16, 0.016, 0.006), offset=0.027, mirror=False, cuts=1, lod1=False),
+        dict(end="rear", group="details", name="tampa", mat="trim", outline=rounded_rect(0.0, br[1] + 0.10, br[0] - 0.3, 0.012, 0.004), offset=0.005, mirror=False, cuts=1, lod1=False),
+        dict(end="rear", group="details", name="placa_t", mat="plate", outline=rounded_rect(0.0, plate_r_z, 0.30, 0.095, 0.01), offset=0.008, mirror=False, cuts=0, lod1=False),
+        dict(end="side", group="details", name="cintura", mat="chrome", axis="x", outline=line_strip(belt_pts, 0.012), offset=0.006, cuts=0, lod1=False),
+        dict(end="side", group="details", name="soleira", mat="trim", axis="x", outline=line_strip([(door_ys[0] - 0.08, 0.255), (0.0, 0.255), (door_ys[-1] - 0.18, 0.255)], 0.045), offset=0.012, cuts=0, lod1=False),
+        *[dict(end="side", group="details", name=f"porta{i}", mat="trim", axis="x", outline=[(y - 0.006, zdoor[0]), (y + 0.006, zdoor[0]), (y + 0.006, zdoor[1]), (y - 0.006, zdoor[1])], offset=0.004, cuts=2, lod1=False) for i, y in enumerate(door_ys)],
+        *( [dict(end="side", group="details", name="tampa_comb", mat="trim", axis="x", outline=rounded_rect(flap[0], flap[1], 0.17, 0.17, 0.05, seg=4), offset=0.006, cuts=1, lod1=False),
+            dict(end="side", group="details", name="tampa_comb_i", mat="chrome", axis="x", outline=rounded_rect(flap[0], flap[1], 0.12, 0.12, 0.04, seg=4), offset=0.010, cuts=1, lod1=False)] if flap else []),
+        *arch_flares(sp),
+    ]
+
+
+def add_ladder(sp, lod):
+    """Escada de alumínio no teto do carro da firma + bagageiro: caixas finas no material `ladder` (o jogo a balança: popup 0,5 no pincel) e `trim` no bagageiro."""
+    L = sp.get("ladder")
+    if not L:
+        return None
+    bm = bmesh.new()
+    mats = ["ladder", "trim"]
+    z = L["z"]
+    y0, y1 = L["y"]
+    for sd in (1, -1):
+        box_part(bm, (sd * L["x"], (y0 + y1) / 2, z), (0.045, y1 - y0, 0.07), 0, 0.0)
+    if lod == 0:
+        n = max(2, int((y1 - y0) / 0.27))
+        for i in range(n + 1):
+            box_part(bm, (0, y0 + 0.07 + (y1 - y0 - 0.14) * i / n, z), (2 * L["x"] - 0.04, 0.035, 0.04), 0, 0.0)
+        for y in L["rack"]:
+            for sd in (1, -1):
+                box_part(bm, (sd * L["x"], y, z - 0.08), (0.05, 0.05, 0.08), 1, 0.0)
+    return new_object("ladder", bm, mats)

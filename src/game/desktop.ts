@@ -120,6 +120,7 @@ export const ACHIEVEMENTS = [
   { id: 'MESTRE_DO_VACUO', pt: 'Mestre do vácuo', en: 'Slipstream Master' },
   { id: 'NITRO_NA_BANDEIRA', pt: 'Nitro na bandeirada', en: 'Nitro Finish' },
   { id: 'DEZ_VITORIAS', pt: 'Dez vitórias', en: 'Ten Wins' },
+  { id: 'HORA_DE_ENTREGA', pt: 'Hora de entrega', en: 'Delivery Time' },
   { id: 'GIRO_COMPLETO', pt: 'Giro completo', en: 'Grand Tour' },
   { id: 'RIVAL_DERROTADO', pt: 'Rival derrotado', en: 'Rival Defeated' },
   // ── Expedição Brasil (onda G): uma por estado, uma por região carimbada e o passaporte inteiro.

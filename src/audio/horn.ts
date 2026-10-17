@@ -52,6 +52,11 @@ const SPECS: Readonly<Record<string, HornSpec>> = {
   // Nacionais: o "fon-fon" curto do quadradão e os três "pi" do compacto.
   cuiabano: { wave: 'square', notes: [392, 493.88], pulses: [{ at: 0, dur: 0.12 }, { at: 0.18, dur: 0.3 }], filter: { type: 'lowpass', freq: 2600 }, gain: 0.85 },
   tupiniquim: { wave: 'triangle', notes: [587.33, 740], pulses: [{ at: 0, dur: 0.08 }, { at: 0.13, dur: 0.08 }, { at: 0.26, dur: 0.08 }], filter: { type: 'lowpass', freq: 3600 }, gain: 0.85 },
+  // Lote 2: gota (duas notas macias), europeu (um "bip" agudo longo), tio (grave de sedã) e a mais fraca do jogo, o "fon-fon" do furgão.
+  caipora: { wave: 'triangle', notes: [466.16, 587.33], pulses: [{ at: 0, dur: 0.18 }, { at: 0.24, dur: 0.18 }], filter: { type: 'lowpass', freq: 2800 }, gain: 0.8 },
+  pampeiro: { wave: 'sawtooth', notes: [880, 1108.73], pulses: [{ at: 0, dur: 0.32 }], filter: { type: 'lowpass', freq: 4200 }, gain: 0.75 },
+  barao: { wave: 'sawtooth', notes: [233.08, 293.66], pulses: [{ at: 0, dur: 0.5, glide: 0.9 }], filter: { type: 'lowpass', freq: 1000 }, gain: 0.95 },
+  furgao: { wave: 'square', notes: [349.23, 440], pulses: [{ at: 0, dur: 0.07 }, { at: 0.10, dur: 0.07 }], filter: { type: 'lowpass', freq: 1800 }, gain: 0.35 },
   // Três notas subindo.
   curupira: {
     wave: 'square', notes: [659.25],

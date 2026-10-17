@@ -59,9 +59,24 @@ export const CARS: CarDef[] = [
   },
   // ── À venda na carreira ──
   {
+    id: 'caipora', name: 'Caipora', color: '#43a047', accent: '#fff59d', price: 9_000, body: 'hatch',
+    topSpeed: REFERENCE_SPEED * 0.94, accel: 810, brake: 2750, handling: 0.90, fuelPerUnit: BASE_FUEL * 0.52,
+    blurb: 'Redondinho e econômico: curva fácil, pouca sede. Falta fôlego na reta.',
+  },
+  {
     id: 'curupira', name: 'Curupira S', color: '#455a64', accent: '#ff5722', price: 12_000, body: 'roadster',
     topSpeed: REFERENCE_SPEED * 0.97, accel: 800, brake: 3200, handling: 0.9, fuelPerUnit: BASE_FUEL * 0.8,
     blurb: 'Leve e sem teto: o melhor freio da garagem e curva fácil. Pouca reta.',
+  },
+  {
+    id: 'pampeiro', name: 'Pampeiro', color: '#8e9aaf', accent: '#d32f2f', price: 13_000, body: 'hatch',
+    topSpeed: REFERENCE_SPEED * 1.0, accel: 760, brake: 3100, handling: 0.88, fuelPerUnit: BASE_FUEL * 0.88,
+    blurb: 'Hatch europeu: firme na freada e na curva, bom de reta. Gosta de gasolina.',
+  },
+  {
+    id: 'barao', name: 'Barão', color: '#5d4037', accent: '#d7ccc8', price: 14_000, body: 'sedan',
+    topSpeed: REFERENCE_SPEED * 1.07, accel: 640, brake: 2350, handling: 0.68, fuelPerUnit: BASE_FUEL * 0.78,
+    blurb: 'O carro do tio: reta boa e tanque que dura. Pesado na arrancada e na curva.',
   },
   {
     id: 'sucuri', name: 'Sucuri E', color: '#2e7d32', price: 16_000, body: 'electric',
@@ -88,6 +103,12 @@ export const CARS: CarDef[] = [
     topSpeed: REFERENCE_SPEED * 1.07, accel: 780, brake: 2800, handling: 0.84, fuelPerUnit: BASE_FUEL * 0.9,
     blurb: 'Forte em tudo, sem ponto fraco. Custa caro.',
   },
+  // ── Carro de conquista "Hora de entrega" (não se compra; ver `conquest`) ──
+  {
+    id: 'furgao', name: 'Furgãozinho da Firma', color: '#f5f5f5', accent: '#1565c0', price: 39_000, conquest: 'HORA_DE_ENTREGA', body: 'micro',
+    topSpeed: REFERENCE_SPEED * 0.93, accel: 820, brake: 3150, handling: 0.92, fuelPerUnit: BASE_FUEL * 0.62,
+    blurb: 'Escada no teto e zero pressa: curva bem, freia bem, anda pouco.',
+  },
   {
     id: 'beijaflor', name: 'Beija-Flor', color: '#1de9b6', accent: '#7c4dff', price: 40_000, body: 'prototype',
     topSpeed: REFERENCE_SPEED * 1.04, accel: 800, brake: 3100, handling: 1, fuelPerUnit: BASE_FUEL * 1.35,
@@ -104,7 +125,7 @@ export const CAR_BODIES: readonly CarBody[] = [
  * Livres que a IA ainda não usa (os nacionais da frente V6c): o sorteio do grid usa o tamanho do pool, e pôr carro novo nele mudaria TODA corrida
  * já gravada (`sim-golden`, fantasmas). Entram no pool quando o dono aprovar a mudança e a impressão for renovada de propósito.
  */
-const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim'];
+const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao'];
 
 /**
  * Carros da IA: os livres (os 4 originais e os 3 da onda F), nunca um à venda — o carro comprado é do jogador.

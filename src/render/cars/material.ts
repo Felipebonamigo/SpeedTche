@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import type { Quality } from '../../game/contracts';
 import { atLeast } from '../../game/quality';
 import { applyStylize } from '../stylize';
+import { LADDER_SHIFT, LADDER_SIDE_M, LADDER_SLIDE_M } from './ladder';
 import { CUT_BIT, CUT_SHIFT } from './mount';
 import { LENS_RIM } from './kit';
 
@@ -269,6 +270,24 @@ float fFlake = 0.0;
 }
 `;
 
+// Partes que se mexem no vértice (aPaint.w): 1 = farol escamoteável (sobe com `uPopup`); 0,5 = a escada do carro da firma (V6c), que anda de lado e
+// para trás conforme os bits altos da instância (cars/ladder.ts: o mesmo lote do casco, sem chamada nova). Os demais vértices têm w = 0.
+const VERT_MOVE = /* glsl */ `
+transformed.y += step( 0.9, aPaint.w ) * uPopup * 0.11;
+{
+  float ladW = step( 0.3, aPaint.w ) * ( 1.0 - step( 0.7, aPaint.w ) );
+  if ( ladW > 0.0 ) {
+    int fl = int( instExtra.w + 0.5 );
+    float lq = float( ( fl >> ${LADDER_SHIFT} ) & 15 );
+    lq = lq > 7.5 ? lq - 16.0 : lq;
+    float ls = float( ( fl >> ${LADDER_SHIFT + 4} ) & 7 ) / 7.0;
+    transformed.x += lq / 7.0 * ${LADDER_SIDE_M.toFixed(3)};
+    transformed.z += ls * ${LADDER_SLIDE_M.toFixed(3)};
+    transformed.y -= ls * 0.04;
+  }
+}
+`;
+
 export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uniforms: CarUniforms } {
   const uniforms: CarUniforms = {
     uSelfLight: { value: 0.2 }, uHeadGlow: { value: 0.4 }, uTailGlow: { value: 0.9 }, uBrakeGlow: { value: 3.2 },
@@ -283,7 +302,8 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_PARS}`)
       .replace('#include <color_vertex>', VERT_COLOR)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y += aPaint.w * uPopup * 0.11;');
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+${VERT_MOVE}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_PARS}`)
       .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif ( vLocal.y > vCut ) discard;')
@@ -332,7 +352,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
   // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`). v6 (V2, realismo): a pintura guarda o matiz. v7 (V2, realismo 2): o céu refletido no vidro.
-  material.customProgramCacheKey = () => 'speed-tche-car-v7';
+  material.customProgramCacheKey = () => 'speed-tche-car-v8';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };

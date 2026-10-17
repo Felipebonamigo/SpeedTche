@@ -102,6 +102,8 @@ export interface CarDef {
   fuelPerUnit: number;
   /** Texto curto de apresentação. */
   blurb: string;
+  /** Carro de CONQUISTA (V6c): não se compra; libera quando o save tem esta conquista. O `price` dele é só nominal (> 0 mantém o carro trancado até lá). */
+  conquest?: string;
   /** Preço na carreira; 0 = sempre liberado. Os outros ficam liberados em todo modo depois de comprados. */
   price: number;
 }

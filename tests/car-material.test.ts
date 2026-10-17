@@ -31,12 +31,12 @@ describe('shader dos carros: acabamentos', () => {
     expect(FINISH_IDS.length - 1).toBeLessThanOrEqual(FINISH_MASK);
   });
 
-  it('a chave do programa mudou (v7) e a estilização continua composta na chave', () => {
+  it('a chave do programa mudou (v8) e a estilização continua composta na chave', () => {
     const key = material.customProgramCacheKey();
     // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado;
     // v5 (V2): o sol com rugosidade mínima na luz direta (o ponto branco com halo no teto do GT).
-    // v6 (V2, realismo): a pintura guarda o matiz (`carPaintHold`). v7 (V2, realismo 2): o céu refletido no vidro (`uGlassSky`).
-    expect(key).toContain('speed-tche-car-v7');
+    // v6 (V2, realismo): a pintura guarda o matiz (`carPaintHold`). v7 (V2, realismo 2): o céu refletido no vidro (`uGlassSky`). v8 (V6c): a escada do furgão se mexe no vértice (`aPaint.w` 0,5 + bits da instância).
+    expect(key).toContain('speed-tche-car-v8');
     expect(key).not.toContain('speed-tche-car-v1');
   });
 

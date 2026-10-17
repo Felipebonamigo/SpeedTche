@@ -17,7 +17,7 @@ import { seatColor } from '../../core/data/drivers';
 import { effectiveStats } from '../../core/sim/stats';
 import type { CarDef, CarStats, UpgradeLevels, UpgradePart } from '../../core/types';
 import type { DeviceId, MenuContext, MenuNav } from '../../game/contracts';
-import { unlockCar } from '../../game/career-save';
+import { syncConquestCars, unlockCar } from '../../game/career-save';
 import { paintColors, paintedCar, seatLook, seatPaint, stepSeatPaint } from '../../game/paints';
 import { saveSave } from '../../game/save';
 import { getLanguage, t } from '../../i18n';
@@ -122,6 +122,7 @@ function careerSummary(ctx: MenuContext, career: CareerState): HTMLElement {
 
 export function careerScreen(api: ScreenApi): ScreenInstance {
   const { ctx } = api;
+  syncConquestCars(ctx.save); // V6c: carro de conquista já ganho entra na garagem (também de uma Expedição criada depois)
   const career = ctx.save.career;
   const ongoing = career !== null && !career.completed;
   const openLobby = (resume: boolean) => {
@@ -212,7 +213,7 @@ export function carScreen(api: ScreenApi, mode: CarScreenMode): ScreenInstance {
   const pool = (seat: number): number[] => {
     const g = garageOf(seat);
     const out: number[] = [];
-    cars.forEach((c, i) => { if (dealer ? c.price > 0 : !!g && ownsCar(g, c.id)) out.push(i); });
+    cars.forEach((c, i) => { if (dealer ? c.price > 0 && !c.conquest : !!g && ownsCar(g, c.id)) out.push(i); });
     return out.length ? out : [0];
   };
   // Carreira concluída: não há o que comprar na garagem; o foco começa no MENU (o último item).

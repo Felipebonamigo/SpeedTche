@@ -34,6 +34,7 @@ const harness = async (name, qs) => {
 for (const car of cars) {
   for (const v of ['front34', 'rear34', 'side', 'front', 'rear']) await harness(`${car}-${v}`, `track=copacabana&seg=300&hud=0&car=${car}&carview=${v}`);
   await harness(`${car}-corrida`, `track=copacabana&seg=300&hud=0&car=${car}`);
+  if (car === 'furgao') await harness(`${car}-corrida-nitro`, `track=copacabana&seg=300&hud=0&car=${car}&nitro=1&nitroat=0`); // a escada cai para trás no nitro
   await harness(`${car}-noite-freio`, `track=copacabana&seg=300&hud=0&car=${car}&tod=night&brake=1`);
   if (only && !only.includes('garagem')) continue;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });

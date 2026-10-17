@@ -232,8 +232,22 @@ export function clearCupProgress(save: SaveData): void {
  * Carro escolhível fora da carreira (lobby, torneio, online): os livres e os comprados numa carreira
  * deste computador. Uma regra só para as telas não divergirem (o online oferecia os 14).
  */
-export function carAvailable(save: Pick<SaveData, 'carsUnlocked'>, car: Pick<CarDef, 'id' | 'price'>): boolean {
-  return car.price === 0 || save.carsUnlocked.includes(car.id);
+export function carAvailable(save: Pick<SaveData, 'carsUnlocked'> & Partial<Pick<SaveData, 'achievements'>>, car: Pick<CarDef, 'id' | 'price'> & { conquest?: string }): boolean {
+  return car.price === 0 || save.carsUnlocked.includes(car.id) || (!!car.conquest && !!save.achievements?.includes(car.conquest));
+}
+
+/**
+ * Carros de CONQUISTA (V6c): quem tem a conquista passa a ter o carro, em todo modo (`carsUnlocked`) e na garagem de todo piloto da Expedição.
+ * Aditivo: só soma ids; idempotente. Devolve verdadeiro se mudou alguma coisa (para a sessão gravar).
+ */
+export function syncConquestCars(save: Pick<SaveData, 'carsUnlocked' | 'achievements' | 'career'>): boolean {
+  let changed = false;
+  for (const car of CARS) {
+    if (!car.conquest || !save.achievements.includes(car.conquest)) continue;
+    if (!save.carsUnlocked.includes(car.id)) { save.carsUnlocked.push(car.id); changed = true; }
+    for (const d of save.career?.drivers ?? []) if (!d.garage.owned.includes(car.id)) { d.garage.owned.push(car.id); changed = true; }
+  }
+  return changed;
 }
 
 /** Libera um carro comprado em todas as modalidades. Devolve verdadeiro se era novo. */

@@ -15,6 +15,8 @@ export interface TestCarOptions {
   /** Um 2º atlas (outra imagem) no material da cabine. */
   secondAtlas?: boolean;
   normalMap?: boolean;
+  /** Uma faixa B (material `stripe_b`) no casco: os estilos com 2+ carros pedem as faixas que eles usam (o 2º sedã, V6c). */
+  stripeB?: boolean;
   /** `lod0` e `lod1` de topo (padrão: sim). Sem LOD, o casco fica sob `body` na raiz; `'so-lod1'` = o `lod1` sem o `lod0` (defeito). */
   lod?: boolean | 'so-lod1';
   /** Caixas a mais no `lod1` (padrão 0; o lod1 padrão é a metade do lod0 ou menos). */
@@ -129,6 +131,7 @@ export function buildTestCar(o: TestCarOptions = {}): Buffer {
     mat('tire', 'tire', { roughness: 0.94 }), // 5
     mat('rim', 'rim', { metalness: 0.9, roughness: 0.3 }), // 6
     mat('decal', 'decal'), // 7
+    ...(o.stripeB ? [mat('stripe_b', 'paint')] : []), // 8
   ];
 
   const lod0Parts: GlbPrimitive[] = [
@@ -139,6 +142,7 @@ export function buildTestCar(o: TestCarOptions = {}): Buffer {
     box(4, 'taillight', [0.6, 0.8, -2.16], [0.34, 0.14, 0.06], uv), box(4, 'taillight', [-0.6, 0.8, -2.16], [0.34, 0.14, 0.06], uv),
     box(1, 'trim', [0, 0.45, 2.1], [1.6, 0.08, 0.3], uv), // spoiler baixo (para-choque dianteiro)
     box(1, 'trim', [0, 1.0, -1.9], [1.6, 0.06, 0.4], uv), // aerofólio
+    ...(o.stripeB ? [box(8, 'paint', [0, 1.02, 0.5], [0.2, 0.01, 1.0], uv)] : []),
   ];
   const lod1Parts: GlbPrimitive[] = [
     box(0, 'paint', [0, 0.7, 0], [1.86, 0.62, 4.3], uv),

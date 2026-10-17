@@ -9,7 +9,7 @@ import { human } from './helpers';
 
 const STATE_CUPS = CUPS.filter((c) => c.stage === 'brasil');
 const WORLD_CUPS = CUPS.filter((c) => c.stage === 'mundial');
-const FOR_SALE = CARS.filter((c) => c.price > 0);
+const FOR_SALE = CARS.filter((c) => c.price > 0 && !c.conquest);
 const noSave = { cupsCompleted: [] as string[], stamps: [] as string[], carsUnlocked: [] as string[] };
 
 /** O item mais barato que um piloto de garagem nova pode comprar: a meta curta dele. */

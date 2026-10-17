@@ -68,13 +68,14 @@ function race(career: CareerState, positions: Record<number, number>) {
 // ───────────────────────────── Carros ─────────────────────────────
 
 describe('carros', () => {
-  it('são 16: os 9 livres são de todos e os 7 à venda custam mais de $ 10 mil (a lista toda: tests/cars.test.ts)', () => {
-    expect(CARS.length).toBe(16);
-    expect(new Set(CARS.map((c) => c.id)).size).toBe(16);
+  it('são 20: os 9 livres são de todos e os 11 de preço (10 à venda + o de conquista) custam mais de $ 8 mil (a lista toda: tests/cars.test.ts)', () => {
+    expect(CARS.length).toBe(20);
+    expect(new Set(CARS.map((c) => c.id)).size).toBe(20);
     expect(CARS.filter((c) => c.price === 0).map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
-    expect(CARS.filter((c) => c.price > 0).length).toBe(7);
+    expect(CARS.filter((c) => c.price > 0).length).toBe(11);
+    expect(CARS.filter((c) => c.conquest).map((c) => c.id)).toEqual(['furgao']);
     for (const c of CARS.filter((x) => x.price > 0)) {
-      expect(c.price).toBeGreaterThan(10_000);
+      expect(c.price).toBeGreaterThanOrEqual(9_000); // o Caipora abre a vitrine (V6c)
       expect(c.name.length).toBeGreaterThan(3);
       expect(c.blurb.length).toBeGreaterThan(10);
     }

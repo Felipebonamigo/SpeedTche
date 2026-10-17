@@ -12,9 +12,12 @@ import { installNodeImage } from '../scripts/lib/node-image';
 import { setLanguage, t } from '../src/i18n';
 import { carSilhouetteMarkup } from '../src/ui/screens/icons';
 import '../src/i18n/core';
+import '../src/career/strings';
 
 beforeAll(installNodeImage);
-const IDS = ['cuiabano', 'tupiniquim'] as const;
+const IDS = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao'] as const;
+/** Estilo de carroceria (o do `CarDef`) e o comprimento mínimo que o validador exige dele. */
+const BODY: Record<(typeof IDS)[number], 'hatch' | 'sedan' | 'micro'> = { cuiabano: 'hatch', tupiniquim: 'hatch', caipora: 'hatch', pampeiro: 'hatch', barao: 'sedan', furgao: 'micro' };
 const file = (id: string) => join(__dirname, '..', 'src', 'assets', 'cars', `${id}.glb`);
 const ab = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 /** O JSON do .glb (nomes de nó, malha e material). */
@@ -34,7 +37,7 @@ describe('carros nacionais: o asset do Blender', () => {
         expect(existsSync(file(id)), `falta src/assets/cars/${id}.glb (npm run carros-blender)`).toBe(true);
         const buf = readFileSync(file(id));
         json = glbJson(buf);
-        const r = await parseCarGlb('hatch', ab(buf), { carId: id });
+        const r = await parseCarGlb(BODY[id], ab(buf), { carId: id });
         expect(r.problems).toEqual([]);
         expect(r.warnings).toEqual([]);
         model = r.model!;
@@ -57,15 +60,15 @@ describe('carros nacionais: o asset do Blender', () => {
         expect(model.wheelModel, 'a roda é a do projeto (catálogo do estilo), não uma roda própria').toBeUndefined();
       });
 
-      it('eixos e pegada do estilo hatch (o núcleo e os rastros não mudam): mesma posição e bitola das rodas', () => {
-        const ref = buildModel('hatch').axles;
+      it('eixos e pegada do estilo do carro (o núcleo e os rastros não mudam): mesma posição e bitola das rodas', () => {
+        const ref = buildModel(BODY[id]).axles;
         for (let i = 0; i < 2; i++) {
           expect(model.axles[i].z, `eixo ${i}`).toBeCloseTo(ref[i].z, 1);
           expect(model.axles[i].x, `bitola ${i}`).toBeCloseTo(ref[i].x, 1);
           expect(model.axles[i].r).toBeGreaterThan(0.33);
         }
         const bb = model.shell.boundingBox!;
-        expect(bb.max.z - bb.min.z).toBeGreaterThan(4.2);
+        expect(bb.max.z - bb.min.z).toBeGreaterThan(BODY[id] === 'micro' ? 3.2 : 4.2);
         expect(bb.max.x - bb.min.x).toBeGreaterThan(1.8);
       });
 
@@ -131,19 +134,23 @@ describe('carros nacionais: o asset do Blender', () => {
 });
 
 describe('carros nacionais: ligação ao jogo', () => {
-  it('os dois são carros livres do estilo hatch, depois dos 7 livres de antes, e a IA segue com os 7 de antes', () => {
+  it('os dois primeiros são carros livres do estilo hatch, depois dos 7 livres de antes, e a IA segue com os 7 de antes', () => {
     const free = CARS.filter((c) => c.price === 0).map((c) => c.id);
     expect(free).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
-    for (const id of IDS) expect(CARS.find((c) => c.id === id)?.body).toBe('hatch');
+    for (const id of IDS) expect(CARS.find((c) => c.id === id)?.body, id).toBe(BODY[id]);
     expect(AI_CAR_POOL.map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto']);
   });
 
-  it('a silhueta 2D dos menus é de cada carro (não a do hatch genérico) e os dois diferem', () => {
+  it('a silhueta 2D dos menus é de cada carro (não a do estilo genérico) e todas diferem entre si', () => {
     const strip = (m: string) => m.replace(/id="[^"]*"|url\(#[^)]*\)/g, '');
-    const [c, t2] = IDS.map((id) => strip(carSilhouetteMarkup(CARS.find((x) => x.id === id)!)));
-    const hatch = strip(carSilhouetteMarkup({ body: 'hatch', color: CARS.find((x) => x.id === 'cuiabano')!.color, accent: CARS.find((x) => x.id === 'cuiabano')!.accent }));
-    expect(c).not.toBe(hatch);
-    expect(t2).not.toBe(c);
+    const marks = IDS.map((id) => {
+      const car = CARS.find((x) => x.id === id)!;
+      const generic = strip(carSilhouetteMarkup({ body: car.body, color: car.color, accent: car.accent }));
+      const own = strip(carSilhouetteMarkup(car));
+      expect(own, id).not.toBe(generic);
+      return own;
+    });
+    expect(new Set(marks).size).toBe(IDS.length);
   });
 
   it('texto em PT e EN para cada um', () => {

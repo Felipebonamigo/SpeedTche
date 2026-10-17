@@ -26,6 +26,9 @@ def build_lod(sp, lod, levels):
     body.parent = root
     cl.wheel_wells(sp, lod).parent = root
     cl.add_patches(sp, body, lod, root)
+    lad = cl.add_ladder(sp, lod)
+    if lad is not None:
+        lad.parent = root
     glass = cl.split_material(body, "glass", "glass")
     if glass is not None:
         glass.parent = root

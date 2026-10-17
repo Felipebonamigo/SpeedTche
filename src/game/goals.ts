@@ -51,7 +51,7 @@ function optionsOf(career: CareerState, driver: number, cars: readonly CarDef[])
     const price = upgradePrice(part, levels[part], d.garage.carId);
     if (price !== null) out.push({ item: 'part', ref: part, price });
   }
-  for (const car of cars) if (car.price > 0 && !ownsCar(d.garage, car.id)) out.push({ item: 'car', ref: car.id, price: car.price });
+  for (const car of cars) if (car.price > 0 && !car.conquest && !ownsCar(d.garage, car.id)) out.push({ item: 'car', ref: car.id, price: car.price });
   return out;
 }
 
@@ -73,7 +73,7 @@ export function nextGoals(input: GoalsInput): GoalsView {
   const cars = input.cars ?? CARS;
   const stateCups = cups.filter((c) => c.stage === 'brasil' && c.state);
   const worldCups = cups.filter((c) => c.stage === 'mundial');
-  const forSale = cars.filter((c) => c.price > 0);
+  const forSale = cars.filter((c) => c.price > 0 && !c.conquest);
 
   // Curta.
   const short: Goal[] = [];

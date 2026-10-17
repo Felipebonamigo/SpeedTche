@@ -23,8 +23,8 @@ describe('ponte com o Electron', () => {
   it('ids de conquista são nomes de API aceitos pela Steam (A–Z, 0–9, _)', () => {
     for (const a of ACHIEVEMENTS) expect(a.id).toMatch(/^[A-Z][A-Z0-9_]*$/);
   });
-  it('67 conquistas (24 de antes da onda G + 27 copas de estado + 5 regiões + passaporte completo + 10 da O5), cada uma com descrição PT e EN e linha no desktop/README.md', () => {
-    expect(ACHIEVEMENTS).toHaveLength(67);
+  it('68 conquistas (24 de antes da onda G + 27 copas de estado + 5 regiões + passaporte completo + 10 da O5 + Hora de entrega da V6c), cada uma com descrição PT e EN e linha no desktop/README.md', () => {
+    expect(ACHIEVEMENTS).toHaveLength(68);
     // A Copa Brasil deixou de existir (save antigo: COPA_BRASIL → COPA_BR_RJ, tests/migration-brasil.test.ts).
     expect(ACHIEVEMENTS.map((a) => a.id)).not.toContain('COPA_BRASIL');
     for (const r of BRAZIL_REGIONS) expect(ACHIEVEMENTS.map((a) => a.id)).toContain(`REGIAO_${r.id.toUpperCase()}`);

@@ -69,6 +69,8 @@ export interface CarModel {
   /** Ordem das pinturas (bits LIVERY_A/LIVERY_B) para o 1º, 2º... carro do estilo. */
   liveries: readonly number[];
   triangles: number;
+  /** Só em modelo de .glb (V6c): o casco tem a escada do carro da firma (material `ladder`), que o renderizador balança (cars/ladder.ts). */
+  ladder?: boolean;
   /** Só no procedural (M4): a traseira-vitrine, para o teste conferir. */
   rear?: RearKit;
 }

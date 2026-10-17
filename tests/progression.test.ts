@@ -200,6 +200,6 @@ describe('settleProgress: a corrida soma XP ao nível (pelas estatísticas) e à
   it('só carros que existem: prêmio de maestria aponta para ids do catálogo da N3', async () => {
     const { FINISH_IDS, RIM_IDS } = await import('../src/game/cosmetics');
     for (const r of MASTERY_REWARDS) expect(r.field === 'finish' ? FINISH_IDS : RIM_IDS).toContain(r.value);
-    expect(CARS.length).toBe(16);
+    expect(CARS.length).toBe(20);
   });
 });

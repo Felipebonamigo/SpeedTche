@@ -39,6 +39,10 @@ registerStrings('core', {
     'car.curupira.blurb': 'Leve e sem teto: o melhor freio da garagem e curva fácil. Pouca reta.',
     'car.iara.blurb': 'Corta o ar: quase a reta do Pororoca, bebendo bem menos. Arisca na curva.',
     'car.beijaflor.blurb': 'Protótipo: ninguém faz curva igual. Bebe muito e não é o mais rápido na reta.',
+    'car.caipora.blurb': 'Redondinho e econômico: curva fácil, pouca sede. Falta fôlego na reta.',
+    'car.pampeiro.blurb': 'Hatch europeu: firme na freada e na curva, bom de reta. Gosta de gasolina.',
+    'car.barao.blurb': 'O carro do tio: reta boa e tanque que dura. Pesado na arrancada e na curva.',
+    'car.furgao.blurb': 'Escada no teto e zero pressa: curva bem, freia bem, anda pouco.',
   },
   en: {
     'car.sucuri.blurb': 'One tank lasts the whole race, and it is quick. Heavy off the line.',
@@ -48,6 +52,10 @@ registerStrings('core', {
     'car.curupira.blurb': 'Light and open-top: the best brakes around and easy in corners. Short on speed.',
     'car.iara.blurb': 'Slices the air: almost the Pororoca\'s speed on far less fuel. Twitchy in corners.',
     'car.beijaflor.blurb': 'A prototype: nothing corners like it. Thirsty, and not the fastest on straights.',
+    'car.caipora.blurb': 'Round and frugal: easy in corners, sips fuel. Short of breath on straights.',
+    'car.pampeiro.blurb': 'A European-style hatch: firm braking and cornering, good on the straights. Thirsty.',
+    'car.barao.blurb': "Uncle's sedan: good top speed and a tank that lasts. Heavy off the line and in corners.",
+    'car.furgao.blurb': 'Ladder on the roof, no hurry: corners and brakes well, slow on straights.',
   },
 });
 

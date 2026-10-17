@@ -76,8 +76,8 @@ describe('lobby: o carro trancado aparece com o cadeado e não pode ser escolhid
     const { screen, carId, lock } = setup();
     until(() => carId() === 'curupira', () => press(screen, 'kb1', 'right'));
     press(screen, 'kb1', 'right');
-    expect(carId()).toBe('sucuri');
-    expect(text(lock()[0])).toContain('Compre na Expedição por $ 16.000');
+    expect(carId()).toBe('pampeiro'); // a vitrine em preço: Caipora, Curupira S, Pampeiro (V6c)
+    expect(text(lock()[0])).toContain('Compre na Expedição por $ 13.000');
   });
 
   it('EN: "Buy it in the Expedition for $12,000"', () => {

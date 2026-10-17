@@ -23,12 +23,13 @@ export function formatPrice(v: number): string {
 }
 
 /** O carro está trancado para este save? (o inverso de `carAvailable`: livre ou comprado numa Expedição deste computador). */
-export function carLocked(save: Pick<SaveData, 'carsUnlocked'>, car: Pick<CarDef, 'id' | 'price'>): boolean {
+export function carLocked(save: Pick<SaveData, 'carsUnlocked'> & Partial<Pick<SaveData, 'achievements'>>, car: Pick<CarDef, 'id' | 'price'> & { conquest?: string }): boolean {
   return !carAvailable(save, car);
 }
 
 /** "Compre na Expedição por $ 12.000". */
-export function lockText(car: Pick<CarDef, 'price'>): string {
+export function lockText(car: Pick<CarDef, 'price'> & { conquest?: string }): string {
+  if (car.conquest) return t('progress.lock.conquest');
   return t('progress.lock.buy', { price: formatPrice(car.price) });
 }
 

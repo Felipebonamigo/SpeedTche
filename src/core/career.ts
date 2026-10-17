@@ -225,6 +225,7 @@ export function buyCar(career: CareerState, driver: number, carId: string): Purc
   const d = career.drivers[driver];
   const def = CARS.find((c) => c.id === carId);
   if (!d || !def) return 'unknown';
+  if (def.conquest) return 'unknown'; // carro de conquista (V6c): não se compra, libera com a conquista
   if (ownsCar(d.garage, carId)) return 'owned';
   if (walletOf(career, driver) < def.price) return 'noMoney';
   career.wallets[walletIndex(career, driver)] -= def.price;

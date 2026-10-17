@@ -33,6 +33,7 @@ import { createTutorialPanel } from '../ui/screens/tutorial';
 import { createTipsHud, describeTip, newTipMemory, observeTips, tipOf, tipsEnabled, type TipMemory, type TipsHud } from '../render/hud-tips';
 import { systemLayout } from '../ui/remap/labels';
 import { newTelemetry, openAchievements, type RaceTelemetry } from './achievements';
+import { syncConquestCars } from './career-save';
 import { saveCupProgress } from './career-save';
 import { compactHumans, createCareerSession } from './career-session';
 import { rollSession } from './expedition';
@@ -164,6 +165,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
   const progress = loadProgress();
   const opened = openAchievements(save, progress);
   if (opened.length > 0) { save.achievements.push(...opened); saveSave(save); }
+  if (syncConquestCars(save)) saveSave(save);
   void syncSteamOnOpen(getDesktop(), save, () => saveSave(save));
 
   let renderer: Renderer = makeRenderer(settings.renderStyle, canvas, hudRoot);

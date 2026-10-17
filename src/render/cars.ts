@@ -30,6 +30,7 @@ import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
 import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameCover, flameGain } from './cars/flame';
 import { newMotion, stepMotion, type Motion, type MotionInput } from './cars/motion';
+import { ladderBits, newLadder, stepLadder, type LadderState } from './cars/ladder';
 import { STAR_COLORS, STARS_PER_CAR, buildStarGeometry, starPose, type StarPose } from './cars/stars';
 import { CAR_BODIES } from '../core/data/cars';
 
@@ -82,6 +83,8 @@ interface CarDraw {
 interface CarAnim {
   spinF: number; spinR: number; yaw: number; roll: number; pitch: number; bob: number;
   brake: boolean; prevSpeed: number; nitro: number;
+  /** A escada do carro da firma (cars/ladder.ts); só anda em modelo com `ladder`. */
+  ladder: LadderState;
   /** Guinada da derrapagem, rodopio, quique, squash & stretch e estrelinhas (cars/motion.ts). */
   motion: Motion;
 }
@@ -239,7 +242,7 @@ export class Cars {
     this.ghost.matrixAutoUpdate = false; this.ghost.frustumCulled = false; this.ghost.visible = false; this.ghost.renderOrder = 3;
     this.group.add(this.ghost);
     for (let i = 0; i < MAX_CARS; i++) {
-      this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, motion: newMotion() });
+      this.anims.push({ spinF: 0, spinR: 0, yaw: 0, roll: 0, pitch: 0, bob: 0, brake: false, prevSpeed: 0, nitro: 0, ladder: newLadder(), motion: newMotion() });
       this.looks.push(null); this.lookIds.push(''); this.lookCars.push('');
     }
     // Faróis do carro do viewport: dois SpotLights que `pose` leva à frente do carro do viewport (cor-brilho: ficavam na linha central, e com o
@@ -373,6 +376,7 @@ export class Cars {
       a.pitch += (pitchTarget - a.pitch) * k;
       a.bob = c.skidTicks > 0 && c.speed > 200 ? 1 : 0;
       a.nitro = c.nitroTicks > 0 ? c.nitroTicks / NITRO_DURATION_TICKS : 0;
+      if (look.style.model.ladder) stepLadder(a.ladder, { roll: a.roll, nitro: a.nitro, reduce: frame.options.reduceEffects }, dt); // V6c: balança e cai no nitro
       // M4: guinada da derrapagem, batida e esticão, só visuais, por borda do estado (cars/motion.ts).
       const mi = this.motionIn;
       mi.driftDir = c.driftDir; mi.driftTicks = c.driftTicks; mi.driftBoostTicks = c.driftBoostTicks; mi.nitroTicks = c.nitroTicks;
@@ -447,7 +451,7 @@ export class Cars {
       d.scale.set(mo.sx, mo.sy, mo.sz);
       d.updateMatrix();
       this.m.copy(d.matrix);
-      let flags = look.body | (a.brake ? BRAKE_BIT : 0);
+      let flags = look.body | (a.brake ? BRAKE_BIT : 0) | (model.ladder ? ladderBits(a.ladder) : 0);
       if (i === ownIndex) this.aimHeadlights(this.m);
       if (i === ownIndex && isMountedCamera(camera)) {
         const mp = this.mountOf(model);

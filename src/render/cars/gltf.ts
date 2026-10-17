@@ -69,6 +69,8 @@ export function brushForMaterial(material: THREE.Material): Brush {
     const k = Math.max(e.r, e.g, e.b) * (std.emissiveIntensity ?? 1) / Math.max(1e-6, c.r, c.g, c.b);
     return Math.min(1, k);
   };
+  // V6c: a escada do carro da firma — vértice marcado (popup 0,5; o farol escamoteável é 1) que o shader balança com os bits da instância (cars/ladder.ts).
+  if (name.startsWith('ladder')) return { ...base, popup: 0.5 };
   if (name.startsWith('stripe_ab')) return { ...base, paint: 1, layer: 3 };
   if (name.startsWith('stripe_a')) return { ...base, paint: 1, layer: 1 };
   if (name.startsWith('stripe_b')) return { ...base, paint: 1, layer: 2 };
@@ -142,6 +144,7 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
   const isShell = (p: Part) => p.under === null && !p.kit && !p.decal;
   const shellParts = parts.filter((p) => isShell(p) && p.lod !== 1);
   const lod1Parts = parts.filter((p) => isShell(p) && p.lod === 1);
+  const shellHasLadder = shellParts.some((p) => (Array.isArray(p.mesh.material) ? p.mesh.material : [p.mesh.material]).some((m) => cleanName(m.name).startsWith('ladder')));
   if (!shellParts.length) {
     const why = lod1Parts.length ? 'só há o nó lod1: falta o lod0 com o casco (o lod1 é a versão simplificada dele)' : 'nenhuma malha de carroceria (fora dos nós wheel_* e exhaust_*)';
     return { model: null, problems: [why], warnings: [] };
@@ -282,6 +285,7 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
         symmetry: (Math.PI * 2) / (Number.isFinite(spokes) && spokes > 0 ? spokes : DEFAULT_SPOKES),
       },
     }),
+    ...(shellHasLadder ? { ladder: true } : {}),
     ...(carId ? { carId } : {}), ...(lod1 ? { lod1 } : {}), ...(map ? { map } : {}), ...(normalMap ? { normalMap } : {}),
   };
   return { model, problems: [...problems, ...checkCarModel(model)], warnings: [...new Set(warnings)] };

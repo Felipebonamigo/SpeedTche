@@ -244,6 +244,8 @@ export function unlockAchievements(
   const totals = save.stats.totals;
   if (totals.meters >= MARATHON_METERS) add('MARATONA', everyone);
   if (totals.wins >= WINS_TARGET) add('DEZ_VITORIAS', winners.length ? winners : everyone);
+  // V6c: "Hora de entrega" — as mesmas 10 vitórias, sem ter comprado nenhum carro (só com os livres). Libera o Furgãozinho da Firma.
+  if (totals.wins >= WINS_TARGET && boughtCars(save).length === 0) add('HORA_DE_ENTREGA', winners.length ? winners : everyone);
   if (TRACKS.every((def) => totals.bestPositions[def.id] !== undefined)) add('GIRO_COMPLETO', everyone);
   if (cupJustCompleted) {
     add(`COPA_${cupJustCompleted.toUpperCase()}`, everyone);
@@ -280,14 +282,19 @@ export function evaluateAchievements(
  * PRIMEIRA_PECA: alguma melhoria na garagem da Expedição; CARRO_NOVO: um carro comprado (`carsUnlocked`); OFICINA_COMPLETA: todas as peças
  * de um carro no máximo dele; COLECIONADOR: os carros à venda todos comprados.
  */
+/** Os carros COMPRADOS do save (o de conquista, quando liberado, também vai em `carsUnlocked` e não é compra). */
+function boughtCars(save: Pick<SaveData, 'carsUnlocked'>): string[] {
+  return save.carsUnlocked.filter((id) => !CARS.find((c) => c.id === id)?.conquest);
+}
+
 export function economyAchievements(save: Pick<SaveData, 'achievements' | 'career' | 'carsUnlocked'>): string[] {
   const out: string[] = [];
   const garages = save.career?.drivers.map((d) => d.garage) ?? [];
   if (garages.some((g) => Object.values(g.upgrades).some((u) => hasUpgrades(u)))) out.push('PRIMEIRA_PECA');
-  if (save.carsUnlocked.length > 0) out.push('CARRO_NOVO');
+  if (boughtCars(save).length > 0) out.push('CARRO_NOVO');
   const full = (carId: string, up: Record<string, number> | undefined) => !!up && UPGRADE_PARTS.every((p) => (up[p] ?? 0) >= partMaxLevel(carId, p));
   if (garages.some((g) => Object.entries(g.upgrades).some(([carId, up]) => full(carId, up)))) out.push('OFICINA_COMPLETA');
-  if (CARS.filter((c) => c.price > 0).every((c) => save.carsUnlocked.includes(c.id))) out.push('COLECIONADOR');
+  if (CARS.filter((c) => c.price > 0 && !c.conquest).every((c) => save.carsUnlocked.includes(c.id))) out.push('COLECIONADOR');
   return out.filter((id) => !save.achievements.includes(id));
 }
 
@@ -298,6 +305,7 @@ export function economyAchievements(save: Pick<SaveData, 'achievements' | 'caree
 export function openAchievements(save: Pick<SaveData, 'achievements' | 'career' | 'carsUnlocked' | 'racesRun' | 'stats'>, progress: ProgressData): string[] {
   const out = new Set(economyAchievements(save));
   if (save.racesRun > 0) out.add('PRIMEIRA_CORRIDA');
+  if (save.stats.totals.wins >= WINS_TARGET && boughtCars(save).length === 0) out.add('HORA_DE_ENTREGA');
   const levels = save.stats.players.map((p) => levelOf(xpOfStats(p)).level);
   if (levels.some((l) => l >= 2)) out.add('SUBIU_DE_NIVEL');
   if (levels.some((l) => l >= MAX_LEVEL)) out.add('NIVEL_MAXIMO');
