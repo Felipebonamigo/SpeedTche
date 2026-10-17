@@ -231,6 +231,8 @@ Cada um dos 13 estilos de carroceria (`CarDef.body`, lista em `CAR_BODIES`) tem 
 próprio, com silhueta que se reconhece de longe. Não existe modelo genérico de reserva: estilo sem
 construtor é erro (`buildModel`), e `tests/car-models.test.ts` confere que as 13 malhas são diferentes.
 
+> **V2, etapa dos estilos (16–17/10/2026):** os outros dez (`prototype`, `roadster`, `rally`, `muscle`, `electric`, `hatch`, `sedan`, `pickup`, `classic`, `micro`) também estão no desenho HCT (casco por linhas, vidro escuro, lanternas embutidas atrás); eixos, pegada, escapes, roda e pinturas iguais. Contagens, gate e folhas: `docs/ondas/V2-estilos.md`.
+
 | Estilo | Silhueta | O que o denuncia de longe | Roda |
 |---|---|---|---|
 | `gt` | **estilo HCT (V2, 15/10/2026)**: supercarro de motor central em cunha (F40/F50, Countach, NSX), casco por linhas (`cars/hull.ts`) | bico baixo com faróis de projetor deitados no capô, cabine avançada de vidro escuro, entrada de ar no flanco, traseira com 4 lanternas redondas **embutidas** num painel preto (lente acesa no fundo do poço), pisca e ré apagados, difusor de 6 aletas, asa com suportes; faixas A do bico à cauda (e na asa) e B no vinco | `sport5` |

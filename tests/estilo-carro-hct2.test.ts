@@ -1,0 +1,284 @@
+// V2, etapa 3 (docs/ondas/V2-estilos.md): os demais estilos no desenho HCT, um bloco por estilo, vistos falhar nos modelos de antes. O bloco comum
+// (tests/hct-common.ts: vidro, lanterna com moldura, faixas, lod1, validador; orçamento 4.500 △ do jogo) e a identidade de cada um (docs/CARROS.md).
+import { describe, expect, it } from 'vitest';
+import { buildModel } from '../src/render/cars/models';
+import { hctCommon } from './hct-common';
+import { probe } from './hct-probe';
+
+describe('protótipo HCT (prototype, Beija-Flor)', () => {
+  const m = buildModel('prototype');
+  const P = probe(m);
+  hctCommon('prototype', { tailCenters: 6, bandFront: -2.12, bandBack: 1.95, maxTris: 4500 });
+
+  it('baixíssimo: teto ≤ 1,08 m e o bico abaixo de 0,40 m nos primeiros 12 cm', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.4 && t.c[2] < 0.6 && t.c[1] > 0.85).map((t) => t.c[1]);
+    expect(roof.length).toBeGreaterThan(5);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.08);
+    let top = 0;
+    for (let i = 0; i < P.pos.count; i++) if (P.pos.getZ(i) <= -2.08) top = Math.max(top, P.pos.getY(i));
+    expect(top).toBeLessThan(0.4);
+  });
+
+  it('faróis em fenda: um projetor em leque por lado, numa fenda de até 7 cm de altura', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) {
+      expect(heads.filter((p) => side * p[0] > 0.2).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+      const lit = P.T.filter((t) => P.isHead(t.i) && side * t.c[0] > 0.2);
+      const ys = lit.flatMap((t) => [P.pos.getY(t.i), P.pos.getY(t.i + 1), P.pos.getY(t.i + 2)]);
+      expect(Math.max(...ys) - Math.min(...ys), `lado ${side}`).toBeLessThanOrEqual(0.07);
+    }
+  });
+
+  it('barbatana de acento do teto à asa, o escape central de sempre e a asa de ponta a ponta com placas', () => {
+    const fin = P.T.filter((t) => P.accent(t.i) && Math.abs(t.n[0]) > 0.9 && Math.abs(t.c[0]) < 0.05 && t.c[1] > 0.75 && t.c[2] > 0.4 && t.c[2] < 1.9);
+    expect(fin.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.25);
+    expect(m.rear?.exhausts).toEqual([{ x: 0, y: 0.44, z: 2.24, r: 0.085 }]);
+    const w = m.rear?.wing;
+    expect(w, 'asa').toBeTruthy();
+    if (w) expect(w.max[0] - w.min[0]).toBeGreaterThanOrEqual(1.8);
+  });
+});
+
+describe('roadster HCT (roadster, Curupira S)', () => {
+  const m = buildModel('roadster');
+  const P = probe(m);
+  hctCommon('roadster', { tailCenters: 4, bandFront: -1.95, bandBack: 1.95, noGlass: true, aSkip: [-0.6, 0.95], maxTris: 4500 });
+
+  it('cockpit aberto: do alto, no meio, o que se vê é o assoalho do interior (não pintado, abaixo de 0,85 m), e o piloto de capacete de acento fica à esquerda', () => {
+    const h = P.fromAbove(0, 0.1);
+    expect(h).not.toBeNull();
+    expect(P.painted(h?.i ?? 0)).toBe(false);
+    expect(h?.y ?? 9).toBeLessThanOrEqual(0.85);
+    const helmet = P.T.filter((t) => P.accent(t.i) && t.c[1] > 0.85 && t.c[2] > 0 && t.c[2] < 0.8);
+    expect(helmet.length).toBeGreaterThan(4);
+    expect(helmet.reduce((s, t) => s + t.c[0], 0) / helmet.length).toBeLessThan(-0.2);
+  });
+
+  it('para-brisa baixo (até 1,10 m, começa depois de z = −0,75) e o santantônio duplo atrás dos bancos acima de 1,05 m', () => {
+    const g = P.T.filter((t) => P.isGlass(t.i) && t.c[2] < 0.2);
+    expect(g.length).toBeGreaterThan(3);
+    expect(Math.max(...g.map((t) => t.c[1]))).toBeLessThanOrEqual(1.1);
+    expect(Math.min(...g.map((t) => t.c[2]))).toBeGreaterThan(-0.75);
+    const bars = P.T.filter((t) => t.c[1] > 1.05 && t.c[2] > 0.6 && t.c[2] < 0.95);
+    expect(bars.length).toBeGreaterThan(4);
+  });
+
+  it('faróis redondos em leque nos para-lamas (um por lado, ≥ 0,066 m² de luz) e escapes gêmeos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.4, 0.4]);
+  });
+});
+
+describe('rali HCT (rally, Carcará RS)', () => {
+  const m = buildModel('rally');
+  const P = probe(m);
+  hctCommon('rally', { tailCenters: 4, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('hatch alto de suspensão levantada: teto entre 1,30 e 1,45 m e a saia a ≥ 0,25 m do chão', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 1.2 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(roof.length).toBeGreaterThan(5);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    const side = P.T.filter((t) => t.n[1] > -0.85 && Math.abs(t.c[2]) < 0.5 && Math.abs(t.c[0]) > 0.6);
+    expect(Math.min(...side.flatMap((t) => [P.pos.getY(t.i), P.pos.getY(t.i + 1), P.pos.getY(t.i + 2)]))).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('para-lamas alargados em caixa (≥ 0,96 m de meia largura sobre as rodas) com a borda preta no arco', () => {
+    for (const z of [-1.3, 1.28]) {
+      let w = 0;
+      for (let i = 0; i < P.pos.count; i++) if (Math.abs(P.pos.getZ(i) - z) < 0.3 && P.pos.getY(i) > 0.5 && P.pos.getY(i) < 1.0) w = Math.max(w, P.pos.getX(i));
+      expect(w, `z = ${z}`).toBeGreaterThanOrEqual(0.96);
+    }
+    const trim = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && Math.abs(t.c[0]) > 0.8 && Math.abs(t.c[2] + 1.3) < 0.6 && t.c[1] > 0.45 && t.c[1] < 0.9);
+    expect(trim.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.1);
+  });
+
+  it('quatro faróis de milha redondos em leque na frente (y entre 0,40 e 0,56), os dois faróis e o escape único grosso à direita', () => {
+    const fogs = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] > 0.4 && p[1] < 0.56 && p[2] < -2.0);
+    expect(fogs.length).toBeGreaterThanOrEqual(4);
+    expect(m.rear?.exhausts).toEqual([{ x: 0.55, y: 0.32, z: 2.22, r: 0.09 }]);
+  });
+});
+
+describe('muscle HCT (muscle, Trovão V12)', () => {
+  const m = buildModel('muscle');
+  const P = probe(m);
+  hctCommon('muscle', { tailCenters: 6, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('capô longo e reto com a tomada de ar elevada (≥ 10 cm acima do capô) e a frente alta e chata (≥ 0,70 m nos primeiros 12 cm)', () => {
+    const y = (x: number, z: number): number => P.fromAbove(x, z)?.y ?? 0;
+    expect(Math.abs(y(0.4, -2.0) - y(0.4, -0.9))).toBeLessThanOrEqual(0.1);
+    expect(y(0, -1.0) - y(0.4, -1.0)).toBeGreaterThanOrEqual(0.1);
+    let top = 0;
+    for (let i = 0; i < P.pos.count; i++) if (P.pos.getZ(i) <= -2.1) top = Math.max(top, P.pos.getY(i));
+    expect(top).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('dois faróis redondos em leque na grade, a entrada de ar escura atrás da porta (≥ 0,04 m² por lado) e os escapes gêmeos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) {
+      expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+      const area = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && side * t.n[0] > 0.7 && side * t.c[0] > 0.85 && t.c[2] > 0.3 && t.c[2] < 0.95 && t.c[1] > 0.3 && t.c[1] < 0.6).reduce((s, t) => s + t.area, 0);
+      expect(area, `entrada, lado ${side}`).toBeGreaterThan(0.04);
+    }
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.52, 0.52]);
+  });
+});
+
+describe('elétrico HCT (electric, Sucuri E)', () => {
+  const m = buildModel('electric');
+  const P = probe(m);
+  hctCommon('electric', { tailCenters: 4, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('teto de vidro inteiro (≥ 1,0 m² de vidro olhando para cima) e a faixa de luz da traseira vai de ponta a ponta (≥ 1,5 m)', () => {
+    const roof = P.T.filter((t) => P.isGlass(t.i) && t.n[1] > 0.5).reduce((s, t) => s + t.area, 0);
+    expect(roof).toBeGreaterThanOrEqual(1.0);
+    const xs = P.T.filter((t) => P.isTail(t.i) && t.n[2] > 0.5).flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('bico fechado com a faixa de luz diurna e faróis finos em leque nas pontas (dois leques por lado), sem grade', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.05 && p[2] < -2.0).length, `lado ${side}`).toBeGreaterThanOrEqual(2);
+    // Grade = lamelas foscas (rugosidade > 0,5: TRIM e GRILLE); o painel preto brilhante da frente (PIANO) não é grade.
+    const grille = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && P.mat.getX(t.i) > 0.5 && t.n[2] < -0.7 && t.c[2] < -2.0 && t.c[1] > 0.4).reduce((s, t) => s + t.area, 0);
+    expect(grille, 'sem grade').toBeLessThanOrEqual(0.05);
+  });
+
+  it('sem escapamento: os dois bocais do jato de sempre no difusor (x = ±0,3)', () => {
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.3, 0.3]);
+  });
+});
+
+describe('hatch HCT (hatch, Tornado RS)', () => {
+  const m = buildModel('hatch');
+  const P = probe(m);
+  hctCommon('hatch', { tailCenters: 2, bandFront: -1.9, bandBack: 1.9, maxTris: 4500 });
+
+  it('compacto e alto: teto entre 1,30 e 1,45 m, a cabine vai até o fim do carro (vidro de trás passa de z = 1,85) e o rabo é quase vertical', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 1.2 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    const rearGlass = P.T.filter((t) => P.isGlass(t.i) && t.c[2] > 1.2).map((t) => Math.max(P.pos.getZ(t.i), P.pos.getZ(t.i + 1), P.pos.getZ(t.i + 2)));
+    expect(Math.max(...rearGlass)).toBeGreaterThanOrEqual(1.85);
+  });
+
+  it('aerofólio de teto de acento com abas (≥ 1,2 m de largura, acima de 1,3 m) e o escape central duplo de sempre', () => {
+    const w = P.T.filter((t) => P.accent(t.i) && t.c[1] > 1.3);
+    expect(w.length).toBeGreaterThan(4);
+    const xs = w.flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(1.2);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.17, 0.17]);
+  });
+
+  it('faróis de canto retangulares em leque, grade colmeia com o friso de acento e piscas laterais âmbar', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3 && p[1] > 0.5).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const amber = P.T.filter((t) => Math.abs(P.col.getX(t.i) - 1) < 0.01 && Math.abs(P.col.getY(t.i) - 0.38) < 0.15 && P.mat.getZ(t.i) > 0.3 && P.mat.getZ(t.i) < 0.6);
+    expect(amber.length).toBeGreaterThan(0);
+  });
+});
+
+describe('sedã HCT (sedan, Camelo X)', () => {
+  const m = buildModel('sedan');
+  const P = probe(m);
+  hctCommon('sedan', { tailCenters: 2, bandFront: -1.95, bandBack: 1.95, maxTris: 4500 });
+
+  it('três volumes: teto alto (1,30–1,45 m) e porta-malas baixo atrás do vidro (≤ 0,98 m em z = 1,9)', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 0.8 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    expect(P.fromAbove(0.3, 1.9)?.y ?? 9).toBeLessThanOrEqual(0.98);
+  });
+
+  it('faróis retangulares largos em leque, pisca âmbar e friso cromado na linha das janelas', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) > 0.8 && t.c[1] > 0.84 && t.c[1] < 0.98 && t.c[2] > -0.6 && t.c[2] < 1.4);
+    expect(chrome.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.02);
+  });
+
+  it('luz de ré em leque ao lado da lanterna (a lente é âmbar-clara, de pouco brilho) e um escape discreto à direita', () => {
+    const rev = P.lensCenters((i) => P.mat.getW(i) > 0.05 && P.mat.getW(i) < 0.5);
+    expect(rev.filter((p) => p[0] > 0).length).toBeGreaterThanOrEqual(1);
+    expect(rev.filter((p) => p[0] < 0).length).toBeGreaterThanOrEqual(1);
+    expect(m.rear?.exhausts).toEqual([{ x: 0.5, y: 0.27, z: 2.25, r: 0.075 }]);
+  });
+});
+
+describe('picape HCT (pickup, Tatu 4x4)', () => {
+  const m = buildModel('pickup');
+  const P = probe(m);
+  hctCommon('pickup', { tailCenters: 2, bandFront: -1.95, bandBack: 1.9, aSkip: [0.4, 2.15], maxTris: 4500 });
+
+  it('alta e quadrada (teto entre 1,65 e 1,95 m) com a caçamba aberta: do alto, em z = 1,2, o fundo escuro fica abaixo de 0,9 m', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.8 && t.c[2] < 0.3 && t.c[1] > 1.4).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.65);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.95);
+    const h = P.fromAbove(0, 1.2);
+    expect(P.painted(h?.i ?? 0)).toBe(false);
+    expect(h?.y ?? 9).toBeLessThanOrEqual(0.9);
+  });
+
+  it('santantônio com quatro faróis de milha em leque acima do teto, faróis retangulares na frente e o escape único de lado', () => {
+    const roofLamps = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] > 1.6);
+    expect(roofLamps.length).toBeGreaterThanOrEqual(4);
+    const front = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] < 1.2 && p[2] < -2.0);
+    expect(front.length).toBeGreaterThanOrEqual(2);
+    expect(m.rear?.exhausts).toEqual([{ x: -0.62, y: 0.4, z: 2.2, r: 0.085 }]);
+  });
+});
+
+describe('clássico HCT (classic, Boto Luxo)', () => {
+  const m = buildModel('classic');
+  const P = probe(m);
+  hctCommon('classic', { tailCenters: 4, bandFront: -1.95, bandBack: 1.95, maxTris: 4500 });
+
+  it('bico estreito (≤ 0,77 m de meia largura nos primeiros 10 cm) e para-lamas bojudos (≥ 0,90 m sobre a roda dianteira)', () => {
+    let nose = 0; let fender = 0;
+    for (let i = 0; i < P.pos.count; i++) {
+      if (!P.painted(i)) continue; // só a lataria (os para-choques cromados partidos passam de 0,77)
+      const z = P.pos.getZ(i); const x = Math.abs(P.pos.getX(i));
+      if (z <= -2.1) nose = Math.max(nose, x);
+      if (z > -1.65 && z < -1.15 && P.pos.getY(i) > 0.5) fender = Math.max(fender, x);
+    }
+    expect(nose).toBeLessThanOrEqual(0.77);
+    expect(fender).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it('faróis redondos em leque nos para-lamas, o friso cromado na cintura (≥ 0,02 m²) e os escapes gêmeos longos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.4).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) > 0.8 && t.c[1] > 0.5 && t.c[1] < 0.75 && t.c[2] > -1.9 && t.c[2] < 1.9);
+    expect(chrome.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.02);
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.26, 0.26]);
+  });
+});
+
+describe('microcarro HCT (micro, Saci Mirim)', () => {
+  const m = buildModel('micro');
+  const P = probe(m);
+  hctCommon('micro', { tailCenters: 2, bandFront: -1.5, bandBack: 1.5, maxTris: 4500 });
+
+  it('curto (≤ 3,5 m) e gordinho, de cabine alta e redonda com o teto na camada A (a cor do teto) e ≥ 1,40 m de altura', () => {
+    const zs = Array.from({ length: P.pos.count }, (_, i) => P.pos.getZ(i));
+    expect(Math.max(...zs) - Math.min(...zs)).toBeLessThanOrEqual(3.5);
+    const roof = P.fromAbove(0, 0.2);
+    expect(roof?.y ?? 0).toBeGreaterThanOrEqual(1.4);
+    expect(P.isA(roof?.i ?? 0)).toBe(true);
+  });
+
+  it('"olhos" redondos grandes em leque nos para-lamas (um por lado, lente de ≥ 12 cm de raio), bigode cromado e pisca âmbar', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) {
+      const mine = heads.filter((p) => side * p[0] > 0.3);
+      expect(mine.length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+      const lit = P.T.filter((t) => P.isHead(t.i) && side * t.c[0] > 0.3 && t.n[2] < -0.5);
+      const xs = lit.flatMap((t) => [P.pos.getX(t.i), P.pos.getX(t.i + 1), P.pos.getX(t.i + 2)]);
+      expect((Math.max(...xs) - Math.min(...xs)) / 2, `lado ${side}`).toBeGreaterThanOrEqual(0.12);
+    }
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) < 0.3 && t.c[2] < -1.55 && t.c[1] > 0.4 && t.c[1] < 0.55);
+    expect(chrome.length).toBeGreaterThan(2);
+  });
+});
