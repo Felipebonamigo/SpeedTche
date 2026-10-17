@@ -206,3 +206,26 @@ describe('sedã HCT (sedan, Camelo X)', () => {
     expect(m.rear?.exhausts).toEqual([{ x: 0.5, y: 0.27, z: 2.25, r: 0.075 }]);
   });
 });
+
+describe('picape HCT (pickup, Tatu 4x4)', () => {
+  const m = buildModel('pickup');
+  const P = probe(m);
+  hctCommon('pickup', { tailCenters: 2, bandFront: -1.95, bandBack: 1.9, aSkip: [0.4, 2.15], maxTris: 4500 });
+
+  it('alta e quadrada (teto entre 1,65 e 1,95 m) com a caçamba aberta: do alto, em z = 1,2, o fundo escuro fica abaixo de 0,9 m', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.8 && t.c[2] < 0.3 && t.c[1] > 1.4).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.65);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.95);
+    const h = P.fromAbove(0, 1.2);
+    expect(P.painted(h?.i ?? 0)).toBe(false);
+    expect(h?.y ?? 9).toBeLessThanOrEqual(0.9);
+  });
+
+  it('santantônio com quatro faróis de milha em leque acima do teto, faróis retangulares na frente e o escape único de lado', () => {
+    const roofLamps = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] > 1.6);
+    expect(roofLamps.length).toBeGreaterThanOrEqual(4);
+    const front = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] < 1.2 && p[2] < -2.0);
+    expect(front.length).toBeGreaterThanOrEqual(2);
+    expect(m.rear?.exhausts).toEqual([{ x: -0.62, y: 0.4, z: 2.2, r: 0.085 }]);
+  });
+});
