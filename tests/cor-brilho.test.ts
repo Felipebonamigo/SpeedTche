@@ -118,7 +118,9 @@ function shade(p: Palette, s: SceneryId, t: TimeOfDay, hex: string, face: Face, 
   const fill = g.fill ?? 1;
   let env = mul(mixv([lum(envRaw), lum(envRaw), lum(envRaw)], envRaw, fill), p.envIntensity);
   if (opts.road && g.road) { // a luz ambiente da pista de dia: a luminância dela no tom quente (a hemisférica e a IBL; o sol não)
-    const grey = (c: V): V => mixv(c, mul(g.road!.tint, lum(c)), g.road!.mix);
+    // ... só no albedo escuro: o tom quente desfaz a tinta azul das sombras, que pesa nos escuros; numa faixa branca deixaria laranja (corte pela luminância do albedo)
+    const w = g.road.mix * (1 - sstep(0.22, 0.5, lum(A)));
+    const grey = (c: V): V => mixv(c, mul(g.road!.tint, lum(c)), w);
     hemi = grey(hemi); env = grey(env);
   }
   const self = car ? mul(A, (0.05 + 0.15 * p.light) * (1 - 0.65 * lum(A))) : [0, 0, 0] as V;
@@ -249,6 +251,13 @@ describe('2b. asfalto de dia à sombra: cinza quente, não azul-marinho (só a p
     expect(bad).toEqual([]);
   });
 
+  it('a faixa branca e a zebra clara não esquentam: o albedo claro fica como estava (±2 por canal), à sombra e ao sol', () => {
+    for (const [s, p] of DAY) for (const sun of [false, true]) {
+      const before = roadShade(s, p, false, sun, p.lane); const now = roadShade(s, p, true, sun, p.lane);
+      now.forEach((v, k) => expect(Math.abs(v - before[k]), `${s} ${sun ? 'ao sol' : 'à sombra'} faixa rgb(${now.join(',')}) × ${before.join(',')}`).toBeLessThanOrEqual(2));
+    }
+  });
+
   it('só a luz ambiente da pista de dia muda: entardecer e noite (mix 0) dão a MESMA cor do asfalto, com e sem a luz da pista', () => {
     for (const s of SCENERIES) for (const t of LATE) {
       const p = palette(s, t);
@@ -275,6 +284,7 @@ describe('2b. asfalto de dia à sombra: cinza quente, não azul-marinho (só a p
     };
     const road = frag('road');
     expect(road).toContain('STYLIZE_ROAD_CODE');
+    expect(road, 'o efeito cai com a luminância do albedo (a faixa branca não esquenta)').toContain('smoothstep( 0.22, 0.5, dot( diffuseColor.rgb');
     expect(road.indexOf('STYLIZE_ROAD_CODE'), 'depois do trecho da IBL (lights_fragment_maps)').toBeGreaterThan(road.indexOf('iblIrradiance = mix('));
     for (const f of ['ground', 'scenery', 'facade', 'car', 'ghost'] as const) expect(frag(f), f).not.toContain('STYLIZE_ROAD_CODE');
     const u = (S.stylizeUniforms as unknown as Record<string, { value: THREE.Vector4 }>).uStylizeRoad;

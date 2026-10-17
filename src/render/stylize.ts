@@ -301,13 +301,18 @@ const FILL_GLSL = /* glsl */ `
 
 /**
  * V4b, só na família da pista: a luz ambiente (hemisférica em `irradiance`, IBL em `iblIrradiance`, já com o `fill`) vira a luminância dela no tom quente
- * `uStylizeRoad.rgb`, na fração `uStylizeRoad.w` (0 = igual a antes). O sol (luz direta) e o reflexo do céu não mudam.
+ * `uStylizeRoad.rgb`, na fração `uStylizeRoad.w` (0 = igual a antes). O sol (luz direta) e o reflexo do céu não mudam. O tom quente desfaz a tinta azul das
+ * sombras da gradação, que só pesa nos ESCUROS: num albedo claro (a faixa branca, a zebra) o mesmo tom ficaria alaranjado, então o efeito cai com a luminância
+ * do albedo (cheio no asfalto, ≤ 0,22; zero a partir de 0,5).
  */
 const ROAD_GLSL = /* glsl */ `
 /* STYLIZE_ROAD_CODE */
 #if defined( RE_IndirectDiffuse )
-  irradiance = mix( irradiance, vec3( dot( irradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, uStylizeRoad.w );
-  iblIrradiance = mix( iblIrradiance, vec3( dot( iblIrradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, uStylizeRoad.w );
+{
+  float rW = uStylizeRoad.w * ( 1.0 - smoothstep( 0.22, 0.5, dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ) );
+  irradiance = mix( irradiance, vec3( dot( irradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, rW );
+  iblIrradiance = mix( iblIrradiance, vec3( dot( iblIrradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, rW );
+}
 #endif
 `;
 
