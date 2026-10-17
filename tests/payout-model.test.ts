@@ -131,7 +131,7 @@ describe('payoutModel: "Já dá para" (M5)', () => {
   });
   it('quem já podia comprar antes não conta: sem cruzamento, nada', () => {
     const { career, humans } = careerOf(1, 'solo');
-    career.wallets[0] = 5000; // todas as peças de nível 1 (até 2.400) já cabiam
+    career.wallets[0] = 3000; // todas as peças de nível 1 (até 2.400) já cabiam; e com o 3º lugar ainda fica abaixo do carro mais barato à venda (Jabuti, 7.000)
     const { model } = pay(career, humans, { 0: 3 });
     expect(model.columns[0].wallet?.canBuy).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('payoutModel: "Já dá para" (M5)', () => {
     const { career, humans } = careerOf(1, 'solo');
     const curupira = CARS.find((c) => c.id === 'curupira');
     expect(curupira?.price).toBeGreaterThan(0);
-    career.wallets[0] = 7000; // + 6.000 do 1º = 13.000: cruza o Curupira (12.000) e fica abaixo do Sucuri (16.000)
+    career.wallets[0] = 6500; // + 6.000 do 1º = 12.500: cruza o Curupira (12.000), o mais caro cruzado, e fica abaixo do Pampeiro (13.000)
     const { model } = pay(career, humans, { 0: 1 });
     const buy = model.columns[0].wallet?.canBuy;
     expect(buy?.kind).toBe('car');
