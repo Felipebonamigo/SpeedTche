@@ -100,3 +100,28 @@ describe('rali HCT (rally, Carcará RS)', () => {
     expect(m.rear?.exhausts).toEqual([{ x: 0.55, y: 0.32, z: 2.22, r: 0.09 }]);
   });
 });
+
+describe('muscle HCT (muscle, Trovão V12)', () => {
+  const m = buildModel('muscle');
+  const P = probe(m);
+  hctCommon('muscle', { tailCenters: 6, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('capô longo e reto com a tomada de ar elevada (≥ 10 cm acima do capô) e a frente alta e chata (≥ 0,70 m nos primeiros 12 cm)', () => {
+    const y = (x: number, z: number): number => P.fromAbove(x, z)?.y ?? 0;
+    expect(Math.abs(y(0.4, -2.0) - y(0.4, -0.9))).toBeLessThanOrEqual(0.1);
+    expect(y(0, -1.0) - y(0.4, -1.0)).toBeGreaterThanOrEqual(0.1);
+    let top = 0;
+    for (let i = 0; i < P.pos.count; i++) if (P.pos.getZ(i) <= -2.1) top = Math.max(top, P.pos.getY(i));
+    expect(top).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('dois faróis redondos em leque na grade, a entrada de ar escura atrás da porta (≥ 0,04 m² por lado) e os escapes gêmeos de sempre', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) {
+      expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+      const area = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && side * t.n[0] > 0.7 && side * t.c[0] > 0.85 && t.c[2] > 0.3 && t.c[2] < 0.95 && t.c[1] > 0.3 && t.c[1] < 0.6).reduce((s, t) => s + t.area, 0);
+      expect(area, `entrada, lado ${side}`).toBeGreaterThan(0.04);
+    }
+    expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.52, 0.52]);
+  });
+});
