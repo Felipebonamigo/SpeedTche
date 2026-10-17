@@ -4,6 +4,6 @@
 set -e
 PY="${BPY_PYTHON:-/home/user/venv-bpy/bin/python}"
 cd "$(dirname "$0")/../.."
-for car in ${@:-cuiabano tupiniquim caipora pampeiro barao furgao}; do
+for car in ${@:-cuiabano tupiniquim caipora pampeiro barao furgao besouro paodeforma gaucho trilheiro lambari jabuti}; do
   "$PY" -I tools/blender/build_car.py "$car" "src/assets/cars/$car.glb"
 done

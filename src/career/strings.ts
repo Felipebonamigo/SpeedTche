@@ -43,6 +43,12 @@ registerStrings('core', {
     'car.pampeiro.blurb': 'Hatch europeu: firme na freada e na curva, bom de reta. Gosta de gasolina.',
     'car.barao.blurb': 'O carro do tio: reta boa e tanque que dura. Pesado na arrancada e na curva.',
     'car.furgao.blurb': 'Escada no teto e zero pressa: curva bem, freia bem, anda pouco.',
+    'car.jabuti.blurb': 'Quadradinho e arisco: freia e curva muito, anda pouco. O mais barato.',
+    'car.lambari.blurb': 'Cupê de reta longa, arrancada fraca e curva pesada. Freio fraco.',
+    'car.besouro.blurb': 'Bojudo e vivo na saída: arranca e curva bem. Bebe muito e perde na reta.',
+    'car.paodeforma.blurb': 'Furgão de reta longa: o mais rápido dos de preço médio. Pesado e sedento.',
+    'car.trilheiro.blurb': 'Jipe: arranca e retoma forte, firme na curva. Pesado, bebe muito.',
+    'car.gaucho.blurb': 'Muscle de capô longo: a maior reta do jogo. Bebe muito e foge da curva.',
   },
   en: {
     'car.sucuri.blurb': 'One tank lasts the whole race, and it is quick. Heavy off the line.',
@@ -56,6 +62,12 @@ registerStrings('core', {
     'car.pampeiro.blurb': 'A European-style hatch: firm braking and cornering, good on the straights. Thirsty.',
     'car.barao.blurb': "Uncle's sedan: good top speed and a tank that lasts. Heavy off the line and in corners.",
     'car.furgao.blurb': 'Ladder on the roof, no hurry: corners and brakes well, slow on straights.',
+    'car.jabuti.blurb': 'Boxy and nimble: brakes and corners hard, slow on straights. The cheapest.',
+    'car.lambari.blurb': 'A coupe with a long straight, weak launch and heavy corners. Weak brakes.',
+    'car.besouro.blurb': 'Round and lively off the line: launches and corners well. Thirsty, loses on straights.',
+    'car.paodeforma.blurb': 'A long-straight van: the fastest of the mid-priced. Heavy and thirsty.',
+    'car.trilheiro.blurb': 'Jeep: strong launch and recovery, firm in corners. Heavy and thirsty.',
+    'car.gaucho.blurb': 'Long-hood muscle: the fastest top speed. Drinks a lot and fights corners.',
   },
 });
 

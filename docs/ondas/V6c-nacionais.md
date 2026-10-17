@@ -174,3 +174,59 @@ Cores: Pampeiro `#cfd8dc` (era `#8e9aaf`: lia cinza chumbo) e Barão `#a1887f` (
 - Barão e Furgão visto de lado são os mais "chapados" (uma só tinta). O adesivo do Furgão é uma placa com três barras, não texto: de propósito (sem nada que se leia como marca).
 - A conquista da sequência no Saci Mirim não foi feita (item 3). O Furgão (0,9925 do Falcão) anda entre o Caipora e o Saci Mirim: nada de brinde lento.
 - Acervo `acervo-3d`: **sem push**; instrução do item 7 do lote 1 vale também para os quatro novos `.glb`.
+
+## Lote 3 (17/10/2026) — poda do Furgão e do Barão, e os seis que faltavam: Besouro, Pão de Forma, Gaúcho V8, Trilheiro, Lambari, Jabuti
+
+> **Base:** `main` local 5fb4490 (lote 2). Mesmas regras: teto 4.500 △ (lod1 ≤ 45%), marca da ficha, sem push, sem suíte inteira, **nenhum entra no sorteio da IA** (`FORA_DA_IA`).
+> **Itens para o advogado** (a regra da ficha pede, antes da Steam): **Besouro** e **Pão de Forma** (arquétipos de desenho protegido: aqui só proporção geral, para-lamas e janelas; faróis, lanternas e boca são nossos) e, por precaução, o conjunto Gaúcho V8 e Trilheiro (grade, faixas e lanternas não reproduzem nenhum modelo). Marcados nos `docs/ARTE.md` e nos docstrings dos specs.
+
+### 1. A poda (Furgão e Barão) e o pior caso REAL no gate
+**Achado que muda a premissa:** o laboratório do gate (`tools/render-harness.lab.ts`) **não carregava os `.glb`** (só o jogo e o harness de captura carregavam): o gate, os "~184 △ de folga" e a medida do lote 2 eram de cena SEM carro de arte. Corrigido: o laboratório agora faz `await loadCarAssets()` antes do renderizador, como o `main.ts` (a cena padrão, sem carro de arte, não mudou: 324.666 △, 77 chamadas;
+`gl-render` segue verde). Também: `setup(..., carIds)` põe o carro pedido DEPOIS dos 300 ticks (posições iguais às da cena padrão: o que muda no quadro é só o carro; antes o carro mudava a corrida do piloto automático e a cena junto, ruído de ±10 mil △ que escondia o custo do modelo).
+**Sampa 4p, Média, 4 jogadores no mesmo carro, todos de perto** (`node tools/blender/medir-gate.mjs`; limite `GATE_LIMITS`: 345.000 △ e 89 chamadas por viewport; a cena padrão com Falcão, Trovão, Tornado e Camelo mede **324.666 △**, folga **20.334**):
+| carro | antes da poda | depois | folga (△) |
+|---|---|---|---|
+| Furgãozinho da Firma (casco 4.392 → **3.500 △**) | 328.722 | **323.376** | 21.624 |
+| Barão (casco 4.236 → **3.344 △**) | 327.788 | **322.440** | 22.560 |
+| os outros dez (cuiabano 4.348 △ é o mais pesado) | — | cuiabano 328.844 · caipora 327.466 · gaúcho 327.048 · besouro 326.856 · tupiniquim 326.230 · trilheiro 325.368 · lambari 325.500 · pampeiro 325.714 · pão 324.384 · jabuti 323.592 | de 16.156 a 21.408 |
+**Antes da poda o pior caso já cabia** (a folga de verdade era ~16 mil, não 184 △): a poda tirou ~5.350 △ do quadro de 4 Furgões e deixou os dois **abaixo da cena padrão**. O pior caso de todos os nacionais é o Cuiabano (+4.178 △ sobre a padrão, 328.844) e as chamadas sobem de 77 para 79–80 (limite 89).
+**O que saiu** (~890 △ de cada, "o que não lê de longe"): tampa de combustível, friso cromado de trás, soleira, subdivisão dos remendos de forma simples (para-choques, entradas de ar, alargamentos); **ficou** o que lê: faróis em camadas, lanternas, faixa, frisos de porta, escada e bagageiro intactos (180 △). Visto nas folhas.
+**Testes que travam o orçamento por carro:** `tests/carros-nacionais.test.ts` (`LOD0_BUDGET`: Furgão ≤ 3.700 △, Barão ≤ 3.500 △, demais ≤ 4.500, reprovava antes da poda: 4.392 e 4.236 △) e `tests/carros-nacionais-gl.test.ts` (novo, GL: os 4 jogadores em cada nacional em Sampa 4p Média ficam a pelo menos 5.000 △ do limite e dentro das chamadas;
+visto falhar com a margem maior que a folga: `NC_GATE_MARGIN=16000` → `cuiabano 330088: expected 330088 to be less than or equal to 329000`). Passa com a margem de 5.000: `Tests  1 passed (1)`.
+
+### 2. Os seis carros (`tools/blender/specs/`, mesma biblioteca: nasceram `end="top"` (remendo projetado de cima), `ridge`, cilindros em `cyls` e `arch_flares` com material)
+| Carro | Estilo | Entra | Preço | Casco | lod1 | Desenho |
+|---|---|---|---|---|---|---|
+| **Jabuti** | `micro` | à venda | $ 7.000 | 3.536 △ | 688 | caixa curta e alta de teto reto, farol quadrado pequeno com friso, lanterna vertical estreita, grade lisa de uma barra, **vinco central do capô** (remendo de cima) |
+| **Lambari** | `classic` | à venda | $ 9.500 (a ficha dizia 9: Caipora já custa 9; ±500) | 3.750 △ | 760 | cupê de traseira inclinada com vidro de trás grande, faróis redondos baixos e afastados, lanterna horizontal fina, para-choque de lâmina cromada |
+| **Besouro** | `classic` | à venda | $ 10.000 | 3.976 △ | 814 | cúpula de teto, traseira que cai em curva, capô curto, **para-lamas bojudos na cor do carro**, estribo, farol redondo baixo e para dentro, lanterna-bolinha na tampa do motor |
+| **Pão de Forma** | `pickup` | à venda | $ 18.000 | 3.668 △ | 724 | furgão baixo e largo de teto alto, nariz curto e liso (sem "boca"), **duas janelas laterais**, lanternas altas |
+| **Trilheiro** | `pickup` | à venda | $ 22.500 (a ficha dizia 22: Pororoca V10 já custa 22; ±500) | 3.832 △ | 736 | jipe de capô reto e largo, para-brisa em pé, teto reto, **grade de 5 barras verticais grossas**, faróis redondos, **estepe atrás** (pneu e aro; a pegada de 4,7 m cobre a ponta) |
+| **Gaúcho V8** | `muscle` | **conquista** | nominal $ 35.000 | 4.028 △ | 792 | capô longo e abaulado, cabine recuada, grade e para-choques cromados, quatro lanternas retangulares, dois escapes |
+Todos: `check-car` aceito, eixos e bitola do estilo, roda do projeto (catálogo do estilo: `wire` no clássico, `steel` na picape, `mag` no muscle), faixa A ou B do projeto, silhueta 2D gerada do casco, timbre de motor e buzina próprios (distintos dos 20 anteriores: `voice-engine`/`voice-horn`). **Nenhum passou do teto**: não há limite novo a propor.
+
+### 3. Loja, preços únicos e equilíbrio
+- **Vitrine em ordem de preço** (todos únicos, múltiplos de $ 500): Jabuti 7.000, Caipora 9.000, Lambari 9.500, Besouro 10.000, Curupira S 12.000, Pampeiro 13.000, Barão 14.000, Sucuri E 16.000, Pão de Forma 18.000, Carcará RS 20.000, Pororoca V10 22.000, **Trilheiro 22.500**, Iara Turbo 24.000, Boitatá GT 30.000, Beija-Flor 40.000 (+ os dois de conquista, fora da loja). A trava de preços passou a pedir múltiplo de 500 e piso de $ 7.000 (de propósito).
+- **Equilíbrio** (`car-balance`, tempo relativo ao Falcão, 109 pistas): Trilheiro 0,9492 · Gaúcho 0,9697 · Pão 0,9741 · Lambari 0,9745 · Besouro 0,9832 · Jabuti 1,0216 (o último, mas o melhor freio, curva e economia do jogo, e o que ganha nas pistas travadas). As travas de `cars.test.ts` e `career.test.ts` passam. Os números saíram de um ajuste por simulação (`scratch/tune.ts`, fora do git): o Lambari começou rápido demais (0,9358, melhor que carros de $ 12–20 mil) e foi freado na arrancada, no freio e na curva.
+- **IA**: os seis ficam fora do sorteio (`FORA_DA_IA`); `sim-golden` e fantasmas intactos.
+
+### 4. A conquista do Gaúcho V8: "Cavalo de aço" (sem campo novo no save)
+- **Regra escolhida: chegar à Maestria 3 com o Trovão V12** (o V8 grave do jogo; a ficha ligava o Gaúcho ao som do Trovão). Das duas sugestões (vencer 3 corridas em carro V8/muscle, ou uma copa em carro de $ 20 mil ou menos), **nenhuma cabe no save de hoje sem contador**: ele não guarda vitórias por carro nem a copa-com-qual-carro. O que o jogo já guarda por carro é o **XP de maestria** (`ProgressData.profiles[].cars[carId]`, O5): a Maestria 3 pede **800 XP** com o Trovão (≈ 8 a 16 corridas) — um prêmio de quem se dedica ao muscle.
+- Implementação: `CarDef.conquest = 'CAVALO_DE_ACO'`; o fim de corrida avalia pelo que a corrida rendeu (`ProgressNews.carId` e `mastery.after ≥ 3`) e a abertura do jogo pelo XP já guardado (`openAchievements`); a liberação é a do lote 2 (`carAvailable` + `syncConquestCars`: lobby, garagem da Expedição, online). Entra na lista da Steam (68 → **69**), com README e textos PT e EN. O cadeado do lobby diz a conquista de cada um (`lock.conquest.<id>`: "Hora de entrega: 10 vitórias sem comprar carro" no Furgão, "Cavalo de aço: Maestria 3 com o Trovão V12" no Gaúcho; teste `o cadeado dos carros de conquista diz a conquista de cada um`, visto falhar: o Gaúcho mostrava o texto do Furgão).
+- **Testes antes (vistos falhar):** `carros-conquista.test.ts`: `6 failed` na primeira execução do Gaúcho (a conquista, o carro e a regra não existiam; a abertura do jogo e o carro liberado reprovavam) e a loja dos 8 à venda (`jabuti`…`trilheiro` sem preço).
+- Como fica a ficha do Furgão: a alternativa "5 vitórias seguidas no Saci" continua adiada (pede contador no save).
+
+### 5. Testes (vistos falhar) e verificação
+- **Antes do código**, `tests/carros-nacionais.test.ts` generalizado para os 12 nacionais e `carros-conquista.test.ts` para os 8 à venda e o Gaúcho: `falta src/assets/cars/besouro.glb (npm run carros-blender)`, lista de carros, silhueta e texto (11 testes vermelhos) e o orçamento do Furgão e do Barão (o `.glb` ainda não podado: casco com 4.392 e 4.236 △ contra o orçamento de 3.700 e 3.500).
+- **Balanço** (a trava de `cars.test.ts`): primeira rodada de números reprovou em 22 duelos (`jabuti perde do tornado em todas`, `besouro perde do saci em todas`, `paodeforma perde do barao em todas`, `saci ≥ besouro em tudo`…); foi ajustada por simulação até `tudo certo`; `lambari não se destaca entre os livres` também apareceu e foi resolvida pela reta (1,07).
+- **Ajustes de teste de propósito (ditos):** 20 → 26 carros e 11 → 17 com preço (cars, career, progression, voice-engine, voice-horn), 68 → 69 conquistas (desktop, achievements-o5), a vitrine passou a começar em $ 7 mil (garage-stage, career, cars) e a pedir múltiplo de 500, e a buzina do Besouro foi trocada (a primeira reprovou em `voice-horn`: `tornado × besouro: expected 0.29 to be greater than 0.3`).
+- **Verificado neste turno:** `npx tsc --noEmit -p .` sem saída. Área (57 arquivos): `Test Files  57 passed (57)` · `Tests  1032 passed | 1 skipped (1033)`. `NC_REQUIRE_GL=1 npx vitest run tests/carros-nacionais-gl.test.ts tests/gl-render.test.ts tests/stage-gl.test.ts`: `Test Files  3 passed (3)` · `Tests  26 passed (26)`.
+
+### 6. Imagens (em `scratch/lote3/`, fora do git; abertas e conferidas)
+`folha-besouro.png`, `folha-paodeforma.png`, `folha-gaucho.png`, `folha-trilheiro.png`, `folha-lambari.png`, `folha-jabuti.png` (8 vistas cada; a garagem põe o carro de conquista ou à venda na garagem do P1) · `folha-comparacao-classic.png` (Besouro × Lambari × Boto Luxo × Falcão GT) · `folha-comparacao-pickup-muscle.png` (Pão de Forma × Trilheiro × Tatu 4x4 × Gaúcho V8 × Trovão V12 × Falcão GT) · `folha-comparacao-micro.png` (Jabuti × Furgão × Saci Mirim × Tornado) · `folha-poda.png` (Furgão e Barão podados: 3/4 frente e traseira, lateral e corrida).
+
+### 7. O que ainda não está bom (honesto)
+- Os seis leem o arquétipo à primeira vista, mas **seguem mais lisos que o Falcão GT e o Tornado** (sem lente translúcida, sem o verniz do GT; frisos e faixas são remendos planos). O **Besouro** é o menos fiel ao arquétipo (a "bolha" saiu mais cupê: a subdivisão de nível 1 não dá a curva redonda; mais relevo pede △); o **Gaúcho** e o **Trilheiro** têm as lentes dos faróis mais baixas que o ideal (a projeção de frente não alcança o topo do nariz).
+- A regra do Gaúcho (Maestria 3 com o Trovão) é longa para quem não gosta do Trovão: é decisão do dono trocar o carro ou o degrau (`IRON_HORSE_CAR`, `IRON_HORSE_MASTERY` em `achievements.ts`).
+- O custo de gate foi medido só em Média (a mais apertada) e em Sampa/Copacabana 4p; o laboratório agora carrega os `.glb`, então o `gl-render` mede o que o jogo desenha.
+- Acervo `acervo-3d`: **sem push**; a instrução do lote 1 vale para os doze `.glb`.

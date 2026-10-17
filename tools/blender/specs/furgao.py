@@ -13,6 +13,8 @@ material_of = make_material_of(COWL, ROOF_F, ROOF_R, GLASS_B, WIN["side"], black
 _WHEEL = dict(r=0.36, w=0.27, arch_gap=0.05, spokes=5)
 _POS = lambda: [(FRONT_AXLE, 1), (FRONT_AXLE, -1), (REAR_AXLE, 1), (REAR_AXLE, -1)]
 _W = dict(wheel=_WHEEL, wheel_positions=_POS)
+# poda do lote 3 (~700 △): tampa de combustível, friso cromado de trás e soleira não leem de longe; os remendos de forma simples ficam sem subdivisão (o farol, que lê de longe, mantém)
+PODA = ('tampa_comb', 'tampa_comb_i', 'friso_t', 'soleira')
 BELT = [(-0.62, 0.95), (0.4, 0.97), (1.4, 0.98)]
 
 SPEC = dict(
@@ -36,7 +38,7 @@ SPEC = dict(
     # escada de alumínio sobre o bagageiro (2 longarinas + degraus), passa uns 20 cm da traseira
     ladder=dict(x=0.40, z=1.77, y=(-0.30, 2.00), rack=(-0.05, 1.20)),
     patches=[
-        *lamp_stack("lamp_head", "far", rounded_rect(0.52, 0.70, 0.28, 0.12, 0.02), [("trim", 1.14), ("chrome", 1.06), ("reflector", 0.97), ("headlight_dim", 0.90), ("headlight", 0.50)], lod1_from=3),
+        *lamp_stack("lamp_head", "far", rounded_rect(0.52, 0.70, 0.28, 0.12, 0.02), [("trim", 1.14), ("chrome", 1.06), ("headlight_dim", 0.90), ("headlight", 0.50)], lod1_from=2),
         dict(end="rear", group="lamp_tail", name="moldura", mat="trim", outline=rounded_rect(0.62, 0.75, 0.15, 0.40, 0.025), offset=0.004, cuts=0, lod1=False),
         *lamp_stack("lamp_tail", "a", rounded_rect(0.62, 0.64, 0.10, 0.15, 0.012), [("taillight_dim", 1.0), ("taillight", 0.55)], end="rear", base=0.009, lod1_from=0),
         *lamp_stack("lamp_tail", "b", rounded_rect(0.62, 0.80, 0.10, 0.15, 0.012), [("taillight_dim", 1.0), ("taillight", 0.55)], end="rear", base=0.009, lod1_from=0),
@@ -46,7 +48,7 @@ SPEC = dict(
         dict(end="side", group="details", name="adesivo_t", mat="stripe_a", axis="x", outline=rounded_rect(-0.05, 0.72, 0.62, 0.05, 0.01), offset=0.010, cuts=0, lod1=False),
         dict(end="side", group="details", name="adesivo_l", mat="stripe_b", axis="x", outline=rounded_rect(-0.12, 0.62, 0.48, 0.03, 0.006), offset=0.010, cuts=0, lod1=False),
         dict(end="side", group="details", name="adesivo_l2", mat="stripe_b", axis="x", outline=rounded_rect(-0.16, 0.57, 0.40, 0.03, 0.006), offset=0.010, cuts=0, lod1=False),
-        *std_details(_W, (-0.60, 0.42), BELT, NOSE, TAIL, bf=(1.66, 0.40), br=(1.56, 0.40), flap=(1.38, 0.82), plate_r_z=0.60),
+        *std_details(_W, (-0.60, 0.42), BELT, NOSE, TAIL, bf=(1.66, 0.40), br=(1.56, 0.40), plate_r_z=0.60, cuts=0, drop=PODA),
     ],
     misc=[
         ("espelho", "paint", (0.935, -0.50, 1.04), (0.10, 0.11, 0.09), 0.025),

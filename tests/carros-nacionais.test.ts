@@ -15,9 +15,14 @@ import '../src/i18n/core';
 import '../src/career/strings';
 
 beforeAll(installNodeImage);
-const IDS = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao'] as const;
+const IDS = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao', 'besouro', 'paodeforma', 'gaucho', 'trilheiro', 'lambari', 'jabuti'] as const;
 /** Estilo de carroceria (o do `CarDef`) e o comprimento mínimo que o validador exige dele. */
-const BODY: Record<(typeof IDS)[number], 'hatch' | 'sedan' | 'micro'> = { cuiabano: 'hatch', tupiniquim: 'hatch', caipora: 'hatch', pampeiro: 'hatch', barao: 'sedan', furgao: 'micro' };
+const BODY: Record<(typeof IDS)[number], 'hatch' | 'sedan' | 'micro' | 'classic' | 'pickup' | 'muscle'> = {
+  cuiabano: 'hatch', tupiniquim: 'hatch', caipora: 'hatch', pampeiro: 'hatch', barao: 'sedan', furgao: 'micro',
+  besouro: 'classic', paodeforma: 'pickup', gaucho: 'muscle', trilheiro: 'pickup', lambari: 'classic', jabuti: 'micro',
+};
+/** Orçamento de triângulos do casco (lod0) por carro: o teto do jogo é 4.500; o Furgão e o Barão foram podados (lote 3) e o teste os prende nisso. */
+const LOD0_BUDGET: Partial<Record<(typeof IDS)[number], number>> = { furgao: 3700, barao: 3500 };
 const file = (id: string) => join(__dirname, '..', 'src', 'assets', 'cars', `${id}.glb`);
 const ab = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 /** O JSON do .glb (nomes de nó, malha e material). */
@@ -45,13 +50,14 @@ describe('carros nacionais: o asset do Blender', () => {
 
       it('orçamento: casco ≤ teto do jogo, lod1 ≤ 45% e há lod1', () => {
         expect(model.triangles).toBeLessThanOrEqual(CAR_LIMITS.maxShellTriangles);
+        expect(model.triangles, `orçamento do ${id}`).toBeLessThanOrEqual(LOD0_BUDGET[id] ?? CAR_LIMITS.maxShellTriangles);
         expect(model.lod1, 'sem nó lod1').toBeDefined();
         expect(model.lod1!.triangles).toBeLessThanOrEqual(Math.floor(model.triangles * 0.45));
         expect(model.triangles, 'casco magro demais para ser desenho de verdade').toBeGreaterThan(2500);
       });
 
-      it('rodada 2: detalhe que lê de longe (casco entre 3.600 e 4.500 △), lanterna com coroa e miolo, faixa do projeto, roda do projeto', () => {
-        expect(model.triangles, 'a folga do orçamento tem de virar detalhe').toBeGreaterThan(3600);
+      it('rodada 2: detalhe que lê de longe (casco entre 3.000 e 4.500 △), lanterna com coroa e miolo, faixa do projeto, roda do projeto', () => {
+        expect(model.triangles, 'a folga do orçamento tem de virar detalhe').toBeGreaterThan(3000);
         const mats = json.materials.map((m) => (m.name ?? '').toLowerCase());
         expect(mats.filter((m) => m.startsWith('taillight')).length, 'lanterna: coroa (fraca) + miolo (forte)').toBeGreaterThanOrEqual(2);
         expect(mats.filter((m) => m.startsWith('headlight')).length, 'farol: coroa + miolo').toBeGreaterThanOrEqual(2);

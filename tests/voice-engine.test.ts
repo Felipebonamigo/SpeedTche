@@ -41,8 +41,8 @@ function settle(bank: EngineBank, frame: RenderFrame, frames = 90): void {
 }
 
 describe('timbre do motor por carro', () => {
-  it('E1: há um timbre para cada um dos 20 carros', () => {
-    expect(CARS).toHaveLength(20);
+  it('E1: há um timbre para cada um dos 26 carros', () => {
+    expect(CARS).toHaveLength(26);
     for (const car of CARS) {
       const t = engineTimbre(car.id);
       expect(t.pitch, car.id).toBeGreaterThan(0);
@@ -51,7 +51,7 @@ describe('timbre do motor por carro', () => {
     }
   });
 
-  it('E2: os 20 timbres são distintos — inclusive Falcão e Boitatá, que dividem a carroceria gt', () => {
+  it('E2: os 26 timbres são distintos — inclusive Falcão e Boitatá, que dividem a carroceria gt', () => {
     expect(CARS.find((c) => c.id === 'falcao')?.body).toBe(CARS.find((c) => c.id === 'boitata')?.body);
     for (let i = 0; i < CARS.length; i++) {
       for (let j = i + 1; j < CARS.length; j++) {
@@ -84,7 +84,7 @@ describe('timbre do motor por carro', () => {
     expect(engineFrequency(0.4, false, 'nao-existe')).toBe(engineFrequency(0.4, false, 'falcao'));
   });
 
-  it('E5: toda frequência dos 20 carros fica em 20–700 Hz, e o nitro sobe o tom', () => {
+  it('E5: toda frequência dos 26 carros fica em 20–700 Hz, e o nitro sobe o tom', () => {
     for (const car of CARS) {
       for (let k = 0; k <= 10; k++) {
         const rpm = k / 10;

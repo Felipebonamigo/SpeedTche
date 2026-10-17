@@ -14,6 +14,8 @@ _POS = lambda: [(FRONT_AXLE, 1), (FRONT_AXLE, -1), (REAR_AXLE, 1), (REAR_AXLE, -
 _W = dict(wheel=_WHEEL, wheel_positions=_POS)
 HEAD = rounded_rect(0.50, 0.705, 0.46, 0.125, 0.03)
 TAIL_L = rounded_rect(0.46, 0.86, 0.58, 0.115, 0.03)       # lanterna longa, vai quase do centro ao canto
+# poda do lote 3 (~700 △): tampa de combustível, friso cromado de trás e soleira não leem de longe; os remendos de forma simples ficam sem subdivisão (o farol, que lê de longe, mantém)
+PODA = ('tampa_comb', 'tampa_comb_i', 'friso_t', 'soleira')
 BELT = [(-0.95, 0.99), (0.4, 1.01), (1.7, 1.03)]
 
 SPEC = dict(
@@ -35,14 +37,14 @@ SPEC = dict(
     cap_material_of=cap_material_of, material_of=material_of,
     exhaust=(0.50, 2.25, 0.27), seat=(0.0, 0.10, 0.95), exhaust_tip=True, windows=(COWL, GLASS_B), silhueta_portas=(-0.90, 0.45, 1.10),
     patches=[
-        *lamp_stack("lamp_head", "far", HEAD, [("trim", 1.12), ("chrome", 1.05), ("reflector", 0.97), ("headlight_dim", 0.90), ("headlight", 0.50)], lod1_from=3),
+        *lamp_stack("lamp_head", "far", HEAD, [("trim", 1.12), ("chrome", 1.05), ("headlight_dim", 0.90), ("headlight", 0.50)], lod1_from=2),
         dict(group="lamp_head", name="pisca", mat="amber", outline=rounded_rect(0.66, 0.600, 0.12, 0.04, 0.01), offset=0.007, cuts=0, lod1=False),
         dict(end="rear", group="lamp_tail", name="moldura", mat="trim", outline=rounded_rect(0.46, 0.86, 0.64, 0.15, 0.03), offset=0.004, cuts=0, lod1=False),
         *lamp_stack("lamp_tail", "l", TAIL_L, [("taillight_dim", 0.96), ("taillight", 0.55)], end="rear", base=0.009, lod1_from=0),
         dict(end="rear", group="lamp_tail", name="friso", mat="chrome", outline=rounded_rect(0.0, 0.86, 0.32, 0.035, 0.012), offset=0.012, mirror=False, cuts=1, lod1=False),
         dict(group="details", name="barra", mat="trim", outline=rounded_rect(0.0, 0.66, 0.56, 0.06, 0.02), offset=0.004, mirror=False, cuts=1, lod1=False),
         dict(end="side", group="details", name="faixa", mat="stripe_a", axis="x", outline=line_strip([(-0.85, 0.62), (0.4, 0.62), (1.9, 0.64)], 0.028), offset=0.005, cuts=0, lod1=False),
-        *std_details(_W, (-0.90, 0.45, 1.10), BELT, NOSE, TAIL, bf=(1.78, 0.42), br=(1.70, 0.42), flap=(1.62, 0.88), plate_r_z=0.62),
+        *std_details(_W, (-0.90, 0.45, 1.10), BELT, NOSE, TAIL, bf=(1.78, 0.42), br=(1.70, 0.42), plate_r_z=0.62, cuts=0, drop=PODA),
     ],
     misc=[
         ("espelho", "paint", (0.94, -0.78, 1.05), (0.10, 0.11, 0.09), 0.025),

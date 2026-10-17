@@ -66,5 +66,6 @@ Folclore brasileiro: o carro compacto com escada no teto, adesivo da empresa e, 
 
 ## Estado (V6c, `docs/ondas/V6c-nacionais.md`)
 
-Feitos no Blender (`tools/blender/`): **#1 Cuiabano**, **#2 Tupiniquim** (livres) e, no lote 2, **#3 Caipora** ($ 9 mil), **#4 Pampeiro** ($ 13 mil: o Curupira S já custa 12), **#5 Barão** ($ 14 mil) e **#6 Furgãozinho da Firma**
-(conquista "Hora de entrega" = 10 vitórias sem comprar carro; a variante "5 seguidas no Saci Mirim" espera um contador no save). Faltam #7 a #12 (Besouro, Pão de Forma, Gaúcho V8, Trilheiro, Lambari, Jabuti).
+Todos os doze feitos no Blender (`tools/blender/`): **livres** #1 Cuiabano e #2 Tupiniquim; **à venda** #3 Caipora ($ 9 mil), #4 Pampeiro ($ 13 mil: o Curupira S já custa 12), #5 Barão ($ 14 mil), #7 Besouro ($ 10 mil), #8 Pão de Forma ($ 18 mil), #10 Trilheiro ($ 22,5 mil: o Pororoca V10 já custa 22), #11 Lambari ($ 9,5 mil: o Caipora já custa 9) e #12 Jabuti ($ 7 mil);
+**conquista** #6 Furgãozinho da Firma ("Hora de entrega" = 10 vitórias sem comprar carro) e #9 Gaúcho V8 ("Cavalo de aço" = Maestria 3 com o Trovão V12). Faltam só as variantes de ficha: o Caipora sedã e a conquista "5 seguidas no Saci Mirim" (pede contador no save).
+**Itens para o advogado antes da Steam:** Besouro e Pão de Forma (arquétipos de desenho protegido), e, por precaução, Gaúcho V8 e Trilheiro.

@@ -29,7 +29,7 @@ export function carLocked(save: Pick<SaveData, 'carsUnlocked'> & Partial<Pick<Sa
 
 /** "Compre na Expedição por $ 12.000". */
 export function lockText(car: Pick<CarDef, 'price'> & { conquest?: string }): string {
-  if (car.conquest) return t('progress.lock.conquest');
+  if (car.conquest) return t(`progress.lock.conquest.${car.conquest}`);
   return t('progress.lock.buy', { price: formatPrice(car.price) });
 }
 

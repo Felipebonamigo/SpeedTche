@@ -59,9 +59,24 @@ export const CARS: CarDef[] = [
   },
   // ── À venda na carreira ──
   {
+    id: 'jabuti', name: 'Jabuti', color: '#9575cd', accent: '#ede7f6', price: 7_000, body: 'micro',
+    topSpeed: REFERENCE_SPEED * 0.88, accel: 940, brake: 3400, handling: 1.0, fuelPerUnit: BASE_FUEL * 0.45,
+    blurb: 'Quadradinho e arisco: freia e curva muito, anda pouco. O mais barato.',
+  },
+  {
     id: 'caipora', name: 'Caipora', color: '#43a047', accent: '#fff59d', price: 9_000, body: 'hatch',
     topSpeed: REFERENCE_SPEED * 0.94, accel: 810, brake: 2750, handling: 0.90, fuelPerUnit: BASE_FUEL * 0.52,
     blurb: 'Redondinho e econômico: curva fácil, pouca sede. Falta fôlego na reta.',
+  },
+  {
+    id: 'lambari', name: 'Lambari', color: '#ff7043', accent: '#fff8e1', price: 9_500, body: 'classic',
+    topSpeed: REFERENCE_SPEED * 1.07, accel: 560, brake: 2250, handling: 0.7, fuelPerUnit: BASE_FUEL * 0.95,
+    blurb: 'Cupê de reta longa, arrancada fraca e curva pesada. Freio fraco.',
+  },
+  {
+    id: 'besouro', name: 'Besouro', color: '#29b6f6', accent: '#ffffff', price: 10_000, body: 'classic',
+    topSpeed: REFERENCE_SPEED * 0.96, accel: 860, brake: 2900, handling: 0.93, fuelPerUnit: BASE_FUEL * 1.4,
+    blurb: 'Bojudo e vivo na saída: arranca e curva bem. Bebe muito e perde na reta.',
   },
   {
     id: 'curupira', name: 'Curupira S', color: '#455a64', accent: '#ff5722', price: 12_000, body: 'roadster',
@@ -84,6 +99,11 @@ export const CARS: CarDef[] = [
     blurb: 'Um tanque para a corrida inteira e boa velocidade. Pesado para arrancar.',
   },
   {
+    id: 'paodeforma', name: 'Pão de Forma', color: '#80cbc4', accent: '#ffffff', price: 18_000, body: 'pickup',
+    topSpeed: REFERENCE_SPEED * 1.09, accel: 640, brake: 2500, handling: 0.64, fuelPerUnit: BASE_FUEL * 1.2,
+    blurb: 'Furgão de reta longa: o mais rápido dos de preço médio. Pesado e sedento.',
+  },
+  {
     id: 'carcara', name: 'Carcará RS', color: '#f9a825', price: 20_000, body: 'rally',
     topSpeed: REFERENCE_SPEED * 0.98, accel: 900, brake: 3000, handling: 0.97, fuelPerUnit: BASE_FUEL * 1.05,
     blurb: 'Dispara na saída e cola na curva. Perde para todos no fim da reta longa.',
@@ -94,6 +114,11 @@ export const CARS: CarDef[] = [
     blurb: 'Ninguém anda mais na reta. Arisco nas curvas e bebe como nenhum outro.',
   },
   {
+    id: 'trilheiro', name: 'Trilheiro', color: '#7cb342', accent: '#212121', price: 22_500, body: 'pickup',
+    topSpeed: REFERENCE_SPEED * 1.0, accel: 900, brake: 2800, handling: 0.9, fuelPerUnit: BASE_FUEL * 1.3,
+    blurb: 'Jipe: arranca e retoma forte, firme na curva. Pesado, bebe muito.',
+  },
+  {
     id: 'iara', name: 'Iara Turbo', color: '#3949ab', accent: '#ff4081', price: 24_000, body: 'wedge',
     topSpeed: REFERENCE_SPEED * 1.09, accel: 700, brake: 2300, handling: 0.62, fuelPerUnit: BASE_FUEL * 0.85,
     blurb: 'Corta o ar: quase a reta do Pororoca, bebendo bem menos. Arisca na curva.',
@@ -102,6 +127,11 @@ export const CARS: CarDef[] = [
     id: 'boitata', name: 'Boitatá GT', color: '#00acc1', price: 30_000, body: 'gt',
     topSpeed: REFERENCE_SPEED * 1.07, accel: 780, brake: 2800, handling: 0.84, fuelPerUnit: BASE_FUEL * 0.9,
     blurb: 'Forte em tudo, sem ponto fraco. Custa caro.',
+  },
+  {
+    id: 'gaucho', name: 'Gaúcho V8', color: '#00695c', accent: '#fafafa', price: 35_000, conquest: 'CAVALO_DE_ACO', body: 'muscle',
+    topSpeed: REFERENCE_SPEED * 1.1, accel: 690, brake: 2350, handling: 0.62, fuelPerUnit: BASE_FUEL * 1.3,
+    blurb: 'Muscle de capô longo: a maior reta do jogo. Bebe muito e foge da curva.',
   },
   // ── Carro de conquista "Hora de entrega" (não se compra; ver `conquest`) ──
   {
@@ -125,7 +155,7 @@ export const CAR_BODIES: readonly CarBody[] = [
  * Livres que a IA ainda não usa (os nacionais da frente V6c): o sorteio do grid usa o tamanho do pool, e pôr carro novo nele mudaria TODA corrida
  * já gravada (`sim-golden`, fantasmas). Entram no pool quando o dono aprovar a mudança e a impressão for renovada de propósito.
  */
-const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao'];
+const FORA_DA_IA: readonly string[] = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro', 'barao', 'furgao', 'jabuti', 'lambari', 'besouro', 'paodeforma', 'trilheiro', 'gaucho'];
 
 /**
  * Carros da IA: os livres (os 4 originais e os 3 da onda F), nunca um à venda — o carro comprado é do jogador.

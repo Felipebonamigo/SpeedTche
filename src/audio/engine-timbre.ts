@@ -67,6 +67,13 @@ const CAR_TWEAKS: Readonly<Record<string, Partial<EngineTimbre>>> = {
   pampeiro: { pitch: 1.4, main: 'sawtooth', sub: 'sawtooth', subMix: 0.25, cutoff: 520, span: 3000, q: 2.6, whine: 0.35, whineRatio: 3, gain: 0.92 },
   barao: { pitch: 0.82, main: 'sawtooth', sub: 'triangle', subMix: 0.7, cutoff: 190, span: 700, q: 0.9, lope: 0.2, lopeRate: 0.9, gain: 0.85 },
   furgao: { pitch: 1.9, main: 'square', sub: 'square', subRatio: 0.667, subMix: 0.7, cutoff: 560, span: 1500, q: 2, lope: 0.45, lopeRate: 3.2, gain: 0.7 },
+  // Lote 3: motorzinho de ar (áspero e grave), cupê esperto, furgão e jipe (graves, batendo devagar), V8 mais fundo que o do Trovão e o motor do carrinho.
+  besouro: { pitch: 0.98, main: 'sawtooth', sub: 'triangle', subMix: 0.45, cutoff: 280, span: 1100, q: 1.6, lope: 0.4, lopeRate: 2.0, gain: 0.85 },
+  lambari: { pitch: 1.12, main: 'triangle', sub: 'square', subMix: 0.6, cutoff: 330, span: 1700, q: 1.1, lope: 0.1, lopeRate: 1, whine: 0.12, whineRatio: 2, gain: 0.9 },
+  paodeforma: { pitch: 0.74, main: 'square', sub: 'sawtooth', subMix: 0.8, cutoff: 170, span: 600, q: 0.8, lope: 0.3, lopeRate: 0.9, gain: 1.0 },
+  trilheiro: { pitch: 0.88, main: 'sawtooth', sub: 'sawtooth', subMix: 0.9, cutoff: 210, span: 1000, q: 2.0, lope: 0.6, lopeRate: 0.7, gain: 1.05 },
+  gaucho: { pitch: 0.62, main: 'sawtooth', sub: 'square', subMix: 1, cutoff: 150, span: 800, q: 1.8, lope: 0.45, lopeRate: 1.1, gain: 1.15 },
+  jabuti: { pitch: 1.75, main: 'sawtooth', sub: 'triangle', subRatio: 0.6, subMix: 0.4, cutoff: 520, span: 1800, q: 1.2, lope: 0.2, lopeRate: 2.8, whine: 0.1, whineRatio: 3, gain: 0.75 },
   tupiniquim: { pitch: 1.5, main: 'triangle', sub: 'sawtooth', subMix: 0.3, cutoff: 460, span: 2600, q: 2.2, whine: 0.2, whineRatio: 2, gain: 0.9 },
 };
 

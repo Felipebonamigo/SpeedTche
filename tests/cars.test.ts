@@ -21,13 +21,13 @@ const NEW_CARS = CARS.filter((c) => !ORIGINALS.includes(c.id));
 const DUELISTS = NEW_CARS.filter((c) => !c.conquest);
 
 describe('carros: dados', () => {
-  it('são 20, com id e nome únicos, e todo estilo de carroceria tem pelo menos um carro', () => {
-    expect(CARS.length).toBe(20);
+  it('são 26, com id e nome únicos, e todo estilo de carroceria tem pelo menos um carro', () => {
+    expect(CARS.length).toBe(26);
     expect(new Set(CARS.map((c) => c.id)).size).toBe(CARS.length);
     expect(new Set(CARS.map((c) => c.name)).size).toBe(CARS.length);
     for (const b of CAR_BODIES) expect(CARS.filter((c) => c.body === b).length, `estilo ${b} sem carro`).toBeGreaterThan(0);
     for (const c of CARS) expect(c.id, 'id minúsculo, sem acento (vai no save e no online)').toMatch(/^[a-z]+$/);
-    expect(NEW_CARS.map((c) => c.body).sort()).toEqual(['classic', 'hatch', 'hatch', 'hatch', 'hatch', 'micro', 'micro', 'pickup', 'prototype', 'roadster', 'sedan', 'wedge']);
+    expect(NEW_CARS.map((c) => c.body).sort()).toEqual(['classic', 'classic', 'classic', 'hatch', 'hatch', 'hatch', 'hatch', 'micro', 'micro', 'micro', 'muscle', 'pickup', 'pickup', 'pickup', 'prototype', 'roadster', 'sedan', 'wedge']);
   });
 
   it('atributos na faixa do jogo; cor e cor de destaque em hex', () => {
@@ -45,14 +45,14 @@ describe('carros: dados', () => {
     for (const c of NEW_CARS) expect(c.accent, c.id).toBeDefined();
   });
 
-  it('preços: 9 livres e 11 com preço (de $ 9 mil a $ 50 mil, em milhares; um deles é o de conquista, preço só nominal); livres primeiro, depois do mais barato ao mais caro', () => {
+  it('preços: 9 livres e 17 com preço (de $ 7 mil a $ 50 mil, em múltiplos de 500; dois deles são os de conquista, preço só nominal); livres primeiro, depois do mais barato ao mais caro', () => {
     const free = CARS.filter((c) => c.price === 0);
     const paid = CARS.filter((c) => c.price > 0);
     expect(free.map((c) => c.id)).toEqual(['falcao', 'trovao', 'tornado', 'camelo', 'saci', 'tatu', 'boto', 'cuiabano', 'tupiniquim']);
-    expect(paid.length).toBe(11);
+    expect(paid.length).toBe(17);
     for (const c of paid) {
-      expect(c.price % 1000, c.id).toBe(0);
-      expect(c.price, c.id).toBeGreaterThanOrEqual(9_000);
+      expect(c.price % 500, c.id).toBe(0);
+      expect(c.price, c.id).toBeGreaterThanOrEqual(7_000);
       expect(c.price, c.id).toBeLessThanOrEqual(50_000);
     }
     // A lista é a ordem do lobby e da garagem (←→): livres, depois a vitrine em preço crescente.

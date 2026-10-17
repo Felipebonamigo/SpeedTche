@@ -284,7 +284,7 @@ def wheel_wells(sp, lod):
     cz = sp["wheel"]["r"]
     for (y, side) in sp["wheel_positions"]():
         x0 = sp["axle_x"] - sp["wheel"]["w"] / 2 - 0.08
-        x1 = sp["axle_x"] + sp["wheel"]["w"] / 2 + 0.07
+        x1 = min(sp["axle_x"] + sp["wheel"]["w"] / 2 + 0.07, 0.985)  # a calha não pode passar da pegada (|x| ≤ 1,0)
         ring0, ring1 = [], []
         for k in range(seg + 1):
             a = math.pi * k / seg  # 0..180 graus, por cima da roda
@@ -307,6 +307,8 @@ def patch(name, outline, mat, target, axis, offset=0.006, cuts=1, plane_y=0.0, d
     bm = bmesh.new()
     if axis == "y":
         vs = [bm.verts.new((x, plane_y, z)) for (x, z) in outline]
+    elif axis == "z":  # por cima: o contorno é (x, y) e o remendo nasce acima do casco, disparando para baixo
+        vs = [bm.verts.new((x, y, plane_y)) for (x, y) in outline]
     else:
         vs = [bm.verts.new((plane_y, x, z)) for (x, z) in outline]
     bm.faces.new(vs)
@@ -322,7 +324,7 @@ def patch(name, outline, mat, target, axis, offset=0.006, cuts=1, plane_y=0.0, d
     mod.wrap_method = "PROJECT"
     mod.use_project_x = axis == "x"
     mod.use_project_y = axis == "y"
-    mod.use_project_z = False
+    mod.use_project_z = axis == "z"
     # o remendo nasce FORA do casco e dispara só para dentro (direction +1: +Y/+X; -1: -Y/-X), para não achar a pele do outro lado
     mod.use_negative_direction = direction <= 0
     mod.use_positive_direction = direction >= 0
@@ -517,15 +519,20 @@ def add_patches(sp, body, lod, parent):
     for p in sp["patches"]:
         if lod == 1 and not p.get("lod1", False):
             continue
-        face = p.get("end", "front")  # frente (y < 0) ou traseira (y > 0)
+        face = p.get("end", "front")  # frente (y < 0), traseira (y > 0), lado (x) ou topo (z)
         base = f"{p['group']}_{p['name']}"
         center = not p.get("mirror", True)  # remendo no eixo do carro: a metade x >= 0 e o espelho dela (a triangulação sai simétrica)
         outline = half_outline(p["outline"]) if center else p["outline"]
-        ob = patch(base + "_l", outline, p["mat"], body, p.get("axis", "y"),
-                   offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1) + EXTRA_CUTS,
-                   plane_y=-3.0 if face == "front" else 3.0, direction=1 if face == "front" else -1) if face != "side" else \
-            patch(base + "_l", outline, p["mat"], body, "x", offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1),
-                  plane_y=3.0, direction=-1)
+        if face == "side":
+            ob = patch(base + "_l", outline, p["mat"], body, "x", offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1),
+                       plane_y=3.0, direction=-1)
+        elif face == "top":
+            ob = patch(base + "_l", outline, p["mat"], body, "z", offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1),
+                       plane_y=4.0, direction=-1)
+        else:
+            ob = patch(base + "_l", outline, p["mat"], body, p.get("axis", "y"),
+                       offset=p.get("offset", 0.006), cuts=0 if lod == 1 else p.get("cuts", 1) + EXTRA_CUTS,
+                       plane_y=-3.0 if face == "front" else 3.0, direction=1 if face == "front" else -1)
         groups.setdefault(p["group"], []).append(ob)
         if True:  # o outro lado é o ESPELHO da malha (e não o contorno espelhado, que triangula diferente)
             groups[p["group"]].append(mirrored_copy(ob, base + "_r"))
@@ -549,7 +556,7 @@ def add_patches(sp, body, lod, parent):
 
 def add_misc(sp, lod):
     """Peças pequenas do spec: espelho, maçaneta, ponteira do escapamento. (nome, material, centro, tamanho, afunilamento); espelhadas em x."""
-    if lod == 1 or not sp.get("misc"):
+    if lod == 1 or not (sp.get("misc") or sp.get("cyls")):
         return None
     bm = bmesh.new()
     mats = []
@@ -558,6 +565,11 @@ def add_misc(sp, lod):
         mats.append("chrome")
         for sd in (1, -1):
             cylinder_part(bm, (sd * ex[0], ex[1] + 0.03, ex[2]), 0.042, 0.14, axis="y", seg=8, mat_index=0)
+    for (mat, c, r, length, axis, seg) in sp.get("cyls", []):  # cilindros (estepe, ponteiras extras): (material, centro, raio, comprimento, eixo, lados), espelhados só se x != 0
+        if mat not in mats:
+            mats.append(mat)
+        for sd in ((1, -1) if abs(c[0]) > 1e-6 else (1,)):
+            cylinder_part(bm, (sd * c[0], c[1], c[2]), r, length, axis=axis, seg=seg, mat_index=mats.index(mat))
     for (nm, mat, c, size, taper) in sp["misc"]:
         if mat not in mats:
             mats.append(mat)
@@ -639,7 +651,7 @@ def lamp_stack(group, name, outline, layers, end="front", base=0.004, step=0.005
     return out
 
 
-def arch_flares(sp, width=0.045, off=0.010):
+def arch_flares(sp, width=0.045, off=0.010, cuts=1, mat="bumper"):
     """Alargamento dos para-lamas: anel de plástico escuro por cima do vão de cada roda (frente e trás), projetado na lateral."""
     r_in = sp["wheel"]["r"] + sp["wheel"]["arch_gap"] + 0.002
     cz = sp["wheel"]["r"]
@@ -649,7 +661,7 @@ def arch_flares(sp, width=0.045, off=0.010):
             continue
         outer = [(y + (r_in + width) * math.cos(a), cz + (r_in + width) * math.sin(a)) for a in [math.radians(8 + 164 * k / 12) for k in range(13)]]
         inner = [(y + r_in * math.cos(a), cz + r_in * math.sin(a)) for a in [math.radians(8 + 164 * k / 12) for k in range(13)]]
-        out.append(dict(end="side", group="details", name=f"flare{int(y * 100)}", mat="bumper", axis="x", outline=outer + list(reversed(inner)), offset=off, cuts=1, lod1=False))
+        out.append(dict(end="side", group="details", name=f"flare{int(y * 100)}", mat=mat, axis="x", outline=outer + list(reversed(inner)), offset=off, cuts=cuts, lod1=False))
     return out
 
 
@@ -665,10 +677,10 @@ def teardrop(cx, cz, r, tdx, tdz, n=16):
     return pts
 
 
-def std_details(sp, door_ys, belt_pts, nose_z, tail_z, bf=(1.66, 0.40), br=(1.50, 0.40), flap=None, plate_f_z=0.47, plate_r_z=0.60, zdoor=(0.32, 0.93)):
+def std_details(sp, door_ys, belt_pts, nose_z, tail_z, bf=(1.66, 0.40), br=(1.50, 0.40), flap=None, plate_f_z=0.47, plate_r_z=0.60, zdoor=(0.32, 0.93), cuts=1, drop=(), flare=None):
     """Detalhes que todo carro leva (rodada 2): para-choques com volume e friso claro, entrada de ar e placas, friso da cintura, soleira, frisos de porta,
     alargamento dos para-lamas. `belt_pts`: [(y, z)] da cintura; `bf`/`br`: (largura, altura) do para-choque da frente e de trás."""
-    return [
+    out = [
         dict(group="details", name="para_choque_f", mat="bumper", outline=rounded_rect(0.0, bf[1], bf[0], 0.19, 0.05), offset=0.022, mirror=False, cuts=1, lod1=False),
         dict(group="details", name="friso_f", mat="chrome", outline=rounded_rect(0.0, bf[1] + 0.107, bf[0] - 0.16, 0.016, 0.006), offset=0.027, mirror=False, cuts=1, lod1=False),
         dict(group="details", name="entrada", mat="trim", outline=rounded_rect(0.0, bf[1] - 0.015, bf[0] * 0.5, 0.09, 0.03), offset=0.027, mirror=False, cuts=1, lod1=False),
@@ -682,8 +694,13 @@ def std_details(sp, door_ys, belt_pts, nose_z, tail_z, bf=(1.66, 0.40), br=(1.50
         *[dict(end="side", group="details", name=f"porta{i}", mat="trim", axis="x", outline=[(y - 0.006, zdoor[0]), (y + 0.006, zdoor[0]), (y + 0.006, zdoor[1]), (y - 0.006, zdoor[1])], offset=0.004, cuts=2, lod1=False) for i, y in enumerate(door_ys)],
         *( [dict(end="side", group="details", name="tampa_comb", mat="trim", axis="x", outline=rounded_rect(flap[0], flap[1], 0.17, 0.17, 0.05, seg=4), offset=0.006, cuts=1, lod1=False),
             dict(end="side", group="details", name="tampa_comb_i", mat="chrome", axis="x", outline=rounded_rect(flap[0], flap[1], 0.12, 0.12, 0.04, seg=4), offset=0.010, cuts=1, lod1=False)] if flap else []),
-        *arch_flares(sp),
+        *arch_flares(sp, cuts=cuts, **(flare or {})),
     ]
+    # poda (V6c, lote 3): `cuts` rebaixa a subdivisão dos remendos de forma simples e `drop` tira os detalhes que não leem de longe
+    for p in out:
+        if p.get('cuts', 0) == 1:
+            p['cuts'] = cuts
+    return [p for p in out if p['name'] not in drop]
 
 
 def add_ladder(sp, lod):
@@ -705,3 +722,9 @@ def add_ladder(sp, lod):
             for sd in (1, -1):
                 box_part(bm, (sd * L["x"], y, z - 0.08), (0.05, 0.05, 0.08), 1, 0.0)
     return new_object("ladder", bm, mats)
+
+
+def ridge(y0, y1, half_w, n=6):
+    """Faixa fina ao longo do eixo do carro (vinco do capô, friso do teto): contorno (x, y) para o remendo `end="top"`."""
+    ys = [y0 + (y1 - y0) * i / n for i in range(n + 1)]
+    return [(-half_w, y) for y in ys] + [(half_w, y) for y in reversed(ys)]

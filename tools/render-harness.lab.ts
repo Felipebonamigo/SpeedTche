@@ -7,6 +7,7 @@ import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type Hum
 import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
 import { paintsOfLooks, raceLooks } from '../src/game/paints';
+import { loadCarAssets } from '../src/render/cars/assets';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
 import { resetRenderPrefs, setRenderPrefs } from '../src/render/prefs';
@@ -17,6 +18,8 @@ import { ROAD_HALF_WIDTH_M } from '../src/render/units';
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLElement;
 const q = new URLSearchParams(location.search);
+// Os carros de arte (src/assets/cars/*.glb) entram ANTES do renderizador, como no jogo (main.ts): o gate mede o que o jogador de fato desenha.
+await loadCarAssets();
 const renderer = createRenderer(canvas, hud);
 renderer.setDynamicResolution(false); // o laboratório mede contagem: a escala só muda quando o teste a fixa
 const gl = (renderer as unknown as { __gl: import('three').WebGLRenderer }).__gl;
@@ -37,7 +40,7 @@ let seatCameras: CameraMode[] | undefined;
 let cartoonFx = false;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
-function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[]): void {
+function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[], carIds?: string[]): void {
   const base = getTrack(trackId);
   const track = tod ? { ...base, def: { ...base.def, timeOfDay: tod } } : base;
   const humans: HumanEntry[] = Array.from({ length: humansN }, (_, i) => ({ seat: i, name: `P${i + 1}`, carId: CARS[i % 8].id, teamId: 0, color: seatColor(i), ...(looks?.[i] ? { look: looks[i] } : {}) }));
@@ -46,6 +49,11 @@ function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'd
     assists: { sharedNitro: true, tow: true, teamDraft: true, catchup: true }, seed: 42 }, track);
   for (const c of state.cars) if (c.seat >= 0) c.ai = { skill: 0.97, laneX: 0.2 * (c.seat - 1.5), laneUntil: 0, lookahead: 28, aggression: 0.6 } satisfies AiBrain;
   for (let i = 0; i < ticks; i++) stepRace(state, track, []);
+  // Os carros pedidos entram DEPOIS dos 300 ticks: as posições são as da cena padrão e o que muda no quadro é só o carro (a medida do custo de um modelo).
+  if (carIds) {
+    for (const h of humans) if (carIds[h.seat]) h.carId = carIds[h.seat];
+    for (const c of state.cars) if (c.seat >= 0 && carIds[c.seat]) c.carId = carIds[c.seat];
+  }
   current = { state, track, humans, n: humansN };
   tick = 0;
 }

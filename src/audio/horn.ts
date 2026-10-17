@@ -57,6 +57,13 @@ const SPECS: Readonly<Record<string, HornSpec>> = {
   pampeiro: { wave: 'sawtooth', notes: [880, 1108.73], pulses: [{ at: 0, dur: 0.32 }], filter: { type: 'lowpass', freq: 4200 }, gain: 0.75 },
   barao: { wave: 'sawtooth', notes: [233.08, 293.66], pulses: [{ at: 0, dur: 0.5, glide: 0.9 }], filter: { type: 'lowpass', freq: 1000 }, gain: 0.95 },
   furgao: { wave: 'square', notes: [349.23, 440], pulses: [{ at: 0, dur: 0.07 }, { at: 0.10, dur: 0.07 }], filter: { type: 'lowpass', freq: 1800 }, gain: 0.35 },
+  // Lote 3: Besouro (três "pó" secos), Lambari (aguda e rápida), Pão de Forma (grave de furgão), Trilheiro (trompa de jipe, quinta), Gaúcho (V8: duas notas graves longas) e Jabuti (a mais aguda e curta).
+  besouro: { wave: 'sawtooth', notes: [466.16, 554.37], pulses: [{ at: 0, dur: 0.12 }, { at: 0.18, dur: 0.12 }, { at: 0.36, dur: 0.12 }], filter: { type: 'lowpass', freq: 1800 }, gain: 0.8 },
+  lambari: { wave: 'sawtooth', notes: [698.46, 880], pulses: [{ at: 0, dur: 0.22, glide: 1.08 }], filter: { type: 'lowpass', freq: 3200 }, gain: 0.8 },
+  paodeforma: { wave: 'sawtooth', notes: [207.65, 261.63], pulses: [{ at: 0, dur: 0.44 }, { at: 0.55, dur: 0.2 }], filter: { type: 'lowpass', freq: 900 }, gain: 0.95 },
+  trilheiro: { wave: 'square', notes: [293.66, 440], pulses: [{ at: 0, dur: 0.3 }], filter: { type: 'lowpass', freq: 1500 }, gain: 0.95 },
+  gaucho: { wave: 'sawtooth', notes: [164.81, 207.65], pulses: [{ at: 0, dur: 0.8, glide: 0.88 }], filter: { type: 'lowpass', freq: 700 }, gain: 1 },
+  jabuti: { wave: 'triangle', notes: [1318.51, 1760], pulses: [{ at: 0, dur: 0.06 }, { at: 0.09, dur: 0.06 }, { at: 0.18, dur: 0.06 }], gain: 0.7 },
   // Três notas subindo.
   curupira: {
     wave: 'square', notes: [659.25],

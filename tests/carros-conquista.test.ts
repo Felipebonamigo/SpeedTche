@@ -10,21 +10,33 @@ import { ACHIEVEMENTS } from '../src/game/desktop';
 import { nextGoals } from '../src/game/goals';
 import { emptyProgress } from '../src/game/progression';
 import { sanitizeSave } from '../src/game/save';
+import { lockText } from '../src/ui/screens/progress';
+import '../src/progress/strings';
 import { setLanguage, t } from '../src/i18n';
 import '../src/i18n/core';
 import '../src/career/strings';
 import '../src/stats/strings';
 import { human, quickRace, run, syntheticTrack } from './helpers';
+import type { ProgressNews } from '../src/game/progression';
+import { MASTERY_XP } from '../src/game/progression';
 
 const duo = [human(0), human(1)];
 
-const FOR_SALE = { caipora: 9_000, pampeiro: 13_000, barao: 14_000 } as const;
+const FOR_SALE = {
+  caipora: 9_000, pampeiro: 13_000, barao: 14_000,
+  jabuti: 7_000, lambari: 9_500, besouro: 10_000, paodeforma: 18_000, trilheiro: 22_500, // lote 3 (preços únicos: o Lambari 9,5 e o Trilheiro 22,5 fogem do Caipora e do Pororoca)
+} as const;
 const fresh = (): SaveData => sanitizeSave({});
 
-describe('os 3 nacionais à venda', () => {
+describe('os 8 nacionais à venda', () => {
   it('estão na vitrine com o preço certo, no estilo certo, e a lista segue em preço crescente', () => {
     for (const [id, price] of Object.entries(FOR_SALE)) expect(CARS.find((c) => c.id === id)?.price, id).toBe(price);
     expect(CARS.find((c) => c.id === 'barao')?.body).toBe('sedan');
+    expect(CARS.find((c) => c.id === 'besouro')?.body).toBe('classic');
+    expect(CARS.find((c) => c.id === 'lambari')?.body).toBe('classic');
+    expect(CARS.find((c) => c.id === 'jabuti')?.body).toBe('micro');
+    expect(CARS.find((c) => c.id === 'paodeforma')?.body).toBe('pickup');
+    expect(CARS.find((c) => c.id === 'trilheiro')?.body).toBe('pickup');
     expect(CARS.find((c) => c.id === 'caipora')?.body).toBe('hatch');
     expect(CARS.find((c) => c.id === 'pampeiro')?.body).toBe('hatch');
     const paid = CARS.filter((c) => c.price > 0).map((c) => c.price);
@@ -124,3 +136,67 @@ describe('HORA_DE_ENTREGA: 10 vitórias sem comprar nenhum carro', () => {
     expect(openAchievements(withWins(3), emptyProgress())).not.toContain('HORA_DE_ENTREGA');
   });
 });
+
+
+describe('o cadeado dos carros de conquista diz a conquista de cada um', () => {
+  it('Furgão: "Hora de entrega"; Gaúcho: "Cavalo de aço"; PT e EN; o carro à venda segue com o preço', () => {
+    const car = (id: string) => CARS.find((c) => c.id === id)!;
+    for (const lang of ['pt', 'en'] as const) {
+      setLanguage(lang);
+      expect(lockText(car('furgao')), lang).toMatch(lang === 'pt' ? /Hora de entrega/ : /Delivery Time/);
+      expect(lockText(car('gaucho')), lang).toMatch(lang === 'pt' ? /Cavalo de aço/ : /Iron Horse/);
+    }
+    setLanguage('pt');
+    expect(lockText(car('jabuti'))).toContain('7.000');
+  });
+});
+
+describe('Gaúcho V8: carro de conquista "Cavalo de aço" (Maestria 3 com o Trovão V12)', () => {
+  const gaucho = () => CARS.find((c) => c.id === 'gaucho')!;
+  const news = (carId: string, after: number): ProgressNews[] => [{ seat: 0, name: 'P1', carId, xp: 50, pilotXp: 0, level: { before: 1, after: 1 }, carXp: 0, mastery: { before: 0, after }, unlocks: [] }];
+  function finished() {
+    const q = quickRace({ track: syntheticTrack([{ op: 'straight', length: 300 }]), humans: [human(0)], totalCars: 4, laps: 1, seed: 11 });
+    run(q.state, q.track, 60 * 240);
+    return q.state;
+  }
+  const ids = (progress: ProgressNews[]) => { const st = finished(); return evaluateAchievements(fresh(), 'quick', st, st.results ?? [], st.config.humans, newTelemetry(), false, null, 'profissional', null, progress); };
+
+  it('é um carro `muscle` de conquista, fora da loja, e a conquista está na Steam com texto PT e EN', () => {
+    expect(gaucho().body).toBe('muscle');
+    expect(gaucho().conquest).toBe('CAVALO_DE_ACO');
+    expect(CARS.filter((c) => c.conquest).map((c) => c.id).sort()).toEqual(['furgao', 'gaucho']);
+    expect(ACHIEVEMENTS.map((a) => a.id)).toContain('CAVALO_DE_ACO');
+    for (const lang of ['pt', 'en'] as const) { setLanguage(lang); expect(t('stats.achDesc.CAVALO_DE_ACO'), lang).not.toBe('stats.achDesc.CAVALO_DE_ACO'); }
+    setLanguage('pt');
+    const career = newCareer([human(0)]);
+    career.wallets[0] = 999_999;
+    expect(buyCar(career, 0, 'gaucho')).not.toBe('ok');
+  });
+
+  it('a regra: chegar à Maestria 3 com o Trovão V12 (o V8 do jogo); outro carro ou Maestria 2 não vale', () => {
+    expect(ids(news('trovao', 3))).toContain('CAVALO_DE_ACO');
+    expect(ids(news('trovao', 5))).toContain('CAVALO_DE_ACO');
+    expect(ids(news('trovao', 2))).not.toContain('CAVALO_DE_ACO');
+    expect(ids(news('falcao', 5))).not.toContain('CAVALO_DE_ACO');
+    expect(ids([])).not.toContain('CAVALO_DE_ACO');
+  });
+
+  it('na abertura: quem já tem XP de Maestria 3 no Trovão ganha; libera o carro (corrida avulsa e garagem)', () => {
+    const progress = { profiles: [{ name: 'P1', cars: { trovao: MASTERY_XP[2] } }] };
+    expect(openAchievements(fresh(), progress)).toContain('CAVALO_DE_ACO');
+    expect(openAchievements(fresh(), { profiles: [{ name: 'P1', cars: { trovao: MASTERY_XP[2] - 1 } }] })).not.toContain('CAVALO_DE_ACO');
+    const save = fresh();
+    expect(carAvailable(save, gaucho())).toBe(false);
+    save.achievements.push('CAVALO_DE_ACO');
+    save.career = newCareer(duo);
+    expect(syncConquestCars(save)).toBe(true);
+    expect(carAvailable(save, gaucho())).toBe(true);
+    for (const d of save.career.drivers) expect(d.garage.owned).toContain('gaucho');
+  });
+
+  it('o carro de conquista liberado não vira CARRO_NOVO nem entra em HORA_DE_ENTREGA como compra', () => {
+    const save = withBought(['gaucho']);
+    expect(openAchievements(save, emptyProgress())).not.toContain('CARRO_NOVO');
+  });
+});
+function withBought(list: string[]): SaveData { const sv = fresh(); sv.carsUnlocked = list; return sv; }

@@ -35,8 +35,8 @@ const ids = (save: SaveData, state: RaceState, t: RaceTelemetry, progress: Progr
   evaluateAchievements(save, mode, state, state.results ?? [], state.config.humans, t, false, null, 'profissional', null, progress);
 
 describe('a lista da Steam', () => {
-  it('68 conquistas: as 57 de antes, as 10 do O5 e a Hora de entrega (V6c), com nome PT e EN', () => {
-    expect(ACHIEVEMENTS).toHaveLength(68);
+  it('69 conquistas: as 57 de antes, as 10 do O5, a Hora de entrega e o Cavalo de aço (V6c), com nome PT e EN', () => {
+    expect(ACHIEVEMENTS).toHaveLength(69);
     for (const id of NEW_IDS) expect(ACHIEVEMENTS.map((a) => a.id), id).toContain(id);
   });
 });

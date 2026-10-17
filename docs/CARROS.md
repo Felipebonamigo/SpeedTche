@@ -2,7 +2,7 @@
 
 ## Os carros
 
-> **V6c (16/10/2026): +2 livres, os hatches nacionais Cuiabano e Tupiniquim** (arte feita no Blender por script, `tools/blender/`; ficha em `docs/CARROS-NACIONAIS.md`, cartão `docs/ondas/V6c-nacionais.md`). São 20 carros: 9 livres, 10 à venda (Caipora $ 9 mil, Pampeiro $ 13 mil, Barão $ 14 mil entram no lote 2) e 1 de conquista (Furgãozinho da Firma, "Hora de entrega"); a IA continua sorteando só os 7 livres de antes (`FORA_DA_IA` em `data/cars.ts`: pôr carro no pool muda toda corrida gravada). Medido com `npx tsx scripts/car-balance.ts` (109 pistas): Cuiabano 0,9883 e Tupiniquim 0,9934 do Falcão; a coluna "Grade" deles fica em branco (a IA não os usa). O texto abaixo ainda diz "catorze" onde falava dos catorze de antes.
+> **V6c (16/10/2026): +2 livres, os hatches nacionais Cuiabano e Tupiniquim** (arte feita no Blender por script, `tools/blender/`; ficha em `docs/CARROS-NACIONAIS.md`, cartão `docs/ondas/V6c-nacionais.md`). São 26 carros: 9 livres, 15 à venda (lote 2: Caipora, Pampeiro, Barão; lote 3: Jabuti $ 7 mil, Lambari $ 9,5 mil, Besouro $ 10 mil, Pão de Forma $ 18 mil, Trilheiro $ 22,5 mil) e 2 de conquista (Furgãozinho da Firma, "Hora de entrega"; Gaúcho V8, "Cavalo de aço"); os preços são únicos em múltiplos de $ 500; a IA continua sorteando só os 7 livres de antes (`FORA_DA_IA` em `data/cars.ts`: pôr carro no pool muda toda corrida gravada). Medido com `npx tsx scripts/car-balance.ts` (109 pistas): Cuiabano 0,9883 e Tupiniquim 0,9934 do Falcão; a coluna "Grade" deles fica em branco (a IA não os usa). O texto abaixo ainda diz "catorze" onde falava dos catorze de antes.
 
 Catorze carros, pelo menos um por estilo de carroceria (`CarDef.body`, 13 estilos em `CAR_BODIES`;
 o Boitatá divide o `gt` com o Falcão). Sete são de todos desde o começo e sete se compram na
@@ -34,15 +34,21 @@ todos os carros: o cérebro da IA no assento humano (habilidade 1 no solo, 0,97 
 | Pampeiro | hatch | 13.000 | 300 | 760 | 3.100 | 0,88 | 0,88 | 0,9495 | — | 2º melhor freio e boa reta × arrancada fraca e sede (nacional, V6c) |
 | Barão | sedan | 14.000 | 321 | 640 | 2.350 | 0,68 | 0,78 | 0,9585 | — | a maior reta dos baratos × arrancada, freio e curva pesados: o carro do tio (nacional, V6c) |
 | Sucuri E | electric | 16.000 | 309 | 640 | 2.700 | 0,80 | 0,50 | 0,949 | 1,84 | tanque para a corrida toda × arrancada |
+| Pão de Forma | pickup | 18.000 | 327 | 640 | 2.500 | 0,64 | 1,20 | 0,9741 | — | furgão de reta longa × pesado e sedento (nacional, V6c lote 3) |
 | Carcará RS | rally | 20.000 | 294 | 900 | 3.000 | 0,97 | 1,05 | 0,944 | 2,44 | arrancada e curva × fim de reta |
 | Pororoca V10 | hyper | 22.000 | 336 | 660 | 2.500 | 0,58 | 1,40 | 0,981 (2) | 3,38 | a maior reta × curva e consumo |
+| Trilheiro | pickup | 22.500 | 300 | 900 | 2.800 | 0,90 | 1,30 | 0,9492 | — | jipe: arranca e retoma forte × sede e peso (nacional, V6c lote 3) |
 | **Iara Turbo** | wedge | 24.000 | 327 | 700 | 2.300 | 0,62 | 0,85 | 0,967 (3) | 2,25 | quase a reta do Pororoca bebendo 40% menos × curva e freio |
 | Boitatá GT | gt | 30.000 | 321 | 780 | 2.800 | 0,84 | 0,90 | 0,905 (6) | 1,00 | forte em tudo × caro |
+| Gaúcho V8 | muscle | conquista (nominal 35.000) | 330 | 690 | 2.350 | 0,62 | 1,30 | 0,9697 | — | a maior reta do jogo × freio, curva e sede; **não se compra**: conquista "Cavalo de aço" (nacional, V6c lote 3) |
 | Furgãozinho da Firma | micro | conquista (nominal 39.000) | 279 | 820 | 3.150 | 0,92 | 0,62 | 0,9925 | — | escada no teto: o melhor freio do jogo × a menor reta; **não se compra**: conquista "Hora de entrega" (nacional, V6c) |
 | **Beija-Flor** | prototype | 40.000 | 312 | 800 | 3.100 | 1,00 | 1,35 | 0,899 (21) | 1,47 | a melhor curva × sede, reta e preço |
 | Cuiabano | hatch | — | 288 | 780 | 2.700 | 0,85 | 0,80 | 0,988 | — | o quadradão: estável e econômico, sem ponto forte (nacional, V6c) |
 | Tupiniquim | hatch | — | 279 | 860 | 2.900 | 0,95 | 0,90 | 0,993 | — | arranca e fecha a curva × a menor reta dos hatches e o tanque curto (nacional, V6c) |
+| Jabuti | micro | 7.000 | 264 | 940 | 3.400 | 1,00 | 0,45 | 1,0216 | — | o mais barato: o melhor freio, curva e economia × a menor reta do jogo (nacional, V6c lote 3) |
 | Caipora | hatch | 9.000 | 282 | 810 | 2.750 | 0,90 | 0,52 | 0,9887 | — | o mais econômico à venda e curva fácil × a menor reta e o menor preço (nacional, V6c) |
+| Lambari | classic | 9.500 | 321 | 560 | 2.250 | 0,70 | 0,95 | 0,9745 | — | cupê de reta longa × arrancada, freio e curva fracos (nacional, V6c lote 3) |
+| Besouro | classic | 10.000 | 288 | 860 | 2.900 | 0,93 | 1,40 | 0,9832 | — | vivo na saída e na curva × sede e pouca reta (nacional, V6c lote 3) |
 
 Em negrito, os seis da onda F. Cada um é o melhor ou está entre os melhores em alguma coisa e paga por
 isso em outra:

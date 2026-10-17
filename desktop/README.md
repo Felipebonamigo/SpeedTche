@@ -313,6 +313,7 @@ conquista da lista tem linha nesta tabela.
 | `MESTRE_DO_VACUO` | Mestre do vácuo | Slipstream Master | Passar 60 segundos no vácuo de outros carros numa mesma corrida. |
 | `NITRO_NA_BANDEIRA` | Nitro na bandeirada | Nitro Finish | Cruzar a chegada com o nitro ligado e a barra sem nenhuma carga (O5; antes: só o nitro ligado). |
 | `DEZ_VITORIAS` | Dez vitórias | Ten Wins | Somar 10 vitórias (o contra-relógio não conta). |
+| `CAVALO_DE_ACO` | Cavalo de aço | Iron Horse | Chegar à Maestria 3 com o Trovão V12: ganha o Gaúcho V8 (carro de conquista, V6c). |
 | `HORA_DE_ENTREGA` | Hora de entrega | Delivery Time | Somar 10 vitórias sem comprar nenhum carro: ganha o Furgãozinho da Firma (carro de conquista, V6c). |
 | `GIRO_COMPLETO` | Giro completo | Grand Tour | Correr em todas as pistas do jogo (o contra-relógio não conta). |
 | `RIVAL_DERROTADO` | Rival derrotado | Rival Defeated | Concluir uma copa (normal ou da carreira) terminando à frente do rival da copa em todas as corridas. |
