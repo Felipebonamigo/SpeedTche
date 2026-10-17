@@ -119,7 +119,7 @@ com os mipmaps. Programas: a fachada (chave `speed-tche-facade-atlas-v1`), a nuv
 1. **Asfalto de dia à sombra é azul-marinho** (Copacabana, `(0,40,98)` na captura; `(18,54,106)` ao sol no modelo da cor-brilho). É a luz do dia — hemisférica azul +
    IBL do céu + o pé do Neutral que zera o vermelho — que a cor-brilho travou ("o dia não muda", `tests/cor-brilho.test.ts`). A textura nova aparece ao sol (Paraty, Fuji,
    Copacabana seg 380), mas à sombra o marinho engole o desgaste. **Recomendação:** abrir a trava para a família `road` (dessaturar a hemisférica/IBL no asfalto, ou o pé do
-   Neutral sobre a luminância também de dia), com antes × depois de Copacabana. Decisão do dono.
+   Neutral sobre a luminância também de dia), com antes × depois de Copacabana. Decisão do dono: **sim** — feito na V4b (`docs/ondas/V4b-sombra.md`).
 2. **Repetição de 48 m:** remendos e trincas voltam no mesmo lugar a cada 48 m (a 270 km/h, ~1,5 vez por segundo); uma camada de decalques por hash do segmento (+1 chamada) resolveria.
 3. **Prédios:** os 4 visuais mudam janela, cor, varanda, térreo e telhado, mas a **silhueta** (coroa, recuos) é a mesma por tipo: mudar a altura mexe na visada dos marcos
    (`block` da `sight.ts`). Fica para quando a régua dos marcos for refeita (T4).
