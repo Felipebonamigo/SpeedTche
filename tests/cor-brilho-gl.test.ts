@@ -218,7 +218,7 @@ describe.skipIf(!available)('cor e brilho na imagem (swiftshader)', { timeout: 1
     const r = await lab((L) => {
       L.freeze('copacabana', 300, { seg: 300, x: 0, parked: true });
       return L.shoot('high', 4, [
-        { box: [-5, 0, -9, -2, 0.02, -5] }, { box: [2, 0, -9, 5, 0.02, -5] }, { box: [-5, 0, -2, -2.2, 0.02, 1.5] }, { box: [2.2, 0, -2, 5, 0.02, 1.5] },
+        { box: [-5, 0, -9, -2, 0.02, -5] }, { box: [2, 0, -9, 5, 0.02, -5] }, { box: [-5, 0, -14, -2, 0.02, -10] }, { box: [2, 0, -14, 5, 0.02, -10] },
         { point: [6.55, 0.02, -7], r: 1 }, { point: [-6.55, 0.02, -7], r: 1 },
       ]);
     });
