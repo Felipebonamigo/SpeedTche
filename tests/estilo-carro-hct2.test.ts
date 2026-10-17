@@ -69,3 +69,34 @@ describe('roadster HCT (roadster, Curupira S)', () => {
     expect(m.rear?.exhausts.map((e) => e.x).sort((a, b) => a - b)).toEqual([-0.4, 0.4]);
   });
 });
+
+describe('rali HCT (rally, Carcará RS)', () => {
+  const m = buildModel('rally');
+  const P = probe(m);
+  hctCommon('rally', { tailCenters: 4, bandFront: -1.95, bandBack: 1.9, maxTris: 4500 });
+
+  it('hatch alto de suspensão levantada: teto entre 1,30 e 1,45 m e a saia a ≥ 0,25 m do chão', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 1.2 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(roof.length).toBeGreaterThan(5);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    const side = P.T.filter((t) => t.n[1] > -0.85 && Math.abs(t.c[2]) < 0.5 && Math.abs(t.c[0]) > 0.6);
+    expect(Math.min(...side.flatMap((t) => [P.pos.getY(t.i), P.pos.getY(t.i + 1), P.pos.getY(t.i + 2)]))).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('para-lamas alargados em caixa (≥ 0,96 m de meia largura sobre as rodas) com a borda preta no arco', () => {
+    for (const z of [-1.3, 1.28]) {
+      let w = 0;
+      for (let i = 0; i < P.pos.count; i++) if (Math.abs(P.pos.getZ(i) - z) < 0.3 && P.pos.getY(i) > 0.5 && P.pos.getY(i) < 1.0) w = Math.max(w, P.pos.getX(i));
+      expect(w, `z = ${z}`).toBeGreaterThanOrEqual(0.96);
+    }
+    const trim = P.T.filter((t) => !P.painted(t.i) && !P.lit(t.i) && P.col.getX(t.i) < 0.05 && Math.abs(t.c[0]) > 0.8 && Math.abs(t.c[2] + 1.3) < 0.6 && t.c[1] > 0.45 && t.c[1] < 0.9);
+    expect(trim.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.1);
+  });
+
+  it('quatro faróis de milha redondos em leque na frente (y entre 0,40 e 0,56), os dois faróis e o escape único grosso à direita', () => {
+    const fogs = P.lensCenters((i) => P.isHead(i)).filter((p) => p[1] > 0.4 && p[1] < 0.56 && p[2] < -2.0);
+    expect(fogs.length).toBeGreaterThanOrEqual(4);
+    expect(m.rear?.exhausts).toEqual([{ x: 0.55, y: 0.32, z: 2.22, r: 0.09 }]);
+  });
+});
