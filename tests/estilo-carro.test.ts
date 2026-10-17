@@ -16,7 +16,7 @@ const META = { shellMax: 4500, wheelRatio: 0.19, tailArea: 0.15, bubble: 0.92, l
  * substitui a cabine bolha de cartum da M4 — o vidro do HCT2 aprovado tem caimento de carro de verdade. Neles a bolha não vale; o caimento é
  * conferido em tests/estilo-carro-gt.test.ts. O resto (roda, lanterna, difusor, asa, vidro reflexivo, lod1, teto do casco) vale para os 13.
  */
-const HCT: readonly CarBody[] = ['gt', 'wedge', 'hyper'];
+const HCT: readonly CarBody[] = ['gt', 'wedge', 'hyper', 'prototype'];
 /** Estilos com aerofólio de brinquedo; clássico, sedã, picape, micro e o roadster (cockpit aberto, com as corcovas) ficam sem, de propósito (decisão de forma). */
 const WING: readonly CarBody[] = ['gt', 'muscle', 'hatch', 'rally', 'hyper', 'wedge', 'prototype', 'electric'];
 
