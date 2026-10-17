@@ -34,7 +34,7 @@ Só neutralizar a luz não bastava: com luz 100% cinza o asfalto à sombra ainda
 
 ## 4. Medidas
 
-Modelo (sRGB 0..255, antes → depois, à sombra | ao sol): Copacabana `0,33,90`→`32,32,25` | `18,54,106`→`57,63,70`; Paraty-tropical `0,26,77`→`23,23,16` | `13,46,93`→`44,53,63`; Savana `0,29,64`→`48,40,22` | `39,55,79`→`75,67,53`. Captura 1280×720, Copacabana seg 300: asfalto à sombra `(0,43,104)` → `(40,45,54)`; ao sol `(62,86,122)` → `(87,92,99)`; faixa branca igual (`90,142,200` → `90,142,200` à sombra). Fuji ao sol `(51,68,112)` → `(73,77,87)`; Xingó `(104,107,128)` → `(123,113,109)`.
+Modelo (sRGB 0..255, antes → depois, à sombra | ao sol): Copacabana `0,33,90`→`32,32,25` | `18,54,106`→`57,63,70`; Tropical `0,26,77`→`23,23,16` | `13,46,93`→`44,53,63`; Savana `0,29,64`→`48,40,22` | `39,55,79`→`75,67,53`. Captura 1280×720, Copacabana seg 300: asfalto à sombra `(0,43,104)` → `(40,45,54)`; ao sol `(62,86,122)` → `(87,92,99)`; faixa branca igual (`90,142,200` → `90,142,200` à sombra). Fuji ao sol `(51,68,112)` → `(73,77,87)`; Xingó `(104,107,128)` → `(123,113,109)`.
 Galeria (1280×720, Alta): `scratch/galeria/comparar-base-40fbefb-vs-sombra.png` — `9 de 13 cenas mudaram · contagens que subiram em 0`: mudaram só as de dia (Copacabana, Fuji, Xingó, 2 e 4 jogadores, derrapagem, largada, os 14 carros, menu); **Paraty (entardecer), Cânion, Sampa (noite) e Garagem: iguais (2 px)**. Chamadas e triângulos idênticos nas 13 cenas.
 
 ## 5. Ressalvas
