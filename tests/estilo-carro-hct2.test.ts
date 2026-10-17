@@ -179,3 +179,30 @@ describe('hatch HCT (hatch, Tornado RS)', () => {
     expect(amber.length).toBeGreaterThan(0);
   });
 });
+
+describe('sedã HCT (sedan, Camelo X)', () => {
+  const m = buildModel('sedan');
+  const P = probe(m);
+  hctCommon('sedan', { tailCenters: 2, bandFront: -1.95, bandBack: 1.95, maxTris: 4500 });
+
+  it('três volumes: teto alto (1,30–1,45 m) e porta-malas baixo atrás do vidro (≤ 0,98 m em z = 1,9)', () => {
+    const roof = P.T.filter((t) => P.painted(t.i) && t.n[1] > 0.8 && t.c[2] > -0.2 && t.c[2] < 0.8 && t.c[1] > 1.0).map((t) => t.c[1]);
+    expect(Math.max(...roof)).toBeGreaterThanOrEqual(1.3);
+    expect(Math.max(...roof)).toBeLessThanOrEqual(1.45);
+    expect(P.fromAbove(0.3, 1.9)?.y ?? 9).toBeLessThanOrEqual(0.98);
+  });
+
+  it('faróis retangulares largos em leque, pisca âmbar e friso cromado na linha das janelas', () => {
+    const heads = P.lensCenters((i) => P.isHead(i));
+    for (const side of [1, -1]) expect(heads.filter((p) => side * p[0] > 0.3).length, `lado ${side}`).toBeGreaterThanOrEqual(1);
+    const chrome = P.T.filter((t) => P.mat.getY(t.i) > 0.95 && P.mat.getX(t.i) < 0.2 && Math.abs(t.c[0]) > 0.8 && t.c[1] > 0.84 && t.c[1] < 0.98 && t.c[2] > -0.6 && t.c[2] < 1.4);
+    expect(chrome.reduce((s, t) => s + t.area, 0)).toBeGreaterThan(0.02);
+  });
+
+  it('luz de ré em leque ao lado da lanterna (a lente é âmbar-clara, de pouco brilho) e um escape discreto à direita', () => {
+    const rev = P.lensCenters((i) => P.mat.getW(i) > 0.05 && P.mat.getW(i) < 0.5);
+    expect(rev.filter((p) => p[0] > 0).length).toBeGreaterThanOrEqual(1);
+    expect(rev.filter((p) => p[0] < 0).length).toBeGreaterThanOrEqual(1);
+    expect(m.rear?.exhausts).toEqual([{ x: 0.5, y: 0.27, z: 2.25, r: 0.075 }]);
+  });
+});
