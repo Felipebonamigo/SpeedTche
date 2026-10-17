@@ -33,7 +33,7 @@ export const STYLIZE_FAMILIES: Readonly<Record<StylizeFamily, FamilyLook>> = {
 };
 
 /** Chave de programa: muda quando o texto do trecho muda (o three guarda o programa pela chave). */
-export const STYLIZE_KEY = 'speed-tche-stylize-v2'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`
+export const STYLIZE_KEY = 'speed-tche-stylize-v3'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`; v3 (V4b): a luz ambiente cinza da pista
 const GRADE_KEY = 'speed-tche-grade-v1';
 
 /**
@@ -64,6 +64,11 @@ export interface Grading {
   toe: number;
   /** Saturação da luz difusa do céu (IBL do domo) nos materiais com luz: 1 = a do domo; menos = mais neutra. O reflexo do céu não muda. */
   fill: number;
+  /**
+   * V4b: a luz AMBIENTE (hemisférica + IBL do céu) só no material da pista. `mix` = quanto dela vira cinza: a luminância dela × `tint` (um tom quente, já com o
+   * ganho); 1 de dia, 0 do entardecer em diante (a mesma `lateness` do resto). Sem isto o asfalto à sombra de dia saía azul-marinho (docs/ondas/V4b-sombra.md).
+   */
+  road: { tint: [number, number, number]; mix: number };
 }
 
 export interface LightLook {
@@ -96,6 +101,16 @@ const LATE_TOE = 0.5;
 const LATE_FILL = 0.25;
 
 /**
+ * V4b, a luz ambiente da pista de dia (provisórios, calibrados nas capturas de Copacabana, Paraty, Fuji e Xingó e no modelo de `tests/cor-brilho.test.ts`).
+ * O azul do asfalto à sombra vem de três lugares: a luz (hemisférica e IBL azuis), o pé do Neutral (zera o vermelho) e a tinta das sombras da gradação, que
+ * empurra os escuros para o azul do céu em TODO material. Só a pista é tirada disso: o ambiente vira cinza e o tom dele sai da própria tinta das sombras ao
+ * contrário (`ROAD_COUNTER` = quanto dela é desfeito, em gama), que é o que a gradação vai pôr de volta; `ROAD_GAIN` repõe a luminância que o pé do Neutral
+ * tira de um escuro neutro (6,25·x² no cinza, contra o escuro azul que ele deixava passar).
+ */
+const ROAD_COUNTER = 3.5;
+const ROAD_GAIN = 1.6;
+
+/**
  * A gradação sai da paleta, então já varia por bioma e por período sem tabela: a sombra é puxada para a cor do céu que a pinta
  * (`hemiSky`: azul na costa de dia; quase neutra no entardecer e na noite desde a cor-brilho) e a luz para a do sol (`sunLight`). A exposição parte da da paleta (calibrada
  * para o ACES) com um ajuste da curva nova: valor provisório, calibrado nas capturas de Copacabana (dia) e Sampa (noite).
@@ -106,15 +121,19 @@ export function gradingFor(p: Palette): Grading {
   const sh = hemi.map((v) => (v - mean(hemi)) * (0.08 + 0.12 * d)) as Rgb;
   // Cor-brilho: fora do dia o ganho quente das luzes cai (o sol do entardecer já é quente; somado, o carro branco ao sol saía pêssego).
   const hi = sun.map((v) => (v - mean(sun)) * 0.22 * (1 - 0.7 * lateness(p.light))) as Rgb;
+  const shadows = sh.map((v) => clamp(v, -0.1, 0.1)) as Rgb;
+  const counter = shadows.map((v) => { const f = Math.max(0.2, 1 - ROAD_COUNTER * v); return f * f; }) as Rgb;
+  const counterLum = 0.2126 * counter[0] + 0.7152 * counter[1] + 0.0722 * counter[2];
   return {
     toneMapping: TONE_MAP,
     exposure: p.exposure * EXPOSURE_TRIM,
     saturation: 0.02 + 0.04 * d,
     contrast: 0.02 + 0.06 * d,
-    shadows: sh.map((v) => clamp(v, -0.1, 0.1)) as Rgb,
+    shadows,
     highlights: hi.map((v) => clamp(v, -0.1, 0.1)) as Rgb,
     toe: LATE_TOE * lateness(p.light),
     fill: 1 - (1 - LATE_FILL) * lateness(p.light),
+    road: { tint: counter.map((v) => (v / counterLum) * ROAD_GAIN) as Rgb, mix: 1 - lateness(p.light) },
   };
 }
 
@@ -149,6 +168,8 @@ export const gradeUniforms = { uGradeShadows: vec3(), uGradeHighlights: vec3(), 
 export const stylizeUniforms = {
   uStylizeRim: vec3(), uStylizeTerm: vec3(), uStylizeFill: { value: 1 },
   uStylizeSkyTop: vec3(), uStylizeSkyHorizon: vec3(), uStylizeGround: vec3(),
+  /** (tom quente da luz ambiente da pista × ganho, quanto dela vale: 0 = nada), só na família `road` (V4b). */
+  uStylizeRoad: { value: new THREE.Vector4(1, 1, 1, 0) },
   ...gradeUniforms,
 };
 
@@ -167,6 +188,7 @@ export function setStylizePalette(p: Palette): Grading {
   gradeUniforms.uGradeHighlights.value.set(...g.highlights);
   gradeUniforms.uGradeAdjust.value.set(g.saturation, g.contrast, g.toe);
   stylizeUniforms.uStylizeFill.value = g.fill;
+  stylizeUniforms.uStylizeRoad.value.set(...g.road.tint, g.road.mix);
   const v = varnishSky(p);
   stylizeUniforms.uStylizeSkyTop.value.set(...v.top);
   stylizeUniforms.uStylizeSkyHorizon.value.set(...v.horizon);
@@ -277,6 +299,18 @@ const FILL_GLSL = /* glsl */ `
 #endif
 `;
 
+/**
+ * V4b, só na família da pista: a luz ambiente (hemisférica em `irradiance`, IBL em `iblIrradiance`, já com o `fill`) vira a luminância dela no tom quente
+ * `uStylizeRoad.rgb`, na fração `uStylizeRoad.w` (0 = igual a antes). O sol (luz direta) e o reflexo do céu não mudam.
+ */
+const ROAD_GLSL = /* glsl */ `
+/* STYLIZE_ROAD_CODE */
+#if defined( RE_IndirectDiffuse )
+  irradiance = mix( irradiance, vec3( dot( irradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, uStylizeRoad.w );
+  iblIrradiance = mix( iblIrradiance, vec3( dot( iblIrradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ) * uStylizeRoad.rgb, uStylizeRoad.w );
+#endif
+`;
+
 let patchedLights: string | null | undefined;
 let warned = false;
 
@@ -313,14 +347,14 @@ export function applyStylize(material: THREE.Material, family: StylizeFamily): v
   if (applied.has(material)) return;
   applied.add(material);
   const f = STYLIZE_FAMILIES[family];
-  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\nuniform float uStylizeFill;\n`;
+  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\nuniform float uStylizeFill;\n${family === 'road' ? 'uniform vec4 uStylizeRoad;\n' : ''}`;
   compose(material, (shader) => {
     Object.assign(shader.uniforms, stylizeUniforms);
     let frag = shader.fragmentShader.replace('#include <common>', () => `#include <common>\n${header}`);
     const chunk = lightsChunk();
     if (chunk) frag = frag.replace('#include <lights_physical_pars_fragment>', () => chunk);
     if (f.rim > 0) frag = frag.replace('#include <emissivemap_fragment>', () => `#include <emissivemap_fragment>\n${RIM_GLSL}`);
-    frag = frag.replace('#include <lights_fragment_maps>', () => `#include <lights_fragment_maps>\n${FILL_GLSL}`);
+    frag = frag.replace('#include <lights_fragment_maps>', () => `#include <lights_fragment_maps>\n${FILL_GLSL}${family === 'road' ? ROAD_GLSL : ''}`);
     shader.fragmentShader = frag;
   }, `${STYLIZE_KEY}:${family}`);
 }

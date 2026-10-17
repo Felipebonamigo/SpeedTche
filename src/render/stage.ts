@@ -101,7 +101,7 @@ interface Slot {
 interface Saved {
   rim: THREE.Vector3; term: THREE.Vector3; shadows: THREE.Vector3; highlights: THREE.Vector3; adjust: THREE.Vector3; exposure: number; clear: THREE.Color; clearAlpha: number;
   /** Cor-brilho: a IBL difusa e o céu/chão do verniz dos carros. */
-  fill: number; skyTop: THREE.Vector3; skyHorizon: THREE.Vector3; ground: THREE.Vector3;
+  fill: number; skyTop: THREE.Vector3; skyHorizon: THREE.Vector3; ground: THREE.Vector3; road: THREE.Vector4;
 }
 interface Size { width: number; height: number; dpr: number }
 
@@ -260,7 +260,7 @@ export class Stage {
       rim: u.uStylizeRim.value.clone(), term: u.uStylizeTerm.value.clone(), shadows: u.uGradeShadows.value.clone(),
       highlights: u.uGradeHighlights.value.clone(), adjust: u.uGradeAdjust.value.clone(), exposure: this.gl.toneMappingExposure,
       clear: this.gl.getClearColor(new THREE.Color()), clearAlpha: this.gl.getClearAlpha(),
-      fill: u.uStylizeFill.value, skyTop: u.uStylizeSkyTop.value.clone(), skyHorizon: u.uStylizeSkyHorizon.value.clone(), ground: u.uStylizeGround.value.clone(),
+      fill: u.uStylizeFill.value, skyTop: u.uStylizeSkyTop.value.clone(), skyHorizon: u.uStylizeSkyHorizon.value.clone(), ground: u.uStylizeGround.value.clone(), road: u.uStylizeRoad.value.clone(),
     };
     this.gl.toneMappingExposure = setStylizePalette(STUDIO).exposure;
     this.scene.add(this.cars.group);
@@ -277,7 +277,7 @@ export class Stage {
       const u = stylizeUniforms;
       u.uStylizeRim.value.copy(s.rim); u.uStylizeTerm.value.copy(s.term); u.uGradeShadows.value.copy(s.shadows);
       u.uGradeHighlights.value.copy(s.highlights); u.uGradeAdjust.value.copy(s.adjust);
-      u.uStylizeFill.value = s.fill; u.uStylizeSkyTop.value.copy(s.skyTop); u.uStylizeSkyHorizon.value.copy(s.skyHorizon); u.uStylizeGround.value.copy(s.ground);
+      u.uStylizeFill.value = s.fill; u.uStylizeSkyTop.value.copy(s.skyTop); u.uStylizeSkyHorizon.value.copy(s.skyHorizon); u.uStylizeGround.value.copy(s.ground); u.uStylizeRoad.value.copy(s.road);
       this.gl.toneMappingExposure = s.exposure;
       this.gl.setClearColor(s.clear, s.clearAlpha);
     }
