@@ -75,13 +75,13 @@ describe.skipIf(!available)('V11 · a estrada na imagem (swiftshader)', { timeou
     return { near: near.rgb, far: far.rgb };
   };
 
-  it('Xingó (deserto, dia): a estrada é terra alaranjada — o vermelho passa do azul em ≥ 70, o matiz fica em 8°–40° e a saturação ≥ 0,45 (antes: asfalto cinza, R − B ≈ 14)', async () => {
+  it('Xingó (deserto, dia): a estrada é terra alaranjada — o vermelho passa do azul em ≥ 90, o matiz fica em 8°–40° e a saturação ≥ 0,5 (antes: asfalto cinza, rgb 106,95,94: R − B = 12, saturação 0,11)', async () => {
     const { near, far } = await estrada(CENAS.xingo);
     registrar(`[V11] xingó: perto rgb(${near}) matiz ${hueDeg(near).toFixed(0)}° sat ${satOf(near).toFixed(2)} · longe rgb(${far})`);
     for (const [nome, c] of [['perto', near], ['longe', far]] as const) {
       expect(c[0] - c[2], `${nome}: R − B (rgb ${c})`).toBeGreaterThanOrEqual(90);
       expect(hueDeg(c), `${nome}: matiz`).toBeGreaterThanOrEqual(8); expect(hueDeg(c)).toBeLessThanOrEqual(40);
-      expect(satOf(c), `${nome}: saturação`).toBeGreaterThanOrEqual(0.45);
+      expect(satOf(c), `${nome}: saturação`).toBeGreaterThanOrEqual(0.5);
     }
     expect(errors).toEqual([]);
   });
