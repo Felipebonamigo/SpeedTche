@@ -33,7 +33,7 @@ export const STYLIZE_FAMILIES: Readonly<Record<StylizeFamily, FamilyLook>> = {
 };
 
 /** Chave de programa: muda quando o texto do trecho muda (o three guarda o programa pela chave). */
-export const STYLIZE_KEY = 'speed-tche-stylize-v3'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`; v3 (V4b): a luz ambiente cinza da pista
+export const STYLIZE_KEY = 'speed-tche-stylize-v4'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`; v3 (V4b): a luz ambiente cinza da pista
 const GRADE_KEY = 'speed-tche-grade-v1';
 
 /**
@@ -189,6 +189,8 @@ export const gradeUniforms = { uGradeShadows: vec3(), uGradeHighlights: vec3(), 
  * (`uStylizeSky*`, `uStylizeGround`, lineares) são o reflexo do verniz dos carros (cor-brilho, cars/material.ts).
  */
 export const stylizeUniforms = {
+  /** V12 (noite roxa): (tom roxo linear, quanto), lido só pelos materiais do cenário e das fachadas (`applyStylize(..., { world: true })`). */
+  uStylizeWorld: { value: new THREE.Vector4(0.8, 0.2, 1, 0) },
   uStylizeRim: vec3(), uStylizeTerm: vec3(), uStylizeFill: { value: 1 },
   uStylizeSkyTop: vec3(), uStylizeSkyHorizon: vec3(), uStylizeGround: vec3(),
   /** (tom quente da luz ambiente da pista × ganho, quanto dela vale: 0 = nada), só na família `road` (V4b). */
@@ -196,10 +198,21 @@ export const stylizeUniforms = {
   ...gradeUniforms,
 };
 
+/**
+ * V12 (docs/ondas/V12-noite-e-camera.md): o roxo do albedo do cenário à noite. O filtro do cenário (`sceneryLook.tint`) só MULTIPLICA: a copa verde ficava verde, mais escura; o
+ * Horizon Chase 2 pinta a árvore de magenta. `amount` = quanto do albedo (luminância mantida) vai ao `tone`: 0 de dia e no entardecer, 0,6 à noite, contínuo na `light`
+ * (a corrida que muda anda por aqui, por uniforme). Só o albedo do mundo: o carro, a pista e a luz não leem isto.
+ */
+export function worldLook(light: number): { tone: [number, number, number]; amount: number } {
+  const t = clamp((0.7 - light) / 0.34, 0, 1);
+  return { tone: linear('#a83cc4'), amount: 0.6 * t * t * (3 - 2 * t) };
+}
+
 /** O que o verniz reflete (linear): o topo do céu, o horizonte (com um pouco do meio) e o chão escuro abaixo da linha do horizonte. */
 export function varnishSky(p: Palette): { top: Rgb; horizon: Rgb; ground: Rgb } {
   const ground = lerp3(linear(p.hemiGround), linear(p.asphalt), 0.5).map((v) => v * 0.7) as Rgb;
-  return { top: linear(p.sky[0]), horizon: lerp3(linear(p.sky[2]), linear(p.sky[1]), 0.3), ground };
+  // V12: o céu que o verniz reflete é o que dá luz (`skyLight`), não o roxo que se pinta à noite.
+  return { top: linear(p.skyLight[0]), horizon: lerp3(linear(p.skyLight[2]), linear(p.skyLight[1]), 0.3), ground };
 }
 
 /** Escreve a paleta atual nos uniformes e devolve a gradação (o renderer usa a `exposure`). Chamar a cada troca de pista/período. */
@@ -216,6 +229,8 @@ export function setStylizePalette(p: Palette): Grading {
   stylizeUniforms.uStylizeSkyTop.value.set(...v.top);
   stylizeUniforms.uStylizeSkyHorizon.value.set(...v.horizon);
   stylizeUniforms.uStylizeGround.value.set(...v.ground);
+  const w = worldLook(p.light);
+  stylizeUniforms.uStylizeWorld.value.set(...w.tone, w.amount);
   return g;
 }
 
@@ -339,6 +354,16 @@ const ROAD_GLSL = /* glsl */ `
 #endif
 `;
 
+/** V12: o albedo do cenário puxado ao tom roxo da noite, mantendo a luminância dele (o filtro de cor já foi multiplicado em `diffuseColor`). */
+const WORLD_GLSL = /* glsl */ `
+/* STYLIZE_WORLD_CODE */
+{
+  float wLum = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+  vec3 wTone = uStylizeWorld.rgb * ( wLum / max( dot( uStylizeWorld.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-4 ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, wTone, uStylizeWorld.w );
+}
+`;
+
 let patchedLights: string | null | undefined;
 let warned = false;
 
@@ -371,20 +396,21 @@ function compose(material: THREE.Material, inject: (shader: THREE.WebGLProgramPa
  * Põe a rampa, o terminador e (nas famílias que têm) a luz de borda num material com luz (`MeshStandard`/`MeshPhysical`).
  * Chamar DEPOIS de o material pôr o `onBeforeCompile` e a `customProgramCacheKey` dele: os dois são compostos, não trocados.
  */
-export function applyStylize(material: THREE.Material, family: StylizeFamily): void {
+export function applyStylize(material: THREE.Material, family: StylizeFamily, opts: { world?: boolean } = {}): void {
   if (applied.has(material)) return;
   applied.add(material);
   const f = STYLIZE_FAMILIES[family];
-  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\nuniform float uStylizeFill;\n${family === 'road' ? 'uniform vec4 uStylizeRoad;\n' : ''}`;
+  const header = `#define STYLIZE_LIT 1\n#define STYLIZE_WRAP ${f.wrap.toFixed(3)}\n#define STYLIZE_TERM ${f.term.toFixed(3)}\n#define STYLIZE_RIM ${f.rim.toFixed(3)}\nuniform vec3 uStylizeRim;\nuniform vec3 uStylizeTerm;\nuniform float uStylizeFill;\n${family === 'road' ? 'uniform vec4 uStylizeRoad;\n' : ''}${opts.world ? 'uniform vec4 uStylizeWorld;\n' : ''}`;
   compose(material, (shader) => {
     Object.assign(shader.uniforms, stylizeUniforms);
     let frag = shader.fragmentShader.replace('#include <common>', () => `#include <common>\n${header}`);
     const chunk = lightsChunk();
     if (chunk) frag = frag.replace('#include <lights_physical_pars_fragment>', () => chunk);
+    if (opts.world) frag = frag.replace('#include <color_fragment>', () => `#include <color_fragment>\n${WORLD_GLSL}`);
     if (f.rim > 0) frag = frag.replace('#include <emissivemap_fragment>', () => `#include <emissivemap_fragment>\n${RIM_GLSL}`);
     frag = frag.replace('#include <lights_fragment_maps>', () => `#include <lights_fragment_maps>\n${FILL_GLSL}${family === 'road' ? ROAD_GLSL : ''}`);
     shader.fragmentShader = frag;
-  }, `${STYLIZE_KEY}:${family}`);
+  }, `${STYLIZE_KEY}:${family}${opts.world ? '+world' : ''}`);
 }
 
 /**

@@ -7,7 +7,7 @@
 // decoração distante usa mancha no chão (barata e funciona também na qualidade baixa).
 import * as THREE from 'three';
 import type { Track } from '../../core/types';
-import { mix, sceneryLook, type Palette } from '../palette';
+import { sceneryLook, type Palette } from '../palette';
 import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
 import { getModel, landmarkOf } from './catalog';
@@ -179,14 +179,15 @@ export class Scenery {
     // Vento no lote liso (copa que balança; o alfa da cor por instância é a fase) ANTES do stylize, que compõe por cima.
     applyWind(this.flatMat, this.windU);
     // Luz estilizada DEPOIS do callback e da chave acima: o stylize compõe com eles (o `fog_fragment` da névoa do horizonte fica).
-    applyStylize(this.flatMat, 'scenery');
-    applyStylize(this.hazeMat, 'scenery');
+    // V12: `world` = o albedo do cenário vai ao roxo da noite pelo uniforme `uStylizeWorld` (0 de dia e no entardecer).
+    applyStylize(this.flatMat, 'scenery', { world: true });
+    applyStylize(this.hazeMat, 'scenery', { world: true });
     const facade = (style: 'office' | 'apartment' | 'classic' | 'house'): THREE.MeshStandardMaterial => {
       const t = facadeTextures(style);
       this.textures.push(t.map, t.light);
       const glass = style === 'office';
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: t.map, emissiveMap: t.light, emissive: '#ffffff', emissiveIntensity: 0, roughness: glass ? 0.34 : 0.78, metalness: glass ? 0.22 : 0 });
-      applyStylize(mat, 'facade');
+      applyStylize(mat, 'facade', { world: true });
       applyFacadeAtlas(mat); // depois do estilizador: a luz de borda dele vem logo depois do `emissivemap_fragment`, que o atlas troca
       this.facadeMats.push(mat);
       return mat;
@@ -265,12 +266,13 @@ export class Scenery {
     const n = track.segments.length;
     const time = track.def.timeOfDay;
     this.dusk = time === 'dusk';
-    // O mesmo filtro de hora da paleta (entardecer esquenta, noite azula): o cenário casa com o chão.
-    this.flatMat.color.set(time === 'day' ? '#ffffff' : time === 'dusk' ? mix('#ffffff', '#5a2e4a', 0.22) : mix('#ffffff', '#0a1030', 0.42));
+    // O mesmo filtro de hora da paleta (entardecer esquenta, noite fica roxa: V12): o cenário casa com o chão. É o `sceneryLook` das três luzes (1 · 0,7 · 0,32): um valor só.
+    const look = sceneryLook(time === 'day' ? 1 : time === 'dusk' ? 0.7 : 0.32);
+    this.flatMat.color.set(look.tint);
     for (const m of this.facadeMats) m.color.copy(this.flatMat.color);
     this.hazeMat.color.copy(this.flatMat.color);
     this.cutoutMat.color.copy(this.flatMat.color);
-    this.blobMat.color.set(time === 'day' ? '#1c2a5a' : time === 'dusk' ? '#2c1a48' : '#050818');
+    this.blobMat.color.set(look.blob);
     this.blobMat.opacity = time === 'night' ? 0.4 : 0.32;
 
     // Geometrias por lote e contagem por segmento de cada uma (para a capacidade por janela).

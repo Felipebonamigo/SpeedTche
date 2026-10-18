@@ -148,7 +148,8 @@ describe('palette', () => {
       expect(day.sun).not.toBeNull(); expect(day.moon).toBeNull(); expect(day.stars).toBe(false);
       expect(night.sun).toBeNull(); expect(night.moon).not.toBeNull(); expect(night.stars).toBe(true);
       expect(dusk.sun).not.toBeNull();
-      const lum = (hex: string) => hexToRgb(hex).reduce((a, b) => a + b, 0);
+      // V12: luminância (pesos do olho) em vez da soma dos três canais: o chão roxo da noite tem o azul e o vermelho altos e o verde baixo (a soma dava mais que o verde do dia, a luminância não).
+      const lum = (hex: string) => 0.2126 * hexToRgb(hex)[0] + 0.7152 * hexToRgb(hex)[1] + 0.0722 * hexToRgb(hex)[2];
       expect(lum(night.grassLight), sc).toBeLessThan(lum(day.grassLight));
       expect(lum(night.roadLight), sc).toBeLessThan(lum(day.roadLight));
       expect(night.light).toBeLessThan(dusk.light); expect(dusk.light).toBeLessThan(day.light);

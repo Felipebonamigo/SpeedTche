@@ -1,6 +1,6 @@
 // Mede imagens (V10, HC2): saturação HSV média, luma, contraste (p95 − p5 da luma) e calor (R − B) de uma região central (fora do HUD) e de faixas.
 //   node tools/medir-imagem.mjs a.png b.webp ...   → uma linha JSON por imagem
-// Região "centro" = x 0,2–0,8 · y 0,15–0,85 (o HUD fica nos cantos e no topo); "céu" = y 0,12–0,32; "chão" = y 0,6–0,85.
+// Região "centro" = x 0,2–0,8 · y 0,15–0,85 (o HUD fica nos cantos e no topo); "céu" = y 0,12–0,32; "chão" = y 0,6–0,85; "horizonte" (a névoa de profundidade) = y 0,36–0,5, x 0,1–0,9. V12: matiz, croma e B − R.
 // A mesma conta de `regions()` em tools/render-harness.lab.ts (a medida do teste), para comparar a referência com o jogo.
 import { readFileSync } from 'node:fs';
 import { extname } from 'node:path';
@@ -21,17 +21,19 @@ for (const f of files) {
     const W = c.width; const H = c.height; const d = ctx.getImageData(0, 0, W, H).data;
     const stat = ([fx0, fy0, fx1, fy1]) => {
       const x0 = Math.floor(fx0 * W), x1 = Math.ceil(fx1 * W), y0 = Math.floor(fy0 * H), y1 = Math.ceil(fy1 * H);
-      const hist = new Uint32Array(256); let n = 0, sat = 0, luma = 0, warm = 0;
+      const hist = new Uint32Array(256); let n = 0, sat = 0, luma = 0, warm = 0, chroma = 0, mr = 0, mg = 0, mb = 0;
       for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
         const i = (y * W + x) * 4; const r = d[i], g = d[i + 1], b = d[i + 2];
         const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-        sat += mx === 0 ? 0 : (mx - mn) / mx; luma += l; warm += (r - b) / 255; n++; hist[Math.round(l * 255)]++;
+        sat += mx === 0 ? 0 : (mx - mn) / mx; luma += l; warm += (r - b) / 255; chroma += (mx - mn) / 255; mr += r; mg += g; mb += b; n++; hist[Math.round(l * 255)]++;
       }
       const pct = (q) => { let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= q * n) return v / 255; } return 1; };
       const r3 = (v) => Math.round(v * 1000) / 1000;
-      return { sat: r3(sat / n), luma: r3(luma / n), contraste: r3(pct(0.95) - pct(0.05)), calor: r3(warm / n) };
+      // V12 (noite roxa): matiz (°, da cor média da região), croma (HSV, média de (máx − mín)/255) e B − R (o contrário do calor).
+      const hueOf = (r, g, b) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx === mn) return 0; const dd = mx - mn; const h = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; return Math.round(((h * 60) + 360) % 360); };
+      return { sat: r3(sat / n), luma: r3(luma / n), contraste: r3(pct(0.95) - pct(0.05)), calor: r3(warm / n), matiz: hueOf(mr / n, mg / n, mb / n), croma: r3(chroma / n), BmR: r3(-warm / n) };
     };
-    return { w: W, h: H, centro: stat([0.2, 0.15, 0.8, 0.85]), ceu: stat([0.2, 0.12, 0.8, 0.32]), chao: stat([0.2, 0.6, 0.8, 0.85]) };
+    return { w: W, h: H, centro: stat([0.2, 0.15, 0.8, 0.85]), ceu: stat([0.2, 0.12, 0.8, 0.32]), chao: stat([0.2, 0.6, 0.8, 0.85]), horizonte: stat([0.1, 0.36, 0.9, 0.5]) };
   }, url);
   console.log(JSON.stringify({ arquivo: f, ...out }));
 }

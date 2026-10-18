@@ -73,6 +73,6 @@ export function cutoutMaterial(map: THREE.Texture): THREE.MeshStandardMaterial {
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('gl_FrontFacing ? 1.0 : - 1.0', '1.0'));
   };
   m.customProgramCacheKey = () => 'scenery-cutout';
-  applyStylize(m, 'scenery');
+  applyStylize(m, 'scenery', { world: true }); // V12: o roxo da noite no albedo do cenário
   return m;
 }

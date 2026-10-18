@@ -13,6 +13,11 @@ import type { SceneryId, TimeOfDay } from '../core/types';
 export interface Palette {
   /** Gradiente do céu, de cima para o horizonte. */
   sky: [string, string, string];
+  /**
+   * V12: o céu que DÁ LUZ ao carro (a IBL difusa do domo e o reflexo do verniz). Igual ao `sky` de dia e no entardecer; à noite é o céu azul de antes do roxo: a noite
+   * roxa vive no que se vê (céu, névoa, chão, cenário), não na luz que cai no carro (cor-brilho: carro branco lê branco).
+   */
+  skyLight: [string, string, string];
   /** Cor do sol (dia/entardecer) ou null. */
   sun: string | null;
   /** Cor da lua (noite) ou null. */
@@ -27,6 +32,8 @@ export interface Palette {
   /** Faixa central da pista. */
   lane: string;
   fog: string;
+  /** V12: a névoa que a luz do carro vê (o "abaixo do horizonte" da IBL): igual à `fog` de dia e no entardecer; à noite, a de antes do roxo. */
+  fogLight: string;
   /** Camada de parallax distante (montanhas/skyline) e próxima (colinas/prédios). */
   far: string;
   near: string;
@@ -222,7 +229,7 @@ const BASES: Record<SceneryId, Base> = {
 const ROAD_TONE: Record<SceneryId, { day: string; dusk: string; night: string; alt: string; earth: number }> = {
   tropical: { day: '#82483c', dusk: '#b0644e', night: '#905a58', alt: '#f08038', earth: 0.9 }, // terra avermelhada da mata
   desert: { day: '#885a40', dusk: '#b8806c', night: '#986a70', alt: '#ffa860', earth: 1 }, // terra alaranjada
-  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#8a78a8', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo-azulado
+  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#a276ae', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo (V12: mauve, não lilás-azulado)
   alpine: { day: '#7c6672', dusk: '#947690', night: '#7c6aa0', alt: '#f0d8e0', earth: 0.3 }, // pedra rosada
   coast: { day: '#6c6a68', dusk: '#a08078', night: '#847888', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente
   savanna: { day: '#80684a', dusk: '#b08064', night: '#946a58', alt: '#ffc868', earth: 0.85 }, // terra ocre
@@ -262,6 +269,43 @@ const NIGHT_SKY: Record<SceneryId, [string, string, string]> = {
   savanna: ['#0a0720', '#2a1a4a', '#6a4a64'],
 };
 function nightSky(b: SceneryId): [string, string, string] { return NIGHT_SKY[b]; }
+
+/**
+ * V12 (noite roxa, docs/ondas/V12-noite-e-camera.md): o roxo/magenta cheio que o Horizon Chase 2 pinta no céu e na névoa da noite (`scratch/ref/hc2-7.webp`: céu 281°, horizonte 287°),
+ * um por bioma para os céus seguirem distintos (a cidade vai ao magenta da poluição luminosa, a costa e a montanha ficam no violeta-azulado do luar, a savana no ameixa). Só o que
+ * SE VÊ: a luz que cai no carro segue com o céu azul (`NIGHT_SKY`, que vira `skyLight`).
+ */
+const NIGHT_SKY_PURPLE: Record<SceneryId, [string, string, string]> = {
+  city_night: ['#1c0a4e', '#46168e', '#a43ca8'],
+  coast: ['#2a1458', '#4a26a8', '#8c4cc0'],
+  desert: ['#1c083e', '#3a1274', '#8230a8'],
+  tropical: ['#200c48', '#40208a', '#6234a8'],
+  alpine: ['#2a1250', '#5030a8', '#6a4cc0'],
+  savanna: ['#200a38', '#481a62', '#984470'],
+};
+
+/**
+ * O tom de roxo que o chão da noite puxa, por bioma, e quanto (V12). A cor ganha o matiz do tom MANTENDO a luminância dela (a M2 mede o contraste estrada × chão por
+ * luminância: roxo não pode clarear nem escurecer o que já foi calibrado). A cidade e o deserto vão mais fundo; a mata e a costa guardam um resto do verde.
+ */
+const NIGHT_GROUND_PURPLE: Record<SceneryId, { tone: string; amount: number }> = {
+  city_night: { tone: '#9a3c9e', amount: 0.78 },
+  coast: { tone: '#8c4cb4', amount: 0.72 },
+  desert: { tone: '#9a3c8c', amount: 0.7 },
+  tropical: { tone: '#8a3aa4', amount: 0.72 },
+  alpine: { tone: '#8c4cb8', amount: 0.72 },
+  savanna: { tone: '#9c3c9c', amount: 0.74 },
+};
+
+/** Puxa `c` para o matiz de `tone` na proporção `amount`, mantendo a luminância de `c`. */
+function roxear(c: string, tone: string, amount: number): string {
+  const mixed = mix(c, tone, amount);
+  const f = luminance(c) / Math.max(1e-3, luminance(mixed));
+  return shade(mixed, f);
+}
+
+/** A 2ª tinta da pista à noite (V12): mauve na cidade (o lilás-azulado de antes lia azul), a de sempre nos outros biomas. */
+const NIGHT_ROAD_ALT: Partial<Record<SceneryId, string>> = { city_night: '#e6bcf0', alpine: '#f0c8ec' };
 
 // ───────────────────────────── Gradação por hora ─────────────────────────────
 
@@ -319,6 +363,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   const b = BASES[scenery];
   const g = (c: string) => grade(c, time);
   let sky: [string, string, string];
+  let skyLight: [string, string, string];
   let glow: string;
   let light: number;
   let sun: string | null = null;
@@ -329,7 +374,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   let bloom: [number, number, number];
   let cloudLit: string | null; let cloudShade: string;
   if (time === 'day') {
-    sky = b.sky; glow = '#fff6d0'; light = 1; sun = '#fff1b0';
+    sky = b.sky; skyLight = sky; glow = '#fff6d0'; light = 1; sun = '#fff1b0';
     sunLight = '#fff0d6'; sunIntensity = 3.3;
     // O céu azul saturado é a luz das sombras: é ele que as deixa azuladas em vez de pretas.
     hemiSky = mix(b.sky[1], '#b4c8f4', 0.6); hemiIntensity = 1.3;
@@ -337,7 +382,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     bloom = [0.34, 0.5, 2.2]; // V10 (HC2): halo no disco do sol (era 0,2 · 0,35 · 2,6)
     cloudLit = '#ffffff'; cloudShade = mix(b.sky[1], '#c8d8f0', 0.55);
   } else if (time === 'dusk') {
-    sky = DUSK_SKY[scenery].sky; glow = DUSK_SKY[scenery].glow; light = 0.7; sun = '#ffc46a';
+    sky = DUSK_SKY[scenery].sky; skyLight = sky; glow = DUSK_SKY[scenery].glow; light = 0.7; sun = '#ffc46a';
     // Cor-brilho: a luz que cai nos objetos é quase neutra — o sol quente, a sombra fria —, e a cor forte fica no céu, na névoa e no reflexo. Era sol
     // #ffab62 e sombra #8a6ad2 (roxo saturado): o carro branco saía rosa e o asfalto roxo (tests/cor-brilho.test.ts).
     sunLight = '#ffe8d0'; sunIntensity = 3.0;
@@ -346,7 +391,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     bloom = [0.3, 0.4, 1.6];
     cloudLit = mix(glow, '#ffa07a', 0.3); cloudShade = mix(sky[1], sky[0], 0.3);
   } else {
-    sky = nightSky(scenery); glow = scenery === 'city_night' ? '#ff9a6a' : '#b8c8ff'; light = 0.32; moon = '#f6f2dc';
+    skyLight = nightSky(scenery); sky = NIGHT_SKY_PURPLE[scenery]; glow = scenery === 'city_night' ? '#ff9a6a' : '#b8c8ff'; light = 0.32; moon = '#f6f2dc';
     // Cor-brilho: luar e céu da noite frios mas quase neutros (eram #9db6ff e #4a66b8/#5a5aa8, azul e roxo saturados); a cidade, um pouco mais quente.
     sunLight = '#dcdee6'; sunIntensity = 0.95;
     hemiSky = scenery === 'city_night' ? '#aaa6aa' : '#a4a6ae'; hemiIntensity = 1.35;
@@ -357,39 +402,47 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     cloudLit = null; cloudShade = sky[1];
   }
   // Névoa: o horizonte com um pouco do meio do céu — tem cor, nunca cinza.
-  const fog = mix(sky[2], sky[1], time === 'day' ? 0.28 : time === 'dusk' ? 0.32 : 0.2);
+  const fogK = time === 'day' ? 0.28 : time === 'dusk' ? 0.32 : 0.2;
+  const fog = mix(sky[2], sky[1], fogK);
+  const fogLight = mix(skyLight[2], skyLight[1], fogK); // a névoa que a luz do carro vê: a de antes do roxo (V12)
   // À noite o chão alto sobe um pouco (a mata e a montanha escuras engoliam a pista) e o asfalto leva menos azul que o resto: o carro
   // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
-  const groundLow = time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow);
-  const groundHigh = time === 'night' ? liftTo(g(b.groundHigh), 0.12) : g(b.groundHigh);
+  const groundLowLight = time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow);
+  const groundHighLight = time === 'night' ? liftTo(g(b.groundHigh), 0.12) : g(b.groundHigh);
+  // V12: à noite o chão e o que é de chão (beira, rocha, areia, planos do horizonte, neve) são pintados de roxo/magenta, com a luminância de antes. O que cai de luz no carro
+  // (`hemiGround`, abaixo) segue saindo do chão de antes: o roxo é albedo do mundo, não luz no carro.
+  const gp = NIGHT_GROUND_PURPLE[scenery];
+  const purple = (c: string): string => (time === 'night' ? roxear(c, gp.tone, gp.amount) : c);
+  const groundLow = purple(groundLowLight);
+  const groundHigh = purple(groundHighLight);
   // Cor-brilho: no entardecer e à noite o asfalto é neutro-quente (era o vinho e o marinho da gradação de hora: com a luz roxa, saía roxo).
   const asphalt = time === 'day' ? b.asphalt : shade(mix(b.asphalt, ASPHALT_LATE, time === 'night' ? 0.8 : 0.6), time === 'night' ? 0.72 : 0.92);
   // Os planos do horizonte puxam para o céu do período (o rosa do entardecer, o azul da noite).
   const skyPull = time === 'day' ? 0 : time === 'dusk' ? 0.28 : 0.5;
-  const layers = b.layers.map((c, i) => mix(g(c), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];
+  const layers = b.layers.map((c, i) => mix(purple(g(c)), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];
   const layerHaze: [number, number, number] = time === 'night' ? [0.14, 0.3, 0.48] : [0.14, 0.32, 0.52];
   const pitLine = time === 'night' ? '#ffe45a' : '#ffd83a';
   const rt = ROAD_TONE[scenery];
   const roadBase = rt[time];
   // A segunda tinta muda o matiz (esquenta/esfria) e clareia pouco (+12% de luma): a média da textura segue a `roadBase` que a cor-brilho calibrou.
-  const altTint = mix(roadBase, rt.alt, time === 'day' ? 0.42 : time === 'dusk' ? 0.36 : 0.25);
+  const altTint = mix(roadBase, (time === 'night' ? NIGHT_ROAD_ALT[scenery] : undefined) ?? rt.alt, time === 'day' ? 0.42 : time === 'dusk' ? 0.36 : 0.25);
   const roadAlt = shade(altTint, (luminance(roadBase) * 1.12) / Math.max(1e-3, luminance(altTint)));
   const kt = KERB_TONE[scenery];
   const lane = time === 'night' ? '#f2f0dc' : '#f4f4f0';
   return {
-    sky, sun, moon, stars: time === 'night',
+    sky, skyLight, sun, moon, stars: time === 'night',
     grassLight: groundLow, grassDark: groundHigh,
     rumbleLight: time === 'night' ? mix(kt.light, '#e8e8f0', 0.5) : kt.light, rumbleDark: time === 'night' ? shade(kt.dark, 0.92) : kt.dark,
     roadLight: shade(asphalt, 1.06), roadDark: shade(asphalt, 0.9),
-    lane, fog,
+    lane, fog, fogLight,
     far: layers[2], near: layers[0],
     pit: shade(asphalt, 1.22), pitLine,
     light,
-    skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(groundLow, asphalt, 0.3), 0.55), hemiIntensity,
+    skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(groundLowLight, asphalt, 0.3), 0.55), hemiIntensity,
     envIntensity, exposure, fogDensity, bloom, cloudLit, cloudShade,
-    asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: g(b.shoulder), verge: g(b.verge), groundLow, groundHigh, rock: g(b.rock),
-    snow: time === 'day' ? '#f4f8ff' : time === 'dusk' ? '#ffe0e4' : '#aebce6',
-    sand: g(b.sand),
+    asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: purple(g(b.shoulder)), verge: purple(g(b.verge)), groundLow, groundHigh, rock: purple(g(b.rock)),
+    snow: time === 'day' ? '#f4f8ff' : time === 'dusk' ? '#ffe0e4' : '#c2b4ea',
+    sand: purple(g(b.sand)),
     layers, layerHaze,
     waterDeep: time === 'day' ? b.waterDeep : time === 'dusk' ? mix(b.waterDeep, '#3a2a7a', 0.45) : mix(b.waterDeep, '#040c30', 0.7),
     waterShallow: time === 'day' ? b.waterShallow : time === 'dusk' ? mix(b.waterShallow, '#e0708a', 0.3) : mix(b.waterShallow, '#0c2a5a', 0.65),
@@ -551,8 +604,9 @@ export function sceneryLook(light: number): SceneryLook {
   const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
   // `k`: 0 na estação do entardecer, 1 na outra ponta (dia acima de 0,7, noite abaixo).
   const pick = (dayV: number, duskV: number, nightV: number): number => (day ? lerp(duskV, dayV, w) : lerp(duskV, nightV, w));
-  const tint = day ? mix(mix('#ffffff', '#5a2e4a', 0.22), '#ffffff', w) : mix(mix('#ffffff', '#5a2e4a', 0.22), mix('#ffffff', '#0a1030', 0.42), w);
-  const blob = day ? mix('#2c1a48', '#1c2a5a', w) : mix('#2c1a48', '#050818', w);
+  // V12: à noite o filtro do cenário (e a mancha de sombra no chão) é roxo, não azul-marinho: as árvores, os prédios e a skyline pegam o roxo do HC2.
+  const tint = day ? mix(mix('#ffffff', '#5a2e4a', 0.22), '#ffffff', w) : mix(mix('#ffffff', '#5a2e4a', 0.22), mix('#ffffff', '#3a0a60', 0.5), w);
+  const blob = day ? mix('#2c1a48', '#1c2a5a', w) : mix('#2c1a48', '#12051e', w);
   return {
     tint, lit: lightsAmount(light), panel: pick(0.3, 0.6, 0.6), glow: pick(0.95, 1.4, 2.0),
     cones: day ? 0 : w, blob, blobOpacity: pick(0.32, 0.32, 0.4),

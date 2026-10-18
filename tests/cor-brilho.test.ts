@@ -45,16 +45,19 @@ const gradeOf = (p: Palette): ReturnType<typeof gradingFor> & GradingNew => grad
 
 // ───────────────────────────── modelo de bolso da luz (independente do código) ─────────────────────────────
 
-/** O domo do céu (o gradiente do SKY_FRAG de sky.ts, sem o disco): horizonte → meio → topo, o brilho do lado do sol, a névoa abaixo do horizonte. */
+/**
+ * O domo do céu (o gradiente do SKY_FRAG de sky.ts, sem o disco): horizonte → meio → topo, o brilho do lado do sol, a névoa abaixo do horizonte. É o que a IBL VÊ: desde a V12
+ * (noite roxa) o env map é capturado com o céu e a névoa "de luz" da paleta (`skyLight`, `fogLight`: os de antes do roxo), não com o que se pinta no domo à noite.
+ */
 function dome(p: Palette, d: THREE.Vector3, sun: THREE.Vector3): V {
   const hp = Math.max(d.y, 0);
-  let col = mixv(lin(p.sky[2]), lin(p.sky[1]), sstep(0, 0.2, hp));
-  col = mixv(col, lin(p.sky[0]), sstep(0.16, 0.75, hp));
+  let col = mixv(lin(p.skyLight[2]), lin(p.skyLight[1]), sstep(0, 0.2, hp));
+  col = mixv(col, lin(p.skyLight[0]), sstep(0.16, 0.75, hp));
   const sh = new THREE.Vector2(sun.x, sun.z).normalize(); const dh = new THREE.Vector2(d.x, d.z).normalize();
   const az = dh.dot(sh) * 0.5 + 0.5;
   const glowAmt = p.light >= 0.8 ? 0.35 : p.light >= 0.5 ? 0.8 : 0.35;
   col = mixv(col, lin(p.skyGlow), Math.exp(-hp * 6) * az * az * az * glowAmt);
-  return mixv(col, lin(p.fog), sstep(0, -0.06, d.y));
+  return mixv(col, lin(p.fogLight), sstep(0, -0.06, d.y));
 }
 
 /** A IBL difusa do three (PMREM do domo, rugosidade 1): a média do domo ponderada pelo cosseno em volta da normal. */

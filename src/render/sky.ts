@@ -390,6 +390,9 @@ export class Sky {
   /** A última paleta ao vivo entregue (para não repetir o mesmo passo), o `t` do último env map e quantas vezes ele foi refeito por `setLive`. */
   private livePair: { a: Palette; b: Palette; t: number } | null = null;
   private envT = 0;
+  /** V12: as cores que o domo mostra à IBL (a luz que cai no carro): o céu e a névoa "de luz" da paleta, não o roxo que se pinta à noite. */
+  private readonly envSky = { top: new THREE.Color(), mid: new THREE.Color(), horizon: new THREE.Color(), below: new THREE.Color() };
+  private readonly envSaved = { top: new THREE.Color(), mid: new THREE.Color(), horizon: new THREE.Color(), below: new THREE.Color() };
   private envRebuilds = 0;
   private fogBase = FOG_DENSITY.high;
   private fogMul = 1;
@@ -519,6 +522,7 @@ export class Sky {
     (u.uHorizon.value as THREE.Color).set(p.sky[2]);
     (u.uGlow.value as THREE.Color).set(p.skyGlow);
     (u.uBelow.value as THREE.Color).set(p.fog);
+    this.envSky.top.set(p.skyLight[0]); this.envSky.mid.set(p.skyLight[1]); this.envSky.horizon.set(p.skyLight[2]); this.envSky.below.set(p.fogLight);
     (u.uSunDir.value as THREE.Vector3).copy(this.sunDirAbs);
     (u.uSunColor.value as THREE.Color).set(live.body);
     u.uSunSize.value = look.size; u.uHalo.value = look.halo; u.uGlowAmt.value = look.glow; u.uDisc.value = look.disc; u.uMoon.value = look.moon;
@@ -562,7 +566,16 @@ export class Sky {
     const envScene = new THREE.Scene();
     const dome = new THREE.Mesh(this.dome.geometry, this.dome.material);
     envScene.add(dome);
-    this.envTarget = this.pmrem.fromScene(envScene, 0.02, 1, SKY_RADIUS * 1.5);
+    // V12: a IBL (a luz difusa que o carro recebe do céu) vê o céu "de luz", e não o roxo da noite: as cores do domo trocam só durante a captura do env map (rara: troca de
+    // pista, passo da corrida que muda) e voltam. Mesmos uniformes, nenhum programa novo.
+    const u = this.dome.material.uniforms;
+    const slots = [['uTop', 'top'], ['uMid', 'mid'], ['uHorizon', 'horizon'], ['uBelow', 'below']] as const;
+    for (const [uni, k] of slots) { this.envSaved[k].copy(u[uni].value as THREE.Color); (u[uni].value as THREE.Color).copy(this.envSky[k]); }
+    try {
+      this.envTarget = this.pmrem.fromScene(envScene, 0.02, 1, SKY_RADIUS * 1.5);
+    } finally {
+      for (const [uni, k] of slots) (u[uni].value as THREE.Color).copy(this.envSaved[k]);
+    }
     this.scene.environment = this.envTarget.texture;
   }
 

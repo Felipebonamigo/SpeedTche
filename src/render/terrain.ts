@@ -591,7 +591,7 @@ export class Terrain {
 
     const win = windowTextures();
     this.cityMaterial = new THREE.MeshStandardMaterial({ map: win.wall, emissiveMap: win.win, emissive: '#ffd27a', emissiveIntensity: 1.3, color: '#5a6478', roughness: 0.7 });
-    applyStylize(this.cityMaterial, 'facade');
+    applyStylize(this.cityMaterial, 'facade', { world: true }); // V12: o roxo da noite nos prédios da skyline
     for (const [w, h, d] of [[18, 22, 18], [16, 42, 16], [22, 70, 22]] as const) {
       const im = new THREE.InstancedMesh(meteredBox(w, h, d), this.cityMaterial, 160);
       im.frustumCulled = false; im.castShadow = false; im.visible = false;
