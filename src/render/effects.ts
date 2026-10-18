@@ -19,12 +19,12 @@ import { createScrapeMemory, observeScrapes } from '../game/race-feel';
 import { newCueMemory, observeCues, type FxCue } from './fx/cues';
 import { fxPlan, type FxPlan } from './fx/plan';
 import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
-import { emitBoostSparks, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
+import { emitBoostSparks, emitExhaustFire, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
 import { contactPoint, emitImpact, type Contact } from './fx/impact';
 import { Pows, powSize } from './fx/pow';
 import { Shockwaves } from './fx/shockwave';
-import { draftLine, lineCount, speedLine, speedLineStrength, type LineSpec } from './fx/lines';
+import { cornerStreak, draftLine, lineCount, speedLine, speedLineStrength, type LineSpec } from './fx/lines';
 import { markStrength, TireMarks, type MarkCarState } from './fx/marks';
 import { hash2 } from './noise';
 import type { Palette } from './palette';
@@ -226,10 +226,17 @@ export class Effects {
     // entardecer, o de limiar de bloom mais baixo, 1,6, elas brilhavam); contínuo entre os dois (a corrida que muda chama isto com a luz ao vivo).
     const t = Math.min(1, Math.max(0, (p.light - 0.7) / 0.25));
     this.lineGain = 0.33 + 0.67 * t * t * (3 - 2 * t);
+    // V10: os riscos largos de canto são o efeito de velocidade principal; caem menos que os fios (0,6 no entardecer e à noite) e o `Effects` do viewport os
+    // acende só abaixo do limiar do bloom do entardecer (alfa ≤ 0,6 × cor ≤ 1,08 não passa de 0,65 somado).
+    this.cornerGain = 0.6 + 0.4 * t * t * (3 - 2 * t);
   }
 
   /** Brilho das linhas de velocidade e do túnel pelo período (`setPalette`). */
   private lineGain = 1;
+  /** Brilho dos riscos largos de canto pelo período (V10). */
+  private cornerGain = 1;
+  /** "Efeitos de cartum" do último quadro (os riscos de canto ficam mais largos). */
+  private cartoon = false;
 
   private rnd(): number { this.seed++; return hash2(this.seed, 77); }
 
@@ -263,6 +270,7 @@ export class Effects {
     const reduce = frame.options.reduceEffects === true;
     const plan = fxPlan(frame.options.quality, reduce, frame.viewports.length, frame.options.cartoonEffects === true);
     this.plan = plan;
+    this.cartoon = frame.options.cartoonEffects === true;
     this.marks.buffer.setTrackLength(frame.track.length);
     this.marks.buffer.setCapacity(plan.marks);
     this.markClock += dt;
@@ -272,7 +280,8 @@ export class Effects {
       const c = state.cars[i];
       // Poeira na grama, fumaça da freada forte e fumaça do pneu na derrapagem: bolhas.
       const pc = this.puffCarOf(c);
-      emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff);
+      emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff, plan.dustScale);
+      const acceleration = (c.speed - this.prevSpeed[i]) / dt; // unidades/s²: a aceleração deste quadro (o `prevSpeed` é trocado mais abaixo)
       emitBrakeSmoke(pc, (this.prevSpeed[i] - c.speed) / dt, c.stats.brake, c.collisionCooldown, plan.smoke, rnd, this.emitPuff);
       if (state.phase !== 'countdown') emitTireSmoke(pc, dt, plan.smoke, rnd, this.emitPuff);
       // Marca de pneu nas duas rodas traseiras (derrapagem, freada forte, arranque da largada-foguete).
@@ -290,6 +299,13 @@ export class Effects {
       if (plan.wheelSparks && state.phase !== 'countdown') emitWheelSparks(this.sparkCarOf(c), driftLevel(c.driftCharge), dt, plan.sparks, rnd, this.emitSpark);
       // Rastro do nitro: traços curtos e discretos (a chama em si é a malha de cars.ts).
       if (c.nitroTicks > 0 && state.phase === 'racing') emitNitroTrail(this.sparkCarOf(c), plan.sparks, rnd, this.emitSpark);
+      // V10 (HC2): os jatos de fogo dos escapes de quem joga (rival não: 19 carros tomariam o lote de traços): no nitro, e nos estouros da aceleração (carro
+      // ganhando ≥ 6% da máxima por segundo, abaixo de 92% dela, sem derrapar).
+      if (c.seat >= 0 && state.phase === 'racing' && plan.exhaustFire > 0) {
+        const top = c.stats.topSpeed;
+        const mode = c.nitroTicks > 0 ? 'nitro' : acceleration >= 0.06 * top && c.speed < 0.92 * top && c.driftTicks <= 0 ? 'accel' : null;
+        if (mode) emitExhaustFire(this.sparkCarOf(c), mode, dt, plan.exhaustFire, rnd, this.emitSpark);
+      }
     }
     // Bordas do estado (fx/cues.ts): a batida e o impulso da derrapagem.
     this.contactsN = 0;
@@ -390,6 +406,9 @@ export class Effects {
     const s = this.spec;
     const nSpeed = lineCount(this.plan.speedLines, v.lineS);
     for (let k = 0; k < nSpeed; k++) if (speedLine(k, nSpeed, v.travel, v.speedMs, v.lineS, s)) this.addLine(rf, track, st, v, s);
+    // V10 (HC2): os riscos largos dos cantos, na mesma passada (a mesma intensidade suavizada, o brilho do período em `cornerGain`).
+    const nCorner = lineCount(this.plan.cornerStreaks, v.lineS);
+    for (let k = 0; k < nCorner; k++) if (cornerStreak(k, nCorner, v.travel, v.speedMs, v.lineS, this.cartoon, s)) this.addLine(rf, track, st, v, s, this.cornerGain);
     const ring = this.plan.draftLines;
     const nDraft = lineCount(ring, v.draftI);
     for (let k = 0; k < nDraft; k++) if (draftLine(k, ring, v.travel, v.time, v.speedMs, v.draftI, s)) this.addLine(rf, track, st, v, s);
@@ -398,11 +417,11 @@ export class Effects {
   private readonly lineHead: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
   private readonly lineTail: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
 
-  private addLine(rf: RoadFrame, track: Track, st: Streaks, v: ViewFx, s: LineSpec): void {
+  private addLine(rf: RoadFrame, track: Track, st: Streaks, v: ViewFx, s: LineSpec, gain = this.lineGain): void {
     const hd = this.lineHead; const tl = this.lineTail;
     if (!locateOnFrame(rf, track, v.z + s.dz * 50, v.x + s.lat / 7, hd)) return;
     const ok = locateOnFrame(rf, track, v.z + s.tail * 50, v.x + s.lat / 7, tl);
-    st.add(hd.x, hd.y + s.h, hd.z, ok ? tl.x : hd.x, ok ? tl.y + s.h : hd.y + s.h, ok ? tl.z : hd.z - 1, s.width, s.r, s.g, s.b, s.a * this.lineGain);
+    st.add(hd.x, hd.y + s.h, hd.z, ok ? tl.x : hd.x, ok ? tl.y + s.h : hd.y + s.h, ok ? tl.z : hd.z - 1, s.width, s.r, s.g, s.b, s.a * gain);
   }
 
   /** Deslocamento da câmera pelo chacoalho do assento (zero se desligado nas opções). */

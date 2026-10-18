@@ -109,6 +109,24 @@ export function emitNitroTrail(c: SparkCar, factor: number, rnd: () => number, o
   }
 }
 
+/**
+ * V10 (HC2): o jato de fogo do escape — o Horizon Chase 2 solta línguas de fogo laranja pelos dois escapes no nitro e nos estouros da aceleração. Traços
+ * HDR de fogo (R ≥ 2 G, G ≥ 3 B: laranja-amarelo, o bloom os pega), 9 a 15 cm de largura, para trás; o que a malha da chama (cars/flame) não faz, a
+ * partir do escape de cada lado. `mode`: `nitro` ≈ 32 por segundo e carro, `accel` ≈ 8 (estouros curtos, não uma chama contínua). `factor` = `fxPlan.exhaustFire`.
+ */
+export function emitExhaustFire(c: SparkCar, mode: 'nitro' | 'accel', dt: number, factor: number, rnd: () => number, out: (s: SparkSpec) => void): void {
+  if (factor <= 0 || c.speed < WHEEL_SPARK_MIN_SPEED) return;
+  const n = draw((mode === 'nitro' ? 32 : 8) * dt * factor, rnd);
+  for (let k = 0; k < n; k++) {
+    const side = rnd() < 0.5 ? -0.065 : 0.065;
+    const back = 1800 + 1200 * rnd(); // unidades/s para trás, relativo ao carro (36 a 60 m/s)
+    out(spec({
+      z: c.z - 66 - 8 * rnd(), x: c.x + side, h: 0.26 + 0.04 * rnd(), vz: c.speed - back * 0.6, vx: side * 0.5 + (rnd() - 0.5) * 0.1, vh: 0.2 + 0.5 * rnd(),
+      svz: -back, svx: 0, svh: 0.3 * rnd(), life: 0.1 + 0.1 * rnd(), width: 0.09 + 0.06 * rnd(), gravity: 0.5, r: 2.6 + 0.6 * rnd(), g: 1.0 + 0.25 * rnd(), b: 0.1 + 0.1 * rnd(),
+    }));
+  }
+}
+
 /** Comprimento do traço: velocidade visual × `STRETCH` s, entre o mínimo e o máximo (m). */
 const STRETCH = 0.03;
 const MIN_LEN = 0.18;

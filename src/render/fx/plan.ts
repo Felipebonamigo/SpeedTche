@@ -20,6 +20,12 @@ export interface FxPlan {
   speedLines: number;
   /** Traços do túnel de ar do vácuo por viewport (teto). */
   draftLines: number;
+  /** V10 (HC2): riscos LARGOS de canto de tela por viewport (teto; `lines.ts`, `cornerStreak`), na mesma malha de traços. */
+  cornerStreaks: number;
+  /** V10 (HC2): fator de emissão dos jatos de fogo dos escapes (nitro e aceleração; `sparks.ts`, `emitExhaustFire`); 0 = nenhum. */
+  exhaustFire: number;
+  /** V10 (HC2): escala da poeira da terra e da areia (tamanho, vida e quantidade de bolhas): 1 = a de antes. */
+  dustScale: number;
   /** Anel da largada e do engate do nitro. */
   shockwave: boolean;
   /** O "POW" da batida (e o leque de faíscas de quadrinho): só com "Efeitos de cartum". */
@@ -32,6 +38,8 @@ const SMOKE = [0.5, 0.8, 1, 1] as const;
 const MARKS = [192, 640, 1280, 2048] as const;
 const SPEED_LINES = [14, 24, 36, 48] as const;
 const DRAFT_LINES = [0, 10, 16, 24] as const;
+const CORNER_STREAKS = [8, 12, 16, 20] as const;
+const EXHAUST_FIRE = [0.6, 0.8, 1, 1] as const;
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
@@ -47,6 +55,10 @@ export function fxPlan(q: Quality, reduceEffects: boolean, viewports = 1, cartoo
     marks: MARKS[i],
     speedLines: lines(SPEED_LINES[i]),
     draftLines: lines(DRAFT_LINES[i]),
+    // V10 (HC2): "Efeitos de cartum" acende a versão ainda mais exagerada (1,5× riscos e fogo, poeira maior); "Reduzir efeitos" mantém o de antes (nada novo, poeira de 1).
+    cornerStreaks: reduceEffects ? 0 : Math.floor(CORNER_STREAKS[i] * split * (cartoon ? 1.5 : 1)),
+    exhaustFire: reduceEffects ? 0 : EXHAUST_FIRE[i] * (cartoon ? 1.5 : 1),
+    dustScale: reduceEffects ? 1 : cartoon ? 2.3 : 1.8,
     shockwave: !reduceEffects && atLeast(q, 'medium'),
     pow: !reduceEffects && cartoon,
   };

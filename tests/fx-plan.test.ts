@@ -5,7 +5,7 @@ import type { Quality } from '../src/game/contracts';
 import { fxPlan, type FxPlan } from '../src/render/fx/plan';
 
 const LEVELS: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
-const NUMBERS = ['sparks', 'smoke', 'marks', 'speedLines', 'draftLines'] as const;
+const NUMBERS = ['sparks', 'smoke', 'marks', 'speedLines', 'draftLines', 'cornerStreaks', 'exhaustFire', 'dustScale'] as const;
 const FLAGS = ['wheelSparks', 'shockwave', 'pow'] as const;
 
 describe('plano de efeitos (M5)', () => {

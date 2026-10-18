@@ -82,3 +82,31 @@ export function draftLine(k: number, count: number, travel: number, time: number
   out.a = 0.4 * clamp01(intensity) * fade;
   return true;
 }
+
+/**
+ * V10 (HC2): os riscos LARGOS de canto de tela — o Horizon Chase 2 enche os cantos com riscos brancos largos que saem do miolo para fora; os fios de 3,5 a 7
+ * cm da V8 (acima) são o vento, estes são o "estou voando". Mesma malha de traços (`Streaks`, sem chamada nova): são só mais alguns traços, GROSSOS, fora do
+ * eixo do carro — 3,2 a 6,2 m para o lado e ou baixos (0,2 a 1,1 m, o canto de baixo) ou altos (2,4 a 4,5 m, o canto de cima), onde a câmera de corrida os
+ * joga para a borda. O `k` escolhe o canto (k % 4: alto-esquerdo, alto-direito, baixo-esquerdo, baixo-direito), então 4 riscos já cobrem a tela.
+ * Função só do deslocamento (sem tempo, sem sorteio, sem estado): nada pisca; nascem e somem em rampa de 6 a 8 m. `cartoon` ("Efeitos de cartum"): mais largos.
+ */
+const C_NEAR = -4;
+const C_FAR = 22;
+const C_SPAN = C_FAR - C_NEAR;
+
+export function cornerStreak(k: number, count: number, travel: number, speedMs: number, strength: number, cartoon: boolean, out: LineSpec): boolean {
+  if (k < 0 || k >= count || strength <= 0) return false;
+  const h2 = hash2(k, 1101); const h3 = hash2(k, 1202); const h4 = hash2(k, 1303); const h5 = hash2(k, 1404); const h6 = hash2(k, 1505);
+  const dz = C_NEAR + mod(h2 * C_SPAN - travel, C_SPAN);
+  const fade = smoothstep(C_FAR, C_FAR - 8, dz) * smoothstep(C_NEAR, C_NEAR + 6, dz);
+  const zone = k % 4;
+  const high = zone < 2;
+  out.dz = dz;
+  out.tail = dz + 4 + 0.1 * speedMs * (0.7 + 0.6 * h6);
+  out.lat = (zone % 2 === 0 ? -1 : 1) * (3.2 + 3.0 * h4);
+  out.h = high ? 2.4 + 2.1 * h3 : 0.2 + 0.9 * h3;
+  out.width = cartoon ? 0.2 + 0.26 * h5 : 0.14 + 0.18 * h5;
+  out.r = 1.0; out.g = 1.0; out.b = 1.08;
+  out.a = Math.min(0.6, (0.2 + 0.36 * clamp01(strength)) * (cartoon ? 1.1 : 1)) * fade;
+  return true;
+}
