@@ -42,3 +42,7 @@ Intactas: carro branco lê branco, vermelho vermelho, o dia travado da V10 (4ª 
 ## 5. Ficou fora
 
 Roxo cheio/rosa do HC2 à noite (aqui lilás contido por causa da trava “carro branco lê branco”); estrada mais clara no deserto (limitada pelo 3:1 da faixa à sombra); tom de pista que o HC2 pinta em pedra de calçada (padrão de lajotas); câmera candidata e traçado são propostas.
+
+## 6. Verificação (rodada no mesmo turno)
+
+`npx tsc --noEmit -p .` sem saída. Área sem GL (22 arquivos: cor-brilho, estrada-v11, camera-v11, cameras, hc2-*, pistas-v4, render*, paleta-m2, stylize, corrida-que-muda*, terreno*, scenery*, landmarks-enquadramento-cameras): 293 passaram, 2 puladas. GL (swiftshader): `gl-render` (inclui o gate de chamadas/△), `cor-brilho-gl`, `corrida-que-muda-gl`, `estrada-gl` verdes; `hc2-gl` 4/4 depois de mover duas travas da V10 (contraste do centro: piso passou de antes + 0,02 a antes − 0,02, Paraty 0,667 → 0,659; saturação mínima de Sampa 0,51 → 0,48 e Copacabana 0,44 → 0,40, ambas ainda acima de antes da V10 — a estrada colorida tirou o azul/vinho saturado do asfalto antigo). Câmera antes × depois: `scratch/estrada/cam-alta.png` × `cam-curva.png` (Copacabana seg 300) e `cam-alta-paraty.png` × `cam-curva-paraty.png`.
