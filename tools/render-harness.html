@@ -8,6 +8,7 @@ import { seatColor } from '../src/core/data/drivers.ts';
 import { PAINT_IDS, paintsOfLooks, raceLooks } from '../src/game/paints.ts';
 import { FINISH_IDS, FLAME_IDS, RIM_IDS, STRIPE_IDS, WHEEL_IDS, WHEEL_LISTS } from '../src/game/cosmetics.ts';
 import { createRenderer } from '../src/render/renderer.ts';
+import { CAMERA_EXPERIMENT } from '../src/render/camera-base.ts';
 import { loadCarAssets } from '../src/render/cars/assets.ts';
 import { loadLandmarkAssets, loadLandmarkParts } from '../src/render/scenery/landmarks/assets.ts';
 import { setLanguage, t } from '../src/i18n/index.ts';
@@ -16,6 +17,8 @@ import '../src/i18n/core.ts';
 import '../src/ui/strings.ts';
 
 const q = new URLSearchParams(location.search);
+// camcurve=1 (V11): liga a câmera Alta candidata (mais alta e mais atrás; src/render/camera-base.ts, CAMERA_HIGH_CURVE). Fora disso, a Alta aprovada.
+if (q.get('camcurve') === '1') CAMERA_EXPERIMENT.highCurve = true;
 const trackId = q.get('track') ?? 'copacabana';
 const humanCount = Math.min(4, Math.max(1, Number(q.get('humans') ?? 1)));
 const idle = q.get('idle') === '1';

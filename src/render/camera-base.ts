@@ -33,6 +33,22 @@ export const CAMERA_POSES: Readonly<Record<CameraMode, CameraPose>> = {
   bumper: { baseFov: 78, speedFov: 11, nitroFov: 7, height: 0.42, back: -1.9, lookAhead: 30, lookY: 0.55 },
 };
 
+/**
+ * V11 (docs/ondas/V11-estrada.md, item 4): CANDIDATA para a Alta, NÃO o padrão — o dono aprovou a de cima (FOV 54, recuo 5,8 m) e só ele troca. Um pouco mais alta
+ * (3,4 m) e mais atrás (6,8 m), olhando 30 m à frente: a pista de 30 a 150 m à frente do carro ocupa 1,31× as linhas (38 → 50 px em 720p; a curva que vem aparece
+ * maior) e o carro encolhe 15% (recuo 5,8 → 6,8 m). O FOV e as parcelas de velocidade e de nitro são os da Alta: a régua de visão dos marcos (sight.ts) e a mola de FOV
+ * não mudam. Só liga pelo interruptor abaixo (o harness: `?camcurve=1`).
+ */
+export const CAMERA_HIGH_CURVE: CameraPose = { baseFov: 54, speedFov: 8, nitroFov: 5, height: 3.4, back: 6.8, lookAhead: 30, lookY: 0.5 };
+
+/** Interruptor de experimento (só a câmera de perseguição do `ChaseCamera` lê; a régua dos marcos segue a pose aprovada). Desligado em produção. */
+export const CAMERA_EXPERIMENT = { highCurve: false };
+
+/** A pose que o `ChaseCamera` usa: a de `CAMERA_POSES`, ou a candidata `CAMERA_HIGH_CURVE` na Alta com o interruptor ligado. */
+export function cameraPoseFor(mode: CameraMode): CameraPose {
+  return mode === 'high' && CAMERA_EXPERIMENT.highCurve ? CAMERA_HIGH_CURVE : CAMERA_POSES[mode];
+}
+
 /** Capô e Frente: a câmera anda com o carro (sem atraso lateral, sem cresta, sem órbita). */
 export function isMountedCamera(m: CameraMode): boolean {
   return m === 'hood' || m === 'bumper';

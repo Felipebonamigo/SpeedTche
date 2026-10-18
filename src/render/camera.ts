@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import type { RenderFrame } from '../game/contracts';
-import { CAMERA_POSES, CHASE_CAMERA, type CameraMode } from './camera-base';
+import { CAMERA_POSES, cameraPoseFor, CHASE_CAMERA, type CameraMode } from './camera-base';
 import type { Shake } from './effects';
 import { frameYAt, type RoadFrame } from './roadframe';
 import {
@@ -105,11 +105,11 @@ export class ChaseCamera {
     const winning = extra.finishSeconds >= 0 && !extra.reduce;
     const mode: CameraMode = CAMERA_RIGS[chosen].mounted && (eye === null || winning) ? 'high' : chosen;
     const rig = CAMERA_RIGS[mode];
-    const pose = CAMERA_POSES[mode];
+    const pose = cameraPoseFor(mode);
     const mountedEye = rig.mounted ? eye : null;
     // Trocou de câmera em movimento: as parcelas de velocidade e de nitro do FOV passam à escala da pose nova (senão o quadro "assenta" por um segundo).
     if (this.lastMode !== mode) {
-      const was = CAMERA_POSES[this.lastMode];
+      const was = cameraPoseFor(this.lastMode);
       this.speedFov *= pose.speedFov / was.speedFov;
       this.nitroFov.x *= pose.nitroFov / was.nitroFov; this.nitroFov.v *= pose.nitroFov / was.nitroFov;
       this.lastMode = mode;
