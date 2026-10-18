@@ -90,9 +90,9 @@ export interface AsphaltCrack { y: number; x0: number; x1: number; amp: number; 
  */
 export const ASPHALT_WEAR: { patches: readonly AsphaltPatch[]; joints: readonly number[]; cracks: readonly AsphaltCrack[]; seams: readonly number[] } = {
   patches: [
-    { x0: 1.0, x1: 3.4, y0: 6.0, y1: 9.6, tone: 0.93 }, // remendo novo, escuro e liso, sobre a trilha da faixa da direita
+    { x0: 1.0, x1: 3.4, y0: 6.0, y1: 9.6, tone: 0.9 }, // remendo novo, escuro e liso, sobre a trilha da faixa da direita
     { x0: -5.7, x1: -3.3, y0: 20.5, y1: 23.2, tone: 1.15 }, // remendo antigo, claro e gasto
-    { x0: 1.2, x1: 5.6, y0: 37.0, y1: 41.5, tone: 0.94 }, // recapeamento da faixa da direita
+    { x0: 1.2, x1: 5.6, y0: 37.0, y1: 41.5, tone: 0.9 }, // recapeamento da faixa da direita
   ],
   joints: [29.0],
   cracks: [{ y: 14.2, x0: -6.3, x1: 1.6, amp: 0.18, seed: 7 }, { y: 44.6, x0: -2.2, x1: 4.8, amp: 0.12, seed: 11 }],
@@ -151,19 +151,55 @@ function markCoverage(x: number, y: number, w: number, h: number): number {
   return Math.max(edge, dx * dy);
 }
 
-interface AsphaltStructure { k: Float32Array; stone: Uint8Array; mark: Uint8Array }
+interface AsphaltStructure { k: Float32Array; stone: Uint8Array; mark: Uint8Array; tone: Uint8Array; crack: Uint8Array }
 let asphaltCache: AsphaltStructure | null = null;
+
+/** V11: a sarjeta, a borda de fora da pista depois da faixa de bordo (a faixa ocupa |x| de 6,4 a 6,7 m): escurece. */
+export const GUTTER = { fromM: 6.62, toM: 6.76, dark: 0.6 } as const;
+
+/**
+ * Rachaduras da terra (V11): células de Voronoi de ~1,75 × 2,4 m (um ponto sorteado por célula, periódico ao longo): a borda entre duas células (F2 − F1 pequeno)
+ * é a rachadura. Devolve 0..255 por pixel (255 = no meio da rachadura); só a terra (`roadEarth`) usa.
+ */
+function crackNet(W: number, H: number, pu: number, pv: number): Uint8Array {
+  const CW = 1.75; const CL = 2.4;
+  const nx = Math.ceil((ROAD_HALF_WIDTH_M * 2) / CW); const ny = Math.round(ASPHALT_REPEAT_M / CL);
+  const pts = new Float32Array(nx * ny * 2);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { pts[(j * nx + i) * 2] = (i + 0.15 + 0.7 * hash2(i * 17 + 3, j * 31 + 5)) * CW; pts[(j * nx + i) * 2 + 1] = (j + 0.15 + 0.7 * hash2(i * 13 + 7, j * 29 + 11)) * (ASPHALT_REPEAT_M / ny); }
+  const out = new Uint8Array(W * H);
+  const cellL = ASPHALT_REPEAT_M / ny; const W2 = 0.045;
+  for (let y = 0; y < H; y++) {
+    const my = (y + 0.5) / pv; const cj = Math.floor(my / cellL);
+    for (let x = 0; x < W; x++) {
+      const mx = (x + 0.5) / pu; const ci = Math.min(nx - 1, Math.floor(mx / CW));
+      let f1 = 1e9; let f2 = 1e9;
+      for (let dj = -1; dj <= 1; dj++) {
+        const jj = (((cj + dj) % ny) + ny) % ny; const wrap = (cj + dj < 0 ? -ASPHALT_REPEAT_M : cj + dj >= ny ? ASPHALT_REPEAT_M : 0);
+        for (let di = -1; di <= 1; di++) {
+          const ii = ci + di; if (ii < 0 || ii >= nx) continue;
+          const px = pts[(jj * nx + ii) * 2]; const py = pts[(jj * nx + ii) * 2 + 1] + wrap;
+          const d = Math.hypot(mx - px, my - py);
+          if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+        }
+      }
+      const e = (f2 - f1) / 2; // distância à borda entre as duas células
+      out[y * W + x] = e < W2 ? Math.round(255 * (1 - e / W2) ** 1.5) : 0;
+    }
+  }
+  return out;
+}
 
 /**
  * O desenho do asfalto, sem cor (o mesmo nas duas pontas da corrida que muda): `k` multiplica a cor base (tom: manchas, trilhas, óleo, remendos,
- * juntas, trincas, granulado), `stone` é o agregado claro (0..255) e `mark` a cobertura da tinta (0..255). Montado uma vez por sessão.
+ * juntas, trincas, granulado, sarjeta), `stone` é o agregado claro (0..255), `mark` a cobertura da tinta (0..255), `tone` (V11) quanto o pixel é da segunda tinta
+ * (`roadAlt`: manchas largas, veios e o tom do trecho) e `crack` (V11) a rachadura da terra. Montado uma vez por sessão.
  */
 function asphaltStructure(): AsphaltStructure {
   if (asphaltCache) return asphaltCache;
   const W = ASPHALT_TEX.w; const H = ASPHALT_TEX.h;
   const RW = ROAD_HALF_WIDTH_M * 2; const R = ASPHALT_REPEAT_M;
   const pu = W / RW; const pv = H / R;
-  const k = new Float32Array(W * H); const stone = new Uint8Array(W * H); const mark = new Uint8Array(W * H);
+  const k = new Float32Array(W * H); const stone = new Uint8Array(W * H); const mark = new Uint8Array(W * H); const tone = new Uint8Array(W * H);
   // Por coluna: trilhas (polidas e escurecidas pela borracha), óleo no meio da faixa, poeira junto da borda e a tinta das faixas de bordo e do traço.
   const colTrack = new Float32Array(W); const colOil = new Float32Array(W); const colEdge = new Float32Array(W);
   const colLine = new Float32Array(W); const colDash = new Float32Array(W); const rowDash = new Float32Array(H);
@@ -187,6 +223,11 @@ function asphaltStructure(): AsphaltStructure {
   const mid = new Lattice(5, Math.ceil(RW / 0.55), Math.round(R / 0.6));
   const streak = new Lattice(9, Math.ceil(RW / 0.07), Math.round(R / 4));
   const blotN = new Lattice(13, Math.ceil(RW / 0.3), Math.round(R / 0.7));
+  // V11 (tom pintado): manchas largas (3 × 5 m) e veios finos e compridos (a roda e o vento arrastando a terra) na segunda tinta; e o tom do TRECHO: uma
+  // oscilação só ao longo da pista (periódica em 48 m: ~ 6 m por ciclo) que desloca a mancha e o brilho para todo o trecho de uma vez.
+  const patchN = new Lattice(21, Math.ceil(RW / 3.2), 10); // 10 células de 4,8 m: fecha a repetição de 48 m
+  const veinN = new Lattice(23, Math.ceil(RW / 0.1), Math.round(R / 6));
+  const alongN = new Lattice(31, 1, Math.round(R / 6));
   const crackY = ASPHALT_WEAR.cracks.map((c) => {
     const n1 = new Lattice(c.seed, Math.ceil(RW / 0.9), 1); const n2 = new Lattice(c.seed + 3, Math.ceil(RW / 0.25), 1);
     const ys = new Float32Array(W);
@@ -204,7 +245,7 @@ function asphaltStructure(): AsphaltStructure {
       const i = y * W + x;
       const mx = (x + 0.5) / pu - ROAD_HALF_WIDTH_M;
       const ux = (x + 0.5) / pu;
-      let patch: AsphaltPatch | null = null;
+      let patch: AsphaltPatch | null = null; let sealed = false;
       for (const q of rowPatches) if (mx >= q.x0 && mx <= q.x1) { patch = q; break; }
       const fresh = patch !== null && patch.tone < 1;
       // Trilha mais fraca no remendo novo (o pneu ainda não o poliu).
@@ -214,6 +255,15 @@ function asphaltStructure(): AsphaltStructure {
       // Gota de óleo e fuligem no meio de cada faixa, em manchas ao longo.
       if (colOil[x] > 0) { const b = blotN.at(ux / 0.3, my / 0.7) * 0.5 + 0.5; kk *= 1 - 0.1 * colOil[x] * b * b; }
       kk *= 1 + 0.04 * colEdge[x];
+      // V11: a sarjeta (depois da faixa de bordo) é mais escura; o tom do trecho (ao longo) e as manchas largas (± 7% no brilho).
+      const gut = sstep(GUTTER.fromM, GUTTER.toM, Math.abs(mx));
+      const run = alongN.at(0.5, my / 6);
+      kk *= 1 - (1 - GUTTER.dark) * gut;
+      kk *= 1 + 0.07 * run + 0.045 * patchN.at(ux / 3.2, my / 4.8);
+      // A segunda tinta: mancha larga (limiar 0,05, borda suave), veio fino (só a crista) e o tom do trecho empurrando tudo junto.
+      const pt = sstep(-0.05, 0.3, patchN.at(ux / 3.2, my / 4.8) + 0.55 * run);
+      const vn = sstep(0.38, 0.62, veinN.at(ux / 0.1, my / 6) * 0.5 + 0.5 + 0.18 * run) * 0.55;
+      const tn = Math.min(1, Math.max(pt * 0.85, vn) * (1 - 0.8 * gut));
       // Granulado fino (menor na trilha polida) e o agregado: pedrisco claro e poro escuro.
       kk *= 1 + 0.11 * (hash2(i, 77) - 0.5) * (1 - 0.5 * tr);
       const h = hash2(i, 191);
@@ -225,7 +275,7 @@ function asphaltStructure(): AsphaltStructure {
         kk *= patch.tone;
         st *= fresh ? 0.45 : 1.25;
         // Borda selada: piche escuro em volta do remendo.
-        if (mx - patch.x0 < SEAL || patch.x1 - mx < SEAL || my - patch.y0 < SEAL || patch.y1 - my < SEAL) { kk *= 0.74; st = 0; }
+        if (mx - patch.x0 < SEAL || patch.x1 - mx < SEAL || my - patch.y0 < SEAL || patch.y1 - my < SEAL) { kk *= 0.66; st = 0; sealed = true; }
       }
       if (joint < 1) { kk *= joint; st = 0; }
       for (const sm of ASPHALT_WEAR.seams) if (Math.abs(mx - sm) < 0.016) kk *= 0.86;
@@ -234,6 +284,7 @@ function asphaltStructure(): AsphaltStructure {
         if (mx >= cr.x0 && mx <= cr.x1 && Math.abs(my - crackY[c][x]) < 0.035) { kk *= 0.52; st = 0; }
       }
       k[i] = kk;
+      tone[i] = sealed ? 0 : Math.round(255 * tn); // a borda selada é piche escuro: sem a segunda tinta (mais clara)
       stone[i] = st > 255 ? 255 : Math.round(st);
       // Tinta: a cobertura antisserrilhada, gasta de leve (lascas onde o agregado aparece).
       const cov = Math.max(colLine[x], colDash[x] * rowDash[y]);
@@ -243,21 +294,26 @@ function asphaltStructure(): AsphaltStructure {
       }
     }
   }
-  asphaltCache = { k, stone, mark };
+  asphaltCache = { k, stone, mark, tone, crack: crackNet(W, H, pu, pv) };
   return asphaltCache;
 }
 
-/** O asfalto pintado nas cores de uma paleta: a cor base × o tom, o agregado claro (cinza neutro) e a tinta por cima. */
+/** O asfalto pintado nas cores de uma paleta: a cor base (`roadBase`) misturada à segunda tinta (`roadAlt`) pelo `tone`, × o tom, as rachaduras da terra, o agregado claro e a tinta por cima. */
 export function asphaltImage(p: Palette): RoadImage {
   const W = ASPHALT_TEX.w; const H = ASPHALT_TEX.h;
-  const { k, stone, mark } = asphaltStructure();
-  const [r0, g0, b0] = hexToRgb(p.asphalt);
+  const { k, stone, mark, tone, crack } = asphaltStructure();
+  const [r0, g0, b0] = hexToRgb(p.roadBase);
+  const [ra, ga, ba] = hexToRgb(p.roadAlt);
+  const earth = p.roadEarth;
+  const amp = 0.55 + 0.45 * earth; // quanto da segunda tinta aparece (o asfalto varia menos que a terra)
   const sg = Math.min(220, ((0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0) * 1.75));
-  const [lr, lg, lb] = hexToRgb(mix(p.lane, p.asphalt, 0.08));
+  const [lr, lg, lb] = hexToRgb(mix(p.lane, p.roadBase, 0.08));
+  const crackK = 0.42 * earth; // a terra racha; o asfalto não (as trincas dele são as do desgaste)
   const data = new Uint8Array(W * H * 4);
   for (let i = 0; i < W * H; i++) {
-    const kk = k[i]; const s = stone[i] / 255; const m = mark[i] / 255;
-    let r = r0 * kk; let g = g0 * kk; let b = b0 * kk;
+    const m = mark[i] / 255; const t = (tone[i] / 255) * amp; const s = stone[i] / 255;
+    const kk = k[i] * (1 - crackK * (crack[i] / 255));
+    let r = (r0 + (ra - r0) * t) * kk; let g = (g0 + (ga - g0) * t) * kk; let b = (b0 + (ba - b0) * t) * kk;
     r += (sg * kk - r) * s; g += (sg * kk - g) * s; b += (sg * 0.97 * kk - b) * s;
     r += (lr - r) * m; g += (lg - g) * m; b += (lb - b) * m;
     const o = i * 4;
@@ -342,18 +398,61 @@ export function paintKerb(p: Palette, anisotropy: number): THREE.DataTexture {
   return dataTexture(kerbImage(p), anisotropy);
 }
 
-/** Acostamento: cascalho/terra (cor da paleta) com pedrisco claro e escuro. */
+/** Acostamento: sarjeta escura, guia clara, cascalho/terra com pedrisco e a faixa de transição até o terreno (V11). */
 export const SHOULDER_REPEAT_M = 6;
-export function paintShoulder(p: Palette, anisotropy: number): THREE.CanvasTexture {
-  const W = 64; const H = 256;
-  const [c, ctx] = canvas(W, H);
-  ctx.fillStyle = p.shoulder; ctx.fillRect(0, 0, W, H);
-  grain(ctx, W, H, 34, 12, 4242, 3);
-  // A borda de dentro, junto do asfalto, um pouco mais escura (pó de pneu).
-  const grd = ctx.createLinearGradient(0, 0, W * 0.35, 0);
-  grd.addColorStop(0, 'rgba(0,0,0,0.25)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grd; ctx.fillRect(0, 0, W * 0.35, H);
-  return makeTexture(c, anisotropy);
+/** 96 px através (1,4 m: 69 px/m) × 256 ao longo (6 m: 43 px/m). */
+export const SHOULDER_TEX = { w: 96, h: 256 } as const;
+
+/**
+ * V11: o acostamento em pixels, do asfalto (u = 0) ao terreno (u = 1): a SARJETA escura de 0 a 0,10 (pó de pneu e sombra do meio-fio), a GUIA clara de 0,14 a
+ * 0,40 (o meio-fio pintado, esmaecendo até 0,5), o miolo de cascalho/terra com pedrisco e manchas, e de 0,8 a 1 o degradê até a cor da faixa de transição do chão (`verge`:
+ * é a cor da primeira coluna do terreno, então não há degrau). Pixel puro (testável no Node): era um canvas com um gradiente escuro só na borda de dentro.
+ */
+export function shoulderImage(p: Palette): RoadImage {
+  const W = SHOULDER_TEX.w; const H = SHOULDER_TEX.h;
+  const sh = hexToRgb(p.shoulder); const verge = hexToRgb(p.verge);
+  const gut = hexToRgb(mix(mix(p.shoulder, p.roadBase, 0.3), '#000000', 0.58));
+  const curb = hexToRgb(mix(p.shoulder, mix(p.rumbleLight, '#ffffff', 0.5), 0.62));
+  const data = new Uint8Array(W * H * 4);
+  const blot = new Lattice(41, 3, 6); // manchas de 6 m / 2 em 2 (periódico em ny × 1 m: aqui ny = 6 → 1 m por célula)
+  for (let y = 0; y < H; y++) {
+    const my = (y + 0.5) * (SHOULDER_REPEAT_M / H);
+    for (let x = 0; x < W; x++) {
+      const u = (x + 0.5) / W; const i = y * W + x;
+      // De dentro para fora: sarjeta → guia → miolo → verge, cada passo com a borda suave.
+      let r = sh[0]; let g = sh[1]; let b = sh[2];
+      const wCurb = sstep(0.1, 0.15, u) * (1 - sstep(0.38, 0.5, u));
+      r += (curb[0] - r) * wCurb; g += (curb[1] - g) * wCurb; b += (curb[2] - b) * wCurb;
+      const wGut = 1 - sstep(0.075, 0.115, u);
+      r += (gut[0] - r) * wGut; g += (gut[1] - g) * wGut; b += (gut[2] - b) * wGut;
+      const wVerge = sstep(0.78, 1, u);
+      r += (verge[0] - r) * wVerge; g += (verge[1] - g) * wVerge; b += (verge[2] - b) * wVerge;
+      // Pedrisco (claro e escuro) e manchas em escala de 1 m; mais fino perto da guia (concreto) que no cascalho.
+      const k = 1 + 0.16 * (hash2(i, 4242) - 0.5) + 0.07 * blot.at(u * 1.4 / 0.5, my / 1);
+      data[i * 4] = Math.min(255, r * k); data[i * 4 + 1] = Math.min(255, g * k); data[i * 4 + 2] = Math.min(255, b * k); data[i * 4 + 3] = 255;
+    }
+  }
+  return { width: W, height: H, data };
+}
+
+export function paintShoulder(p: Palette, anisotropy: number): THREE.DataTexture {
+  return dataTexture(shoulderImage(p), anisotropy);
+}
+
+/**
+ * V11: o tom de um trecho da pista (multiplica a textura do asfalto por vértice): ao longo de dezenas de metros o asfalto/terra é mais claro, mais quente ou mais
+ * frio, e os dois lados diferem um pouco (um lado mais gasto). Só do índice do segmento (a mesma volta, o mesmo tom), contínuo entre vizinhos (ruído de valor
+ * suave em células de 12 e 9 segmentos), 0,92–1,08 por canal. `side`: −1 esquerda, 1 direita.
+ */
+export function stretchTint(index: number, side: number): [number, number, number] {
+  const seed = side < 0 ? 17 : 29;
+  const noise = (cell: number, salt: number): number => {
+    const x = index / cell; const i = Math.floor(x); const f = x - i; const w = f * f * (3 - 2 * f);
+    const a = hash2(i, salt + seed) * 2 - 1; const b = hash2(i + 1, salt + seed) * 2 - 1;
+    return a + (b - a) * w;
+  };
+  const light = 0.05 * noise(12, 601); const warm = 0.03 * noise(9, 733);
+  return [1 + light + warm, 1 + light, 1 + light - warm];
 }
 
 /** Largura do box em x normalizado (a divisa listrada é a faixa que a física trata como grama). */

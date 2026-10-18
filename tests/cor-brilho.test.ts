@@ -311,6 +311,99 @@ describe('2b. asfalto de dia à sombra: cinza quente, não azul-marinho (só a p
   });
 });
 
+// ───────────────────────────── 2c. a estrada tem tom (V11) ─────────────────────────────
+// V11 (docs/ondas/V11-estrada.md): o dono achou a pista cinza escura e lisa (o HC2 pinta terra laranja, pedra rosada, asfalto roxo à noite). A cor que a pista
+// pinta agora é `roadBase` (a `asphalt` segue como a referência de luz do resto: chão, hemisférica, box). O que continua travado: nenhum azul-marinho, o asfalto das
+// cidades e da praia ainda é cinza (croma baixo), a faixa lê contra a estrada (≥ 3:1) e a estrada não vira um buraco preto nem um clarão. O que MUDA de propósito: a
+// terra (deserto, mata, savana) tem croma alto e é mais clara que o asfalto de antes; a cidade à noite é roxo-azulada (matiz 245°–300°), não neutra.
+const roadOf = (p: Palette): string => (p as Palette & { roadBase?: string }).roadBase ?? p.asphalt;
+const ROAD_EARTH: readonly SceneryId[] = ['desert', 'tropical', 'savanna'];
+
+describe('2c. a estrada tem tom (V11): terra e pedra com cor, sem azul-marinho', () => {
+  const ALL = SCENERIES.flatMap((s) => TIMES_OF_DAY.map((t) => [s, t, palette(s, t)] as const));
+  const road = (s: SceneryId, t: TimeOfDay, p: Palette, sun: boolean, hex = roadOf(p)): V => shade(p, s, t, hex, 'top', false, { road: true, sun });
+
+  // Diagnóstico (V11_DEBUG=1): a tabela da cor renderizada da estrada por bioma × período (à sombra · ao sol), para calibrar `ROAD_TONE` em palette.ts.
+  it.skipIf(!process.env.V11_DEBUG)('diagnóstico: cor renderizada da estrada', () => {
+    for (const [s, t, p] of ALL) console.log(`${s}:${t} base ${roadOf(p)} → sombra rgb(${road(s, t, p, false)}) · sol rgb(${road(s, t, p, true)}) · faixa ${wcag(road(s, t, p, false, p.lane), road(s, t, p, false)).toFixed(2)} / ${wcag(road(s, t, p, true, p.lane), road(s, t, p, true)).toFixed(2)}`);
+  });
+
+  // V11_CAND="bioma:periodo:#hex,..." mede albedos candidatos no mesmo modelo (calibrar `ROAD_TONE`).
+  it.skipIf(!process.env.V11_CAND)('diagnóstico: albedos candidatos', () => {
+    for (const c of (process.env.V11_CAND ?? '').split(',')) {
+      const [s, t, hex] = c.split(':') as [SceneryId, TimeOfDay, string]; const p = palette(s, t);
+      console.log(`CAND ${s}:${t} ${hex} → sombra rgb(${road(s, t, p, false, hex)}) · sol rgb(${road(s, t, p, true, hex)}) · faixa ${wcag(road(s, t, p, false, p.lane), road(s, t, p, false, hex)).toFixed(2)} / ${wcag(road(s, t, p, true, p.lane), road(s, t, p, true, hex)).toFixed(2)}`);
+    }
+  });
+
+  it('de dia o azul não passa do vermelho em mais de 20 e, fora da terra, a cor segue de pouca saturação (máx − mín ≤ 52: a gradação do dia já soma saturação); a terra (deserto, mata, savana) tem croma ≥ 60 e o vermelho passa do azul em ≥ 45, à sombra e ao sol', () => {
+    const bad: string[] = [];
+    for (const [s, t, p] of ALL) {
+      if (t !== 'day') continue;
+      for (const sun of [false, true]) {
+        const c = road(s, t, p, sun); const spread = Math.max(...c) - Math.min(...c);
+        const tag = `${s} ${sun ? 'ao sol' : 'à sombra'} rgb(${c.join(',')})`;
+        if (c[2] - c[0] > 20) bad.push(`${tag}: azul demais`);
+        if (ROAD_EARTH.includes(s)) { if (spread < 60 || c[0] - c[2] < 45) bad.push(`${tag}: terra sem cor`); } else if (spread > 52) bad.push(`${tag}: saturada demais`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('o matiz renderizado é o do bioma: deserto 10°–38°, mata 2°–28°, savana 26°–50°; praia quente (R ≥ B); a cidade à noite é roxo-azulada (matiz 245°–300°, B − R entre 8 e 60)', () => {
+    const hueOf = (s: SceneryId, t: TimeOfDay, sun: boolean): number => hueDeg(road(s, t, palette(s, t), sun));
+    for (const sun of [false, true]) {
+      const tag = sun ? 'ao sol' : 'à sombra';
+      expect(hueOf('desert', 'day', sun), `deserto ${tag}`).toBeGreaterThanOrEqual(10); expect(hueOf('desert', 'day', sun)).toBeLessThanOrEqual(38);
+      expect(hueOf('tropical', 'day', sun), `mata ${tag}`).toBeGreaterThanOrEqual(2); expect(hueOf('tropical', 'day', sun)).toBeLessThanOrEqual(28);
+      expect(hueOf('savanna', 'day', sun), `savana ${tag}`).toBeGreaterThanOrEqual(26); expect(hueOf('savanna', 'day', sun)).toBeLessThanOrEqual(50);
+      const coast = road('coast', 'day', palette('coast', 'day'), sun);
+      expect(coast[0], `praia ${tag}: R ≥ B`).toBeGreaterThanOrEqual(coast[2]);
+      const c = road('city_night', 'night', palette('city_night', 'night'), sun);
+      expect(hueDeg(c), `cidade à noite ${tag} rgb(${c.join(',')})`).toBeGreaterThanOrEqual(245); expect(hueDeg(c)).toBeLessThanOrEqual(300);
+      expect(c[2] - c[0], `cidade à noite ${tag}: B − R`).toBeGreaterThanOrEqual(8); expect(c[2] - c[0]).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it('nenhum azul-marinho em período nenhum: matiz 200°–250° com croma > 0,3 não existe na estrada (18 combinações, à sombra e ao sol)', () => {
+    const bad: string[] = [];
+    for (const [s, t, p] of ALL) for (const sun of [false, true]) {
+      const c = road(s, t, p, sun);
+      if (hueDeg(c) >= 200 && hueDeg(c) <= 250 && chroma(c) > 0.3) bad.push(`${s}:${t} ${sun ? 'ao sol' : 'à sombra'} rgb(${c.join(',')})`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('a estrada não vira um buraco preto nem um clarão: luma 0..255 entre 26 e 150 de dia, entre 18 e 110 no entardecer e à noite, à sombra e ao sol', () => {
+    const bad: string[] = [];
+    for (const [s, t, p] of ALL) for (const sun of [false, true]) {
+      const l = luma8(road(s, t, p, sun)); const [lo, hi] = t === 'day' ? [26, 150] : [18, 110];
+      if (l < lo || l > hi) bad.push(`${s}:${t} ${sun ? 'ao sol' : 'à sombra'} luma ${l.toFixed(0)} fora de ${lo}–${hi}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('a faixa branca lê contra a estrada nova: ≥ 3:1 (WCAG) em todo período, à sombra e ao sol', () => {
+    const bad: string[] = [];
+    for (const [s, t, p] of ALL) for (const sun of [false, true]) {
+      const r = wcag(road(s, t, p, sun, p.lane), road(s, t, p, sun));
+      if (r < 3) bad.push(`${s}:${t} ${sun ? 'ao sol' : 'à sombra'} ${r.toFixed(2)}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('o carro branco lê contra a estrada (≥ 2:1 WCAG, capô ao sol sobre a pista à sombra) e o vermelho também (≥ 1,5:1), em todo período', () => {
+    const bad: string[] = [];
+    for (const [s, t, p] of ALL) {
+      const white = shade(p, s, t, WHITE, 'top', true); const red = shade(p, s, t, RED, 'sun', true);
+      const r = road(s, t, p, false);
+      if (wcag(white, r) < 2) bad.push(`${s}:${t} branco ${wcag(white, r).toFixed(2)}`);
+      if (wcag(red, r) < 1.5) bad.push(`${s}:${t} vermelho ${wcag(red, r).toFixed(2)}`);
+    }
+    expect(bad).toEqual([]);
+  });
+});
+
 // ───────────────────────────── 1. faróis do jogador ─────────────────────────────
 
 function raceWith(x: number) {

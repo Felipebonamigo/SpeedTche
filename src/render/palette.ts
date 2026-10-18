@@ -59,8 +59,13 @@ export interface Palette {
   cloudShade: string;
 
   // ── Chão ──
-  /** Asfalto (cor base da textura). */
+  /** Asfalto de referência (a luz do resto da cena parte dele: chão, hemisférica, box). A cor que a PISTA pinta é `roadBase` (V11). */
   asphalt: string;
+  /** V11: a cor base que a textura da pista pinta (terra alaranjada, terra avermelhada, ocre, cinza quente, roxo-azulado à noite…), e a segunda tinta das manchas e veios. */
+  roadBase: string;
+  roadAlt: string;
+  /** V11: quanto a pista é terra (0 = asfalto, 1 = terra batida): liga as rachaduras e o desgaste de terra na textura. */
+  roadEarth: number;
   /** Acostamento (cascalho/terra/areia) e a faixa de transição até o terreno. */
   shoulder: string;
   verge: string;
@@ -209,6 +214,30 @@ const BASES: Record<SceneryId, Base> = {
   },
 };
 
+/**
+ * V11 (docs/ondas/V11-estrada.md): a cor que a pista pinta, por bioma e período (era o `asphalt` cinza escuro de todos: o HC2 pinta terra laranja, pedra rosada, asfalto
+ * roxo à noite). `roadBase` é o albedo; `alt` é a segunda tinta das manchas largas e dos veios; `earth` liga o desgaste de terra (rachaduras) na textura. O albedo
+ * vai à luz do período, então fica abaixo do que se vê (a cor-brilho: nada de azul-marinho, a faixa branca lê ≥ 3:1, o carro branco lê branco).
+ */
+const ROAD_TONE: Record<SceneryId, { day: string; dusk: string; night: string; alt: string; earth: number }> = {
+  tropical: { day: '#82483c', dusk: '#b0644e', night: '#905a58', alt: '#f08038', earth: 0.9 }, // terra avermelhada da mata
+  desert: { day: '#885a40', dusk: '#b8806c', night: '#986a70', alt: '#ffa860', earth: 1 }, // terra alaranjada
+  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#7c68b0', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo-azulado
+  alpine: { day: '#7c6672', dusk: '#947690', night: '#7c6aa0', alt: '#f0d8e0', earth: 0.3 }, // pedra rosada
+  coast: { day: '#6c6a68', dusk: '#8c7878', night: '#847888', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente
+  savanna: { day: '#80684a', dusk: '#b08064', night: '#946a58', alt: '#ffc868', earth: 0.85 }, // terra ocre
+};
+
+/** V11: a zebra com a cor do bioma (escuro/claro): o claro nunca é só branco, o escuro nunca é só vermelho. Mantém ≥ 0,35 de luma entre os blocos. */
+const KERB_TONE: Record<SceneryId, { dark: string; light: string }> = {
+  tropical: { dark: '#f0701a', light: '#fff6e4' }, // laranja de mata, creme
+  desert: { dark: '#c2391c', light: '#f8e8c8' }, // terracota e creme
+  city_night: { dark: '#e8386e', light: '#f6f4fa' }, // rosa-neon
+  alpine: { dark: '#d8343c', light: '#f4f8ff' }, // vermelho de esqui, gelo
+  coast: { dark: '#1a6cd0', light: '#f8fcff' }, // azul náutico
+  savanna: { dark: '#2f8a3a', light: '#f8ecc8' }, // verde de capim e palha
+};
+
 /** Céus do entardecer por bioma (topo, meio, horizonte) e o brilho em volta do sol. */
 const DUSK_SKY: Record<SceneryId, { sky: [string, string, string]; glow: string }> = {
   tropical: { sky: ['#173f6a', '#e0587a', '#ffb870'], glow: '#ffd27a' },
@@ -340,11 +369,17 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   const layers = b.layers.map((c, i) => mix(g(c), mix(sky[1], sky[2], 0.5), skyPull * (0.6 + 0.2 * i))) as [string, string, string];
   const layerHaze: [number, number, number] = time === 'night' ? [0.14, 0.3, 0.48] : [0.14, 0.32, 0.52];
   const pitLine = time === 'night' ? '#ffe45a' : '#ffd83a';
+  const rt = ROAD_TONE[scenery];
+  const roadBase = rt[time];
+  // A segunda tinta muda o matiz (esquenta/esfria) e clareia pouco (+12% de luma): a média da textura segue a `roadBase` que a cor-brilho calibrou.
+  const altTint = mix(roadBase, rt.alt, time === 'day' ? 0.42 : time === 'dusk' ? 0.36 : 0.25);
+  const roadAlt = shade(altTint, (luminance(roadBase) * 1.12) / Math.max(1e-3, luminance(altTint)));
+  const kt = KERB_TONE[scenery];
   const lane = time === 'night' ? '#f2f0dc' : '#f4f4f0';
   return {
     sky, sun, moon, stars: time === 'night',
     grassLight: groundLow, grassDark: groundHigh,
-    rumbleLight: time === 'night' ? '#e8e8f0' : '#f6f6f6', rumbleDark: time === 'night' ? '#d8343c' : '#e0262e',
+    rumbleLight: time === 'night' ? mix(kt.light, '#e8e8f0', 0.5) : kt.light, rumbleDark: time === 'night' ? shade(kt.dark, 0.92) : kt.dark,
     roadLight: shade(asphalt, 1.06), roadDark: shade(asphalt, 0.9),
     lane, fog,
     far: layers[2], near: layers[0],
@@ -352,7 +387,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     light,
     skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(groundLow, asphalt, 0.3), 0.55), hemiIntensity,
     envIntensity, exposure, fogDensity, bloom, cloudLit, cloudShade,
-    asphalt, shoulder: g(b.shoulder), verge: g(b.verge), groundLow, groundHigh, rock: g(b.rock),
+    asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: g(b.shoulder), verge: g(b.verge), groundLow, groundHigh, rock: g(b.rock),
     snow: time === 'day' ? '#f4f8ff' : time === 'dusk' ? '#ffe0e4' : '#aebce6',
     sand: g(b.sand),
     layers, layerHaze,

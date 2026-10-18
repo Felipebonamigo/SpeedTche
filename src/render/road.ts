@@ -10,7 +10,7 @@ import { applyGrade, applyStylize } from './stylize';
 import type { Quality } from '../game/contracts';
 import {
   ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintShoulder, paintStartDecal, PIT_REPEAT_M,
-  PIT_X0, PIT_X1, ROAD_ANISOTROPY, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND,
+  PIT_X0, PIT_X1, ROAD_ANISOTROPY, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND, stretchTint,
 } from './road-textures';
 import type { RoadFrame } from './roadframe';
 import { LAMP_HEAD_X } from './scenery/props';
@@ -378,8 +378,10 @@ export class Road {
       const dist = s.index * SEGMENT_M;
       const v = dist / ASPHALT_REPEAT_M;
       const band = this.cBand[s.band];
-      this.asphalt.set(j, 0, px - W * cx, py, pz - W * sz, 0, v, band.r, band.g, band.b);
-      this.asphalt.set(j, 1, px + W * cx, py, pz + W * sz, 1, v, band.r, band.g, band.b);
+      // V11: o tom do trecho (mais claro/quente/frio por dezenas de metros, um lado mais gasto que o outro) multiplica a textura por vértice: sem geometria nova.
+      const tl = stretchTint(s.index, -1); const tr = stretchTint(s.index, 1);
+      this.asphalt.set(j, 0, px - W * cx, py, pz - W * sz, 0, v, band.r * tl[0], band.g * tl[1], band.b * tl[2]);
+      this.asphalt.set(j, 1, px + W * cx, py, pz + W * sz, 1, v, band.r * tr[0], band.g * tr[1], band.b * tr[2]);
       // Acostamento: u = 0 junto do asfalto, 1 no terreno (a textura escurece a borda de dentro).
       const o = W + SHOULDER_M;
       const vs = dist / SHOULDER_REPEAT_M;

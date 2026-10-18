@@ -165,7 +165,7 @@ describe('V4 · asfalto com agregado e desgaste', { timeout: 120_000 }, () => {
     }
   });
 
-  it('a tinta da faixa de bordo se lê contra o asfalto (≥ 0,45 de luma, a régua de render-ground) nos 18 períodos', () => {
+  it('a tinta da faixa de bordo se lê contra o asfalto (≥ 0,32 de luma no albedo; era 0,45 até a V11, que clareou a estrada no entardecer e na noite — o 3:1 com a luz está em cor-brilho 2c) nos 18 períodos', () => {
     const M = RT.MARKINGS;
     for (const s of SCENERIES) for (const t of TIMES_OF_DAY) {
       const q = palette(s, t);
@@ -174,7 +174,7 @@ describe('V4 · asfalto com agregado e desgaste', { timeout: 120_000 }, () => {
       const xLine = col(ROAD_M / 2 - M.edgeOffsetM - M.edgeWidthM / 2);
       let line = 0; let asph = 0; let n = 0;
       for (let y = 0; y < im.height; y += 7) { line += Lq(xLine, y); asph += Lq(col(1.4), y); n++; }
-      expect((line - asph) / n, `${s}:${t}`).toBeGreaterThanOrEqual(0.45);
+      expect((line - asph) / n, `${s}:${t}`).toBeGreaterThanOrEqual(0.32);
     }
   });
 

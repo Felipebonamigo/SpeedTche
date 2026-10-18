@@ -62,10 +62,39 @@ function smooth01(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Relevo (m) na distância `dist` do lado `side`, no segmento `seg`: zero até FLAT_M, sobe, e cai na borda. */
+/** V11: altura (m) da lombada que corre ao lado da pista, por bioma (a cidade é calçada e quadra: plana). */
+const NEAR_AMP: Record<SceneryId, number> = { desert: 1.0, tropical: 0.7, savanna: 0.5, alpine: 0.6, coast: 0.45, city_night: 0 };
+/** V11: onde a lombada começa (a coluna da faixa de transição, a que o acostamento já alcançou) e onde termina (FLAT_M: o relevo de longe começa em zero ali). */
+const NEAR_FROM = 10.8;
+
+/**
+ * V11: relevo suave perto da pista (10,8 a 26 m): uma lombada de dunas/barrancos que sobe da faixa de transição, tem o pico em ~16 m e volta a zero em 26 m, com
+ * a altura variando ao longo da pista (ruído por segmento). Zero na faixa de transição (a pista, o acostamento e o verge ficam planos) e na cidade. Por vértice
+ * (as colunas de 16 m e 26 m já existiam): nenhuma geometria nova. O cenário pousa nela pela mesma conta (`columnHeightAboveRoad`).
+ */
+function nearRelief(biome: SceneryId, seg: number, dist: number, side: number): number {
+  const amp = NEAR_AMP[biome];
+  if (amp === 0 || dist <= NEAR_FROM || dist >= FLAT_M) return 0;
+  const bump = smooth01(NEAR_FROM, 16, dist) * (1 - smooth01(16, FLAT_M, dist));
+  const n = fbm(side > 0 ? 611 : 827, seg * 0.05 + dist * 0.02, 2) * 0.5 + 0.5;
+  return amp * bump * (0.12 + 0.88 * Math.pow(n, 1.2));
+}
+
+/**
+ * V11: o tom do chão por vértice (0..1), do segmento, do lado e da coluna: manchas de 20 a 60 m ao longo da pista com um pouco de ruído por vértice. O
+ * `groundColor` empurra o chão para a cor baixa (clara) ou alta (escura) do bioma por ele: faixas de areia e de ocre no deserto, de capim claro e escuro nos campos.
+ */
+export function groundTone(biome: SceneryId, seg: number, col: number, side: number): number {
+  const a = fbm(side > 0 ? 73 : 97, seg * 0.09 + col * 0.8, 2) * 0.5 + 0.5;
+  const b = hash3(seg, col, side + 11) - 0.5;
+  return smooth01(0.12, 0.88, a + 0.5 * b * (biome === 'city_night' ? 0 : 1));
+}
+
+/** Relevo (m) na distância `dist` do lado `side`, no segmento `seg`: lombada suave perto da pista (V11), plano até FLAT_M, sobe, e cai na borda. */
 export function relief(biome: SceneryId, seg: number, dist: number, side: number): number {
   const r = RELIEF[biome];
-  if (r.amp === 0 || dist <= FLAT_M) return 0;
+  if (dist <= FLAT_M) return nearRelief(biome, seg, dist, side);
+  if (r.amp === 0) return 0;
   const ramp = Math.pow(Math.min(1, (dist - FLAT_M) / (300 - FLAT_M)), 1.25);
   // A última coluna volta para perto do fundo: a borda da faixa não vira um degrau no disco de chão.
   const edge = 1 - 0.75 * smooth01(300, 380, dist);
@@ -648,7 +677,7 @@ export class Terrain {
           const slope = c === 0 ? 0 : Math.abs(hs[c] - hs[c - 1]) / (COLS[c] - COLS[c - 1]);
           this.groundColor(i, c, side, hs[c], slope, roadH, gc, out);
           // Leve variação por vértice: o chão fica "pintado", não de plástico.
-          const j = 0.94 + hash3(i, c, side + 7) * 0.12;
+          const j = (c >= 2 && c <= 5 ? 0.9 + hash3(i, c, side + 7) * 0.2 : 0.94 + hash3(i, c, side + 7) * 0.12); // V11: mais variação perto da pista
           const k = ((i * 2 + si) * NC + c) * 3;
           this.colorTable[k] = out.r * j; this.colorTable[k + 1] = out.g * j; this.colorTable[k + 2] = out.b * j;
         }
@@ -692,6 +721,10 @@ export class Terrain {
     if (b === 'savanna') ground.lerp(gc.verge, smooth01(0.62, 0.8, patch) * 0.55); // capim seco
     if (b === 'desert') ground.copy(gc.low).lerp(gc.high, patch * 0.6 + smooth01(0, 30, h) * 0.3);
     if (col === 1) return ground.lerp(gc.verge, 0.55 + 0.45 * smooth01(0.4, 0.7, patch));
+    // V11: o tom do chão por vértice (faixas claras e escuras do bioma, não um plano liso) e a transição suave da faixa de terra até o chão (coluna 2).
+    const tone = groundTone(b, seg, col, side);
+    ground.lerp(tone > 0.5 ? gc.low : gc.high, Math.abs(tone - 0.5) * 1.4);
+    if (col === 2) ground.lerp(gc.verge, 0.38 * (1 - smooth01(0.3, 0.8, patch)));
     // Encosta íngreme: rocha (vermelha no deserto, azulada na montanha).
     ground.lerp(gc.rock, smooth01(0.42, 0.95, slope) * (b === 'tropical' ? 0.55 : 0.9));
     // Neve acima da linha (com ruído na borda), nunca colada na pista.
