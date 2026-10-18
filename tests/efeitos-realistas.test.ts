@@ -208,9 +208,11 @@ describe('linhas de velocidade: finas, sutis, só acima de 90% (e no nitro)', ()
       frame.time += 1 / 60; fx.update(frame); fx.pose(buildRoadFrame(t, me.z, 30, 200), t, 600, 0);
     }
     const col = (fx.streaks as unknown as { color: THREE.BufferAttribute }).color;
+    const wid = (fx.streaks as unknown as { width: THREE.BufferAttribute }).width;
     expect(fx.streaks.count, 'há linhas acesas').toBeGreaterThan(5);
     let peak = 0;
-    for (let k = 0; k < fx.streaks.count; k++) peak = Math.max(peak, Math.max(col.getX(k * 4), col.getY(k * 4), col.getZ(k * 4)) * col.getW(k * 4));
+    // V10 (HC2): só os FIOS (≤ 10 cm); os riscos largos de canto têm o teste deles em tests/hc2-fx.test.ts (alfa até 0,6 de propósito).
+    for (let k = 0; k < fx.streaks.count; k++) if (wid.getX(k * 4) <= 0.1) peak = Math.max(peak, Math.max(col.getX(k * 4), col.getY(k * 4), col.getZ(k * 4)) * col.getW(k * 4));
     return peak;
   }
 

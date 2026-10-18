@@ -170,18 +170,19 @@ describe('as linhas no Effects', () => {
   it('abaixo de 90% da máxima não há linha; a 100% há, até o teto do degrau; reduzir efeitos não tem', () => {
     expect(corre(cena('high'), 90, 0.88)).toBe(0);
     const cheio = corre(cena('high'), 120, 1);
-    expect(cheio).toBe(fxPlan('high', false).speedLines);
+    expect(cheio).toBe(fxPlan('high', false).speedLines + fxPlan('high', false).cornerStreaks); // V10: + os riscos largos de canto, na mesma malha
     expect(corre(cena('high', { reduce: true }), 120, 1)).toBe(0);
   });
 
   it('o teto sobe do Baixo ao Ultra e cai pela metade com 3 ou 4 jogadores', () => {
     const q = (x: Quality) => corre(cena(x), 120, 1);
-    expect(q('low')).toBe(fxPlan('low', false).speedLines);
-    expect(q('medium')).toBe(fxPlan('medium', false).speedLines);
-    expect(q('ultra')).toBe(fxPlan('ultra', false).speedLines);
+    const tracos = (x: Quality, v = 1) => fxPlan(x, false, v).speedLines + fxPlan(x, false, v).cornerStreaks; // V10: fios + riscos largos de canto
+    expect(q('low')).toBe(tracos('low'));
+    expect(q('medium')).toBe(tracos('medium'));
+    expect(q('ultra')).toBe(tracos('ultra'));
     expect(q('low')).toBeLessThan(q('ultra'));
     const quatro = cena('high', { humans: 4 });
-    expect(corre(quatro, 120, 1)).toBe(fxPlan('high', false, 4).speedLines);
+    expect(corre(quatro, 120, 1)).toBe(fxPlan('high', false, 4).speedLines + fxPlan('high', false, 4).cornerStreaks);
   });
 
   it('sobe e desce com suavidade ao cruzar 90% (sem piscar de uma vez)', () => {

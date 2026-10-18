@@ -47,15 +47,19 @@ export function emitBrakeSmoke(c: PuffCar, decel: number, brake: number, collisi
   out(puff({ z: c.z - 60, x: c.x + side, h: 0.15, vz: c.speed * 0.6, vx: side * 0.3, vh: 0.8, life: 0.5, size: 0.5, grow: 1.6, gravity: 0.2, r, g, b }));
 }
 
-/** A poeira da grama (o carro com as rodas fora do asfalto): duas bolhas por quadro, uma de cada lado, na cor do chão. */
-export function emitGrassDust(c: PuffCar, color: readonly [number, number, number], f: number, rnd: () => number, out: (s: PuffSpec) => void): void {
+/**
+ * A poeira da terra e da areia (o carro com as rodas fora do asfalto): bolhas na cor do chão, de cada lado. `scale` (V10, HC2; `fxPlan.dustScale`): 1 = a de
+ * antes (2 bolhas por quadro, 0,5 m, vida de 0,6 a 1,1 s); 1,8 = a nuvem grande e legível do Horizon Chase 2 (3 bolhas, ≥ 0,9 m que incham ≥ 2,5 m, ≥ 1 s).
+ */
+export function emitGrassDust(c: PuffCar, color: readonly [number, number, number], f: number, rnd: () => number, out: (s: PuffSpec) => void, scale = 1): void {
   if (f <= 0 || c.skidTicks <= 0 || c.speed <= 250) return;
-  for (let k = 0; k < 2; k++) {
+  const per = Math.ceil(2 * scale * 0.75);
+  for (let k = 0; k < per; k++) {
     if (f < 1 && rnd() >= f) continue;
     const side = k % 2 === 0 ? -0.16 : 0.16;
     out(puff({
       z: c.z - 50 + rnd() * 30, x: c.x + side * (1 + rnd()), h: 0.3, vz: c.speed * (0.5 + rnd() * 0.2), vx: (rnd() - 0.5) * 0.4 + side * 0.8,
-      vh: 1.2 + rnd() * 1.6, life: 0.6 + rnd() * 0.5, size: 0.5, grow: 1.4, gravity: 0.5, r: color[0], g: color[1], b: color[2],
+      vh: (1.2 + rnd() * 1.6) * Math.min(1.5, scale), life: 0.6 + rnd() * 0.5 + 0.5 * (scale - 1), size: 0.5 * scale, grow: 1.4 * scale, gravity: 0.5, r: color[0], g: color[1], b: color[2],
     }));
   }
 }

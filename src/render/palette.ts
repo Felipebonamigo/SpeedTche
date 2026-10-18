@@ -305,7 +305,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     // O céu azul saturado é a luz das sombras: é ele que as deixa azuladas em vez de pretas.
     hemiSky = mix(b.sky[1], '#b4c8f4', 0.6); hemiIntensity = 1.3;
     envIntensity = 0.45; exposure = 0.98; fogDensity = 1;
-    bloom = [0.2, 0.35, 2.6];
+    bloom = [0.34, 0.5, 2.2]; // V10 (HC2): halo no disco do sol (era 0,2 · 0,35 · 2,6)
     cloudLit = '#ffffff'; cloudShade = mix(b.sky[1], '#c8d8f0', 0.55);
   } else if (time === 'dusk') {
     sky = DUSK_SKY[scenery].sky; glow = DUSK_SKY[scenery].glow; light = 0.7; sun = '#ffc46a';

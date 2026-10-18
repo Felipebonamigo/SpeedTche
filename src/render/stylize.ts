@@ -107,8 +107,8 @@ const LATE_FILL = 0.25;
  * contrário (`ROAD_COUNTER` = quanto dela é desfeito, em gama), que é o que a gradação vai pôr de volta; `ROAD_GAIN` repõe a luminância que o pé do Neutral
  * tira de um escuro neutro (6,25·x² no cinza, contra o escuro azul que ele deixava passar).
  */
-const ROAD_COUNTER = 3.5;
-const ROAD_GAIN = 1.6;
+const ROAD_COUNTER = 2.5;
+const ROAD_GAIN = 2.0;
 
 /**
  * A gradação sai da paleta, então já varia por bioma e por período sem tabela: a sombra é puxada para a cor do céu que a pinta
@@ -117,24 +117,47 @@ const ROAD_GAIN = 1.6;
  */
 export function gradingFor(p: Palette): Grading {
   const d = dayness(p);
+  const late = lateness(p.light);
   const hemi = linear(p.hemiSky); const sun = linear(p.sunLight);
-  const sh = hemi.map((v) => (v - mean(hemi)) * (0.08 + 0.12 * d)) as Rgb;
+  // V10 (HC2): a tinta das sombras ganha um tom por período, somado ao do céu que as pinta (azul-quente de dia, magenta no entardecer, roxo à noite): o
+  // Horizon Chase 2 pinta a sombra com cor, a nossa era cinza-azulada. Contínuo na `light` (a corrida que muda anda por aqui).
+  const tone = shadowTone(d, late);
+  const sh = hemi.map((v, i) => (v - mean(hemi)) * (0.08 + 0.12 * d) + tone[i]) as Rgb;
   // Cor-brilho: fora do dia o ganho quente das luzes cai (o sol do entardecer já é quente; somado, o carro branco ao sol saía pêssego).
-  const hi = sun.map((v) => (v - mean(sun)) * 0.22 * (1 - 0.7 * lateness(p.light))) as Rgb;
-  const shadows = sh.map((v) => clamp(v, -0.1, 0.1)) as Rgb;
+  // V10: de dia o sol é mais quente (0,4 em vez de 0,22 do desvio da cor do sol).
+  const hi = sun.map((v) => (v - mean(sun)) * (0.4 - 0.18 * late) * (1 - 0.4 * late)) as Rgb;
+  const shadows = sh.map((v) => clamp(v, -0.14, 0.14)) as Rgb;
   const counter = shadows.map((v) => { const f = Math.max(0.2, 1 - ROAD_COUNTER * v); return f * f; }) as Rgb;
   const counterLum = 0.2126 * counter[0] + 0.7152 * counter[1] + 0.0722 * counter[2];
   return {
     toneMapping: TONE_MAP,
-    exposure: p.exposure * EXPOSURE_TRIM,
-    saturation: 0.02 + 0.04 * d,
-    contrast: 0.02 + 0.06 * d,
+    exposure: p.exposure * EXPOSURE_TRIM * (1 + NIGHT_LIFT * clamp(1 - d / 0.56, 0, 1)), // V10: a noite sobe até 25% (entupia: 48% dos pixels de Sampa < 0,12)
+    saturation: SATURATION_LATE + (SATURATION_DAY - SATURATION_LATE) * d,
+    contrast: CONTRAST_NIGHT + (CONTRAST_DAY - CONTRAST_NIGHT) * d,
     shadows,
-    highlights: hi.map((v) => clamp(v, -0.1, 0.1)) as Rgb,
-    toe: LATE_TOE * lateness(p.light),
-    fill: 1 - (1 - LATE_FILL) * lateness(p.light),
-    road: { tint: counter.map((v) => (v / counterLum) * ROAD_GAIN) as Rgb, mix: 1 - lateness(p.light) },
+    highlights: hi.map((v) => clamp(v, -0.14, 0.14)) as Rgb,
+    toe: LATE_TOE * late,
+    fill: 1 - (1 - LATE_FILL) * late,
+    road: { tint: counter.map((v) => (v / counterLum) * ROAD_GAIN) as Rgb, mix: 1 - late },
   };
+}
+
+/**
+ * V10 (HC2), a gradação mais viva (provisórios, calibrados nas capturas e nas medidas de `tests/hc2-gl.test.ts`): saturação 0,18 (noite) → 0,24 (dia) e
+ * contraste 0,05 (noite) → 0,18 (dia), eram 0,02–0,06 e 0,02–0,08. À noite o contraste é menor porque quase tudo já é escuro (mais contraste o afunda).
+ */
+const NIGHT_LIFT = 0.25;
+const SATURATION_DAY = 0.24;
+const SATURATION_LATE = 0.18;
+const CONTRAST_DAY = 0.18;
+const CONTRAST_NIGHT = 0.05;
+
+/** O tom que cada período põe nas sombras (deltas em gama; somados ao do céu): dia azul-quente, entardecer magenta, noite roxo. `late` = `lateness`. */
+function shadowTone(d: number, late: number): Rgb {
+  const day: Rgb = [0.025, 0.0, 0.0]; const dusk: Rgb = [0.01, 0.0, 0.03]; const night: Rgb = [0.02, -0.012, 0.05];
+  // dia → entardecer pela `lateness` (0 → 1); entardecer → noite pelo escurecer (a `dayness` cai de 0,56 a 0)
+  const toNight = clamp(1 - d / 0.56, 0, 1);
+  return lerp3(lerp3(day, dusk, late), night, toNight);
 }
 
 /**

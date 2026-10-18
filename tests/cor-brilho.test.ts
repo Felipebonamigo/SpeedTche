@@ -143,14 +143,14 @@ const RED = '#e53935'; // Trovão V12
 const LATE: TimeOfDay[] = ['dusk', 'night'];
 
 describe('2. véu magenta: a luz do entardecer e da noite deixa a pintura com a cor dela', () => {
-  it('o carro branco lê branco (quente ou frio, nunca rosa/roxo): croma ≤ 0,22 na traseira à sombra, no lado ao sol e no capô, e sem o verde afundado do magenta', () => {
+  it('o carro branco lê branco (quente ou frio, nunca rosa/roxo): croma ≤ 0,22 na traseira à sombra, no lado ao sol e no capô, e sem o verde afundado do magenta (≤ 10; era ≤ 6 antes da V10: a sombra tem tom)', () => {
     const bad: string[] = [];
     for (const s of SCENERIES) for (const t of LATE) {
       const p = palette(s, t);
       for (const face of ['shadow', 'sun', 'top'] as const) {
         const c = shade(p, s, t, WHITE, face, true);
         const magenta = Math.min(c[0], c[2]) - c[1];
-        if (chroma(c) > 0.22 || magenta > 6) bad.push(`${s}:${t} ${face} rgb(${c.join(',')}) croma ${chroma(c).toFixed(2)} magenta ${magenta}`);
+        if (chroma(c) > 0.22 || magenta > 10) bad.push(`${s}:${t} ${face} rgb(${c.join(',')}) croma ${chroma(c).toFixed(2)} magenta ${magenta}`);
       }
     }
     expect(bad).toEqual([]);
@@ -180,15 +180,16 @@ describe('2. véu magenta: a luz do entardecer e da noite deixa a pintura com a 
     expect(bad).toEqual([]);
   });
 
-  it('o dia não muda (trava: Copacabana de dia é o melhor quadro): os 6 biomas de dia dão as mesmas cores de antes', () => {
-    // Medido no `main` 150dd01 com este mesmo modelo (branco à sombra · branco ao sol · vermelho à sombra · asfalto).
+  it('o dia está travado nos valores da V10 (HC2): os 6 biomas de dia dão as mesmas cores de antes (a gradação mais viva mudou o dia DE PROPÓSITO; esta trava vale a partir dela)', () => {
+    // V10 (HC2, docs/ondas/V10-hc2.md): era "o dia não muda" (valores do `main` 150dd01: branco à sombra tropical 124,174,201 · asfalto 13,46,93). O dono pediu mais
+    // saturação, contraste e luz quente de dia, então a trava foi movida para os valores novos, medidos com este mesmo modelo (branco à sombra · branco ao sol · vermelho à sombra · asfalto).
     const BEFORE: Record<SceneryId, [V, V, V, V]> = {
-      tropical: [[124, 174, 201], [241, 249, 241], [140, 1, 25], [13, 46, 93]],
-      desert: [[159, 165, 187], [255, 244, 233], [166, 0, 22], [38, 52, 96]],
-      city_night: [[152, 176, 210], [248, 246, 243], [163, 1, 28], [20, 40, 86]],
-      alpine: [[140, 169, 213], [242, 241, 244], [153, 0, 32], [22, 43, 96]],
-      coast: [[117, 178, 221], [229, 242, 245], [133, 1, 35], [18, 54, 106]],
-      savanna: [[166, 189, 197], [255, 252, 235], [172, 3, 19], [39, 55, 79]],
+      tropical: [[117, 181, 213], [254, 255, 246], [167, 0, 6], [7, 38, 94]],
+      desert: [[162, 168, 196], [255, 255, 236], [199, 0, 3], [38, 45, 96]],
+      city_night: [[151, 182, 222], [255, 255, 248], [194, 0, 9], [15, 31, 86]],
+      alpine: [[137, 174, 228], [255, 252, 250], [183, 0, 16], [18, 35, 97]],
+      coast: [[106, 185, 237], [240, 254, 252], [159, 0, 19], [13, 47, 108]],
+      savanna: [[168, 196, 204], [255, 255, 237], [206, 0, 1], [38, 48, 74]],
     };
     for (const s of SCENERIES) {
       const p = palette(s, 'day');
@@ -232,11 +233,16 @@ describe('2b. asfalto de dia à sombra: cinza quente, não azul-marinho (só a p
     expect(bad).toEqual([]);
   });
 
-  it('a luminância parecida (0,8× a 1,7× a de hoje): o asfalto não vira um buraco preto nem um clarão', () => {
+  it('a luminância parecida (0,65× a 1,5× a do main 08033d9, em valores absolutos): o asfalto não vira um buraco preto nem um clarão', () => {
+    // V10 (HC2): a trava era relativa ao asfalto SEM a luz da pista sob a MESMA gradação; com a gradação mais viva (saturação e contraste maiores) as duas pontas
+    // andam juntas e a razão perdeu o sentido (18 → 7 e 18 → 37 no mesmo quadro). Passou a ser contra o que o asfalto media no main 08033d9 (luma 0..255, à sombra · ao sol).
+    const BASE: Record<SceneryId, [number, number]> = {
+      tropical: [22.5, 51.8], desert: [32.2, 64.6], city_night: [22.9, 49.9], alpine: [23.2, 52.7], coast: [31.5, 62.2], savanna: [40.4, 67.7],
+    };
     const bad: string[] = [];
-    for (const [s, p] of DAY) for (const sun of [false, true]) {
-      const before = luma8(roadShade(s, p, false, sun)); const now = luma8(roadShade(s, p, true, sun));
-      if (now < 0.8 * before || now > 1.7 * before) bad.push(`${s} ${sun ? 'ao sol' : 'à sombra'}: luma ${before.toFixed(0)} → ${now.toFixed(0)}`);
+    for (const [s, p] of DAY) for (const [i, sun] of [false, true].entries()) {
+      const base = BASE[s][i]; const now = luma8(roadShade(s, p, true, sun));
+      if (now < 0.65 * base || now > 1.5 * base) bad.push(`${s} ${sun ? 'ao sol' : 'à sombra'}: luma ${base.toFixed(0)} → ${now.toFixed(0)}`);
     }
     expect(bad).toEqual([]);
   });

@@ -38,6 +38,8 @@ let tick = 0;
 let seatCameras: CameraMode[] | undefined;
 /** A opção "Efeitos de cartum" no quadro (V8; o padrão do jogo é desligada). */
 let cartoonFx = false;
+/** A opção "Reduzir efeitos" no quadro (V10: a diferença entre o quadro com ela e sem ela é só dos efeitos). */
+let reduceFx = false;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[], carIds?: string[]): void {
@@ -65,7 +67,7 @@ function frameFor(quality: Quality): RenderFrame {
   return {
     state, track,
     viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [], ...(seatCameras?.[h.seat] ? { camera: seatCameras[h.seat] } : {}) })),
-    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
+    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: reduceFx, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
     time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
 }
@@ -308,6 +310,89 @@ function shoot(quality: Quality, frames: number, probes: Probe[]): ProbeStat[] {
   });
 }
 
+/** Medida de uma região da tela (fração 0..1 do quadro, y de cima para baixo): saturação HSV média, luma, contraste (p95 − p5 da luma), calor (R − B). */
+export interface RegionStat { sat: number; luma: number; p5: number; p95: number; contrast: number; warm: number; dark: number; bright: number }
+/**
+ * V10 (HC2): desenha `frames` quadros sem andar a corrida e mede regiões FRACIONÁRIAS da imagem final (o quadro todo, o céu, a beira da pista...). Sem sonda em
+ * metros: serve para a gradação (saturação e contraste por cena) e para contar pixels de efeito (`bright` = fração de pixels com luma > 0,85).
+ */
+function regions(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>): RegionStat[] {
+  if (!current) throw new Error('lab.setup primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  return boxes.map(([fx0, fy0, fx1, fy1]) => {
+    const x0 = Math.max(0, Math.floor(fx0 * W)); const x1 = Math.min(W, Math.ceil(fx1 * W));
+    const y0 = Math.max(0, Math.floor(fy0 * H)); const y1 = Math.min(H, Math.ceil(fy1 * H));
+    const hist = new Uint32Array(256);
+    let n = 0; let sat = 0; let luma = 0; let warm = 0; let dark = 0; let bright = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4;
+      const r = buf[i]; const g = buf[i + 1]; const b = buf[i + 2];
+      const mx = Math.max(r, g, b); const mn = Math.min(r, g, b);
+      const l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      sat += mx === 0 ? 0 : (mx - mn) / mx; luma += l; warm += (r - b) / 255; n++;
+      hist[Math.round(l * 255)]++;
+      if (l < 0.12) dark++;
+      if (l > 0.85) bright++;
+    }
+    const k = Math.max(1, n);
+    const pct = (q: number): number => { let acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= q * k) return v / 255; } return 1; };
+    const p5 = pct(0.05); const p95 = pct(0.95);
+    return { sat: sat / k, luma: luma / k, p5, p95, contrast: p95 - p5, warm: warm / k, dark: dark / k, bright: bright / k };
+  });
+}
+
+/** O jogador no quadro parado (V10): `speed` = fração da velocidade máxima, `nitro` liga o nitro, `skid` põe as rodas fora do asfalto (poeira). */
+function drive(o: { speed?: number; nitro?: boolean; skid?: boolean }): void {
+  if (!current) throw new Error('lab.setup primeiro');
+  const me = current.state.cars.find((c) => c.seat >= 0);
+  if (!me) throw new Error('sem humano');
+  if (o.speed !== undefined) me.speed = me.stats.topSpeed * o.speed;
+  me.nitroTicks = o.nitro ? 100 : 0;
+  me.skidTicks = o.skid ? 6 : 0;
+}
+
+let snapBuf: Uint8Array | null = null;
+function readBuf(): Uint8Array {
+  const ctx = gl.getContext();
+  const buf = new Uint8Array(ctx.drawingBufferWidth * ctx.drawingBufferHeight * 4);
+  ctx.readPixels(0, 0, ctx.drawingBufferWidth, ctx.drawingBufferHeight, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  return buf;
+}
+/** Desenha `frames` quadros e guarda a imagem (o "sem efeito" de uma comparação por pixel). */
+function snapshot(quality: Quality, frames: number): void {
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  snapBuf = readBuf();
+}
+export interface DiffStat { changed: number; warm: number; bright: number; luma: number }
+/**
+ * Desenha `frames` quadros e compara com o `snapshot` nas regiões (frações da tela, y de cima para baixo): `changed` = fração de pixels que mudaram mais de `thr`/255,
+ * `warm` = fração destes que é quente (R ≥ 1,3 G e R ≥ 1,6 B: fogo, poeira de terra), `bright` = fração destes com luma > 0,8, `luma` = a média do que mudou (0..1).
+ */
+function diffFromSnapshot(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>, thr = 8): DiffStat[] {
+  if (!snapBuf) throw new Error('lab.snapshot primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const now = readBuf(); const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  return boxes.map(([fx0, fy0, fx1, fy1]) => {
+    const x0 = Math.floor(fx0 * W); const x1 = Math.ceil(fx1 * W); const y0 = Math.floor(fy0 * H); const y1 = Math.ceil(fy1 * H);
+    let n = 0; let ch = 0; let warm = 0; let bright = 0; let luma = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4; n++;
+      const dr = now[i] - snapBuf![i]; const dg = now[i + 1] - snapBuf![i + 1]; const db = now[i + 2] - snapBuf![i + 2];
+      if (Math.abs(dr) <= thr && Math.abs(dg) <= thr && Math.abs(db) <= thr) continue;
+      ch++;
+      const l = (0.2126 * now[i] + 0.7152 * now[i + 1] + 0.0722 * now[i + 2]) / 255; luma += l;
+      if (now[i] >= 1.3 * now[i + 1] && now[i] >= 1.6 * now[i + 2]) warm++;
+      if (l > 0.8) bright++;
+    }
+    return { changed: ch / Math.max(1, n), warm: warm / Math.max(1, ch), bright: bright / Math.max(1, ch), luma: luma / Math.max(1, ch) };
+  });
+}
+
 /**
  * O teto do bloom, isolado: um quadrado de `px` px com emissão HDR `hdr` no centro de uma cena preta, pelo MESMO pipeline da Alta com o bloom
  * `bloom` (força, raio, limiar), e quanta luz vaza para FORA dele (soma da luma 0..1 dos pixels a 3 px da borda em diante).
@@ -401,7 +486,14 @@ function flameDiff(quality: Quality, frames: number, box: Box, mouth?: Box): Fla
 }
 
 const lab = {
-  freeze, headlights, shoot, bloomHalo, nitro, flameDiff,
+  freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
+  /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
+  setReduce: (on: boolean): void => { reduceFx = on; },
+  setCartoon: (on: boolean): void => { cartoonFx = on; },
+  /** Esconde (ou mostra) a malha de efeito `name` (`fx-streaks`, `fx-dust`...) só pelo material: `Effects` mexe na `visible` da malha a cada quadro. */
+  hideFx: (name: string, hide: boolean): void => {
+    scene.traverse((o) => { const m = o as THREE.Mesh; if (o.name === name && m.material) (m.material as THREE.Material).visible = !hide; });
+  },
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
