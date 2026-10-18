@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.6, build de 18/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.7, build de 19/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,14 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.7 (sobre a 0.1.6):
+  * ESTRADA COM COR DO LUGAR: terra alaranjada no deserto, terra avermelhada na mata, pedra rosada na serra, asfalto cinza-quente na
+    praia e lilás de noite na cidade; bordas e meios-fios marcados, chão fora da pista com relevo suave.
+  * CENÁRIO E LUZ: mais cor e calor (sol mais quente, sombras com tom), rochas e árvores com degradê de luz e mais variação de altura.
+  * VELOCIDADE COM ENERGIA: riscos brancos largos nos cantos da tela, jatos de fogo nos escapamentos com o nitro e poeira maior nos pneus.
+    ("Reduzir efeitos" deixa tudo mais suave; nada pisca.)
+  * Teste de câmera: na versão de teste existe uma câmera Alta mais baixa e afastada que mostra mais curva (desligada; avisem se querem).
+  * Corrigido o dinheiro de teste da tela de pagamento com os carros baratos novos.
 - NOVIDADES DA 0.1.6 (sobre a 0.1.5):
   * 12 CARROS NACIONAIS NOVOS, inspirados nos que todo brasileiro conhece (sem marca nem logo): Cuiabano e Tupiniquim (livres),
     Jabuti, Caipora, Lambari, Besouro, Pampeiro, Barão, Pão de Forma e Trilheiro (à venda na Expedição), e dois por conquista:

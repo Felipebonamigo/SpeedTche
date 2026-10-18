@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.6 — versão de teste para amigos** (build de 18/10/2026)
+**Speed Tchê 0.1.7 — versão de teste para amigos** (build de 19/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.6-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.6-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.7-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.7-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.7: **estrada com a cor do lugar** (terra no deserto, asfalto lilás à noite na cidade, cinza-quente na praia) com guia e bordas marcadas; **cenário mais quente e colorido**; **velocidade com energia** (riscos largos nos cantos, jatos de fogo e poeira maior; "Reduzir efeitos" deixa suave).
 
 Novidades da 0.1.6: **12 carros nacionais** inspirados nos que todo brasileiro conhece (sem marca nem logo; dois só por conquista, um deles com escada no teto); **carros redesenhados** (GT e os 10 outros estilos); **HUD sem caixas**; **batida realista** (faíscas no lugar do "POW!"; o "POW!" volta nas opções); **pistas com acabamento** e asfalto cinza de dia; **nível de piloto e maestria por carro** com 12 conquistas novas; **marcos de volta** nas curvas novas (38 pistas mudam de versão: recordes antigos aparecem como "versão anterior"); garagem, pódio e lobby mostram o visual escolhido.
 
