@@ -5,7 +5,7 @@
 
 ## 1. A câmera Alta "curva" nas Opções
 
-`CAMERA_HIGH_CURVE` (V11: altura 3,4, recuo 6,8, mira 30 m, mesmo FOV 54) virou a opção **Opções › Acessibilidade › "Alta em curva"** (coluna da direita, depois das câmeras por assento).
+`CAMERA_HIGH_CURVE` (V11: altura 3,4, recuo 6,8, mira 30 m, mesmo FOV 54) virou a opção **Opções › Acessibilidade › "Alta em curva"** (coluna da esquerda, a da visão e dos efeitos: a da direita já estava cheia).
 - **Global** (não por assento: o seletor por assento escolhe entre as quatro câmeras; esta troca a *pose* da Alta de todos): cabe numa linha, e o ciclo da tecla C/V continua com as quatro.
 - **Desligada por padrão.** `Settings.highCurveCamera` (booleano), campo **aditivo**: opções sem ele abrem desligadas, lixo vira `false`, a 0.1.7 ignora o campo (saneador em lista branca) e abre as opções novas sem perder nada; se ela regravar, o campo cai (docs/SAVE.md, "Alta em curva (V12)").
 - Caminho: `Settings` → `RenderOptions.highCurveCamera` (`session.ts`) → `cameraExtraFor` → `CameraExtra.curve` → `cameraPoseFor(mode, curve)` (`camera-base.ts`). O interruptor do harness (`?camcurve=1`) continua.
@@ -64,4 +64,4 @@ Intactas (visto passar): carro branco lê branco (croma ≤ 0,22), vermelho verm
 
 ## 7. Verificação (rodada no mesmo turno)
 
-Ver o fecho no relatório de entrega; comandos: `npx tsc --noEmit -p .`, os arquivos de área sem GL, e com `NC_REQUIRE_GL=1`: `noite-roxa-gl`, `cor-brilho-gl`, `hc2-gl`, `estrada-gl`, `corrida-que-muda-gl`, `gl-render` (gate de chamadas/△), mais `playtest-layout` das Opções e da Acessibilidade (7 resoluções × 2 tamanhos de texto).
+`tsc` sem saída; área sem GL (39 arquivos, 595 testes) verde; GL 6 arquivos, 41 testes verdes (`noite-roxa-gl`, `cor-brilho-gl`, `hc2-gl`, `estrada-gl`, `corrida-que-muda-gl`, `gl-render` com o gate); `playtest-layout` options + access, 7 resoluções × 2 tamanhos de texto: 28/28 limpas (a linha nova na coluna da direita estourava 4–43 px; ficou na da esquerda). Comandos: `npx tsc --noEmit -p .`, os arquivos de área sem GL, e com `NC_REQUIRE_GL=1`: `noite-roxa-gl`, `cor-brilho-gl`, `hc2-gl`, `estrada-gl`, `corrida-que-muda-gl`, `gl-render` (gate de chamadas/△), mais `playtest-layout` das Opções e da Acessibilidade (7 resoluções × 2 tamanhos de texto).

@@ -43,6 +43,11 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     seatRows.forEach((row, i) => row.el.style.setProperty('--seat', seatColor(i, s.colorPalette)));
   };
 
+  // "Alta em curva" (V12): a Alta sobe a 3,4 m e recua a 6,8 m (CAMERA_HIGH_CURVE). Global, não por assento: cabe numa linha só (a coluna da direita já estava cheia: ela entra na da esquerda, com as de visão).
+  const highCurve = {
+    item: selector(t('access.options.highCurve'), () => onOff(s.highCurveCamera === true), () => { s.highCurveCamera = !s.highCurveCamera; commit(); }, { sfx }),
+    desc: () => t('access.desc.highCurve'),
+  };
   const vision: Array<{ item: Selector; desc: () => string }> = [
     { item: selector(t('access.options.palette'), () => t(`access.palette.${s.colorPalette}`), (d) => { s.colorPalette = cycle(COLOR_PALETTES, s.colorPalette, d); commit(); paint(); }, { sfx }), desc: () => t(`access.desc.palette.${s.colorPalette}`) },
     { item: selector(t('access.options.hudScale'), () => percent(s.hudScale), (d) => { s.hudScale = Math.round(Math.min(HUD_SCALE_MAX, Math.max(HUD_SCALE_MIN, s.hudScale + d * 0.1)) * 10) / 10; commit(); }, { sfx }), desc: () => t('access.desc.hudScale') },
@@ -51,6 +56,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     { item: selector(t('access.options.reduceEffects'), () => onOff(s.reduceEffects), () => { s.reduceEffects = !s.reduceEffects; commit(); }, { sfx }), desc: () => t('access.desc.reduceEffects') },
     { item: selector(t('access.options.cartoon'), () => onOff(s.cartoonEffects), () => { s.cartoonEffects = !s.cartoonEffects; commit(); }, { sfx }), desc: () => t('access.desc.cartoon') },
     { item: selector(t('ui.options.shake'), () => onOff(s.screenShake), () => { s.screenShake = !s.screenShake; commit(); }, { sfx }), desc: () => t('access.desc.shake') },
+    highCurve,
   ];
   // A sessão troca o array a cada mudança de opções: sempre lido de s.seatAssists na hora.
   const levelOf = (seat: number) => s.seatAssists[seat] ?? 'none';
@@ -73,18 +79,13 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     seatRows.push(item);
     return { item, desc: () => t(`access.desc.camera.${cameraOf(seat)}`) };
   });
-  // "Alta em curva" (V12): a Alta sobe a 3,4 m e recua a 6,8 m (CAMERA_HIGH_CURVE). Global, não por assento: cabe numa linha só (a coluna ganha a 10ª).
-  const highCurve = {
-    item: selector(t('access.options.highCurve'), () => onOff(s.highCurveCamera === true), () => { s.highCurveCamera = !s.highCurveCamera; commit(); }, { sfx }),
-    desc: () => t('access.desc.highCurve'),
-  };
   paint();
 
   const back = button(t('ui.common.back'), () => api.back());
   // 30 fps travados na Média com 3-4 jogadores (L2b): as colunas das Opções já têm as dez linhas que cabem (docs/TELAS.md); aqui a coluna de
   // direção é a mais curta, então a linha entra nela sem crescer a tela.
   const perf = { item: fps30Selector(api, commit), desc: () => t('ui.options.fps30.hint') };
-  const entries = [...vision, ...driving, ...cameras, highCurve, perf];
+  const entries = [...vision, ...driving, ...cameras, perf];
   const list = createFocusList([...entries.map((e) => e.item), back], { sfx });
   const desc = h('p', { class: 'access-desc glass', attrs: { 'aria-live': 'polite' } });
   let shown = '';
@@ -97,7 +98,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
   const el = screenFrame('access', t('access.options.title'),
     h('div', { class: 'options-columns access-columns' },
       h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.vision') }), vision[0].item.el, swatches, vision.slice(1).map((v) => v.item.el)),
-      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), highCurve.item.el, perf.item.el),
+      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), perf.item.el),
     ),
     desc,
     h('div', { class: 'access-actions' }, back.el),
