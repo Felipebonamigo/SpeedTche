@@ -131,7 +131,7 @@ export function gradingFor(p: Palette): Grading {
   const counterLum = 0.2126 * counter[0] + 0.7152 * counter[1] + 0.0722 * counter[2];
   return {
     toneMapping: TONE_MAP,
-    exposure: p.exposure * EXPOSURE_TRIM * (1 + NIGHT_LIFT * clamp(1 - d / 0.56, 0, 1)), // V10: a noite sobe até 16% (entupia: 48% dos pixels de Sampa < 0,12)
+    exposure: p.exposure * EXPOSURE_TRIM * (1 + NIGHT_LIFT * clamp(1 - d / 0.56, 0, 1)), // V10: a noite sobe até 25% (entupia: 48% dos pixels de Sampa < 0,12)
     saturation: SATURATION_LATE + (SATURATION_DAY - SATURATION_LATE) * d,
     contrast: CONTRAST_NIGHT + (CONTRAST_DAY - CONTRAST_NIGHT) * d,
     shadows,
@@ -144,13 +144,13 @@ export function gradingFor(p: Palette): Grading {
 
 /**
  * V10 (HC2), a gradação mais viva (provisórios, calibrados nas capturas e nas medidas de `tests/hc2-gl.test.ts`): saturação 0,18 (noite) → 0,24 (dia) e
- * contraste 0,10 (noite) → 0,18 (dia), eram 0,02–0,06 e 0,02–0,08. À noite o contraste é menor porque quase tudo já é escuro (mais contraste o afunda).
+ * contraste 0,05 (noite) → 0,18 (dia), eram 0,02–0,06 e 0,02–0,08. À noite o contraste é menor porque quase tudo já é escuro (mais contraste o afunda).
  */
-const NIGHT_LIFT = 0.16;
+const NIGHT_LIFT = 0.25;
 const SATURATION_DAY = 0.24;
 const SATURATION_LATE = 0.18;
 const CONTRAST_DAY = 0.18;
-const CONTRAST_NIGHT = 0.1;
+const CONTRAST_NIGHT = 0.05;
 
 /** O tom que cada período põe nas sombras (deltas em gama; somados ao do céu): dia azul-quente, entardecer magenta, noite roxo. `late` = `lateness`. */
 function shadowTone(d: number, late: number): Rgb {

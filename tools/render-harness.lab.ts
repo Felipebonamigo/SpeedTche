@@ -38,6 +38,8 @@ let tick = 0;
 let seatCameras: CameraMode[] | undefined;
 /** A opção "Efeitos de cartum" no quadro (V8; o padrão do jogo é desligada). */
 let cartoonFx = false;
+/** A opção "Reduzir efeitos" no quadro (V10: a diferença entre o quadro com ela e sem ela é só dos efeitos). */
+let reduceFx = false;
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[], carIds?: string[]): void {
@@ -65,7 +67,7 @@ function frameFor(quality: Quality): RenderFrame {
   return {
     state, track,
     viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [], ...(seatCameras?.[h.seat] ? { camera: seatCameras[h.seat] } : {}) })),
-    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: false, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
+    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: reduceFx, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
     time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
 }
@@ -343,6 +345,54 @@ function regions(quality: Quality, frames: number, boxes: Array<[number, number,
   });
 }
 
+/** O jogador no quadro parado (V10): `speed` = fração da velocidade máxima, `nitro` liga o nitro, `skid` põe as rodas fora do asfalto (poeira). */
+function drive(o: { speed?: number; nitro?: boolean; skid?: boolean }): void {
+  if (!current) throw new Error('lab.setup primeiro');
+  const me = current.state.cars.find((c) => c.seat >= 0);
+  if (!me) throw new Error('sem humano');
+  if (o.speed !== undefined) me.speed = me.stats.topSpeed * o.speed;
+  me.nitroTicks = o.nitro ? 100 : 0;
+  me.skidTicks = o.skid ? 6 : 0;
+}
+
+let snapBuf: Uint8Array | null = null;
+function readBuf(): Uint8Array {
+  const ctx = gl.getContext();
+  const buf = new Uint8Array(ctx.drawingBufferWidth * ctx.drawingBufferHeight * 4);
+  ctx.readPixels(0, 0, ctx.drawingBufferWidth, ctx.drawingBufferHeight, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  return buf;
+}
+/** Desenha `frames` quadros e guarda a imagem (o "sem efeito" de uma comparação por pixel). */
+function snapshot(quality: Quality, frames: number): void {
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  snapBuf = readBuf();
+}
+export interface DiffStat { changed: number; warm: number; bright: number; luma: number }
+/**
+ * Desenha `frames` quadros e compara com o `snapshot` nas regiões (frações da tela, y de cima para baixo): `changed` = fração de pixels que mudaram mais de `thr`/255,
+ * `warm` = fração destes que é quente (R ≥ 1,3 G e R ≥ 1,6 B: fogo, poeira de terra), `bright` = fração destes com luma > 0,8, `luma` = a média do que mudou (0..1).
+ */
+function diffFromSnapshot(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>, thr = 8): DiffStat[] {
+  if (!snapBuf) throw new Error('lab.snapshot primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const now = readBuf(); const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  return boxes.map(([fx0, fy0, fx1, fy1]) => {
+    const x0 = Math.floor(fx0 * W); const x1 = Math.ceil(fx1 * W); const y0 = Math.floor(fy0 * H); const y1 = Math.ceil(fy1 * H);
+    let n = 0; let ch = 0; let warm = 0; let bright = 0; let luma = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4; n++;
+      const dr = now[i] - snapBuf![i]; const dg = now[i + 1] - snapBuf![i + 1]; const db = now[i + 2] - snapBuf![i + 2];
+      if (Math.abs(dr) <= thr && Math.abs(dg) <= thr && Math.abs(db) <= thr) continue;
+      ch++;
+      const l = (0.2126 * now[i] + 0.7152 * now[i + 1] + 0.0722 * now[i + 2]) / 255; luma += l;
+      if (now[i] >= 1.3 * now[i + 1] && now[i] >= 1.6 * now[i + 2]) warm++;
+      if (l > 0.8) bright++;
+    }
+    return { changed: ch / Math.max(1, n), warm: warm / Math.max(1, ch), bright: bright / Math.max(1, ch), luma: luma / Math.max(1, ch) };
+  });
+}
+
 /**
  * O teto do bloom, isolado: um quadrado de `px` px com emissão HDR `hdr` no centro de uma cena preta, pelo MESMO pipeline da Alta com o bloom
  * `bloom` (força, raio, limiar), e quanta luz vaza para FORA dele (soma da luma 0..1 dos pixels a 3 px da borda em diante).
@@ -436,7 +486,14 @@ function flameDiff(quality: Quality, frames: number, box: Box, mouth?: Box): Fla
 }
 
 const lab = {
-  freeze, headlights, shoot, regions, bloomHalo, nitro, flameDiff,
+  freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
+  /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
+  setReduce: (on: boolean): void => { reduceFx = on; },
+  setCartoon: (on: boolean): void => { cartoonFx = on; },
+  /** Esconde (ou mostra) a malha de efeito `name` (`fx-streaks`, `fx-dust`...) só pelo material: `Effects` mexe na `visible` da malha a cada quadro. */
+  hideFx: (name: string, hide: boolean): void => {
+    scene.traverse((o) => { const m = o as THREE.Mesh; if (o.name === name && m.material) (m.material as THREE.Material).visible = !hide; });
+  },
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },

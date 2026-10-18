@@ -84,7 +84,7 @@ export function draftLine(k: number, count: number, travel: number, time: number
 }
 
 /**
- * V10 (HC2): os riscos LARGOS de canto de tela — o Horizon Chase 2 enche os cantos com riscos brancos largos que saem do miolo para fora; os fios de 3,5 a 7
+ * V10 (HC2): os riscos LARGOS de canto de tela (18 a 42 cm, alfa até 0,75) — o Horizon Chase 2 enche os cantos com riscos brancos largos que saem do miolo para fora; os fios de 3,5 a 7
  * cm da V8 (acima) são o vento, estes são o "estou voando". Mesma malha de traços (`Streaks`, sem chamada nova): são só mais alguns traços, GROSSOS, fora do
  * eixo do carro — 3,2 a 6,2 m para o lado e ou baixos (0,2 a 1,1 m, o canto de baixo) ou altos (2,4 a 4,5 m, o canto de cima), onde a câmera de corrida os
  * joga para a borda. O `k` escolhe o canto (k % 4: alto-esquerdo, alto-direito, baixo-esquerdo, baixo-direito), então 4 riscos já cobrem a tela.
@@ -105,8 +105,8 @@ export function cornerStreak(k: number, count: number, travel: number, speedMs: 
   out.tail = dz + 4 + 0.1 * speedMs * (0.7 + 0.6 * h6);
   out.lat = (zone % 2 === 0 ? -1 : 1) * (3.2 + 3.0 * h4);
   out.h = high ? 2.4 + 2.1 * h3 : 0.2 + 0.9 * h3;
-  out.width = cartoon ? 0.2 + 0.26 * h5 : 0.14 + 0.18 * h5;
+  out.width = cartoon ? 0.26 + 0.34 * h5 : 0.18 + 0.24 * h5;
   out.r = 1.0; out.g = 1.0; out.b = 1.08;
-  out.a = Math.min(0.6, (0.2 + 0.36 * clamp01(strength)) * (cartoon ? 1.1 : 1)) * fade;
+  out.a = Math.min(0.8, (0.28 + 0.47 * clamp01(strength)) * (cartoon ? 1.08 : 1)) * fade;
   return true;
 }

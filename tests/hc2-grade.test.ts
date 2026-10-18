@@ -8,19 +8,19 @@ const ALL = SCENERIES.flatMap((s) => TIMES_OF_DAY.map((t) => [s, t] as const));
 const grade = (s: (typeof SCENERIES)[number], t: (typeof TIMES_OF_DAY)[number]) => gradingFor(palette(s, t));
 
 describe('A. gradação mais viva: saturação e contraste', () => {
-  it('as 18 combinações têm saturação ≥ 0,18 (era 0,02–0,06) e contraste ≥ 0,10 de dia e no entardecer, ≥ 0,06 à noite (era 0,02–0,08)', () => {
+  it('as 18 combinações têm saturação ≥ 0,18 (era 0,02–0,06) e contraste ≥ 0,10 de dia e no entardecer, ≥ 0,05 à noite (era 0,02–0,08)', () => {
     for (const [s, t] of ALL) {
       const g = grade(s, t);
       expect(g.saturation, `${s}/${t} saturação`).toBeGreaterThanOrEqual(0.18);
-      expect(g.contrast, `${s}/${t} contraste`).toBeGreaterThanOrEqual(t === 'night' ? 0.06 : 0.1);
+      expect(g.contrast, `${s}/${t} contraste`).toBeGreaterThanOrEqual(t === 'night' ? 0.05 : 0.1);
     }
   });
 });
 
 describe('A. noite menos entupida', () => {
-  it('a exposição da noite sobe ≥ 15% sobre a de antes (1,34 → ≥ 1,54) e a do dia não muda (1,18): Sampa tinha 48% dos pixels abaixo de 0,12 de luma', () => {
+  it('a exposição da noite sobe ≥ 22% sobre a de antes (1,34 → ≥ 1,64) e a do dia não muda (1,18): Sampa tinha 48% dos pixels abaixo de 0,12 de luma', () => {
     for (const s of SCENERIES) {
-      expect(grade(s, 'night').exposure, s).toBeGreaterThanOrEqual(1.54);
+      expect(grade(s, 'night').exposure, s).toBeGreaterThanOrEqual(1.64);
       expect(grade(s, 'day').exposure, s).toBeCloseTo(1.18, 2);
     }
   });

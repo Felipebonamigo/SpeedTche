@@ -39,14 +39,14 @@ describe('B. riscos largos de canto de tela', () => {
   const each = (strength: number, fn: (s: LineSpec, k: number) => void, travel = 123.4, cartoon = false): void => {
     for (let k = 0; k < N; k++) { const s = blank(); if (cornerStreak(k, N, travel, 110, strength, cartoon, s)) fn(s, k); }
   };
-  it('largos: de 14 a 34 cm (os de fio têm 3,5 a 7 cm), e no cartum de 20 a 48 cm', () => {
-    each(1, (s, k) => { expect(s.width, `risco ${k}`).toBeGreaterThanOrEqual(0.14); expect(s.width, `risco ${k}`).toBeLessThanOrEqual(0.34); });
-    each(1, (s, k) => { expect(s.width, `risco ${k}`).toBeGreaterThanOrEqual(0.2); expect(s.width, `risco ${k}`).toBeLessThanOrEqual(0.48); }, 123.4, true);
+  it('largos: de 18 a 42 cm (os de fio têm 3,5 a 7 cm), e no cartum de 26 a 60 cm', () => {
+    each(1, (s, k) => { expect(s.width, `risco ${k}`).toBeGreaterThanOrEqual(0.18); expect(s.width, `risco ${k}`).toBeLessThanOrEqual(0.42); });
+    each(1, (s, k) => { expect(s.width, `risco ${k}`).toBeGreaterThanOrEqual(0.26); expect(s.width, `risco ${k}`).toBeLessThanOrEqual(0.6); }, 123.4, true);
   });
-  it('vistosos: alfa de pico entre 0,45 e 0,6 na velocidade máxima (os de fio: ≤ 0,30)', () => {
+  it('vistosos: alfa de pico entre 0,6 e 0,8 na velocidade máxima (os de fio: ≤ 0,30)', () => {
     let peak = 0;
     for (let t = 0; t < 40; t += 0.5) each(1, (s) => { peak = Math.max(peak, s.a); }, t);
-    expect(peak).toBeGreaterThanOrEqual(0.45); expect(peak).toBeLessThanOrEqual(0.6);
+    expect(peak).toBeGreaterThanOrEqual(0.6); expect(peak).toBeLessThanOrEqual(0.8);
   });
   it('ficam nos cantos: afastados da pista (|lat| de 3 a 6,5 m) e ou baixos (h ≤ 1,3 m) ou altos (h ≥ 2,2 m), nunca na linha do horizonte do meio', () => {
     each(1, (s, k) => {
