@@ -193,3 +193,11 @@ jogo reaberto. Aceitar não grava nada aqui (a escolha aceita já fica nas opç�
 saneador delas é lista branca e o campo novo não muda nenhum outro); se ela regravar as opções, o campo cai e a oferta pode aparecer
 mais uma vez — o único efeito. A sequência de eliminações continua só na sessão. Testes: `tests/oferta-assistencia-save.test.ts`
 (opções literais da 0.1.5) e `tests/oferta-assistencia-sessao.test.ts` (a sessão reaberta não oferece de novo).
+
+## Alta em curva (V12)
+
+Campo aditivo `highCurveCamera` (booleano) nas opções (`speed-tche.settings`): liga a câmera Alta candidata da V11 (`CAMERA_HIGH_CURVE`: 3,4 m de altura, recuo 6,8 m, mira 30 m, mesmo FOV)
+em Opções › Acessibilidade › "Alta em curva". **Global** (vale para a Alta de todos os assentos; Baixa, Capô e Frente não mudam), desligado por padrão. Opções sem o campo (todas as de antes)
+abrem com `false`, a Alta aprovada de sempre; lixo no campo vira `false`. A 0.1.7 lê as opções novas sem erro e sem perder nada (o saneador dela é lista branca: o campo novo não muda nenhum outro);
+se ela regravar as opções, o campo cai e a Alta volta à aprovada — o único efeito. Só renderização e opções: nada no núcleo, na rede, em `hashRace` ou `sim-golden`.
+Testes: `tests/camera-curva-opcao.test.ts` (opções literais da 0.1.7, a lista de campos do saneador, a pose, a sessão e a tela).

@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { TICK_RATE } from '../core/constants';
 import { wrappedDelta } from '../core/sim/collisions';
 import type { RenderFrame } from '../game/contracts';
-import { CAMERA_POSES, cameraPoseFor, CHASE_CAMERA, type CameraMode } from './camera-base';
+import { CAMERA_EXPERIMENT, CAMERA_POSES, cameraPoseFor, CHASE_CAMERA, type CameraMode } from './camera-base';
 import type { Shake } from './effects';
 import { frameYAt, type RoadFrame } from './roadframe';
 import {
@@ -38,10 +38,12 @@ export interface CameraExtra {
   /** Os outros carros perto, em metros relativos a este (`dz` positivo = à frente); só os `count` primeiros valem. */
   neighbors: Neighbor[];
   count: number;
+  /** "Alta em curva" (V12): a câmera Alta usa a pose candidata (`CAMERA_HIGH_CURVE`); só a Alta lê isto. */
+  curve: boolean;
 }
 
 export function newCameraExtra(): CameraExtra {
-  return { reduce: false, tremor: false, finishSeconds: -1, crest: 0, neighbors: [], count: 0 };
+  return { reduce: false, tremor: false, finishSeconds: -1, crest: 0, neighbors: [], count: 0, curve: false };
 }
 
 const DEFAULT_EXTRA = newCameraExtra();
@@ -52,6 +54,7 @@ export function cameraExtraFor(frame: RenderFrame, carIndex: number, out: Camera
   const car = state.cars[carIndex];
   out.reduce = frame.options.reduceEffects === true;
   out.tremor = frame.options.screenShake === true && !out.reduce;
+  out.curve = frame.options.highCurveCamera === true || CAMERA_EXPERIMENT.highCurve;
   out.finishSeconds = -1; out.crest = 0; out.count = 0;
   if (!car) return out;
   // Cruzou a linha em 1º: finished + a 1ª posição (os que terminaram vêm antes, por `finishTick`: positions.ts).
@@ -105,7 +108,7 @@ export class ChaseCamera {
     const winning = extra.finishSeconds >= 0 && !extra.reduce;
     const mode: CameraMode = CAMERA_RIGS[chosen].mounted && (eye === null || winning) ? 'high' : chosen;
     const rig = CAMERA_RIGS[mode];
-    const pose = cameraPoseFor(mode);
+    const pose = cameraPoseFor(mode, extra.curve);
     const mountedEye = rig.mounted ? eye : null;
     // Trocou de câmera em movimento: as parcelas de velocidade e de nitro do FOV passam à escala da pose nova (senão o quadro "assenta" por um segundo).
     if (this.lastMode !== mode) {

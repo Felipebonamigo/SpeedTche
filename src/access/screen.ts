@@ -1,5 +1,5 @@
 // Tela de Acessibilidade (Opções › Acessibilidade): cores dos jogadores, tamanho do HUD, legenda dos marcos, texto
-// grande, reduzir efeitos, efeitos de cartum, tremor de tela e a direção assistida de cada assento, com a explicação do item em foco.
+// grande, reduzir efeitos, a Alta em curva (V12), efeitos de cartum, tremor de tela e a direção assistida de cada assento, com a explicação do item em foco.
 // "Efeitos de cartum" (V8, docs/ondas/V8-efeitos.md) entra na coluna Visão, ao lado de "Reduzir efeitos": ela fica com 7 linhas e as amostras de cor,
 // abaixo das 9 da coluna de direção (as colunas das Opções já têm as 10 que cabem).
 // A legenda dos marcos mora aqui, ao lado do tamanho do HUD: as duas colunas das Opções já têm as dez linhas que cabem.
@@ -73,13 +73,18 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
     seatRows.push(item);
     return { item, desc: () => t(`access.desc.camera.${cameraOf(seat)}`) };
   });
+  // "Alta em curva" (V12): a Alta sobe a 3,4 m e recua a 6,8 m (CAMERA_HIGH_CURVE). Global, não por assento: cabe numa linha só (a coluna ganha a 10ª).
+  const highCurve = {
+    item: selector(t('access.options.highCurve'), () => onOff(s.highCurveCamera === true), () => { s.highCurveCamera = !s.highCurveCamera; commit(); }, { sfx }),
+    desc: () => t('access.desc.highCurve'),
+  };
   paint();
 
   const back = button(t('ui.common.back'), () => api.back());
   // 30 fps travados na Média com 3-4 jogadores (L2b): as colunas das Opções já têm as dez linhas que cabem (docs/TELAS.md); aqui a coluna de
   // direção é a mais curta, então a linha entra nela sem crescer a tela.
   const perf = { item: fps30Selector(api, commit), desc: () => t('ui.options.fps30.hint') };
-  const entries = [...vision, ...driving, ...cameras, perf];
+  const entries = [...vision, ...driving, ...cameras, highCurve, perf];
   const list = createFocusList([...entries.map((e) => e.item), back], { sfx });
   const desc = h('p', { class: 'access-desc glass', attrs: { 'aria-live': 'polite' } });
   let shown = '';
@@ -92,7 +97,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
   const el = screenFrame('access', t('access.options.title'),
     h('div', { class: 'options-columns access-columns' },
       h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.vision') }), vision[0].item.el, swatches, vision.slice(1).map((v) => v.item.el)),
-      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), perf.item.el),
+      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), highCurve.item.el, perf.item.el),
     ),
     desc,
     h('div', { class: 'access-actions' }, back.el),

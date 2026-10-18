@@ -41,12 +41,15 @@ export const CAMERA_POSES: Readonly<Record<CameraMode, CameraPose>> = {
  */
 export const CAMERA_HIGH_CURVE: CameraPose = { baseFov: 54, speedFov: 8, nitroFov: 5, height: 3.4, back: 6.8, lookAhead: 30, lookY: 0.5 };
 
-/** Interruptor de experimento (só a câmera de perseguição do `ChaseCamera` lê; a régua dos marcos segue a pose aprovada). Desligado em produção. */
+/** Interruptor de experimento (só a câmera de perseguição do `ChaseCamera` lê; a régua dos marcos segue a pose aprovada). Desligado em produção (a opção "Alta em curva" das Opções não passa por aqui). */
 export const CAMERA_EXPERIMENT = { highCurve: false };
 
-/** A pose que o `ChaseCamera` usa: a de `CAMERA_POSES`, ou a candidata `CAMERA_HIGH_CURVE` na Alta com o interruptor ligado. */
-export function cameraPoseFor(mode: CameraMode): CameraPose {
-  return mode === 'high' && CAMERA_EXPERIMENT.highCurve ? CAMERA_HIGH_CURVE : CAMERA_POSES[mode];
+/**
+ * A pose que o `ChaseCamera` usa: a de `CAMERA_POSES`, ou a candidata `CAMERA_HIGH_CURVE` na Alta quando `curve` (a opção "Alta em curva", V12:
+ * `Settings.highCurveCamera`) ou o interruptor do harness estão ligados. Baixa, Capô e Frente nunca mudam.
+ */
+export function cameraPoseFor(mode: CameraMode, curve: boolean = CAMERA_EXPERIMENT.highCurve): CameraPose {
+  return mode === 'high' && curve ? CAMERA_HIGH_CURVE : CAMERA_POSES[mode];
 }
 
 /** Capô e Frente: a câmera anda com o carro (sem atraso lateral, sem cresta, sem órbita). */

@@ -114,6 +114,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     landmarkCaptions: pickBool(r.landmarkCaptions, d.landmarkCaptions),
     lockFps30: pickBool(r.lockFps30, d.lockFps30),
     seatCameras: pickSeatCameras(r.seatCameras),
+    // Sem o campo (opções de antes da V12) a Alta fica a aprovada: a "Alta em curva" é escolha.
+    highCurveCamera: pickBool(r.highCurveCamera, d.highCurveCamera),
     // Sem o campo (opções de antes da T8) a oferta de assistência continua de pé.
     assistOfferDeclined: pickBool(r.assistOfferDeclined, d.assistOfferDeclined),
     // Sem o campo (save de antes da L2b) fica ausente de propósito: só a 1ª abertura de verdade o grava.

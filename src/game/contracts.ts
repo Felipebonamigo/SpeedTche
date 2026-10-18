@@ -135,6 +135,11 @@ export interface Settings {
   /** A câmera de cada assento (P1..P4): Alta, Baixa, Capô ou Frente. Só renderização e entrada local (nada no núcleo, nada na rede). Campo aditivo: save sem ele abre na Alta. */
   seatCameras: CameraMode[];
   /**
+   * "Alta em curva" (V12, Opções › Acessibilidade): a câmera Alta sobe a 3,4 m e recua a 6,8 m, olhando 30 m à frente (`CAMERA_HIGH_CURVE`, V11): a curva que vem aparece maior e o carro
+   * fica 15% menor. Vale para a Alta de todos os assentos; Baixa, Capô e Frente não mudam. Desligado por padrão; campo aditivo (opções sem ele abrem desligadas; a 0.1.7 o ignora).
+   */
+  highCurveCamera: boolean;
+  /**
    * O jogador recusou ("Seguir assim") a oferta de Freio automático / Amador depois de 2 eliminações (O3, `game/assist-offer.ts`):
    * ela não volta mais, nem com o jogo reaberto (T8). Campo aditivo: opções sem ele abrem com a oferta de pé; a 0.1.4/0.1.5 o ignoram.
    */
@@ -153,7 +158,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   ghost: true,
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
   landmarkCaptions: true, lockFps30: false, cartoonEffects: false,
-  seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[],
+  seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[], highCurveCamera: false,
   assistOfferDeclined: false,
 });
 
@@ -263,6 +268,8 @@ export interface RenderOptions {
   palette: ColorPalette;
   /** Legenda dos marcos turísticos (src/render/caption/); ausente = ligada. O modo Retrô não tem marcos nem legenda. */
   landmarkCaptions?: boolean;
+  /** "Alta em curva" (V12): a Alta usa `CAMERA_HIGH_CURVE`; ausente = a Alta aprovada. */
+  highCurveCamera?: boolean;
 }
 
 /** Cores de um carro na pista quando o jogador o pintou (src/game/paints.ts): carroceria e segunda cor. */
