@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.5, build de 15/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.6, build de 18/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,22 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.6 (sobre a 0.1.5):
+  * 12 CARROS NACIONAIS NOVOS, inspirados nos que todo brasileiro conhece (sem marca nem logo): Cuiabano e Tupiniquim (livres),
+    Jabuti, Caipora, Lambari, Besouro, Pampeiro, Barão, Pão de Forma e Trilheiro (à venda na Expedição), e dois por conquista:
+    Furgãozinho da Firma ("Hora de entrega": 10 vitórias sem comprar carro; tem escada no teto que balança) e Gaúcho V8
+    ("Cavalo de aço": Maestria 3 com o Trovão V12). Os carros novos ainda NÃO aparecem como rivais da IA.
+  * CARROS MAIS BEM DESENHADOS: o Falcão GT e os outros 10 estilos foram refeitos (vidro escuro, lanternas embutidas, faixas, roda com
+    aro fundo, tinta que mantém a cor, sombra embaixo do carro). Digam o que acharam de cada um.
+  * HUD NOVO, sem caixas: posição, volta, tempo e velocímetro grandes, em itálico, no estilo do menu novo.
+  * EFEITOS MAIS REALISTAS: a batida solta faíscas de metal em vez do "POW!" (o "POW!" volta em Acessibilidade › Efeitos de cartum).
+  * PISTAS COM ACABAMENTO: asfalto com textura (pedrisco, trilhas, remendos) e cinza de dia (não mais azul-marinho à sombra), faixas
+    mais nítidas, nuvens pintadas, prédios variados e mar mais vivo.
+  * PROGRESSO QUE FICA: nível de piloto (1–30) e maestria por carro, títulos e molduras, 12 conquistas novas, carro trancado no lobby.
+  * MARCOS: o traçado novo escondia pontes e monumentos em várias pistas; 38 pistas mudaram de enquadramento e seus recordes e
+    fantasmas aparecem como "versão anterior" (o save abre normal).
+  * GARAGEM e PÓDIO mostram o acabamento, as rodas e a faixa que você escolheu; o lobby mostra o carro em 3D.
+  * Dicas da primeira corrida na Copacabana corrigidas; recusar a oferta de assistência fica gravado.
 - NOVIDADES DA 0.1.5 (sobre a 0.1.4):
   * MENU NOVO, mais moderno, com o logo novo do Speed Tchê. O detalhe da Copa África do Sul agora cabe no Steam Deck.
   * 4 CÂMERAS: Alta (padrão, mais alta e mais aberta, para ver os pontos turísticos), Baixa, Capô e Frente.

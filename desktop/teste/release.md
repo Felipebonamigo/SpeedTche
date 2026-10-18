@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.5 — versão de teste para amigos** (build de 15/10/2026)
+**Speed Tchê 0.1.6 — versão de teste para amigos** (build de 18/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.5-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.5-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.6-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.6-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.6: **12 carros nacionais** inspirados nos que todo brasileiro conhece (sem marca nem logo; dois só por conquista, um deles com escada no teto); **carros redesenhados** (GT e os 10 outros estilos); **HUD sem caixas**; **batida realista** (faíscas no lugar do "POW!"; o "POW!" volta nas opções); **pistas com acabamento** e asfalto cinza de dia; **nível de piloto e maestria por carro** com 12 conquistas novas; **marcos de volta** nas curvas novas (38 pistas mudam de versão: recordes antigos aparecem como "versão anterior"); garagem, pódio e lobby mostram o visual escolhido.
 
 Novidades da 0.1.5: **menu novo** com o logo novo; **4 câmeras** (Alta, Baixa, Capô e Frente — tecla **C**, **V** ou **Select/Back** no controle); **cor e brilho** sem clarão nem véu rosado, faróis presos ao carro, lanternas vermelhas, pintura com verniz e **chama do nitro de fogo**; corrigido o **vazamento de memória** depois de várias largadas com 3–4 jogadores; Copa África do Sul cabe no Steam Deck. No controle, o nitro é **LB/Y**, as marchas no **D-pad ↑/↓** e derrapar no **RB** (o LEIA-ME antigo estava errado).
 
