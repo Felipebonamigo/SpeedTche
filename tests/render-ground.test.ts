@@ -101,13 +101,13 @@ describe('terreno', () => {
     for (let c = 1; c < COLS.length; c++) expect(COLS[c]).toBeGreaterThan(COLS[c - 1]);
   });
 
-  it('relevo zero até 10,8 m da pista e em 26 m, e uma lombada suave entre os dois (0 a 1,1 m; V11: era zero até 26 m); o cenário pousa nela pela mesma conta (scenery.test)', () => {
+  it('relevo zero até 10,8 m da pista e em 26 m, e uma lombada suave entre os dois (0 a 2 m; V11: era zero até 26 m); o cenário pousa nela pela mesma conta (scenery.test)', () => {
     // Um expect só no fim: milhares de expects por valor estouravam o tempo com a máquina carregada.
     const bad: string[] = [];
     for (const sc of SCENERIES) for (let seg = 0; seg < 2000; seg += 17) for (const side of [-1, 1]) {
       for (const dist of COLS) {
         const h = relief(sc, seg, dist, side);
-        if (((dist <= 10.8 || dist === 26) && h !== 0) || (dist > 10.8 && dist < 26 && h > 1.1) || !Number.isFinite(h) || h < 0 || h >= 80) bad.push(`${sc} seg ${seg} ${dist} m: ${h}`);
+        if (((dist <= 10.8 || dist === 26) && h !== 0) || (dist > 10.8 && dist < 26 && h > 2) || !Number.isFinite(h) || h < 0 || h >= 80) bad.push(`${sc} seg ${seg} ${dist} m: ${h}`);
       }
     }
     expect(bad).toEqual([]);

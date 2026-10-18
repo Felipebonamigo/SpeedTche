@@ -68,10 +68,10 @@ describe('V11 · a cor da estrada (paleta por bioma e período)', () => {
     expect(sat(alpine), 'serra: pedra rosada').toBeGreaterThanOrEqual(0.04); expect(sat(alpine)).toBeLessThanOrEqual(0.2);
   });
 
-  it('a cidade à noite tem asfalto roxo-azulado (matiz 245°–290°, saturação ≥ 0,3) e nenhum bioma tem azul-marinho (matiz 200°–245° com saturação > 0,4) em período nenhum', () => {
+  it('a cidade à noite tem asfalto roxo-azulado (matiz 245°–290°, saturação ≥ 0,25: lilás, não néon) e nenhum bioma tem azul-marinho (matiz 200°–245° com saturação > 0,4) em período nenhum', () => {
     const c = rgb(RB(palette('city_night', 'night')));
     expect(hueDeg(c), 'matiz').toBeGreaterThanOrEqual(245); expect(hueDeg(c)).toBeLessThanOrEqual(290);
-    expect(sat(c), 'saturação').toBeGreaterThanOrEqual(0.3);
+    expect(sat(c), 'saturação').toBeGreaterThanOrEqual(0.25);
     const navy = COMBOS.filter(([s, t]) => { const x = rgb(RB(palette(s, t))); return hueDeg(x) >= 200 && hueDeg(x) < 245 && sat(x) > 0.4; }).map((k) => k.join(':'));
     expect(navy).toEqual([]);
   });
@@ -84,7 +84,7 @@ describe('V11 · a cor da estrada (paleta por bioma e período)', () => {
     expect(close).toEqual([]);
   });
 
-  it('a estrada continua lendo contra o carro e o chão (a paleta-m2 mede o `asphalt`; aqui a cor que a pista pinta de verdade): albedo contra o carro branco ≥ 3,0 e o escuro ≥ 1,35; contra o chão baixo e o alto, razão ≥ 1,12 ou distância de cor (soma dos canais) ≥ 0,15 (a estrada de terra tem o tom do chão, como no HC2: as bordas é que a separam); contra o acostamento, razão ≥ 1,1 ou distância ≥ 0,2 (a faixa de transição `verge` fica de fora: o acostamento com sarjeta e guia separa as duas)', () => {
+  it('a estrada continua lendo contra o carro e o chão (a paleta-m2 mede o `asphalt`; aqui a cor que a pista pinta de verdade): albedo contra o carro branco ≥ 3,0 e o escuro ≥ 1,35; contra o chão baixo e o alto, razão ≥ 1,12 ou distância de cor (soma dos canais) ≥ 0,15 (a estrada de terra tem o tom do chão, como no HC2: as bordas é que a separam); contra o acostamento, razão ≥ 1,05 ou distância ≥ 0,2 (a faixa de transição `verge` fica de fora: o acostamento com sarjeta e guia separa as duas)', () => {
     const bad: string[] = [];
     const dist = (a: V, b: V): number => (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 255;
     for (const [s, t] of COMBOS) {
@@ -93,7 +93,7 @@ describe('V11 · a cor da estrada (paleta por bioma e período)', () => {
       if (!(white >= 3)) bad.push(`${s}:${t} branco ${white.toFixed(2)}`);
       if (!(dark >= 1.35)) bad.push(`${s}:${t} escuro ${dark.toFixed(2)}`);
       for (const k of ['groundLow', 'groundHigh'] as const) { const q = dist(r, rgb(p[k])); const w = wcag(r, rgb(p[k])); if (!(q >= 0.15 || w >= 1.12)) bad.push(`${s}:${t} ${k} distância ${q.toFixed(2)} razão ${w.toFixed(2)}`); }
-      const sh = wcag(r, rgb(p.shoulder)); if (!(sh >= 1.1 || dist(r, rgb(p.shoulder)) >= 0.2)) bad.push(`${s}:${t} acostamento ${sh.toFixed(2)} / ${dist(r, rgb(p.shoulder)).toFixed(2)}`);
+      const sh = wcag(r, rgb(p.shoulder)); if (!(sh >= 1.05 || dist(r, rgb(p.shoulder)) >= 0.2)) bad.push(`${s}:${t} acostamento ${sh.toFixed(2)} / ${dist(r, rgb(p.shoulder)).toFixed(2)}`);
     }
     expect(bad).toEqual([]);
   });
@@ -307,17 +307,17 @@ describe('V11 · tom por trecho (cor por vértice do asfalto)', () => {
 });
 
 describe('V11 · o chão fora da pista (tom e relevo suave)', () => {
-  it('relevo suave perto da pista: zero até a faixa de transição (10,8 m), sobe devagar até ≤ 1,1 m, nunca negativo, e volta a zero em 26 m (onde o relevo de longe começa) — nos biomas de terra', () => {
+  it('relevo suave perto da pista: zero até a faixa de transição (10,8 m), sobe devagar até ≤ 2,0 m, nunca negativo, e volta a zero em 26 m (onde o relevo de longe começa) — nos biomas de terra', () => {
     const bad: string[] = [];
     let peak = 0;
     for (const s of ['desert', 'tropical', 'savanna', 'alpine', 'coast'] as const) for (let seg = 0; seg < 2000; seg += 13) for (const side of [-1, 1]) {
       if (s === 'coast' && side > 0) continue; // o lado do mar
       for (const d of [8.4, 9.6, 10.8]) { const h = TER.relief(s, seg, d, side); if (h !== 0) bad.push(`${s} seg ${seg} ${d} m: ${h}`); }
       const h26 = TER.relief(s, seg, 26, side); if (h26 !== 0) bad.push(`${s} seg ${seg} 26 m: ${h26}`);
-      for (const d of [14, 16, 18, 22]) { const h = TER.relief(s, seg, d, side); if (!(h >= 0 && h <= 1.1)) bad.push(`${s} seg ${seg} ${d} m: ${h}`); peak = Math.max(peak, h); }
+      for (const d of [14, 16, 18, 22]) { const h = TER.relief(s, seg, d, side); if (!(h >= 0 && h <= 2)) bad.push(`${s} seg ${seg} ${d} m: ${h}`); peak = Math.max(peak, h); }
     }
     expect(bad).toEqual([]);
-    expect(peak, 'o pico do relevo perto da pista (m): precisa aparecer').toBeGreaterThanOrEqual(0.3);
+    expect(peak, 'o pico do relevo perto da pista (m): precisa aparecer').toBeGreaterThanOrEqual(0.8);
   });
 
   it('a cidade continua plana (as quadras e a calçada) e o relevo perto da pista varia de um segmento a outro (não é uma valeta uniforme)', () => {

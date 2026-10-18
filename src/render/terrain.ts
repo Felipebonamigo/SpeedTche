@@ -63,7 +63,7 @@ function smooth01(e0: number, e1: number, x: number): number {
 }
 
 /** V11: altura (m) da lombada que corre ao lado da pista, por bioma (a cidade é calçada e quadra: plana). */
-const NEAR_AMP: Record<SceneryId, number> = { desert: 1.0, tropical: 0.7, savanna: 0.5, alpine: 0.6, coast: 0.45, city_night: 0 };
+const NEAR_AMP: Record<SceneryId, number> = { desert: 1.8, tropical: 1.3, savanna: 1.0, alpine: 1.2, coast: 0.8, city_night: 0 };
 /** V11: onde a lombada começa (a coluna da faixa de transição, a que o acostamento já alcançou) e onde termina (FLAT_M: o relevo de longe começa em zero ali). */
 const NEAR_FROM = 10.8;
 
@@ -724,6 +724,8 @@ export class Terrain {
     // V11: o tom do chão por vértice (faixas claras e escuras do bioma, não um plano liso) e a transição suave da faixa de terra até o chão (coluna 2).
     const tone = groundTone(b, seg, col, side);
     ground.lerp(tone > 0.5 ? gc.low : gc.high, Math.abs(tone - 0.5) * 1.4);
+    // Manchas de terra à mostra (a rocha vermelha no deserto e na costa/serra, a terra do `verge` na mata e na savana) onde o tom passa de 0,8.
+    ground.lerp(b === 'desert' || b === 'alpine' || b === 'coast' ? gc.rock : gc.verge, 0.3 * smooth01(0.78, 1, tone));
     if (col === 2) ground.lerp(gc.verge, 0.38 * (1 - smooth01(0.3, 0.8, patch)));
     // Encosta íngreme: rocha (vermelha no deserto, azulada na montanha).
     ground.lerp(gc.rock, smooth01(0.42, 0.95, slope) * (b === 'tropical' ? 0.55 : 0.9));

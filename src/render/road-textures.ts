@@ -158,16 +158,16 @@ let asphaltCache: AsphaltStructure | null = null;
 export const GUTTER = { fromM: 6.62, toM: 6.76, dark: 0.6 } as const;
 
 /**
- * Rachaduras da terra (V11): células de Voronoi de ~1,75 × 2,4 m (um ponto sorteado por célula, periódico ao longo): a borda entre duas células (F2 − F1 pequeno)
+ * Rachaduras da terra (V11): células de Voronoi de ~2,1 × 3 m (um ponto sorteado por célula, periódico ao longo): a borda entre duas células (F2 − F1 pequeno)
  * é a rachadura. Devolve 0..255 por pixel (255 = no meio da rachadura); só a terra (`roadEarth`) usa.
  */
 function crackNet(W: number, H: number, pu: number, pv: number): Uint8Array {
-  const CW = 1.75; const CL = 2.4;
+  const CW = 2.1; const CL = 3;
   const nx = Math.ceil((ROAD_HALF_WIDTH_M * 2) / CW); const ny = Math.round(ASPHALT_REPEAT_M / CL);
   const pts = new Float32Array(nx * ny * 2);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { pts[(j * nx + i) * 2] = (i + 0.15 + 0.7 * hash2(i * 17 + 3, j * 31 + 5)) * CW; pts[(j * nx + i) * 2 + 1] = (j + 0.15 + 0.7 * hash2(i * 13 + 7, j * 29 + 11)) * (ASPHALT_REPEAT_M / ny); }
   const out = new Uint8Array(W * H);
-  const cellL = ASPHALT_REPEAT_M / ny; const W2 = 0.045;
+  const cellL = ASPHALT_REPEAT_M / ny; const W2 = 0.035;
   for (let y = 0; y < H; y++) {
     const my = (y + 0.5) / pv; const cj = Math.floor(my / cellL);
     for (let x = 0; x < W; x++) {
@@ -308,11 +308,11 @@ export function asphaltImage(p: Palette): RoadImage {
   const amp = 0.55 + 0.45 * earth; // quanto da segunda tinta aparece (o asfalto varia menos que a terra)
   const sg = Math.min(220, ((0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0) * 1.75));
   const [lr, lg, lb] = hexToRgb(mix(p.lane, p.roadBase, 0.08));
-  const crackK = 0.42 * earth; // a terra racha; o asfalto não (as trincas dele são as do desgaste)
+  const crackK = 0.4 * earth; // a terra racha; o asfalto não (as trincas dele são as do desgaste); mais onde a mancha é da segunda tinta (terra seca)
   const data = new Uint8Array(W * H * 4);
   for (let i = 0; i < W * H; i++) {
     const m = mark[i] / 255; const t = (tone[i] / 255) * amp; const s = stone[i] / 255;
-    const kk = k[i] * (1 - crackK * (crack[i] / 255));
+    const kk = k[i] * (1 - crackK * (0.5 + 0.5 * (tone[i] / 255)) * (crack[i] / 255));
     let r = (r0 + (ra - r0) * t) * kk; let g = (g0 + (ga - g0) * t) * kk; let b = (b0 + (ba - b0) * t) * kk;
     r += (sg * kk - r) * s; g += (sg * kk - g) * s; b += (sg * 0.97 * kk - b) * s;
     r += (lr - r) * m; g += (lg - g) * m; b += (lb - b) * m;

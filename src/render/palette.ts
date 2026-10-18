@@ -222,9 +222,9 @@ const BASES: Record<SceneryId, Base> = {
 const ROAD_TONE: Record<SceneryId, { day: string; dusk: string; night: string; alt: string; earth: number }> = {
   tropical: { day: '#82483c', dusk: '#b0644e', night: '#905a58', alt: '#f08038', earth: 0.9 }, // terra avermelhada da mata
   desert: { day: '#885a40', dusk: '#b8806c', night: '#986a70', alt: '#ffa860', earth: 1 }, // terra alaranjada
-  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#7c68b0', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo-azulado
+  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#8a78a8', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo-azulado
   alpine: { day: '#7c6672', dusk: '#947690', night: '#7c6aa0', alt: '#f0d8e0', earth: 0.3 }, // pedra rosada
-  coast: { day: '#6c6a68', dusk: '#8c7878', night: '#847888', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente
+  coast: { day: '#6c6a68', dusk: '#a08078', night: '#847888', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente
   savanna: { day: '#80684a', dusk: '#b08064', night: '#946a58', alt: '#ffc868', earth: 0.85 }, // terra ocre
 };
 
