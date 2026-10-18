@@ -308,6 +308,41 @@ function shoot(quality: Quality, frames: number, probes: Probe[]): ProbeStat[] {
   });
 }
 
+/** Medida de uma região da tela (fração 0..1 do quadro, y de cima para baixo): saturação HSV média, luma, contraste (p95 − p5 da luma), calor (R − B). */
+export interface RegionStat { sat: number; luma: number; p5: number; p95: number; contrast: number; warm: number; dark: number; bright: number }
+/**
+ * V10 (HC2): desenha `frames` quadros sem andar a corrida e mede regiões FRACIONÁRIAS da imagem final (o quadro todo, o céu, a beira da pista...). Sem sonda em
+ * metros: serve para a gradação (saturação e contraste por cena) e para contar pixels de efeito (`bright` = fração de pixels com luma > 0,85).
+ */
+function regions(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>): RegionStat[] {
+  if (!current) throw new Error('lab.setup primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  return boxes.map(([fx0, fy0, fx1, fy1]) => {
+    const x0 = Math.max(0, Math.floor(fx0 * W)); const x1 = Math.min(W, Math.ceil(fx1 * W));
+    const y0 = Math.max(0, Math.floor(fy0 * H)); const y1 = Math.min(H, Math.ceil(fy1 * H));
+    const hist = new Uint32Array(256);
+    let n = 0; let sat = 0; let luma = 0; let warm = 0; let dark = 0; let bright = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4;
+      const r = buf[i]; const g = buf[i + 1]; const b = buf[i + 2];
+      const mx = Math.max(r, g, b); const mn = Math.min(r, g, b);
+      const l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      sat += mx === 0 ? 0 : (mx - mn) / mx; luma += l; warm += (r - b) / 255; n++;
+      hist[Math.round(l * 255)]++;
+      if (l < 0.12) dark++;
+      if (l > 0.85) bright++;
+    }
+    const k = Math.max(1, n);
+    const pct = (q: number): number => { let acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= q * k) return v / 255; } return 1; };
+    const p5 = pct(0.05); const p95 = pct(0.95);
+    return { sat: sat / k, luma: luma / k, p5, p95, contrast: p95 - p5, warm: warm / k, dark: dark / k, bright: bright / k };
+  });
+}
+
 /**
  * O teto do bloom, isolado: um quadrado de `px` px com emissão HDR `hdr` no centro de uma cena preta, pelo MESMO pipeline da Alta com o bloom
  * `bloom` (força, raio, limiar), e quanta luz vaza para FORA dele (soma da luma 0..1 dos pixels a 3 px da borda em diante).
@@ -401,7 +436,7 @@ function flameDiff(quality: Quality, frames: number, box: Box, mouth?: Box): Fla
 }
 
 const lab = {
-  freeze, headlights, shoot, bloomHalo, nitro, flameDiff,
+  freeze, headlights, shoot, regions, bloomHalo, nitro, flameDiff,
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
