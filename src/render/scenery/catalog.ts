@@ -3,7 +3,7 @@
 // Puro (sem DOM): o layout e os testes usam; scenery.ts só instancia.
 import type { SceneryId, SpriteKind, TrackDef } from '../../core/types';
 import { hash2 } from '../noise';
-import { bandPoints, type Model } from './geom';
+import { bandPoints, volumeLook, type Model } from './geom';
 import { LANDMARKS } from './landmarks';
 import { onLandmarkPartsChange } from './landmarks/parts';
 import type { LandmarkDef } from './landmarks/types';
@@ -151,6 +151,26 @@ export function landmarkOf(modelId: string): LandmarkDef | undefined {
   return Object.prototype.hasOwnProperty.call(LANDMARKS, key) ? LANDMARKS[key] : undefined;
 }
 
+/**
+ * V10 (HC2): quanto cada família ganha de gradiente vertical (`base` no pé, `top` no alto; `geom.volumeLook`). Rochas e mesas
+ * levam o mais forte (chapadas, eram as mais lisas), arbustos quase o mesmo, árvores e cactos menos (a copa já tinha `shadeY` de 0,84 a 1,1). O resto (prédios,
+ * cerca, objetos de pista, capim de cartão, as sebes) fica como estava.
+ */
+const VOLUME: Array<{ pick: RegExp; base: number; top: number }> = [
+  { pick: /^(rock:|mesa:|stack:|searock:|far:(rock|boulder))/, base: 0.62, top: 1.26 },
+  { pick: /^bush:(?!hedge)/, base: 0.66, top: 1.24 },
+  { pick: /^(tree:|pine:|palm:|cactus:|far:(round|cone|palm|poplar|flat|saguaro|mandacaru))/, base: 0.7, top: 1.22 },
+];
+
+function volumeModel(id: string, model: Model): Model {
+  const v = VOLUME.find((e) => e.pick.test(id));
+  if (!v) return model;
+  let ymin = Infinity; let ymax = -Infinity;
+  for (const p of model.parts) { const a = p.geometry.attributes.position; for (let i = 0; i < a.count; i++) { ymin = Math.min(ymin, a.getY(i)); ymax = Math.max(ymax, a.getY(i)); } }
+  for (const p of model.parts) if (p.mat === 'flat') volumeLook(p.geometry, ymin, ymax, v.base, v.top);
+  return model;
+}
+
 /** Modelo pelo id (montado na primeira vez; o chamador não libera: o cache vive o jogo inteiro). */
 export function getModel(id: string): Model {
   let m = cache.get(id);
@@ -160,7 +180,7 @@ export function getModel(id: string): Model {
   if (file) { m = smoothModel(id, file); cache.set(id, m); return m; } // o arquivo convertido também (bicho, estátua)
   const b = BUILDERS[id] ?? dynamicBuilder(id) ?? (lm ? lm.build : undefined);
   if (!b) throw new Error(`modelo desconhecido: ${id}`);
-  m = smoothModel(id, b()); // normal suave com o vinco da família (smooth.ts), uma vez por modelo
+  m = volumeModel(id, smoothModel(id, b())); // normal suave com o vinco da família (smooth.ts) e o volume pintado (V10), uma vez por modelo
   cache.set(id, m);
   return m;
 }
@@ -492,7 +512,7 @@ function towerId(biome: SceneryId, region: Region, variant: number): { id: strin
 /** O visual de um sprite do núcleo neste bioma/país. */
 export function spriteVisual(kind: SpriteKind, variant: number, scale: number, def: TrackDef): SpriteVisual {
   const biome = def.scenery; const region = regionOf(def);
-  const round = (id: string, yaw = Math.PI, hj = 0.18): SpriteVisual => ({ models: [{ id }], mode: 'round', yawJitter: yaw, heightJitter: hj });
+  const round = (id: string, yaw = Math.PI, hj = 0.24): SpriteVisual => ({ models: [{ id }], mode: 'round', yawJitter: yaw, heightJitter: hj });
   switch (kind) {
     case 'tree': { const t = TREES[biome]; return round(pickV(t[region] ?? t._, variant)); }
     case 'pine': return round(pickV(PINES[region] ?? PINES._, variant));
@@ -500,10 +520,10 @@ export function spriteVisual(kind: SpriteKind, variant: number, scale: number, d
     case 'cactus': {
       const id = pickV(CACTI[region] ?? CACTI._, variant);
       // Saguaro e palma têm braços em X: giro pequeno, para a largura na pista continuar a de colisão.
-      return round(id, id.startsWith('cactus:saguaro') || id === 'cactus:pear' ? 0.3 : Math.PI, 0.15);
+      return round(id, id.startsWith('cactus:saguaro') || id === 'cactus:pear' ? 0.3 : Math.PI, 0.22);
     }
-    case 'bush': return round(pickV(BUSHES[biome], variant), BUSHES[biome][0] === 'bush:hedge' ? 0 : Math.PI, 0.25);
-    case 'boulder': return round(pickV(rockIds(biome, region), variant), Math.PI, 0.12);
+    case 'bush': return round(pickV(BUSHES[biome], variant), BUSHES[biome][0] === 'bush:hedge' ? 0 : Math.PI, 0.4);
+    case 'boulder': return round(pickV(rockIds(biome, region), variant), Math.PI, 0.3);
     case 'building': return { models: [{ id: buildingId(biome, region, def.id, variant, scale) }], mode: 'building', yawJitter: 0, heightJitter: 0, uniform: true };
     case 'tower': {
       const t = towerId(biome, region, variant);

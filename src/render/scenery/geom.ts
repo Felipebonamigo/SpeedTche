@@ -219,6 +219,25 @@ export function tintUp(geo: Geo, color: THREE.ColorRepresentation, threshold: nu
   return geo;
 }
 
+/**
+ * V10 (HC2): o volume pintado — gradiente vertical, por vértice. A cor de cada vértice é multiplicada por `base` no pé do modelo e `top` no alto (curva
+ * suave pela altura do modelo inteiro). Só a POSIÇÃO decide (a normal não: dois vértices no mesmo ponto de faces vizinhas, na aresta lisa, têm de ficar da mesma
+ * cor — `tests/scenery-forma.test.ts`); a luz de borda no contorno é do shader (`stylize.ts`, família `scenery`). Sem geometria, textura nem material novos. Uma vez por modelo.
+ */
+export function volumeLook(geo: Geo, ymin: number, ymax: number, base: number, top: number): Geo {
+  const p = geo.attributes.position as THREE.BufferAttribute;
+  const c = geo.attributes.color as THREE.BufferAttribute | undefined;
+  if (!c) return geo;
+  const span = Math.max(1e-6, ymax - ymin);
+  for (let i = 0; i < p.count; i++) {
+    const t = Math.max(0, Math.min(1, (p.getY(i) - ymin) / span));
+    const k = base + (top - base) * (t * t * (3 - 2 * t));
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k);
+  }
+  c.needsUpdate = true;
+  return geo;
+}
+
 /** Varia o tom de cada face (±amount) por hash: dá textura às copas e pedras sem textura. */
 export function speckle(geo: Geo, amount: number, seed: number): Geo {
   const c = geo.attributes.color as THREE.BufferAttribute;
