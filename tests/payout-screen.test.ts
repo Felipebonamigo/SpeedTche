@@ -176,12 +176,12 @@ describe('Pagamento: o número conta (T2)', () => {
     expect(text(buy(r))).toContain('Já dá para:');
     expect(text(buy(r))).toContain(`${t('career.garage.part.engine')} nível 1`);
     // Quem já podia comprar tudo antes não ganha a linha.
-    const rich = rig({ kind: 'solo', money: 5000, positions: { 0: 3 } });
+    const rich = rig({ kind: 'solo', money: 3000, positions: { 0: 3 } }); // abaixo do carro mais barato à venda (Jabuti, 7.000) mesmo com o 3º lugar
     run(rich, POST_STEP_SECONDS.payout + 1);
     expect(buy(rich).classList.contains('on')).toBe(false);
   });
   it('um carro à venda cruzado aparece pelo nome do carro', () => {
-    const r = rig({ kind: 'solo', money: 7000, positions: { 0: 1 } });
+    const r = rig({ kind: 'solo', money: 6500, positions: { 0: 1 } }); // + 6.000 do 1º = 12.500: o mais caro cruzado é o Curupira (12.000), abaixo do Pampeiro (13.000)
     run(r, POST_STEP_SECONDS.payout + 1);
     expect(buy(r).classList.contains('on')).toBe(true);
     expect(text(buy(r))).toContain(CARS.find((c) => c.id === 'curupira')?.name ?? '?');
