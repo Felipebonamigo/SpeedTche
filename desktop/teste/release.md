@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.7 — versão de teste para amigos** (build de 19/10/2026)
+**Speed Tchê 0.1.8 — versão de teste para amigos** (build de 20/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.7-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.7-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.8-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.8-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.8: **noite mais roxa** (céu, névoa, chão e cenário violeta; o carro continua com a mesma luz) e a opção **"Alta em curva"** em Opções › Acessibilidade (câmera Alta mais baixa e afastada que mostra mais curva; vem desligada).
 
 Novidades da 0.1.7: **estrada com a cor do lugar** (terra no deserto, asfalto lilás à noite na cidade, cinza-quente na praia) com guia e bordas marcadas; **cenário mais quente e colorido**; **velocidade com energia** (riscos largos nos cantos, jatos de fogo e poeira maior; "Reduzir efeitos" deixa suave).
 
