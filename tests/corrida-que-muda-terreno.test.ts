@@ -40,7 +40,13 @@ describe('M6 (b): o chão ao vivo', () => {
       live.setLive(mid);
       expect(mid.t).toBeGreaterThan(0.2); expect(mid.t).toBeLessThan(0.8);
       const ref = new Terrain(200); ref.setTrack(tr, mid.p, `${id}:mid`);
-      close(colorsOf(live, tr), colorsOf(ref, tr), 0.02); // a paleta interpolada tem cores de 8 bits (hex): o resto é o arredondamento
+      // Exato: a mistura é a linear das duas pontas (a conta do shader/vértice, em espaço linear), medida em ≤ 3e-8 nos três pares.
+      const pa = colorsOf(staticTerrain(tr, sc, from, `${id}:pa`), tr); const pb = colorsOf(staticTerrain(tr, sc, to, `${id}:pb`), tr);
+      const lin = pa.map((x, s) => Float32Array.from(x, (v, i) => v + (pb[s][i] - v) * mid.t));
+      close(colorsOf(live, tr), lin, 1e-5);
+      // A paleta interpolada (hex em sRGB, a de referência) difere por GAMA, não por arredondamento: a mistura de duas cores em sRGB não é a em linear, e a diferença cresce com a
+      // distância das pontas. V12: dusk → night de Sampa (verde → roxo) deu 0,035 (os outros pares, 0,002 e 0,006); a ponta de baixo continua cobrando que ela exista e fique perto.
+      close(colorsOf(live, tr), colorsOf(ref, tr), 0.04);
     }
   }, 60000);
 

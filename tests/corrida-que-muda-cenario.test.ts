@@ -14,12 +14,12 @@ describe('M6 (b): o cenário ao vivo', () => {
 
   it('nas três luzes do período dá os valores que o cenário usa hoje (dia · entardecer · noite)', () => {
     const day = sceneryLook(1); const dusk = sceneryLook(0.7); const night = sceneryLook(0.32);
-    expect(day.tint).toBe('#ffffff'); expect(dusk.tint).toBe(mix('#ffffff', '#5a2e4a', 0.22)); expect(night.tint).toBe(mix('#ffffff', '#0a1030', 0.42));
+    expect(day.tint).toBe('#ffffff'); expect(dusk.tint).toBe(mix('#ffffff', '#5a2e4a', 0.22)); expect(night.tint).toBe(mix('#ffffff', '#3a0a60', 0.5)); // V12: a noite do cenário é roxa (era mix com #0a1030, 0,42, azul-marinho)
     expect([day.lit, dusk.lit, night.lit]).toEqual([0, 0.6, 1].map((v) => expect.closeTo(v, 12)));
     expect([day.panel, dusk.panel, night.panel]).toEqual([0.3, 0.6, 0.6].map((v) => expect.closeTo(v, 12)));
     expect([day.glow, dusk.glow, night.glow]).toEqual([0.95, 1.4, 2.0].map((v) => expect.closeTo(v, 12)));
     expect([day.cones, dusk.cones, night.cones]).toEqual([0, 0, 1].map((v) => expect.closeTo(v, 12)));
-    expect([day.blob, dusk.blob, night.blob]).toEqual(['#1c2a5a', '#2c1a48', '#050818']);
+    expect([day.blob, dusk.blob, night.blob]).toEqual(['#1c2a5a', '#2c1a48', '#12051e']); // V12: a mancha de sombra da noite é roxo-escura (era #050818)
     expect([day.blobOpacity, dusk.blobOpacity, night.blobOpacity]).toEqual([0.32, 0.32, 0.4].map((v) => expect.closeTo(v, 12)));
   });
 
@@ -48,7 +48,7 @@ describe('M6 (b): o cenário ao vivo', () => {
     expect(g.panelMat.emissiveIntensity).toBeCloseTo(0.6, 12);
     expect(g.glowMat.color.r).toBeCloseTo(2.0, 12);
     expect(g.blobMat.opacity).toBeCloseTo(0.4, 12);
-    expect(g.flatMat.color.getHexString()).toBe(new THREE.Color(mix('#ffffff', '#0a1030', 0.42)).getHexString());
+    expect(g.flatMat.color.getHexString()).toBe(new THREE.Color(sceneryLook(0.32).tint).getHexString());
     expect(g.materials.cone.opacity).toBeCloseTo(0.035, 12);
     s.setLive(livePalette('city_night', 'dusk', 3, 0).p);
     expect(g.facadeMats[0].emissiveIntensity).toBeCloseTo(0.6 * 1.25, 12);
