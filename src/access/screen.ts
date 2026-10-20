@@ -11,7 +11,7 @@ import { HUD_SCALE_MAX, HUD_SCALE_MIN } from '../game/settings';
 import { CAMERA_MODES, DEFAULT_CAMERA_MODE, pickCameraMode } from '../render/camera-base';
 import { t } from '../i18n';
 import { button, createFocusList, h, listNav, onOff, screenFrame, selector, type FocusItem, type ScreenApi, type ScreenInstance, type Selector } from '../ui/screens/common';
-import { commitSettings, fps30Selector, percent } from '../ui/screens/options';
+import { commitSettings, fps30Selector, heroCarsSelector, percent } from '../ui/screens/options';
 import '../render/caption/strings';
 import './access.css';
 import './strings';
@@ -85,7 +85,9 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
   // 30 fps travados na Média com 3-4 jogadores (L2b): as colunas das Opções já têm as dez linhas que cabem (docs/TELAS.md); aqui a coluna de
   // direção é a mais curta, então a linha entra nela sem crescer a tela.
   const perf = { item: fps30Selector(api, commit), desc: () => t('ui.options.fps30.hint') };
-  const entries = [...vision, ...driving, ...cameras, perf];
+  // Carros em alta definição (V9): a mesma razão — a linha entra na coluna de direção, abaixo do 30 fps (ela passa a ter 10 linhas, as que cabem).
+  const hero = { item: heroCarsSelector(api, commit), desc: () => t('ui.options.heroCars.hint') };
+  const entries = [...vision, ...driving, ...cameras, perf, hero];
   const list = createFocusList([...entries.map((e) => e.item), back], { sfx });
   const desc = h('p', { class: 'access-desc glass', attrs: { 'aria-live': 'polite' } });
   let shown = '';
@@ -98,7 +100,7 @@ export function accessScreen(api: ScreenApi): ScreenInstance {
   const el = screenFrame('access', t('access.options.title'),
     h('div', { class: 'options-columns access-columns' },
       h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.vision') }), vision[0].item.el, swatches, vision.slice(1).map((v) => v.item.el)),
-      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), perf.item.el),
+      h('div', { class: 'options-col' }, h('h2', { class: 'sub-title', text: t('access.options.driving') }), driving.map((d) => d.item.el), cameras.map((c) => c.item.el), perf.item.el, hero.item.el),
     ),
     desc,
     h('div', { class: 'access-actions' }, back.el),

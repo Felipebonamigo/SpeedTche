@@ -8,7 +8,7 @@ import { pickCameraMode, type CameraMode } from '../render/camera-base';
 import { sanitizeBindings } from '../ui/remap/bindings';
 import { normalizeServerUrl } from '../net/protocol';
 import { applyAutoQuality, shouldAutoQuality } from './auto-quality';
-import { DEFAULT_SETTINGS, type Quality, type RenderStyle, type Settings } from './contracts';
+import { DEFAULT_SETTINGS, type HeroCarsSetting, type Quality, type RenderStyle, type Settings } from './contracts';
 import type { DesktopApi } from './desktop';
 import { readJson, writeJson } from './storage';
 
@@ -25,6 +25,8 @@ export const HUD_SCALE_MAX = 1.5;
 
 export const LANGUAGES: readonly Lang[] = ['pt', 'en'];
 export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
+/** Os três estados do interruptor "Carros em alta definição" (V9), na ordem em que o seletor gira. */
+export const HERO_CARS_SETTINGS: readonly HeroCarsSetting[] = ['auto', 'on', 'off'];
 export const RENDER_STYLES: readonly RenderStyle[] = ['modern', 'retro'];
 export const DIFFICULTIES: readonly Difficulty[] = ['amador', 'profissional', 'campeao'];
 
@@ -116,6 +118,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     seatCameras: pickSeatCameras(r.seatCameras),
     // Sem o campo (opções de antes da V12) a Alta fica a aprovada: a "Alta em curva" é escolha.
     highCurveCamera: pickBool(r.highCurveCamera, d.highCurveCamera),
+    // Sem o campo (opções de antes da V9) vale o automático: ligado em Alta e Ultra.
+    heroCars: pickEnum(r.heroCars, HERO_CARS_SETTINGS, d.heroCars),
     // Sem o campo (opções de antes da T8) a oferta de assistência continua de pé.
     assistOfferDeclined: pickBool(r.assistOfferDeclined, d.assistOfferDeclined),
     // Sem o campo (save de antes da L2b) fica ausente de propósito: só a 1ª abertura de verdade o grava.

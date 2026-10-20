@@ -61,11 +61,11 @@ describe('a opção nas Settings (campo aditivo)', () => {
     for (const bad of ['true', 1, null, [], {}]) expect((sanitizeSettings({ highCurveCamera: bad }) as WithCurve).highCurveCamera).toBe(false);
     const keys = Object.keys(sanitizeSettings({}));
     expect(keys).toContain('highCurveCamera');
-    // a 0.1.7 devolvia estas (sem `autoQuality`, que só vem na 1ª abertura): nenhuma sumiu e só uma entrou
+    // a 0.1.7 devolvia estas (sem `autoQuality`, que só vem na 1ª abertura): nenhuma sumiu e só uma entrou (V9: `heroCars` é o campo seguinte, de propósito; tests/heroi-ajuste.test.ts)
     const da0_1_7 = ['language', 'masterVolume', 'musicVolume', 'sfxVolume', 'fullscreen', 'quality', 'renderStyle', 'showMinimap', 'screenShake', 'difficulty', 'manualGear', 'assists',
       'totalCars', 'quickLaps', 'music', 'telemetryConsent', 'controls', 'vibration', 'serverUrl', 'ghost', 'seatAssists', 'colorPalette', 'hudScale', 'largeText', 'reduceEffects',
       'cartoonEffects', 'landmarkCaptions', 'lockFps30', 'seatCameras', 'assistOfferDeclined'];
-    expect(keys.filter((k) => !da0_1_7.includes(k))).toEqual(['highCurveCamera']);
+    expect(keys.filter((k) => !da0_1_7.includes(k))).toEqual(['highCurveCamera', 'heroCars']);
   });
 });
 

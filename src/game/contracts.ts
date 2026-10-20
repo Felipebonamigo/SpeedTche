@@ -140,6 +140,12 @@ export interface Settings {
    */
   highCurveCamera: boolean;
   /**
+   * "Carros em alta definição" (V9, Opções › Visual): o carro dos jogadores humanos, perto da câmera, usa o casco herói (feito no Blender, 10 a 20 mil △ em vez de ~4 mil).
+   * `auto` = ligado só em Alta e Ultra; `on` liga também na Média; `off` desliga. Nunca na Baixa nem com "Reduzir efeitos". Campo aditivo: opções sem ele abrem no
+   * automático; a 0.1.9 o ignora.
+   */
+  heroCars: HeroCarsSetting;
+  /**
    * O jogador recusou ("Seguir assim") a oferta de Freio automático / Amador depois de 2 eliminações (O3, `game/assist-offer.ts`):
    * ela não volta mais, nem com o jogo reaberto (T8). Campo aditivo: opções sem ele abrem com a oferta de pé; a 0.1.4/0.1.5 o ignoram.
    */
@@ -147,6 +153,8 @@ export interface Settings {
   /** A qualidade que a escolha automática da 1ª abertura gravou (L2b). Ausente = não rodou (save de antes, ou automação): é campo aditivo, sem padrão. */
   autoQuality?: Quality;
 }
+
+export type HeroCarsSetting = 'auto' | 'on' | 'off';
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   language: 'pt', masterVolume: 0.8, musicVolume: 0.6, sfxVolume: 0.9, fullscreen: false, quality: 'high', renderStyle: 'modern',
@@ -158,7 +166,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   ghost: true,
   seatAssists: ['none', 'none', 'none', 'none'] as AssistLevel[], colorPalette: 'default' as ColorPalette, hudScale: 1, largeText: false, reduceEffects: false,
   landmarkCaptions: true, lockFps30: false, cartoonEffects: false,
-  seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[], highCurveCamera: false,
+  seatCameras: ['high', 'high', 'high', 'high'] as CameraMode[], highCurveCamera: false, heroCars: 'auto' as HeroCarsSetting,
   assistOfferDeclined: false,
 });
 
@@ -270,6 +278,8 @@ export interface RenderOptions {
   landmarkCaptions?: boolean;
   /** "Alta em curva" (V12): a Alta usa `CAMERA_HIGH_CURVE`; ausente = a Alta aprovada. */
   highCurveCamera?: boolean;
+  /** Carros em alta definição (V9), JÁ resolvido pela sessão (interruptor × qualidade × "Reduzir efeitos": `heroEnabled`); ausente = desligado, como antes. */
+  heroCars?: boolean;
 }
 
 /** Cores de um carro na pista quando o jogador o pintou (src/game/paints.ts): carroceria e segunda cor. */

@@ -1,7 +1,7 @@
 // Opções: cada mudança grava no localStorage e avisa a sessão (`settingsChanged`).
 import type { CoopAssists } from '../../core/types';
 import type { Settings } from '../../game/contracts';
-import { DIFFICULTIES, QUALITIES, QUICK_LAPS_MAX, RENDER_STYLES, QUICK_LAPS_MIN, TOTAL_CARS_MAX, TOTAL_CARS_MIN, saveSettings } from '../../game/settings';
+import { DIFFICULTIES, HERO_CARS_SETTINGS, QUALITIES, QUICK_LAPS_MAX, RENDER_STYLES, QUICK_LAPS_MIN, TOTAL_CARS_MAX, TOTAL_CARS_MIN, saveSettings } from '../../game/settings';
 import { setRenderPrefs } from '../../render/prefs';
 import { accessEntry } from '../../access/screen';
 import { optionsFooter } from '../../errors/options';
@@ -62,6 +62,12 @@ export function qualitySelector(api: ScreenApi, commit: () => void): Selector {
 export function fps30Selector(api: ScreenApi, commit: () => void): Selector {
   const s = api.ctx.settings;
   return selector(t('ui.options.fps30'), () => onOff(s.lockFps30), () => { s.lockFps30 = !s.lockFps30; commit(); }, { sfx: api.sfx });
+}
+
+/** "Carros em alta definição" (V9): automático (Alta e Ultra) → ligado → desligado. Mora na tela de Acessibilidade, ao lado do 30 fps, porque as colunas das Opções já têm as dez linhas que cabem. */
+export function heroCarsSelector(api: ScreenApi, commit: () => void): Selector {
+  const s = api.ctx.settings;
+  return selector(t('ui.options.heroCars'), () => t(`ui.options.heroCars.${s.heroCars ?? 'auto'}`), (d) => { s.heroCars = cycle(HERO_CARS_SETTINGS, s.heroCars ?? 'auto', d); commit(); }, { sfx: api.sfx });
 }
 
 export function commitSettings(api: ScreenApi): void {
