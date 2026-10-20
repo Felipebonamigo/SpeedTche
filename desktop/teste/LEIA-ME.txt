@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.10, build de 22/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.11, build de 23/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,11 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.11 (sobre a 0.1.10), valem para TODOS os carros:
+  * VIDRO PRETO: o vidro dos carros deixa de ler azul-marinho e fica preto com um reflexo de céu só na parte de cima.
+  * LANTERNAS COM HALO: as lanternas ganham um brilho vermelho em volta, de dia e de noite (mais forte no freio).
+  * TINTA COM BRILHO: a lataria ganha uma faixa de luz alongada e mais profundidade; a cor escolhida continua igual.
+    ("Reduzir efeitos" e qualidade Baixa ficam com a versão simples.)
 - NOVIDADES DA 0.1.10 (sobre a 0.1.9):
   * CARRO EM ALTA DEFINIÇÃO (Falcão GT): o carro da sua câmera ganha uma malha bem mais detalhada (traseira com lanternas de LED, grade
     em colmeia, difusor, escapamentos duplos, asa com suportes; frente com faróis de projetor e entradas de ar). Vale para o seu carro e

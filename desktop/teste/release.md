@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.10 — versão de teste para amigos** (build de 22/10/2026)
+**Speed Tchê 0.1.11 — versão de teste para amigos** (build de 23/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.10-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.10-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.11-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.11-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.11 (em todos os carros): **vidro preto**, **lanternas com halo** e **tinta com brilho alongado**.
 
 Novidades da 0.1.10: **Falcão GT em alta definição** (traseira com lanternas de LED, grade em colmeia, difusor, escapamentos duplos; opção "Carros em HD" em Opções › Acessibilidade) e **tela dividida mais leve** (o que está fora da tela deixa de ser desenhado; a imagem quase não muda).
 
