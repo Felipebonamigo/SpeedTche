@@ -8,6 +8,7 @@ import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
 import { paintsOfLooks, raceLooks } from '../src/game/paints';
 import { loadCarAssets } from '../src/render/cars/assets';
+import { buildModel, modelKey } from '../src/render/cars/models';
 import { heroEnabled, type HeroSetting } from '../src/render/cars/lod';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
@@ -251,14 +252,14 @@ function liveScene(quality: Quality, trackId: string, fractions: number[], repea
 
 /** Uma caixa (canto mínimo e máximo, m, no referencial do carro do viewport 0: −z à frente) ou um ponto (m) com meia largura em px. */
 export type Probe = { box: [number, number, number, number, number, number] } | { point: [number, number, number]; r: number };
-export interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number] }
+export interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mean: number; white: number; rgb: [number, number, number]; /** V14: luma (0..1) dos percentis 5 e 95 da caixa (o contraste do brilho na lataria). */ p5: number; p95: number }
 
 /**
  * Corrida parada no quadro: o mundo não anda (os carros ficam onde a corrida os deixou); `x` põe o jogador numa faixa, `parked` o para; `seg` o leva ao
  * início do segmento (o `seg=` do render-harness.html: a folha do GT e a galeria) e tira os outros da frente; `look` é o visual do jogador (N3).
  */
-function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night'; seg?: number; look?: CarLook } = {}): void {
-  setup(trackId, 1, ticks, opts.tod, opts.look ? [opts.look] : undefined);
+function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night'; seg?: number; look?: CarLook; car?: string } = {}): void {
+  setup(trackId, 1, ticks, opts.tod, opts.look ? [opts.look] : undefined, opts.car ? [opts.car] : undefined);
   if (!current) throw new Error('lab.setup primeiro');
   const me = current.state.cars.find((c) => c.seat >= 0);
   if (!me) throw new Error('sem humano');
@@ -304,15 +305,17 @@ function shoot(quality: Quality, frames: number, probes: Probe[]): ProbeStat[] {
       x0 = px - p.r; x1 = px + p.r; y0 = py - p.r; y1 = py + p.r;
     }
     x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0)); x1 = Math.min(W - 1, Math.round(x1)); y1 = Math.min(H - 1, Math.round(y1));
-    let n = 0; let sum = 0; let white = 0; const rgb = [0, 0, 0];
+    let n = 0; let sum = 0; let white = 0; const rgb = [0, 0, 0]; const hist = new Uint32Array(256);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const i = ((H - 1 - y) * W + x) * 4; // readPixels vem de baixo para cima
       const r = buf[i]; const g = buf[i + 1]; const b = buf[i + 2];
-      sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; rgb[0] += r; rgb[1] += g; rgb[2] += b; n++;
+      const l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      sum += l; rgb[0] += r; rgb[1] += g; rgb[2] += b; n++; hist[Math.round(l * 255)]++;
       if (r > 235 && g > 235 && b > 225) white++;
     }
     const k = Math.max(1, n);
-    return { x0, y0, x1, y1, mean: sum / k, white: white / k, rgb: [Math.round(rgb[0] / k), Math.round(rgb[1] / k), Math.round(rgb[2] / k)] };
+    const pct = (q: number): number => { let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= q * n) return v / 255; } return 1; };
+    return { x0, y0, x1, y1, mean: sum / k, white: white / k, rgb: [Math.round(rgb[0] / k), Math.round(rgb[1] / k), Math.round(rgb[2] / k)], p5: pct(0.05), p95: pct(0.95) };
   });
 }
 
@@ -588,7 +591,57 @@ function perfil(quality: Quality, frames: number): PerfilViewport[] {
   } finally { for (const h of hooks) h(); }
 }
 
+/**
+ * V14: o vidro de trás de um carro, em dois pontos (centro dos triângulos de vidro que olham para trás: o terço de baixo e o de cima do vidro), no referencial do
+ * carro (o mesmo das sondas), com a mesma regra de vidro do shader (rugosidade ≤ 0,081, metal ≥ 0,6, sem luz, sem pintura). Sem eles o teste teria de saber onde
+ * cada um dos 26 carros tem o vidro. `null` se o carro não tem vidro virado para trás.
+ */
+function glassPoints(carId: string): { low: Probe; high: Probe; n: number } | null {
+  const def = CARS.find((c) => c.id === carId);
+  if (!def) throw new Error(`carro ${carId}`);
+  const g = buildModel(modelKey(def)).shell;
+  const pos = g.getAttribute('position'); const mat = g.getAttribute('aMat'); const pnt = g.getAttribute('aPaint');
+  const tris: Array<{ c: [number, number, number]; a: number }> = [];
+  for (let i = 0; i < pos.count; i += 3) {
+    if (!(mat.getX(i) <= 0.081 && mat.getY(i) >= 0.6 && mat.getZ(i) + mat.getW(i) < 0.01 && pnt.getX(i) < 0.5 && mat.getY(i) < 0.99)) continue;
+    const p = [0, 1, 2].map((k) => new THREE.Vector3(pos.getX(i + k), pos.getY(i + k), pos.getZ(i + k)));
+    const n = new THREE.Vector3().crossVectors(p[1].clone().sub(p[0]), p[2].clone().sub(p[0]));
+    const a = n.length() / 2; n.normalize();
+    if (n.z < 0.3) continue;
+    const c = p[0].clone().add(p[1]).add(p[2]).divideScalar(3);
+    tris.push({ c: [c.x, c.y, c.z], a });
+  }
+  if (tris.length === 0) return null;
+  const ys = tris.map((t) => t.c[1]); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
+  const centroid = (list: typeof tris): [number, number, number] => {
+    const w = list.reduce((s, t) => s + t.a, 0);
+    return [0, 1, 2].map((k) => list.reduce((s, t) => s + t.c[k] * t.a, 0) / w) as [number, number, number];
+  };
+  const part = (a: number, b: number): [number, number, number] => centroid(tris.filter((t) => t.c[1] >= y0 + (y1 - y0) * a - 1e-6 && t.c[1] <= y0 + (y1 - y0) * b + 1e-6));
+  const low = part(0.1, 0.4); const high = part(0.6, 0.9); // dentro do vidro: a borda mistura com a lataria no antisserrilhado
+  low[0] = 0; high[0] = 0; // no eixo do carro: o vidro é simétrico e o centroide de um lado só mentiria
+  return { low: { point: low, r: 2 }, high: { point: high, r: 2 }, n: tris.length };
+}
+
+/** V14: as lanternas vermelhas que o casco do carro carrega para o halo (`userData.lamps`, cars/kit.ts): centro, meia extensão e alcance, no referencial do carro. */
+function lamps(carId: string): Array<{ c: number[]; e: number[]; reach: number }> {
+  const def = CARS.find((c) => c.id === carId);
+  if (!def) throw new Error(`carro ${carId}`);
+  return ((buildModel(modelKey(def)).shell.userData as { lamps?: Array<{ c: number[]; e: number[]; reach: number }> }).lamps ?? []).map((l) => ({ c: [...l.c], e: [...l.e], reach: l.reach }));
+}
+
+/** V14: escreve um uniforme do material dos carros (todos os materiais de carro da cena): o brilho (`uSheen`) e o halo se ligam e desligam para medir a diferença. */
+function carUniform(name: string, value: number[]): void {
+  scene.traverse((o) => {
+    const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
+    const u = (mat?.userData as { carUniforms?: Record<string, { value: unknown }> } | undefined)?.carUniforms;
+    const slot = u?.[name]?.value as { set?: (...a: number[]) => void } | number | undefined;
+    if (slot && typeof slot === 'object' && slot.set) slot.set(...value); else if (u?.[name] && typeof slot === 'number') u[name].value = value[0];
+  });
+}
+
 const lab = {
+  glassPoints, lamps, carUniform, carIds: (): string[] => CARS.map((c) => c.id),
   hold: (on: boolean): void => { holdClock = on; },
   freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */

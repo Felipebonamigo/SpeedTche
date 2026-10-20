@@ -33,7 +33,7 @@ export const STYLIZE_FAMILIES: Readonly<Record<StylizeFamily, FamilyLook>> = {
 };
 
 /** Chave de programa: muda quando o texto do trecho muda (o three guarda o programa pela chave). */
-export const STYLIZE_KEY = 'speed-tche-stylize-v4'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`; v3 (V4b): a luz ambiente cinza da pista
+export const STYLIZE_KEY = 'speed-tche-stylize-v5'; // v2 (cor-brilho): a IBL difusa dessaturada por `uStylizeFill`; v3 (V4b): a luz ambiente cinza da pista; v5 (V14): a máscara da luz de borda (`STYLIZE_RIM_MASK`: o vidro do carro não leva a borda azul do céu)
 const GRADE_KEY = 'speed-tche-grade-v1';
 
 /**
@@ -319,11 +319,15 @@ export function patchLightsChunk(chunk: string): string {
 /** Luz de borda: fresnel × "olhando para cima" (o céu está em cima), na cor do período, um pouco tingida pelo albedo. */
 const RIM_GLSL = /* glsl */ `
 /* STYLIZE_RIM_CODE */
+// V14: quem quiser menos borda (o vidro do carro: preto, sem o azul do céu na raspa) define STYLIZE_RIM_MASK antes deste ponto; o padrão é 1.
+#ifndef STYLIZE_RIM_MASK
+#define STYLIZE_RIM_MASK 1.0
+#endif
 {
   float sNV = clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );
   float sUp = dot( normal, normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ) * 0.5 + 0.5;
   float sRim = pow( 1.0 - sNV, 3.0 ) * mix( 0.5, 1.0, sUp );
-  totalEmissiveRadiance += uStylizeRim * ( sRim * STYLIZE_RIM ) * mix( vec3( 1.0 ), diffuseColor.rgb, 0.5 );
+  totalEmissiveRadiance += uStylizeRim * ( sRim * STYLIZE_RIM * STYLIZE_RIM_MASK ) * mix( vec3( 1.0 ), diffuseColor.rgb, 0.5 );
 }
 `;
 

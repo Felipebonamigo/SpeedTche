@@ -139,6 +139,8 @@ export class MeshBuilder {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     const col = new Uint8Array(n * 3); const pnt = new Uint8Array(n * 4); const mat = new Uint8Array(n * 4);
     const lens = lensRadius(this.pos, this.mat);
+    const lamps = lensLamps(this.pos, this.mat, this.col);
+    const glassY = glassRange(this.pos, this.mat, this.pnt);
     for (let i = 0; i < n * 3; i++) col[i] = q8(this.col[i]);
     for (let i = 0; i < n * 4; i++) { pnt[i] = q8(this.pnt[i]); mat[i] = q8(this.mat[i]); }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
@@ -146,6 +148,8 @@ export class MeshBuilder {
     g.setAttribute('aMat', new THREE.BufferAttribute(mat, 4, true));
     g.setAttribute('aLens', new THREE.BufferAttribute(Uint8Array.from(lens, q8), 1, true));
     if (this.hasUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    g.userData.lamps = lamps; // V14: o halo das lanternas (cars.ts as leva ao material, lote a lote)
+    g.userData.glassY = glassY; // V14: a faixa de altura do vidro (o reflexo do céu fica na parte de cima)
     smoothNormals(g, crease);
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
@@ -162,8 +166,18 @@ export const LENS_RIM = 0.4;
  * `aMat` (o pincel, que o glTF e o contrato do asset leem) não muda.
  */
 export function lensRadius(pos: readonly number[], mat: readonly number[]): number[] {
+  const out = new Array<number>(pos.length / 3).fill(0);
+  for (const g of lensGroups(pos, mat)) for (const v of g.verts) out[v] = Math.min(1, g.dist(v) / g.r);
+  return out;
+}
+
+/** Uma lente em leque (a tampa de uma lanterna ou de um farol): os vértices dela (índice de vértice da malha), o centro, o raio e a distância ao centro. */
+interface LensGroup { ch: number; verts: number[]; c: [number, number, number]; r: number; dist: (v: number) => number }
+
+/** As lentes em leque da malha (canal 2 = farol, 3 = lanterna): a conta que `lensRadius` (o `aLens`) e `lensLamps` (o halo) dividem. */
+function lensGroups(pos: readonly number[], mat: readonly number[]): LensGroup[] {
   const n = pos.length / 3;
-  const out = new Array<number>(n).fill(0);
+  const found: LensGroup[] = [];
   const key = (v: number): string => `${Math.round(pos[v * 3] * 1e4)},${Math.round(pos[v * 3 + 1] * 1e4)},${Math.round(pos[v * 3 + 2] * 1e4)}`;
   for (const ch of [2, 3]) {
     // Triângulos da lente: os três vértices com o mesmo emissivo > 0 neste canal.
@@ -193,11 +207,55 @@ export function lensRadius(pos: readonly number[], mat: readonly number[]): numb
       const dist = (v: number): number => Math.hypot(pos[v * 3] - cx, pos[v * 3 + 1] - cy, pos[v * 3 + 2] - cz);
       let r = 0; let near = Infinity;
       for (const v of seen.values()) { const d = dist(v); r = Math.max(r, d); near = Math.min(near, d); }
-      if (r < 1e-4 || near > 0.15 * r) continue; // sem vértice no centro: não é um leque
-      for (const t of list) for (let k = 0; k < 3; k++) { const v = t * 3 + k; out[v] = Math.min(1, dist(v) / r); }
+      if (r < 1e-4 || near > 0.15 * r) continue; // sem vértice central: não é um leque
+      found.push({ ch, verts: list.flatMap((t) => [t * 3, t * 3 + 1, t * 3 + 2]), c: [cx, cy, cz], r, dist });
     }
   }
-  return out;
+  return found;
+}
+
+/**
+ * A faixa de altura do vidro do casco (V14): do ponto mais baixo ao mais alto das faces de vidro (rugosidade ≤ 0,081, metal ≥ 0,6, sem luz, sem pintura: a regra do shader). O
+ * reflexo do céu no vidro (`carGlassSky`) fica na parte de cima dessa faixa, como o do HC2; `null` se o casco não tem vidro.
+ */
+export function glassRange(pos: readonly number[], mat: readonly number[], pnt: readonly number[]): [number, number] | null {
+  let lo = Infinity; let hi = -Infinity;
+  for (let v = 0; v < pos.length / 3; v++) {
+    const glass = mat[v * 4] <= 0.081 && mat[v * 4 + 1] >= 0.6 && mat[v * 4 + 2] + mat[v * 4 + 3] < 0.01 && pnt[v * 4] < 0.5;
+    if (!glass) continue;
+    lo = Math.min(lo, pos[v * 3 + 1]); hi = Math.max(hi, pos[v * 3 + 1]);
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+
+/** Quantas lanternas um casco leva para o halo da lataria (uniformes do material: `uLampC`/`uLampE`, cars/material.ts). */
+export const MAX_LAMPS = 6;
+
+/** Uma lanterna acesa para o halo (V14): o centro e a meia extensão da lente no referencial do casco, e o alcance do halo (m) fora dela. */
+export interface Lamp { c: [number, number, number]; e: [number, number, number]; reach: number }
+
+/**
+ * As lanternas vermelhas acesas do casco (V14, docs/ondas/V14-tinta.md): cada lente em leque do canal da lanterna (`aMat.w` ≥ 0,5) de cor vermelha (a luz de ré, clara, e a
+ * coroa apagada não entram). O halo da lataria em volta é uma distância à caixa da lente no fragmento, e esta lista é tudo o que ele precisa. As maiores primeiro, até `MAX_LAMPS`.
+ * O alcance acompanha a lente: 0,9 × a menor meia extensão + 3 cm, entre 5 e 16 cm.
+ */
+export function lensLamps(pos: readonly number[], mat: readonly number[], col: readonly number[]): Lamp[] {
+  const lamps: Array<Lamp & { size: number }> = [];
+  for (const g of lensGroups(pos, mat)) {
+    if (g.ch !== 3) continue;
+    const verts = [...new Set(g.verts)];
+    if (mat[verts[0] * 4 + 3] < 0.5) continue;
+    let r = 0; let gr = 0; let b = 0;
+    for (const v of verts) { r += col[v * 3]; gr += col[v * 3 + 1]; b += col[v * 3 + 2]; }
+    if (!(r > 2.2 * gr && r > 2.2 * b)) continue;
+    const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
+    for (const v of verts) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], pos[v * 3 + k]); hi[k] = Math.max(hi[k], pos[v * 3 + k]); }
+    const e = [0, 1, 2].map((k) => (hi[k] - lo[k]) / 2) as [number, number, number];
+    const c = [0, 1, 2].map((k) => (hi[k] + lo[k]) / 2) as [number, number, number];
+    const small = Math.min(...e.filter((x) => x > 1e-3));
+    lamps.push({ c, e, reach: Math.min(0.16, Math.max(0.05, 0.9 * small + 0.03)), size: e[0] * e[1] });
+  }
+  return lamps.sort((a, b) => b.size - a.size).slice(0, MAX_LAMPS).map(({ size: _size, ...l }) => l);
 }
 
 function dist2(a: P3, b: P3): number {

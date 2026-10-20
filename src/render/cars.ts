@@ -22,7 +22,8 @@ import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 import { blobTexture, labelTexture } from './textures';
 import { VIP_COLOR, VIP_NAME } from '../core/modes';
 import { zToMeters } from './units';
-import { createCarMaterial, FINISH_SHIFT, setCarQuality, tailGlow, type CarUniforms } from './cars/material';
+import { createCarMaterial, FINISH_SHIFT, setCarLamps, setCarQuality, setCarSheen, tailGlow, type CarUniforms } from './cars/material';
+import type { Lamp } from './cars/kit';
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
@@ -195,6 +196,19 @@ export class Cars {
         rig.material.normalMap = model.normalMap ?? null;
         this.rigs.push(rig);
       }
+      // V14: o halo das lanternas é uma distância às lentes DO CASCO no fragmento; as lanternas entram nos uniformes do material. Um material por casco com lanternas
+      // (o casco de sempre e o herói do mesmo modelo têm lentes em lugares diferentes): o three só reenvia os uniformes quando o material muda de um desenho para o outro.
+      // Mesmo programa (a chave não muda: `onBeforeCompile` só reata os uniformes), então nenhum programa novo; as rodas e o lod1 (lente chata, sem halo) ficam no `rig`.
+      const lampRig = (g: THREE.BufferGeometry): Rig => {
+        const { lamps, glassY } = g.userData as { lamps?: ReadonlyArray<Lamp>; glassY?: [number, number] | null };
+        if ((!lamps || lamps.length === 0) && !glassY) return rig;
+        const own = createCarMaterial();
+        own.material.map = rig.material.map;
+        own.material.normalMap = rig.material.normalMap;
+        setCarLamps(own.uniforms, lamps, glassY);
+        this.rigs.push(own);
+        return own;
+      };
       // A roda do arquivo é de um modelo só; as dos estilos dividem por desenho. Rodas não fazem sombra: ficam dentro da
       // sombra da carroceria e da de contato.
       const wheelKey: WheelDesign | CarModel = model.wheelModel ? model : model.wheel;
@@ -205,9 +219,9 @@ export class Cars {
         wheelByDesign.set(wheelKey, wheels);
         this.wheelBatches.push(wheels);
       }
-      const lod1 = model.lod1 ? this.batch(model.lod1.shell, MAX_CARS, true, rig.material) : null;
-      const hero = model.hero ? this.batch(model.hero.shell, MAX_CARS, true, rig.material) : null;
-      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, rig.material), key, model, wheels, lod1, hero };
+      const lod1 = model.lod1 ? this.batch(model.lod1.shell, MAX_CARS, true, lampRig(model.lod1.shell).material) : null;
+      const hero = model.hero ? this.batch(model.hero.shell, MAX_CARS, true, lampRig(model.hero.shell).material) : null;
+      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, lampRig(model.shell).material), key, model, wheels, lod1, hero };
       style.mesh.receiveShadow = true;
       if (lod1) lod1.mesh.receiveShadow = true;
       if (hero) hero.mesh.receiveShadow = true;
@@ -312,7 +326,8 @@ export class Cars {
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
-    for (const { material, uniforms } of this.rigs) setCarQuality(material, q, uniforms); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
+    this.quality = q;
+    for (const { material, uniforms } of this.rigs) setCarQuality(material, q, uniforms, this.reduceFx); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
     this.lowQuality = q === 'low';
   }
 
@@ -401,11 +416,16 @@ export class Cars {
       stepMotion(a.motion, mi, dt);
     }
     this.flameMaterial.uniforms.uTime.value = frame.time;
-    this.reduceFx = frame.options.reduceEffects;
+    if (frame.options.reduceEffects !== this.reduceFx) { // V14: "Reduzir efeitos" tira o halo e a faixa do brilho (só o lobo, mais fraco)
+      this.reduceFx = frame.options.reduceEffects;
+      for (const { uniforms } of this.rigs) setCarSheen(uniforms, this.quality, this.reduceFx);
+    }
   }
 
-  /** "Reduzir efeitos" do último `update` (a chama fica mais curta e mais fraca). */
+  /** "Reduzir efeitos" do último `update` (a chama fica mais curta e mais fraca; o brilho da tinta perde a faixa e o halo). */
   private reduceFx = false;
+  /** A qualidade do último `setQuality` (o brilho da tinta é por degrau). */
+  private quality: Quality = 'high';
 
   /** Uma instância: a matriz, a cor da carroceria e `instExtra` = (cor do detalhe — no lote de roda, a do aro —, bits). */
   private put(b: Batch, m: THREE.Matrix4, look: CarDraw, flags: number, extra: THREE.Color = look.accent): void {

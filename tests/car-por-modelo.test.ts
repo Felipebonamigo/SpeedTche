@@ -151,8 +151,11 @@ describe('modelo por carro: o instanciamento (Cars)', () => {
     expect(matG.map).toBeNull();
     expect(matF).not.toBe(matG);
     expect(falcao?.lod1?.mesh.material).toBe(matF);
-    // O material comum é um só para todos os procedurais.
-    expect(new Set(lots.filter((s) => !s.model.carId).map((s) => s.mesh.material)).size).toBe(1);
+    // V14: cada casco com lanternas ou vidro tem o MATERIAL dele (o halo da lataria em volta das lanternas e o céu na parte de cima do vidro são uniformes do casco, e o three só
+    // reenvia uniformes quando o material muda de um desenho para o outro; era um material comum só para todos os procedurais), mas o PROGRAMA é um só: a chave é a mesma.
+    const procedural = lots.filter((s) => !s.model.carId).map((s) => s.mesh.material as THREE.MeshPhysicalMaterial);
+    expect(new Set(procedural.map((m) => m.customProgramCacheKey())).size).toBe(1);
+    for (const m of procedural) expect(m.map).toBeNull();
     cars.dispose();
   });
 
