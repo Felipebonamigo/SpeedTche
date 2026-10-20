@@ -127,12 +127,11 @@ ipcMain.handle('window:quit', () => app.quit());
 
 ipcMain.handle('steam:name', () => { try { return steam ? steam.localplayer.getName() : null; } catch { return null; } });
 ipcMain.handle('steam:achievement', (_e, id) => {
-  try {
-    if (!steam || typeof id !== 'string' || !id) return false;
-    // O5: o jogo reenvia ao abrir toda conquista guardada; a que a Steam já tem não é regravada (cada `activate` chama o StoreStats).
-    if (typeof steam.achievement.isActivated === 'function' && steam.achievement.isActivated(id)) return true;
-    return steam.achievement.activate(id) !== false;
-  } catch { /* ignorado */ }
+  if (!steam || typeof id !== 'string' || !id) return false;
+  // O5: o jogo reenvia ao abrir toda conquista guardada; a que a Steam já tem não é regravada (cada `activate` chama o StoreStats).
+  // A1: a consulta tem o próprio try — se ela lançar (estatísticas da Steam ainda não chegaram), a conquista ainda é ativada.
+  try { if (typeof steam.achievement.isActivated === 'function' && steam.achievement.isActivated(id)) return true; } catch { /* segue para a ativação */ }
+  try { return steam.achievement.activate(id) !== false; } catch { /* ignorado */ }
   return false;
 });
 // O5: idioma da 1ª abertura (src/game/settings.ts: languageCandidates) — o do jogo na Steam ('brazilian', 'english'…) e o do sistema ('pt-BR'…).
@@ -167,8 +166,19 @@ ipcMain.handle('file:open', async (e) => {
 });
 
 // Saves espelhados em arquivo (Steam Auto-Cloud) e log de erros — ver storage.cjs e src/game/cloudsave.ts.
-ipcMain.handle('store:readAll', () => storage.readAllSaves(savesDir()));
-ipcMain.handle('store:write', (_e, key, json) => storage.writeSave(savesDir(), key, json));
+// A1: arquivo que não leu / não gravou deixa uma linha no errors.log. Antes a recusa só voltava como `false`/`null` para a página, que a trata
+// (a chave fica pendente) mas não a mostra: um disco que recusa o save em silêncio é um Steam Cloud que não sincroniza, e ninguém ficava sabendo.
+ipcMain.handle('store:readAll', () => {
+  const all = storage.readAllSaves(savesDir());
+  const unreadable = Object.keys(all).filter((k) => all[k] === null);
+  if (unreadable.length > 0) logProcessEvent('store-read-failed', { keys: unreadable });
+  return all;
+});
+ipcMain.handle('store:write', (_e, key, json) => {
+  const ok = storage.writeSave(savesDir(), key, json);
+  if (!ok) logProcessEvent('store-write-failed', { key: typeof key === 'string' ? key.slice(0, 80) : typeof key, bytes: typeof json === 'string' ? Buffer.byteLength(json, 'utf8') : null });
+  return ok;
+});
 ipcMain.handle('log:append', (_e, text) => storage.appendLog(logsDir(), text));
 // O preload roda em sandbox, onde o módulo `clipboard` não existe: a cópia do relatório passa por aqui.
 ipcMain.handle('clipboard:write', (_e, text) => {
