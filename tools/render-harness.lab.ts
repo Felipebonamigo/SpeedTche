@@ -515,7 +515,8 @@ function perfilCategories(): Map<THREE.Object3D, string> {
     else if (base === 'carros') {
       const m = o as THREE.InstancedMesh;
       const tri = m.geometry ? (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3 : 0;
-      out.set(o, `carros:${m.isInstancedMesh ? (tri > 2000 ? 'casco lod0' : tri > 600 ? 'casco lod1/roda' : 'rodas/blob/chama') : 'outros'}`);
+      const i = top.children.indexOf(o);
+      out.set(o, `carros:#${i} ${m.isInstancedMesh ? `${Math.round(tri)} △/inst` : 'outros'}`);
     } else if (base === 'terreno' || base === 'pista' || base === 'céu') out.set(o, `${base}#${top.children.indexOf(o) >= 0 ? top.children.indexOf(o) : idx}${o.name ? ':' + o.name : ''}`);
     else out.set(o, `${base}${o.name ? ':' + o.name : ''}`);
   });

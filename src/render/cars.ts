@@ -26,6 +26,7 @@ import { createCarMaterial, FINISH_SHIFT, setCarQuality, tailGlow, type CarUnifo
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
+import { carLodDistance } from './cars/lod';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
 import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameCover, flameGain } from './cars/flame';
@@ -48,8 +49,8 @@ const SIDES = [-1, 1] as const;
 export const HEADLIGHT = { lamp: [0.55, 0.6, -2.0], aim: [1.0, -0.4, -40], angle: 0.42, distance: 90, decay: 1.3, night: 200, dusk: 20 } as const;
 const IDENTITY = new THREE.Matrix4();
 
-/** Carro mais que isto à frente do carro do viewport (a câmera fica 7,8 m atrás) usa a roda simples. */
-const FAR_WHEELS_M = 30;
+// Carro mais longe que `carLodDistance(n)` à frente do carro do viewport (a câmera fica 7,8 m atrás) usa a roda simples e o casco do LOD1 (cars/lod.ts: 30 m em
+// tela cheia, 15 m na tela dividida, onde o viewport tem a metade da altura).
 
 interface Batch {
   readonly mesh: THREE.InstancedMesh;
@@ -429,6 +430,7 @@ export class Cars {
     const d = this.dummy;
     const w = this.wheelDummy;
     let nBlob = 0; let nFlames = 0; let nStars = 0;
+    const farM = carLodDistance(viewportSeats.length);
     for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
     for (const wb of this.wheelBatches) wb.count = 0;
     for (const s of this.labels) if (s) s.visible = false;
@@ -462,7 +464,7 @@ export class Cars {
         this.ownEyeOn = true;
       }
       // Longe (e na Baixa) o casco simplificado do LOD1, se o modelo tem; o mesmo critério da roda simples.
-      const far = this.lowQuality || this.pt.z < -FAR_WHEELS_M;
+      const far = this.lowQuality || this.pt.z < -farM;
       this.put(far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);
       // Sombra de contato: no chão, sem rolagem/mergulho.
       d.rotation.set(0, -(this.pt.heading + yaw), 0, 'YXZ');

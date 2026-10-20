@@ -24,7 +24,9 @@ interface LabApi {
   diffFromSnapshot(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>, thr?: number): Array<{ changed: number }>;
   scene: { traverse(f: (o: { name: string; perObjectFrustumCulled?: boolean }) => void): void };
 }
-declare global { interface Window { lab: LabApi; labReady: boolean } }
+
+/** Cascos completos (lod0) de Copacabana 1p Média, medidos antes do corte do LOD (tools/folga-perfil.mjs): a distância de 1 jogador é a de sempre. */
+const CARROS_1P_LOD0 = 8;
 
 /** O pior viewport (triângulos e chamadas) dos dois últimos quadros, como o gate (`collect` em tools/render-harness.lab.ts). */
 interface Pior { triangles: number; calls: number }
@@ -43,7 +45,7 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
     page.setDefaultTimeout(1_200_000);
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
     await page.goto(`http://127.0.0.1:${port}/tools/render-harness.lab.html`);
-    await page.waitForFunction(() => window.labReady === true);
+    await page.waitForFunction(() => (window as unknown as { labReady?: boolean }).labReady === true);
   }, 300_000);
 
   afterAll(async () => {
@@ -54,17 +56,17 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
 
   /** A cena do gate (300 ticks de largada, 4 quadros, o pior viewport dos 2 últimos). */
   const pior = (track: string, humans: number, quality: Quality): Promise<Pior> => page.evaluate(([t, n, q]) => {
-    window.lab.setup(t as string, n as number, 300);
-    const last = window.lab.render(q as Quality, 4).slice(-2);
+    (window as unknown as { lab: LabApi }).lab.setup(t as string, n as number, 300);
+    const last = (window as unknown as { lab: LabApi }).lab.render(q as Quality, 4).slice(-2);
     const vps = last.flatMap((d) => d.viewports);
     return { triangles: Math.max(...vps.map((v) => v.triangles)), calls: Math.max(...vps.map((v) => v.calls)) };
   }, [track, humans, quality] as const);
 
   it('cenário: todo lote corta por objeto contra a câmera e contra o mapa de sombra (antes desenhava a janela inteira, 30% dos triângulos de Sampa 4p)', async () => {
-    await page.evaluate(() => { window.lab.setup('copacabana', 1, 300); window.lab.render('medium', 2); });
+    await page.evaluate(() => { (window as unknown as { lab: LabApi }).lab.setup('copacabana', 1, 300); (window as unknown as { lab: LabApi }).lab.render('medium', 2); });
     const lotes = await page.evaluate(() => {
       const out: Array<{ name: string; cull: boolean | undefined }> = [];
-      window.lab.scene.traverse((o) => { if (o.name.startsWith('scenery:')) out.push({ name: o.name, cull: o.perObjectFrustumCulled }); });
+      (window as unknown as { lab: LabApi }).lab.scene.traverse((o) => { if (o.name.startsWith('scenery:')) out.push({ name: o.name, cull: o.perObjectFrustumCulled }); });
       return out;
     });
     expect(lotes.length).toBeGreaterThanOrEqual(8);
@@ -74,7 +76,7 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
   it('o corte do cenário não muda UM pixel (mesmo instante, com e sem o corte): Copacabana 4 jogadores e Sampa 4 jogadores, Média e Alta', async () => {
     for (const [track, q] of [['copacabana', 'medium'], ['sampa_noite', 'medium'], ['copacabana', 'high'], ['sampa_noite', 'high']] as const) {
       const r = await page.evaluate(([t, quality]) => {
-        const lab = window.lab;
+        const lab = (window as unknown as { lab: LabApi }).lab;
         lab.setup(t, 4, 300);
         lab.render(quality as Quality, 2);
         lab.hold(true);
@@ -99,5 +101,30 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
     expect(sampa.triangles).toBeLessThan(260_000);
     expect(copa.triangles).toBeLessThan(245_000);
     expect(errors).toEqual([]);
+  });
+
+  /** Triângulos dos carros (cascos, rodas, mancha) do pior viewport, e quantos cascos de cada nível. */
+  const carros = (track: string, humans: number, quality: Quality): Promise<{ total: number; carTriangles: number; lod0: number; lod1: number }> => page.evaluate(([t, n, q]) => {
+    (window as unknown as { lab: LabApi }).lab.setup(t as string, n as number, 300);
+    const vps = (window as unknown as { lab: LabApi }).lab.perfil(q as Quality, 2);
+    const w = vps.reduce((a, b) => (b.total > a.total ? b : a));
+    const car = w.rows.filter((r) => r.cat.startsWith('carros:'));
+    const hull = (r: PerfilLinha): number => Number(/(\d+) △\/inst/.exec(r.cat)?.[1] ?? 0);
+    return {
+      total: w.total, carTriangles: car.reduce((s, r) => s + r.main + r.shadow, 0),
+      lod0: car.filter((r) => hull(r) > 2000).reduce((s, r) => s + r.instances, 0), lod1: car.filter((r) => hull(r) > 600 && hull(r) <= 2000).reduce((s, r) => s + r.instances, 0),
+    };
+  }, [track, humans, quality] as const);
+
+  it('carros em tela dividida: o casco simplificado entra na metade da distância (Sampa 4p Média: pior viewport abaixo de 200.000 △; antes 241.394 depois do corte do cenário)', async () => {
+    const sampa = await carros('sampa_noite', 4, 'medium');
+    expect(sampa.total).toBeLessThan(200_000);
+    // a largada enche 17 cascos completos a menos de 30 m do líder; a menos de 15 m cabem poucos
+    expect(sampa.lod0).toBeLessThanOrEqual(9);
+  });
+
+  it('1 jogador não muda: Copacabana 1p Média segue com os mesmos cascos completos (a distância é a de sempre)', async () => {
+    const um = await carros('copacabana', 1, 'medium');
+    expect(um.lod0).toBe(CARROS_1P_LOD0);
   });
 });
