@@ -20,6 +20,7 @@ import { DEFAULT_CAMERA_MODE, pickCameraMode } from './camera-base';
 import { cameraExtraFor, ChaseCamera, IdleCamera, newCameraExtra } from './camera';
 import { CaptionDirector, captionScene, captionSpots, type CaptionScene, type CaptionView } from './caption/caption';
 import { Cars } from './cars';
+import { screenLodScale } from './cars/lod';
 import { Effects, type Shake } from './effects';
 import { Hud } from './hud';
 import { viewportRects, type Rect } from './layout';
@@ -282,12 +283,12 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     renderer.setScissor(rect.x, y, rect.w, rect.h);
   }
 
-  function poseWorld(rf: RoadFrame, track: Track, z: number, time: number): void {
+  function poseWorld(rf: RoadFrame, track: Track, z: number, time: number, viewports = 1): void {
     const absH = absoluteHeading(track, z);
     sky.update(absH, time);
     road.update(rf, track);
     terrain.update(rf, track, time, sky.sunDirLocal, absH);
-    scenery.update(rf, track, time);
+    scenery.update(rf, track, time, screenLodScale(viewports));
   }
 
   /** A cena da legenda da pista atual (null antes do cenário montar o layout dela). */
@@ -344,7 +345,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
       if (!car) continue;
       const rf = buildRoadFrame(track, car.z, BEHIND, AHEAD[q], frames[i]);
       frames[i] = rf;
-      poseWorld(rf, track, car.z, frame.time);
+      poseWorld(rf, track, car.z, frame.time, n);
       const camMode = pickCameraMode(vp.camera, DEFAULT_CAMERA_MODE); // a escolha do assento (nada no núcleo nem na rede)
       cars.pose(rf, frame.state, track, vp.carIndex, frame.viewports, frame.time, camMode);
       cars.poseGhost(rf, track, frame.ghost);

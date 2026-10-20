@@ -388,7 +388,8 @@ export class Scenery {
 
   // ───────────────────────────── Por quadro, por viewport ─────────────────────────────
 
-  update(frame: RoadFrame, track: Track, time: number): void {
+  /** `lodScale` (cars/lod.ts `screenLodScale`): 0,5 na tela dividida, onde o viewport tem a metade da altura — a decoração pequena some e o modelo de longe entra na metade da distância (mesmos pixels). */
+  update(frame: RoadFrame, track: Track, time: number, lodScale = 1): void {
     const key = `${track.def.id}:${track.segments.length}`;
     if (key !== this.trackKey || !this.layout) { this.trackKey = key; this.setTrack(track); }
     const layout = this.layout;
@@ -416,8 +417,8 @@ export class Scenery {
       if (ahead > fogSegs) break;
       for (let k = 0; k < list.length; k++) {
         const p = list[k];
-        if (ahead > p.maxAhead || p.rank > detail) continue;
-        const useFar = p.far >= 0 && ahead >= p.farFrom;
+        if (ahead > p.maxAhead * lodScale || p.rank > detail) continue;
+        const useFar = p.far >= 0 && ahead >= p.farFrom * lodScale;
         this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD);
       }
     }

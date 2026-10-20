@@ -10,5 +10,10 @@ export const CAR_LOD_FAR_M = 30;
  * viewports de jogador a tela tem (0 = fundo do menu, sem jogador: tela cheia).
  */
 export function carLodDistance(viewports: number): number {
-  return viewports >= 2 ? CAR_LOD_FAR_M / 2 : CAR_LOD_FAR_M;
+  return CAR_LOD_FAR_M * screenLodScale(viewports);
+}
+
+/** Fator das distâncias de LOD pelo tamanho do viewport: 1 em tela cheia, 0,5 quando o viewport tem a metade da altura (também usado pelo cenário, scenery/runtime.ts). */
+export function screenLodScale(viewports: number): number {
+  return viewports >= 2 ? 0.5 : 1;
 }

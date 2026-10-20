@@ -25,6 +25,9 @@ interface LabApi {
   scene: { traverse(f: (o: { name: string; perObjectFrustumCulled?: boolean }) => void): void };
 }
 
+/** Triângulos do cenário (cena + sombra) de Copacabana 1p Média, medidos antes do corte (tools/folga-perfil.mjs): 1 jogador não muda. */
+const CENARIO_COPA_1P = 101_126;
+
 /** Cascos completos (lod0) de Copacabana 1p Média, medidos antes do corte do LOD (tools/folga-perfil.mjs): a distância de 1 jogador é a de sempre. */
 const CARROS_1P_LOD0 = 8;
 
@@ -84,9 +87,9 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
         const original: Array<[{ perObjectFrustumCulled?: boolean }, boolean | undefined]> = [];
         lab.scene.traverse((o) => { if (o.name.startsWith('scenery:')) original.push([o, o.perObjectFrustumCulled]); });
         set(false);
-        lab.snapshot(quality as Quality, 1);
+        lab.snapshot(quality as Quality, 2); // 2 quadros: com 3 e 4 jogadores a sombra alterna a cada quadro, a paridade tem de casar
         set(true);
-        const d = lab.diffFromSnapshot(quality as Quality, 1, [[0, 0, 1, 1]], 0)[0];
+        const d = lab.diffFromSnapshot(quality as Quality, 2, [[0, 0, 1, 1]], 0)[0];
         lab.hold(false);
         for (const [o, v] of original) o.perObjectFrustumCulled = v; // devolve o que o jogo tinha
         return d.changed;
@@ -126,5 +129,16 @@ describe.skipIf(!available)('folga V13 (GL, swiftshader)', { timeout: 1_500_000 
   it('1 jogador não muda: Copacabana 1p Média segue com os mesmos cascos completos (a distância é a de sempre)', async () => {
     const um = await carros('copacabana', 1, 'medium');
     expect(um.lod0).toBe(CARROS_1P_LOD0);
+  });
+
+  it('cenário em tela dividida: a decoração pequena some e o modelo de longe entra na metade da distância (Copacabana 4p Média: cenário abaixo de 92.000 △, antes 100.874 (a estimativa de 85.000 era otimista: medido 89.294); 1 jogador não muda)', async () => {
+    const soma = (track: string, humans: number, quality: Quality): Promise<number> => page.evaluate(([t, n, q]) => {
+      const lab = (window as unknown as { lab: LabApi }).lab;
+      lab.setup(t as string, n as number, 300);
+      const w = lab.perfil(q as Quality, 2).reduce((a, b) => (b.total > a.total ? b : a));
+      return w.rows.filter((r) => r.cat.startsWith('cenário')).reduce((s, r) => s + r.main + r.shadow, 0);
+    }, [track, humans, quality] as const);
+    expect(await soma('copacabana', 4, 'medium')).toBeLessThan(92_000);
+    expect(await soma('copacabana', 1, 'medium')).toBe(CENARIO_COPA_1P);
   });
 });
