@@ -19,7 +19,8 @@
     "check-car": "tsx scripts/check-car-glb.ts",
     "convert-car": "tsx scripts/convert-car.ts",
     "carros-blender": "sh tools/blender/build_all.sh",
-    "carro-heroi": "sh tools/blender/hero/build.sh"
+    "carro-heroi": "sh tools/blender/hero/build.sh",
+    "carros-herois": "sh tools/blender/hero/build-herois.sh"
   },
   "license": "MIT",
   "devDependencies": {

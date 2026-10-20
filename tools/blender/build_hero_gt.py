@@ -25,6 +25,21 @@ from mathutils.bvhtree import BVHTree  # noqa: E402
 CAGE = json.load(open(os.path.join(HERE, "hero", "gt-gaiola.json")))
 AXLES = CAGE["axles"]
 RING = 26
+# Configuração do que muda de estilo para estilo (o GT é o padrão; `use_cage` troca): raio da borda do teto da cabine, vãos de vidro (0 = para-brisa, 2 = vidro de trás) e a abertura do cockpit.
+CFG = {"edge": 0.1, "roof_glass_gaps": (0, 2), "pit": None, "belt_paint_gaps": ()}
+
+
+def use_cage(path):
+    """Troca a gaiola (outro estilo): os globais que as funções leem em tempo de chamada. O GT é o padrão do módulo; os outros estilos entram por `build_hero.py`."""
+    global CAGE, AXLES, C0, C3
+    CAGE = json.load(open(path))
+    AXLES = CAGE["axles"]
+    if CAGE.get("cabin"):
+        C0, C3 = CAGE["cabin"][0]["z"], CAGE["cabin"][-1]["z"]
+    else:
+        C0, C3 = 99.0, 99.0  # sem cabine (roadster): nenhum "debaixo da cabine"
+    CFG["pit"] = CAGE.get("pit")
+    CFG["edge"] = CAGE.get("edge") or 0.1
 
 
 # ───────────────────────────── materiais (os pincéis de `src/render/cars/paints.ts`, em cor linear) ─────────────────────────────
@@ -62,6 +77,16 @@ HERO_MATERIALS = {
     "lens_clear": (lin("#d9dde3"), 0.35, 0.12, None),
     "plate": (lin("#bdb9aa"), 0.0, 0.55, None),
     "interior": (lin("#23252a"), 0.0, 0.85, None),
+    # V15 (os outros estilos): bancos, número do protótipo, grade fosca, e a tampa dos faróis escamoteáveis da cunha (o "popup" no nome sobe com o farol à noite)
+    "seat": (lin("#3a2d27"), 0.0, 0.80, None),
+    "white": (lin("#f3f3f0"), 0.0, 0.40, None),
+    "grille": (lin("#101114"), 0.0, 0.80, None),
+    "paint_popup": ((1.0, 1.0, 1.0), 0.04, 0.40, None),
+    "trim_popup": (lin("#17181b"), 0.0, 0.72, None),
+    "headlight_popup": (lin("#fff6e0"), 0.0, 0.15, 1.0),
+    "glass_dark": (lin("#1b2638"), 0.90, 0.05, None),
+    "headlight_amber": (lin("#ffa51f"), 0.0, 0.20, 0.45),
+    "headlight_dim_popup": (lin("#fff6e0"), 0.0, 0.15, 0.45),
     # roda do projeto (só dá posição e tamanho; carlib.build_wheel usa estes)
     "tire": (lin("#141416"), 0.0, 0.94, None),
     "rim": (lin("#b9bec6"), 0.9, 0.34, None),
@@ -199,6 +224,8 @@ def build_body():
             m = MAT_OF_REGION[region]
             if region in ("top", "stripe", "center") and C0 + 0.02 < zc < C3 - 0.02:
                 m = "interior"  # debaixo da cabine: o vão do vidro mostra o interior escuro, não pintura
+            if CFG["pit"] and region in ("top", "stripe", "center") and CFG["pit"][0] < zc < CFG["pit"][1]:
+                continue  # cockpit aberto (roadster): sem as faces de cima entre as portas
             try:
                 f = bm.faces.new(vs)
             except ValueError:
@@ -309,7 +336,7 @@ def cabin_sections(bend=0.1):
 def cabin_ring(s):
     """Metade direita do anel da cabine: base, friso da cintura, alto do vidro, arco da borda do teto, e as faixas do teto (8 pontos com o centro)."""
     sx1r, sx2r = CAGE["stripeA"][1], CAGE["stripeA"][0]
-    edge = 0.1
+    edge = CFG["edge"]
     c = s["crown"] if s["crown"] else 0.03
     sx1 = min(sx1r, s["hwt"] * 0.8)
     sx2 = min(sx2r, sx1 * 0.4)
@@ -349,17 +376,17 @@ def build_cabin():
             e = j if j < 7 else n - 2 - j
             kind = seg_kind[e]
             if kind == "trim":
-                m = "trim"
+                m = "paint" if gap in CFG["belt_paint_gaps"] else "trim"  # o friso preto da cintura; onde a lateral é pintada (a tampa do motor), a base também
             elif kind == "side":
                 m = "paint" if gap == 2 else "glass"
             elif kind in ("roof",):
                 m = "paint"
                 if e == 4:
-                    m = "glass" if gap in (0, 2) else "paint"
+                    m = "glass" if gap in CFG["roof_glass_gaps"] else "paint"
             elif kind == "stripe":
-                m = "glass" if gap in (0, 2) else "stripe_a"
+                m = "glass" if gap in CFG["roof_glass_gaps"] else "stripe_a"
             else:
-                m = "glass" if gap in (0, 2) else "paint"
+                m = "glass" if gap in CFG["roof_glass_gaps"] else "paint"
             a, b = rings[i][j], rings[i][j + 1]
             c, d = rings[i + 1][j + 1], rings[i + 1][j]
             f = bm.faces.new((a, d, c, b))
@@ -985,12 +1012,26 @@ def wing():
 
 
 # ───────────────────────────── rodas (só posição e tamanho; o jogo usa a roda do catálogo) e vazios ─────────────────────────────
-def wheels_and_empties():
-    w = dict(r=AXLES[0]["r"], w=(AXLES[0]["w"] - 0.0077) / 1.044, spokes=5, spoke_in=0.03, spoke_out=0.048)  # a roda de carlib mede 1,044 w + 0,0077 (pneu abaulado e friso do aro): o jogo mede o tamanho pela caixa
-    sp = dict(wheel=w, axle_x=AXLES[0]["x"], project_wheel=True,
-              wheel_positions=lambda: [(AXLES[0]["z"], 1), (AXLES[0]["z"], -1), (AXLES[1]["z"], 1), (AXLES[1]["z"], -1)],
-              exhaust=(0.42, 2.28, 0.26), seat=(0.0, 0.1, 0.80))
-    cl.finish_wheels_and_empties(sp)
+def wheels_and_empties(exhaust=(0.42, 2.28, 0.26), seat=(0.0, 0.1, 0.80), single_exhaust=False):
+    """As quatro rodas (só posição e tamanho: o jogo usa a roda do catálogo, um desenho por eixo) e os vazios do escape e do assento. `exhaust` = (x, y, z) do Blender (a ponta
+    à esquerda; a da direita é o espelho; `single_exhaust`: uma ponta só, no `exhaust_l`); cada eixo tem o seu raio e a sua largura (a traseira de um hipercarro é mais larga)."""
+    names = (("wheel_fl", "wheel_fr"), ("wheel_rl", "wheel_rr"))
+    for ai, a in enumerate(AXLES):
+        w = dict(r=a["r"], w=(a["w"] - 0.0077) / 1.044, spokes=5, spoke_in=0.03, spoke_out=0.048)  # a roda de carlib mede 1,044 w + 0,0077 (pneu abaulado e friso do aro): o jogo mede o tamanho pela caixa
+        sp = dict(wheel=w)
+        for sd, nm in zip((1, -1), names[ai]):
+            ob = cl.build_wheel(nm, sp)
+            ob["project_wheel"] = True  # o jogo usa a roda do catálogo do estilo; este desenho só dá posição e tamanho
+            ob.location = (sd * a["x"], a["z"], w["r"])
+            if sd < 0:  # roda da direita (x < 0 no Blender = direita do carro): a face de fora olha para -X
+                ob.rotation_euler = (0, 0, math.pi)
+            cl.select_only(ob)
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+            ob.location = (0, 0, 0)
+    cl.empty("exhaust_l", (exhaust[0], exhaust[1], exhaust[2]))
+    if not single_exhaust:
+        cl.empty("exhaust_r", (-exhaust[0], exhaust[1], exhaust[2]))
+    cl.empty("seat", seat)
 
 
 def debug_backfaces():
