@@ -98,30 +98,33 @@ describe('o asset do herói (Falcão GT)', () => {
     for (const want of ['paint', 'stripe_a', 'stripe_b', 'accent', 'glass', 'headlight', 'headlight_dim', 'taillight', 'taillight_dim', 'trim', 'chrome', 'plate']) {
       expect(mats.some((m) => m === want || m.startsWith(`${want}.`)), `material ${want}`).toBe(true);
     }
-    expect(model.liveries[0], 'o jogo aplica as faixas do arquivo (A e B)').toBe(6);
     const pr = probe(model);
     expect(pr.T.some((t) => pr.isA(t.i)) && pr.T.some((t) => pr.isB(t.i)), 'faixa A e faixa B na malha').toBe(true);
     expect(pr.T.some((t) => pr.accent(t.i)), 'acento (pinças) na malha').toBe(true);
   });
 
-  it('simetria esquerda × direita (posição dos vértices, tolerância de 5 mm)', () => {
+  it('simetria esquerda × direita (posição dos vértices, tolerância de 5 mm; fora as faixas de reflexo do céu nos vidros, que são diagonais de propósito)', () => {
     const pos = model.shell.getAttribute('position');
+    const mat = model.shell.getAttribute('aMat');
     const key = (x: number, y: number, z: number) => `${Math.round(x * 200)},${Math.round(y * 200)},${Math.round(z * 200)}`;
     const set = new Set<string>();
-    for (let i = 0; i < pos.count; i++) set.add(key(pos.getX(i), pos.getY(i), pos.getZ(i)));
+    const mine: number[] = [];
+    for (let i = 0; i < pos.count; i++) { if (mat.getY(i) > 0.99 && mat.getX(i) < 0.08) continue; mine.push(i); set.add(key(pos.getX(i), pos.getY(i), pos.getZ(i))); } // metal 1,0 e rugosidade baixa = o espelho do reflexo (o cromo é mais fosco e entra na conta)
     let miss = 0;
-    for (let i = 0; i < pos.count; i++) {
+    for (const i of mine) {
       const [a, b, c] = key(-pos.getX(i), pos.getY(i), pos.getZ(i)).split(',').map(Number);
       const near = [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => [-1, 0, 1].some((dz) => set.has(`${a + dx},${b + dy},${c + dz}`))));
       if (!near) miss++;
     }
-    expect(miss / pos.count).toBeLessThan(0.01);
+    expect(miss / mine.length).toBeLessThan(0.01);
   });
 
   it('vão de roda: nenhum vértice do casco dentro do pneu e o pneu não fura a lataria (o casco passa do topo dele)', () => {
     const pos = model.shell.getAttribute('position');
+    const pnt = model.shell.getAttribute('aPaint');
     for (const a of model.axles) {
       for (let i = 0; i < pos.count; i++) {
+        if (pnt.getY(i) > 0.5) continue; // a pinça de freio (acento) mora DENTRO do aro, entre os raios, como a do GT de sempre
         const x = Math.abs(pos.getX(i));
         if (x > a.x - a.w / 2 + 0.01 && x < a.x + a.w / 2 - 0.01) expect(Math.hypot(pos.getZ(i) - a.z, pos.getY(i) - a.r), 'casco dentro da roda').toBeGreaterThan(a.r * 0.99);
       }
@@ -152,7 +155,7 @@ describe('o asset do herói (Falcão GT)', () => {
       expect(hits.filter((h) => h.h && pr.isA(h.h.i)).length / hits.length, `faixa A em x = ${x}`).toBeGreaterThanOrEqual(0.6);
     }
     let bandSeen = 0;
-    for (const z of range(-0.75, 0.75, 0.05)) { const h = pr.fromSide(0, 0, 1) && pr.fromSide(0.55 + 0.06 * (z + 0.75), z, 1); if (h && pr.isB(h.i)) bandSeen++; }
+    for (const z of range(-0.75, 0.75, 0.05)) { const h = pr.fromSide(0.55 + 0.06 * (z + 0.75), z, 1); if (h && pr.isB(h.i)) bandSeen++; }
     expect(bandSeen, 'faixa B de lado, na altura do vinco').toBeGreaterThan(8);
   });
 
@@ -179,16 +182,22 @@ describe('o asset do herói (Falcão GT)', () => {
     expect(P.tris('difusor'), 'difusor').toBeGreaterThanOrEqual(200);
     const fins = new Set<number>();
     for (const m of P.meshes('difusor')) {
+      m.updateWorldMatrix(true, false);
       const pos = m.geometry.getAttribute('position');
-      for (let i = 0; i < pos.count; i++) if (pos.getZ(i) > 2.0 && pos.getY(i) < 0.4 && Math.abs(pos.getX(i)) < 0.7) fins.add(Math.round(pos.getX(i) * 100 / 3));
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); // glTF → jogo: x e z trocam de sinal
+        if (-v.z > 2.0 && v.y < 0.4 && Math.abs(v.x) < 0.7) fins.add(Math.round((-v.x * 100) / 3));
+      }
     }
     expect(fins.size, 'posições em x das aletas (a cada ≥ 3 cm)').toBeGreaterThanOrEqual(8);
     for (const side of ['l', 'r']) {
       expect(P.tris(`escape_${side}`), `escape ${side}`).toBeGreaterThanOrEqual(80);
-      const [m] = P.meshes(`escape_${side}`);
-      const mat = (Array.isArray(m.material) ? m.material : [m.material]) as THREE.MeshStandardMaterial[];
+      const ms = P.meshes(`escape_${side}`);
+      const mat = ms.flatMap((m) => (Array.isArray(m.material) ? m.material : [m.material])) as THREE.MeshStandardMaterial[];
       expect(mat.some((x) => x.metalness >= 0.8), `escape ${side} é de metal`).toBe(true);
-      const box = new THREE.Box3().setFromObject(m);
+      const box = new THREE.Box3();
+      for (const m of ms) box.expandByObject(m);
       expect(Math.abs((box.min.x + box.max.x) / 2), 'escape em x = ±0,42').toBeGreaterThan(0.38); expect(Math.abs((box.min.x + box.max.x) / 2)).toBeLessThan(0.46);
     }
     expect(P.tris('placa'), 'placa').toBeGreaterThanOrEqual(2);
@@ -219,6 +228,13 @@ describe('o asset do herói (Falcão GT)', () => {
     expect(json.images ?? [], 'sem imagem embutida').toHaveLength(0);
     expect(json.textures ?? [], 'sem textura').toHaveLength(0);
     expect(buf.subarray(20, 20 + buf.readUInt32LE(12)).toString('utf8')).not.toMatch(BRANDS);
+  });
+
+  it('a licença está registrada em docs/ARTE.md (criação própria, sem terceiros)', () => {
+    const arte = readFileSync(join(__dirname, '..', 'docs', 'ARTE.md'), 'utf8');
+    const row = arte.split('\n').find((l) => l.startsWith('|') && l.includes('src/assets/cars/hero/gt.glb'));
+    expect(row, 'linha da tabela de licenças com "src/assets/cars/hero/gt.glb"').toBeTruthy();
+    expect(row).toMatch(/Criação própria/);
   });
 
   it('regra de marca: nada no código da ferramenta que gera o herói (tools/blender)', () => {

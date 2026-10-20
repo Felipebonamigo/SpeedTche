@@ -56,6 +56,8 @@ export interface CarModel {
   normalMap?: THREE.Texture;
   /** Casco do nó `lod1`, se o arquivo trouxe (no máximo metade dos triângulos do `lod0`). */
   lod1?: CarLod;
+  /** Casco HERÓI (V9, `src/assets/cars/hero/<modelo>.glb`): alta definição, só para o carro humano perto da câmera (cars/lod.ts). Sem ele, o modelo não tem herói. */
+  hero?: CarLod;
   /** Roda do próprio arquivo (nó `wheel_fr`, em escala unitária); sem ela, o desenho é o de `wheel`. */
   wheelModel?: WheelModel;
   /** Só em modelo de .glb: o que o contrato do asset pede além do casco. */

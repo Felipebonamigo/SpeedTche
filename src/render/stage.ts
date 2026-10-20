@@ -12,9 +12,11 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CARS } from '../core/data/cars';
 import type { Quality } from '../game/contracts';
 import type { Cars, DisplayCar } from './cars';
+import { heroEnabled } from './cars/lod';
 import { hash2 } from './noise';
 import { palette, type Palette } from './palette';
 import { planFor, type PostPlan } from './postfx/plan';
+import { getRenderPrefs } from './prefs';
 import { ViewportPipeline } from './postfx/pipeline';
 import type { LivePanel, StagePanel } from './stage-bus';
 import {
@@ -338,6 +340,7 @@ export class Stage {
     this.lastTime = time;
     const n = items.length;
     const q = stageQuality(items[0].lp.panel.quality, n);
+    this.cars.setHero(heroEnabled({ quality: q, reduceEffects: items[0].lp.panel.reduceEffects, setting: getRenderPrefs().heroCars })); // a vitrine usa o casco herói, se ligado (V9)
     if (q !== this.quality) {
       this.quality = q;
       this.cars.setQuality(q);

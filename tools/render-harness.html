@@ -10,6 +10,7 @@ import { FINISH_IDS, FLAME_IDS, RIM_IDS, STRIPE_IDS, WHEEL_IDS, WHEEL_LISTS } fr
 import { createRenderer } from '../src/render/renderer.ts';
 import { CAMERA_EXPERIMENT } from '../src/render/camera-base.ts';
 import { loadCarAssets } from '../src/render/cars/assets.ts';
+import { heroEnabled } from '../src/render/cars/lod.ts';
 import { loadLandmarkAssets, loadLandmarkParts } from '../src/render/scenery/landmarks/assets.ts';
 import { setLanguage, t } from '../src/i18n/index.ts';
 import * as THREE from 'three';
@@ -39,6 +40,8 @@ const draftForced = q.get('draft') === '1';
 const reduceFx = q.get('reduce') === '1';
 // cartoon=1: a opção "Efeitos de cartum" (V8: POW, estrelinhas, rodopio e squash & stretch na batida; o padrão é a batida realista).
 const cartoonFx = q.get('cartoon') === '1';
+// hero=0|1|auto|on|off (V9, carros em alta definição): sem o parâmetro vale o automático do jogo (ligado só em Alta e Ultra, nunca com reduce=1).
+const heroFx = heroEnabled({ quality, reduceEffects: reduceFx, setting: ({ '0': 'off', '1': 'on', off: 'off', on: 'on' })[q.get('hero')] ?? 'auto' });
 // win=<segundos>: o carro do jogador cruzou a linha em 1º há tantos segundos (a órbita da vitória da câmera, M5).
 // nitroat=<quadro>: o nitro engata nesse quadro (nitro=1 o liga desde o 1º, e o 1º quadro só guarda o estado: sem anel de engate).
 const nitroAt = Number(q.get('nitroat') ?? -1);
@@ -198,7 +201,7 @@ function raceFrame() {
   if (sheetLook !== undefined && (paintSheet || lookSheet)) looks[state.cars.indexOf(me)] = sheetLook;
   const paints = paintsOfLooks(state.cars, looks);
   const ghost = ghostOn ? { pose: { z: me.z + 420, x: Math.max(-0.9, Math.min(0.9, me.x + 0.35)), speed: me.speed, steerPose: 0, nitro: false }, carId: me.carId, delta: 0.4 } : undefined;
-  return { state, track, viewports, options: { quality, showMinimap: q.get('map') !== '0', screenShake: true, reduceEffects: reduceFx, cartoonEffects: cartoonFx }, time, paused: forcePause, coop: humanCount >= 2, showHud: q.get('hud') !== '0' && !extraCam, ghost, paints, looks };
+  return { state, track, viewports, options: { quality, showMinimap: q.get('map') !== '0', screenShake: true, reduceEffects: reduceFx, cartoonEffects: cartoonFx, heroCars: heroFx }, time, paused: forcePause, coop: humanCount >= 2, showHud: q.get('hud') !== '0' && !extraCam, ghost, paints, looks };
 }
 
 /** Folha de contato: cada estilo (e o 2º GT) desenhado com a mesma câmera e copiado para um quadro. */

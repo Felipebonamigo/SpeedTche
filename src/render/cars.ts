@@ -26,7 +26,7 @@ import { createCarMaterial, FINISH_SHIFT, setCarQuality, tailGlow, type CarUnifo
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
 import { buildModel, modelKey, modelKeys } from './cars/models';
-import { carLodDistance } from './cars/lod';
+import { carDetail } from './cars/lod';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
 import { FLAME_CHOSEN_WHITE, FLAME_FRAG, FLAME_REDUCED, FLAME_SIZE, FLAME_VERT, buildFlameGeometry, flameChosenColor, flameColorFor, flameCover, flameGain } from './cars/flame';
@@ -58,8 +58,11 @@ interface Batch {
   count: number;
 }
 
-/** Um modelo: estilo (`gt`) ou carro com arquivo próprio (`falcao`). `lod1` = o lote do casco simplificado (carros longe). */
-interface StyleBatch extends Batch { readonly key: string; readonly model: CarModel; readonly wheels: WheelBatch; readonly lod1: Batch | null }
+/**
+ * Um modelo: estilo (`gt`) ou carro com arquivo próprio (`falcao`). `lod1` = o lote do casco simplificado (carros longe). `hero` = o lote do casco herói (V9:
+ * alta definição, só o carro humano perto da câmera; só existe se o modelo tem `src/assets/cars/hero/<modelo>.glb`) — um lote por MODELO, nunca por carro.
+ */
+interface StyleBatch extends Batch { readonly key: string; readonly model: CarModel; readonly wheels: WheelBatch; readonly lod1: Batch | null; readonly hero: Batch | null }
 interface WheelBatch extends Batch { readonly model: WheelModel; readonly label: string }
 /** Material e uniformes de um programa de carro: o comum e um por modelo com atlas. */
 interface Rig { readonly material: THREE.MeshPhysicalMaterial; readonly uniforms: CarUniforms }
@@ -120,6 +123,10 @@ export class Cars {
   /** Roda única da qualidade baixa e dos carros distantes (todas numa chamada). */
   private readonly simpleWheels: WheelBatch;
   private lowQuality = false;
+  /** Carros em alta definição ligado neste quadro (V9; `RenderOptions.heroCars`, e o palco por `setHero`). */
+  private heroOn = false;
+  /** Histerese do herói (cars/lod.ts): por viewport (a posição do carro do viewport + 1; 0 = fundo do menu) e por carro; 1 = era herói no quadro anterior. */
+  private readonly heroSeen = new Uint8Array((MAX_CARS + 1) * MAX_CARS);
   private readonly blob: THREE.InstancedMesh;
   private readonly flames: THREE.InstancedMesh;
   private readonly flameMaterial: THREE.ShaderMaterial;
@@ -162,7 +169,7 @@ export class Cars {
   private readonly ghost: THREE.Mesh;
 
   private get instanced(): THREE.InstancedMesh[] {
-    return [...this.styles.flatMap((s) => (s.lod1 ? [s.mesh, s.lod1.mesh] : [s.mesh])), ...this.wheelBatches.map((w) => w.mesh), this.blob, this.flames, this.stars];
+    return [...this.styles.flatMap((s) => [s.mesh, ...(s.lod1 ? [s.lod1.mesh] : []), ...(s.hero ? [s.hero.mesh] : [])]), ...this.wheelBatches.map((w) => w.mesh), this.blob, this.flames, this.stars];
   }
 
   constructor(scene: THREE.Scene) {
@@ -199,15 +206,17 @@ export class Cars {
         this.wheelBatches.push(wheels);
       }
       const lod1 = model.lod1 ? this.batch(model.lod1.shell, MAX_CARS, true, rig.material) : null;
-      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, rig.material), key, model, wheels, lod1 };
+      const hero = model.hero ? this.batch(model.hero.shell, MAX_CARS, true, rig.material) : null;
+      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, rig.material), key, model, wheels, lod1, hero };
       style.mesh.receiveShadow = true;
       if (lod1) lod1.mesh.receiveShadow = true;
+      if (hero) hero.mesh.receiveShadow = true;
       this.styles.push(style);
     }
     const simple = buildSimpleWheel();
     this.simpleWheels = { ...this.batch(simple.geometry, MAX_CARS * 4, false, base.material), model: simple, label: 'simple' };
     this.wheelBatches.push(this.simpleWheels);
-    for (const st of this.styles) { this.batches.push(st); if (st.lod1) this.batches.push(st.lod1); }
+    for (const st of this.styles) { this.batches.push(st); if (st.lod1) this.batches.push(st.lod1); if (st.hero) this.batches.push(st.hero); }
     this.batches.push(...this.wheelBatches);
     this.blob = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.5, 4.9).rotateX(-Math.PI / 2).translate(0, 0.02, 0), new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false }), MAX_CARS);
     this.blob.renderOrder = 1;
@@ -296,6 +305,11 @@ export class Cars {
     }
   }
 
+  /** Liga ou desliga o casco herói (V9): a corrida o recebe do quadro (`update`) e o palco, das opções (`stage.ts`). */
+  setHero(on: boolean): void {
+    this.heroOn = on;
+  }
+
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
   setQuality(q: Quality): void {
     for (const { material, uniforms } of this.rigs) setCarQuality(material, q, uniforms); // um material por modelo com atlas (L3); a L1 passa o nível, não um boolean
@@ -353,6 +367,7 @@ export class Cars {
     this.lastTime = frame.time;
     this.looksIn = frame.looks;
     this.paints = frame.paints;
+    this.heroOn = frame.options.heroCars === true;
     const cars = frame.state.cars;
     const segs = frame.track.segments;
     for (let i = 0; i < cars.length && i < MAX_CARS; i++) {
@@ -430,8 +445,14 @@ export class Cars {
     const d = this.dummy;
     const w = this.wheelDummy;
     let nBlob = 0; let nFlames = 0; let nStars = 0;
-    const farM = carLodDistance(viewportSeats.length);
-    for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
+    const nViews = viewportSeats.length;
+    const mounted = isMountedCamera(camera);
+    // O carro do viewport: o raio do herói conta a partir dele (a posição na pista, não a câmera).
+    let ownX = 0;
+    const ownCar = ownIndex >= 0 ? cars[ownIndex] : undefined;
+    if (ownCar && locateOnFrame(rf, track, ownCar.z, ownCar.x, this.pt)) ownX = this.pt.x;
+    const seen = Math.max(0, ownIndex + 1) * MAX_CARS;
+    for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; if (s.hero) s.hero.count = 0; }
     for (const wb of this.wheelBatches) wb.count = 0;
     for (const s of this.labels) if (s) s.visible = false;
     for (let i = 0; i < cars.length && i < MAX_CARS; i++) {
@@ -463,9 +484,14 @@ export class Cars {
         this.ownEye.x = this.eyeVec.x; this.ownEye.y = this.eyeVec.y; this.ownEye.z = this.eyeVec.z;
         this.ownEyeOn = true;
       }
-      // Longe (e na Baixa) o casco simplificado do LOD1, se o modelo tem; o mesmo critério da roda simples.
-      const far = this.lowQuality || this.pt.z < -farM;
-      this.put(far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);
+      // Três níveis (cars/lod.ts): HERÓI (humano perto da câmera, se o modelo tem casco herói), o casco de sempre e, longe (e na Baixa), o LOD1 e a roda simples.
+      const level = carDetail({
+        human: c.seat >= 0, own: i === ownIndex, mounted, distance: Math.hypot(this.pt.x - ownX, this.pt.z), ahead: -this.pt.z, viewports: nViews,
+        lowQuality: this.lowQuality, heroOn: this.heroOn && look.style.hero !== null, wasHero: this.heroSeen[seen + i] === 1,
+      });
+      this.heroSeen[seen + i] = level === 'hero' ? 1 : 0;
+      const far = level === 'far';
+      this.put(level === 'hero' && look.style.hero ? look.style.hero : far && look.style.lod1 ? look.style.lod1 : look.style, this.m, look, flags);
       // Sombra de contato: no chão, sem rolagem/mergulho.
       d.rotation.set(0, -(this.pt.heading + yaw), 0, 'YXZ');
       d.position.y = this.pt.y;
@@ -655,7 +681,7 @@ export class Cars {
     let nBlob = 0;
     let nFlames = 0;
     this.flameMaterial.uniforms.uTime.value = time;
-    for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; }
+    for (const s of this.styles) { s.count = 0; if (s.lod1) s.lod1.count = 0; if (s.hero) s.hero.count = 0; }
     for (const wb of this.wheelBatches) wb.count = 0;
     for (const s of this.labels) if (s) s.visible = false;
     this.ghost.visible = false;
@@ -668,7 +694,7 @@ export class Cars {
       d.rotation.set(0, it.yaw, 0, 'YXZ');
       d.scale.set(1, 1, 1);
       d.updateMatrix();
-      this.put(look.style, d.matrix, look, look.body);
+      this.put(this.heroOn && look.style.hero ? look.style.hero : look.style, d.matrix, look, look.body); // a vitrine (garagem, pódio): o casco herói, se ligado
       d.position.set(it.x, it.y, it.z);
       d.updateMatrix();
       this.m.copy(d.matrix);

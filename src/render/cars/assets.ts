@@ -4,8 +4,8 @@
 // (docs/CONTRATO-DO-ASSET.md) fica de fora com o motivo e o modelo segue procedural. Sem arquivo nenhum, nada muda.
 import { CAR_BODIES, CARS } from '../../core/data/cars';
 import type { CarBody } from '../../core/types';
-import { parseCarGlb } from './gltf';
-import { setModelOverride } from './models';
+import { parseCarGlb, parseHeroGlb } from './gltf';
+import { setHeroOverride, setModelOverride } from './models';
 
 /** Esquema do protocolo próprio do Electron (desktop/assets.cjs, o mesmo texto): a página é `file://` e o `fetch` de `file:` não funciona. */
 export const ASSET_SCHEME = 'speedtche-asset';
@@ -16,14 +16,20 @@ export const ASSET_SCHEME = 'speedtche-asset';
 const URLS = import.meta.glob<string>('../../assets/cars/*.glb', { query: '?no-inline', import: 'default', eager: true });
 const FILES: Record<string, () => Promise<string>> = Object.fromEntries(Object.entries(URLS).map(([path, url]) => [path, async () => url]));
 
+/** Os cascos HERÓI (V9): `src/assets/cars/hero/<estilo ou carro>.glb`, na pasta própria para não se confundirem com o modelo do carro. */
+const HERO_URLS = import.meta.glob<string>('../../assets/cars/hero/*.glb', { query: '?no-inline', import: 'default', eager: true });
+const HERO_FILES: Record<string, () => Promise<string>> = Object.fromEntries(Object.entries(HERO_URLS).map(([path, url]) => [path, async () => url]));
+
 export interface CarAssetReport {
   /** Chaves aceitas: ids de carro (`falcao`) e estilos (`gt`). */
   loaded: string[];
+  /** Os modelos que ganharam o casco herói (V9). */
+  heroes: string[];
   rejected: { file: string; problems: string[] }[];
   warnings: string[];
 }
 
-let last: CarAssetReport = { loaded: [], rejected: [], warnings: [] };
+let last: CarAssetReport = { loaded: [], heroes: [], rejected: [], warnings: [] };
 
 /** O resultado do último carregamento (para o harness e os playtests). */
 export function lastCarAssetReport(): CarAssetReport { return last; }
@@ -55,8 +61,8 @@ export async function readAsset(url: string): Promise<ArrayBuffer> {
 }
 
 /** Carrega os arquivos e registra os aceitos. `files` = caminho → função que devolve a URL (ou data URL) do .glb. */
-export async function loadCarAssets(files: Record<string, () => Promise<string>> = FILES): Promise<CarAssetReport> {
-  const report: CarAssetReport = { loaded: [], rejected: [], warnings: [] };
+export async function loadCarAssets(files: Record<string, () => Promise<string>> = FILES, heroFiles: Record<string, () => Promise<string>> = files === FILES ? HERO_FILES : {}): Promise<CarAssetReport> {
+  const report: CarAssetReport = { loaded: [], heroes: [], rejected: [], warnings: [] };
   for (const [path, load] of Object.entries(files)) {
     const file = path.slice(path.lastIndexOf('/') + 1);
     const name = file.replace(/\.glb$/i, '');
@@ -70,6 +76,24 @@ export async function loadCarAssets(files: Record<string, () => Promise<string>>
       const { model, problems, warnings } = await parseCarGlb(body, await readAsset(await load()), car ? { carId: car.id } : {});
       report.warnings.push(...warnings.map((w) => `${file}: ${w}`));
       if (model && problems.length === 0) { setModelOverride(car ? car.id : body, model); report.loaded.push(car ? car.id : body); } else report.rejected.push({ file, problems });
+    } catch (e) {
+      report.rejected.push({ file, problems: [`não carregou: ${e instanceof Error ? e.message : String(e)}`] });
+    }
+  }
+  // Cascos herói (V9): o arquivo recusado fica de fora com o motivo e o modelo segue sem herói (o jogo é o de sempre).
+  for (const [path, load] of Object.entries(heroFiles)) {
+    const file = `hero/${path.slice(path.lastIndexOf('/') + 1)}`;
+    const name = file.slice(5).replace(/\.glb$/i, '');
+    const car = CARS.find((c) => c.id === name);
+    const body = (car ? car.body : name) as CarBody;
+    if (!car && !CAR_BODIES.includes(body)) {
+      report.rejected.push({ file, problems: [`"${name}" não é um carro nem um estilo (o herói tem o nome do modelo que ele atende)`] });
+      continue;
+    }
+    try {
+      const { model, problems, warnings } = await parseHeroGlb(body, await readAsset(await load()));
+      report.warnings.push(...warnings.map((w) => `${file}: ${w}`));
+      if (model && problems.length === 0) { setHeroOverride(name, { shell: model.shell, triangles: model.triangles }); report.heroes.push(name); } else report.rejected.push({ file, problems });
     } catch (e) {
       report.rejected.push({ file, problems: [`não carregou: ${e instanceof Error ? e.message : String(e)}`] });
     }

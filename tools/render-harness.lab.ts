@@ -8,6 +8,7 @@ import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
 import { paintsOfLooks, raceLooks } from '../src/game/paints';
 import { loadCarAssets } from '../src/render/cars/assets';
+import { heroEnabled, type HeroSetting } from '../src/render/cars/lod';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
 import { resetRenderPrefs, setRenderPrefs } from '../src/render/prefs';
@@ -40,6 +41,8 @@ let seatCameras: CameraMode[] | undefined;
 let cartoonFx = false;
 /** A opção "Reduzir efeitos" no quadro (V10: a diferença entre o quadro com ela e sem ela é só dos efeitos). */
 let reduceFx = false;
+/** O interruptor "Carros em alta definição" no quadro (V9): o padrão do jogo é o automático (Alta e Ultra). */
+let heroMode: HeroSetting = 'auto';
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[], carIds?: string[]): void {
@@ -67,7 +70,7 @@ function frameFor(quality: Quality): RenderFrame {
   return {
     state, track,
     viewports: humans.map((h) => ({ seat: h.seat, carIndex: state.cars.findIndex((c) => c.seat === h.seat), color: h.color, name: h.name, messages: [], ...(seatCameras?.[h.seat] ? { camera: seatCameras[h.seat] } : {}) })),
-    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: reduceFx, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx },
+    options: { quality, showMinimap: false, screenShake: DEFAULT_SETTINGS.screenShake, reduceEffects: reduceFx, palette: DEFAULT_SETTINGS.colorPalette, landmarkCaptions: false, cartoonEffects: cartoonFx, heroCars: heroEnabled({ quality, reduceEffects: reduceFx, setting: heroMode }) },
     time: tick / 60, paused: false, coop: humans.length >= 2, showHud: false, paints: paintsOfLooks(state.cars, looks), looks,
   };
 }
@@ -588,6 +591,8 @@ const lab = {
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
   setReduce: (on: boolean): void => { reduceFx = on; },
   setCartoon: (on: boolean): void => { cartoonFx = on; },
+  /** O interruptor dos carros em alta definição (V9) nos quadros seguintes: auto (padrão), on (também na Média) ou off. */
+  setHero: (mode: HeroSetting): void => { heroMode = mode; },
   /** Esconde (ou mostra) a malha de efeito `name` (`fx-streaks`, `fx-dust`...) só pelo material: `Effects` mexe na `visible` da malha a cada quadro. */
   hideFx: (name: string, hide: boolean): void => {
     scene.traverse((o) => { const m = o as THREE.Mesh; if (o.name === name && m.material) (m.material as THREE.Material).visible = !hide; });

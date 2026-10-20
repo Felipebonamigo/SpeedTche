@@ -23,7 +23,7 @@ const m1 = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, 
 const int = (v: number) => v.toLocaleString('pt-BR');
 
 /** Problemas do modelo, em português (vazio = aceito). */
-export function checkCarModel(m: CarModel): string[] {
+export function checkCarModel(m: CarModel, opts: { maxTriangles?: number } = {}): string[] {
   const out: string[] = [];
   const L = CAR_LIMITS;
   const g = m.shell;
@@ -67,7 +67,8 @@ export function checkCarModel(m: CarModel): string[] {
     if (Math.abs(e[0]) >= 0.95) out.push('o escapamento sai da largura do carro');
   }
 
-  if (m.triangles > L.maxShellTriangles) out.push(`${int(m.triangles)} triângulos no casco (até ${int(L.maxShellTriangles)})`);
+  const cap = opts.maxTriangles ?? L.maxShellTriangles; // o casco herói (V9) tem o teto dele: `HERO_MAX_TRIANGLES`
+  if (m.triangles > cap) out.push(`${int(m.triangles)} triângulos no casco (até ${int(cap)})`);
 
   // As pinturas que os carros deste estilo usam têm de existir na malha (senão dois carros saem iguais).
   const paint = g.getAttribute('aPaint');

@@ -2,7 +2,7 @@
 // reserva (estilo sem construtor é erro, e o teste confere que as 13 malhas são diferentes). O modelo de
 // um .glb da arte (assets.ts, passo 2.4) tem precedência sobre o construtor — por carro (`falcao.glb`) ou por estilo (`gt.glb`).
 import type { CarBody, CarDef } from '../../core/types';
-import type { CarModel, Lod } from './model';
+import type { CarLod, CarModel, Lod } from './model';
 import { buildClassic } from './styles/classic';
 import { buildElectric } from './styles/electric';
 import { buildGt } from './styles/gt';
@@ -39,6 +39,14 @@ export const MODEL_BUILDERS: Readonly<Record<CarBody, (lod?: Lod) => CarModel>> 
  */
 const overrides = new Map<string, CarModel>();
 
+/** Cascos herói (V9) por chave de modelo (estilo ou carro): vêm de `src/assets/cars/hero/<chave>.glb` (assets.ts). */
+const heroes = new Map<string, CarLod>();
+
+/** Registra (ou, com null, tira) o casco herói de um modelo. */
+export function setHeroOverride(key: string, hero: CarLod | null): void {
+  if (hero) heroes.set(key, hero); else heroes.delete(key);
+}
+
 /** Troca (ou, com null, devolve ao procedural) o modelo de um carro ou de um estilo. */
 export function setModelOverride(key: string, model: CarModel | null): void {
   if (model) overrides.set(key, model); else overrides.delete(key);
@@ -64,11 +72,17 @@ export function modelKeys(bodies: readonly CarBody[], cars: readonly Pick<CarDef
 
 export function buildModel(key: string): CarModel {
   const loaded = overrides.get(key);
-  if (loaded) return loaded;
+  if (loaded) return withHero(key, loaded);
   const make = MODEL_BUILDERS[key as CarBody];
   if (!make) throw new Error(`Estilo de carroceria sem modelo: ${key}`);
   // O casco simples (lod1) do procedural sai do MESMO construtor, no nível 1 (M4): carros a mais de 30 m e a qualidade Baixa.
   const full = make();
   const low = make(1);
-  return { ...full, lod1: { shell: low.shell, triangles: low.triangles } };
+  return withHero(key, { ...full, lod1: { shell: low.shell, triangles: low.triangles } });
+}
+
+/** O modelo com o casco herói da chave, se houver (V9). */
+function withHero(key: string, model: CarModel): CarModel {
+  const hero = heroes.get(key);
+  return hero ? { ...model, hero } : model;
 }

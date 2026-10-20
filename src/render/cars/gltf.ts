@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { CarBody } from '../../core/types';
 import { CAR_LIMITS, checkCarModel } from './check';
+import { HERO_MAX_TRIANGLES } from './lod';
 import { MeshBuilder, type Brush, type P2, type P3 } from './kit';
 import type { Axle } from './body';
 import type { CarContract, CarModel } from './model';
@@ -136,7 +137,7 @@ const DEFAULT_SPOKES = 6;
  * falta o que a convenção exige; os problemas de medida (pegada, rodas, luzes…) vêm do validador comum.
  * `carId`: o arquivo é de um carro só (`src/assets/cars/<carId>.glb`), não do estilo.
  */
-export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: string): GltfCar {
+export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: string, opts: { maxTriangles?: number } = {}): GltfCar {
   root.updateMatrixWorld(true);
   const { parts, nodes, lodNodes, seats } = collect(root);
   const missing = WHEEL_NODES.filter((n) => !nodes.has(n) || !parts.some((p) => p.under === n));
@@ -288,15 +289,45 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
     ...(shellHasLadder ? { ladder: true } : {}),
     ...(carId ? { carId } : {}), ...(lod1 ? { lod1 } : {}), ...(map ? { map } : {}), ...(normalMap ? { normalMap } : {}),
   };
-  return { model, problems: [...problems, ...checkCarModel(model)], warnings: [...new Set(warnings)] };
+  return { model, problems: [...problems, ...checkCarModel(model, opts)], warnings: [...new Set(warnings)] };
 }
 
-/** Lê um .glb (ArrayBuffer) e devolve o modelo do jogo e os problemas. `opts.carId`: o arquivo é de um carro só. */
-export async function parseCarGlb(body: CarBody, data: ArrayBuffer, opts: { carId?: string } = {}): Promise<GltfCar> {
+/** Lê um .glb (ArrayBuffer) e devolve o modelo do jogo e os problemas. `opts.carId`: o arquivo é de um carro só; `opts.maxTriangles`: outro teto de casco (o herói). */
+export async function parseCarGlb(body: CarBody, data: ArrayBuffer, opts: { carId?: string; maxTriangles?: number } = {}): Promise<GltfCar> {
   try {
     const gltf = await new GLTFLoader().parseAsync(data, '');
-    return carModelFromGltf(body, gltf.scene, opts.carId);
+    return carModelFromGltf(body, gltf.scene, opts.carId, opts);
   } catch (e) {
     return { model: null, problems: [`o arquivo não abre como glTF: ${e instanceof Error ? e.message : String(e)}`], warnings: [] };
   }
+}
+
+/**
+ * O casco HERÓI de um estilo (V9, `src/assets/cars/hero/<estilo>.glb`): o mesmo contrato dos carros da arte (nós, materiais, rodas do projeto, escapes), com o teto
+ * `HERO_MAX_TRIANGLES`, e a geometria base do estilo intacta — a física, os rastros e a chama não podem notar a troca. Devolve os problemas de um e de outro.
+ */
+export async function parseHeroGlb(body: CarBody, data: ArrayBuffer): Promise<GltfCar> {
+  const r = await parseCarGlb(body, data, { maxTriangles: HERO_MAX_TRIANGLES });
+  if (!r.model) return r;
+  return { ...r, problems: [...r.problems, ...heroProblems(r.model, MODEL_BUILDERS[body]())] };
+}
+
+/** O que o herói tem de manter do modelo de sempre: eixos, bitola e tamanho das rodas, escapes (2 cm) e a pegada (6 cm). */
+export function heroProblems(hero: CarModel, base: CarModel): string[] {
+  const out: string[] = [];
+  const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+  hero.axles.forEach((a, i) => {
+    for (const k of ['z', 'x', 'r', 'w'] as const) if (!near(a[k], base.axles[i][k], 0.02)) out.push(`o eixo ${i === 0 ? 'da frente' : 'de trás'} difere do modelo de sempre em ${k} (${a[k].toFixed(3)} × ${base.axles[i][k].toFixed(3)}): a física e a chama dependem dele`);
+  });
+  for (const b of base.exhausts) {
+    const e = hero.exhausts.find((x) => Math.sign(x[0]) === Math.sign(b[0]));
+    if (!e || [0, 1, 2].some((k) => !near(e[k], b[k], 0.02))) out.push(`o escapamento ${b[0] > 0 ? 'direito' : 'esquerdo'} não está onde o do modelo de sempre está (a chama do nitro sai dele)`);
+  }
+  const hb = hero.shell.boundingBox; const bb = base.shell.boundingBox;
+  if (hb && bb) {
+    for (const k of ['x', 'z'] as const) if (hb.max[k] > bb.max[k] + 0.06 || hb.max[k] < bb.max[k] - 0.06 || hb.min[k] > bb.min[k] + 0.06 || hb.min[k] < bb.min[k] - 0.06) out.push(`a pegada em ${k} sai de ±6 cm do modelo de sempre`);
+    if (Math.abs(hb.max.y - bb.max.y) > 0.06) out.push(`a altura (${hb.max.y.toFixed(2)} m) sai de ±6 cm da do modelo de sempre (${bb.max.y.toFixed(2)} m)`);
+    if (hb.min.y < 0.06 || hb.min.y > bb.min.y + 0.08) out.push(`o ponto mais baixo (${hb.min.y.toFixed(2)} m) sai da faixa do modelo de sempre`);
+  }
+  return out;
 }
