@@ -49,3 +49,6 @@ Folga em △ de pior viewport, ao limite de hoje: copa-4p Média 111 mil, Alta 1
 
 ### 6. Ferramentas e arquivos
 `tools/folga-perfil.mjs` (perfil por categoria e passe), `tools/folga-gate.mjs <raiz>` (contagens do gate de qualquer worktree), `tools/folga-recorte.mjs` (antes | depois | diferença ampliados), `lab.perfil` e `lab.hold` em `tools/render-harness.lab.ts`. Código de jogo: `src/render/scenery/runtime.ts`, `src/render/cars.ts`, `src/render/cars/lod.ts` (novo), `src/render/renderer.ts` (só passa o número de viewports).
+
+### 7. Teste existente alterado de propósito
+`tests/corrida-que-muda-gl.test.ts` (M6): exigia chamadas ≤ primeira + 1 e triângulos dentro de 0,5% durante a transição dia → entardecer. Com o corte contra a caixa do mapa de sombra (que gira com o sol) o quadro passa a variar: Copacabana Média 78 → 80 chamadas e 235.963 → 247.020 △ (+4,7%), ainda abaixo do 273.962 de antes. Limites novos: chamadas ≤ primeira + 3, triângulos < 7%. Prova final (mesmo turno): `NC_REQUIRE_GL=1 npx vitest run gl-render stage-gl corrida-que-muda-gl carros-nacionais-gl folga-gl` → gate e stage passam; a única falha era esta; depois do ajuste 3/3. Testes da área (scenery, landmark, terrain, road, car-, cars, quality, bench, corrida-que-muda, pistas-v4, estrada-, hc2-, noite-roxa, render, stage, folga, sem os GL): 66 arquivos, 1114 passaram. `tsc` limpo.

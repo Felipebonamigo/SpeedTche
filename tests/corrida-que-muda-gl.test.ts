@@ -52,10 +52,13 @@ describe.skipIf(!available)('M6 (b): a corrida que muda em GL (swiftshader)', { 
       const first = r.frames[0];
       for (const f of r.frames) {
         // O reflexo de lente do entardecer (M2) é 1 malha e 16 triângulos que só existem com o sol do entardecer: a única chamada a mais que a transição pode trazer.
-        expect(f.calls, `${q} ${f.fraction}: chamadas`).toBeLessThanOrEqual(first.calls + 1);
+        // V13: o cenário agora corta por objeto também contra a caixa do mapa de sombra, que gira com o sol: com o sol baixo do entardecer entram na caixa lotes
+        // (e triângulos) que ao meio-dia ficavam fora — até +2 chamadas de sombra e ~5% de triângulos (medido em Copacabana Média: 78 → 80 e 235.963 → 247.020).
+        // Antes cada lote desenhava a janela toda nos dois passes e esta conta era constante (79 → 80 e 273.962 → 273.996); o total continua bem abaixo do de antes.
+        expect(f.calls, `${q} ${f.fraction}: chamadas`).toBeLessThanOrEqual(first.calls + 3);
         expect(f.calls, `${q} ${f.fraction}: chamadas`).toBeGreaterThanOrEqual(first.calls);
         // Os triângulos andam um pouco com o relógio (poeira, balanço das copas): a transição não os muda além disso.
-        expect(Math.abs(f.triangles - first.triangles) / first.triangles, `${q} ${f.fraction}: triângulos`).toBeLessThan(0.005);
+        expect(Math.abs(f.triangles - first.triangles) / first.triangles, `${q} ${f.fraction}: triângulos`).toBeLessThan(0.07);
       }
       // Os programas existem desde o primeiro quadro (o aquecimento dos faróis); a transição não cria nenhum.
       const afterWarm = r.frames[3].programs;
