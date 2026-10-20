@@ -79,8 +79,8 @@ describe.skipIf(!available)('carro herói (GL, swiftshader)', { timeout: 1_500_0
     expect(await heroes('copacabana', 1, 'high', 'auto', ['falcao'])).toEqual([1]);
   });
 
-  it('o carro que não tem casco herói não ganha: o Trovão (muscle) do jogador 1 segue no casco de sempre', async () => {
-    expect(await heroes('copacabana', 1, 'high', 'auto', ['trovao'])).toEqual([0]);
+  it('o carro que não tem casco herói não ganha: o Tornado (hatch) do jogador 1 segue no casco de sempre', async () => {
+    expect(await heroes('copacabana', 1, 'high', 'auto', ['tornado'])).toEqual([0]);
   });
 
   it('desligado: Baixa nunca, Reduzir efeitos nunca, interruptor desligado nunca, Média no automático nunca; Média com "ligado" sim', async () => {

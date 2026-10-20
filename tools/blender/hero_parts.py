@@ -9,6 +9,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import build_hero_gt as H  # noqa: E402
+from mathutils import Matrix  # noqa: E402
 from build_hero_gt import Part, Vector, v3, frame, lathe, box, extrude, tube, project, patch_on, strip_on, hex_cells, rounded, facing  # noqa: E402,F401
 
 AXIS_WANT = {"back": (0, 1, 0), "front": (0, -1, 0), "top": (0, 0, 1), "side+": (1, 0, 0), "side-": (-1, 0, 0)}
@@ -137,7 +138,7 @@ def strip_lamp(Pl, Pled, tree, axis, cx, cz, a, b, mats=TAIL_MATS, slope=0.0, n=
         M = frame(pm, nrm, up=(0, 0, 1))
         ang = math.atan2(zb - za, xb - xa)
         # a barra: caixa no plano da pele, comprimento pelo eixo x local, girada pela inclinação
-        Mr = M @ __import__("mathutils").Matrix.Rotation(-ang, 4, "Y")
+        Mr = M @ Matrix.Rotation(-ang, 4, "Y")
         box(Pl, (0, 0, 0), ((pb - pa).length, 0.0075, hbar_w), mats["rib"], Mr)
     if dots:
         for rr in dot_rows:
@@ -291,7 +292,6 @@ def calipers_part(axles, mat="accent"):
 def rbox(P, c, size, mat, bevel=0.02, seg=2, M=None):
     """Caixa de arestas arredondadas (bevel) de centro `c` e lados `size`; `M` (matriz 4×4 em torno de `c`) gira a peça. Faces para fora."""
     import bmesh
-    from mathutils import Matrix
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     for v in bm.verts:

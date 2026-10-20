@@ -49,3 +49,6 @@ O custo de um herói é o arquivo + um lote por modelo (+2 chamadas só quando e
 
 ## 6. Arquivos
 `src/render/cars/lod.ts`, `cars.ts`, `models.ts`, `model.ts`, `assets.ts`, `gltf.ts`, `check.ts`, `src/render/stage.ts`, `prefs.ts`, `src/game/{contracts,settings,session}.ts`, `src/ui/screens/{options,strings}.ts`, `src/access/{screen.ts,access.css}`, `tools/blender/{build_hero_gt.py,hero/*}`, `tools/{heroi-folha,heroi-gate}.mjs`, `tools/render-harness.{html,lab.ts}` (`hero=` e `lab.setHero`), `tests/heroi-*.test.ts`.
+
+
+> **Atualização (V15, 20/10/2026):** o pipeline foi estendido a hyper, wedge, prototype, roadster, muscle e rally (`docs/ondas/V15-herois.md`): 4 humanos em 4 estilos cabem no gate; o herói soma 0 chamadas fora do GT.

@@ -252,6 +252,22 @@ construtor é erro (`buildModel`), e `tests/car-models.test.ts` confere que as 1
 Todos ocupam a pegada de colisão (~4,4 × 1,9 m; o teste prende o casco em |x| ≤ 1,0 m e |z| ≤ 2,35 m,
 com as rodas dentro da largura).
 
+### Carro herói (V9 e V15)
+
+Além do modelo procedural de cada estilo, sete estilos têm um **casco herói** de alta definição (13,5 a 15,5 mil △, feito no Blender por script, `tools/blender/`; `HERO_STYLES` em `src/render/cars/lod.ts`): o carro **humano** a menos de 24 m do carro do viewport (12 m na tela dividida) usa o herói; a IA e quem está longe seguem no casco de sempre (`docs/ondas/V9-heroi.md`, `docs/ondas/V15-herois.md`; opção "Carros em HD", automática em Alta e Ultra). Mesma pegada, eixos e escapes do estilo (a física e a chama não mudam), os mesmos nós e materiais (tinta, faixas A/B, acento, roda, chama, verniz e halo das lanternas continuam valendo), lanternas em **tira de LED** onde o estilo pede e sem logo nem marca.
+
+| Estilo | Carro(s) | Herói | △ | O que o herói traz a mais |
+|---|---|---|---|---|
+| `gt` | Falcão GT, Boitatá GT | `hero/gt.glb` (V9) | 13.838 | 4 lanternas de LED com lente, colmeia, difusor de 9 aletas, escapes duplos, asa com suportes, faróis de projetor |
+| `hyper` | Pororoca V10 | `hero/hyper.glb` | 15.490 | duas tiras de LED por lado, colmeia entre os escapes centrais, difusor de 11 aletas, asa de pescoço de cisne, faróis em fenda, entrada de ar enorme no flanco |
+| `wedge` | Iara Turbo | `hero/wedge.glb` | 14.836 | grade-lanterna de ponta a ponta (tira de LED atrás de três lâminas), faróis escamoteáveis que sobem à noite, placa lisa, asa de postes, venezianas |
+| `prototype` | Beija-Flor | `hero/prototype.glb` | 13.550 | faixa de LED em três células, escape central, difusor de 12 aletas, asa de ponta a ponta com placas, barbatana, painel de número |
+| `roadster` | Curupira S | `hero/roadster.glb` | 14.534 | cockpit com tina, painel, dois bancos, piloto de capacete e volante, para-brisa com moldura, santantônio, corcovas, faróis redondos embutidos, 4 lanternas redondas de LED |
+| `muscle` | Trovão V12 (o Gaúcho V8 tem o `.glb` próprio e não entra) | `hero/muscle.glb` | 14.000 | faixa de LED em três células, tomada de ar elevada no capô, grade com lamelas, faróis redondos, para-choques cromados, escapes gêmeos |
+| `rally` | Carcará RS | `hero/rally.glb` | 15.314 | faixa de LED alta, faróis em fenda e quatro de milha, painel de número, para-barros, borda preta dos arcos, tomada de ar do teto, asa grande |
+
+Os outros seis estilos (`hatch`, `sedan`, `electric`, `classic`, `pickup`, `micro`) e os nacionais já em `.glb` seguem sem herói. Estilo novo: gaiola (`npx tsx tools/blender/hero/exportar-gaiola.ts <estilo>`), módulo em `tools/blender/hero_styles/`, `npm run carros-herois`, linha em `HERO_STYLES` e em `docs/ARTE.md`, e a entrada em `tests/herois-asset.test.ts`.
+
 ### Como um modelo é feito (`src/render/cars/`)
 
 - `kit.ts` — o construtor de malha (`MeshBuilder`) e as primitivas fechadas com as faces para fora:
