@@ -31,12 +31,13 @@ export const GATE_SCENES: ReadonlyArray<{ id: string; track: string; humans: num
 // 10/10/2026 (M5): +1 chamada em Média com 2 e 4 jogadores (copa-2p 77 → 78, copa-4p 79 → 80): a malha de traços das linhas de velocidade 3D (fx/streaks.ts) acende acima de 85% da máxima, e o piso medido já estava no limite. Deliberado e medido (tools/render-harness.lab.ts, com e sem o grupo de efeitos); os outros degraus ficam dentro.
 // 12/10/2026 (M6): Sampa 4p Média 306 mil → 345 mil e Alta/Ultra 350 mil → 380 mil triângulos (medido 339 mil e 372 mil; antes da M6, 300 mil na Média: +13%). O traçado do mapa fecha a pista (a curva da pista é a do mapa) e, provavelmente (não isolado), o corte de instâncias por câmera do BatchedMesh deixa entrar no quadro mais cenário nas curvas fechadas; as chamadas não mudaram (as cenas da copa também ficam dentro). Deliberado e medido (tools/render-harness.lab.ts); provisório até o `--bench` do dono.
 // 10/10/2026 (N3): copa-4p/medium 80 → 82: uma roda escolhida que ninguém mais usa na cena abre um lote (+1 chamada, teto de 9 lotes).
+// 22/10/2026 (V9): copa-1p Alta/Ultra +1 chamada (84 → 85, 85 → 86): o carro herói do jogador (Falcão GT em alta definição) abre 1 lote de casco a mais com 1 humano (medido: 83 → 85 e 84 → 86 com o herói ligado; o laboratório de contagem parte com o herói desligado, e `tests/heroi-gl.test.ts` mede o herói à parte). Triângulos com folga enorme (V13). Provisório até o `--bench` do dono.
 export const GATE_LIMITS: GateLimits = {
   'copa-1p': {
     low: { calls: 38, triangles: 173000, passes: 0, postPxRatio: 0 },
     medium: { calls: 80, triangles: 315000, passes: 5, postPxRatio: 5.8 },
-    high: { calls: 84, triangles: 340000, passes: 5, postPxRatio: 7.1 },
-    ultra: { calls: 85, triangles: 340000, passes: 5, postPxRatio: 8.7 },
+    high: { calls: 85, triangles: 340000, passes: 5, postPxRatio: 7.1 },
+    ultra: { calls: 86, triangles: 340000, passes: 5, postPxRatio: 8.7 },
   },
   'copa-2p': {
     low: { calls: 39, triangles: 174000, passes: 0, postPxRatio: 0 },
