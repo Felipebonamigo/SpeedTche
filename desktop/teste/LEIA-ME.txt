@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.8, build de 20/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.9, build de 20/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,12 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.9 (sobre a 0.1.8):
+  * CARRO DA FIRMA: o Furgãozinho da Firma agora também sai com 5 VITÓRIAS SEGUIDAS no Saci Mirim (além das 10 vitórias sem comprar carro).
+    Qualquer uma das duas libera. Contra-relógio não conta nem zera a sequência.
+  * CÓPIA DE SEGURANÇA DO SAVE: na primeira abertura depois de uma versão nova, o jogo guarda uma cópia dos seus saves em
+    saves/backup/<versão anterior>/ (as 3 mais recentes). Se voltar a uma versão antiga e perder algo, é lá que está.
+  * Correções no Electron: conquista da Steam e gravação do save agora deixam rastro no relatório de erros quando falham.
 - NOVIDADES DA 0.1.8 (sobre a 0.1.7):
   * NOITE MAIS ROXA: o céu, a névoa, o chão e o cenário à noite ficam violeta (mais perto do estilo que queremos); a luz que cai no
     carro não muda, então o carro branco continua branco e o vermelho continua vermelho.

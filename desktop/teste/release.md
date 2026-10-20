@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.8 — versão de teste para amigos** (build de 20/10/2026)
+**Speed Tchê 0.1.9 — versão de teste para amigos** (build de 20/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.8-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.8-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.9-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.9-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.9: o **Furgãozinho da Firma** agora também sai com **5 vitórias seguidas no Saci Mirim**; **cópia de segurança dos saves** na troca de versão (`saves/backup/`); correções no Electron (conquista da Steam e gravação deixam rastro quando falham).
 
 Novidades da 0.1.8: **noite mais roxa** (céu, névoa, chão e cenário violeta; o carro continua com a mesma luz) e a opção **"Alta em curva"** em Opções › Acessibilidade (câmera Alta mais baixa e afastada que mostra mais curva; vem desligada).
 
