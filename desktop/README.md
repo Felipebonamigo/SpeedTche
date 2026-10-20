@@ -226,7 +226,7 @@ Com o `localStorage` cheio (cota), toda gravação vai para o arquivo mesmo assi
 
 **Configurar no Steamworks** (App Admin → Cloud → Steam Auto-Cloud):
 
-1. Cota: 1 MB e 20 arquivos por usuário é folga (hoje são 2 arquivos de poucos KB).
+1. Cota: 1 MB e 20 arquivos por usuário é folga (hoje são 5 arquivos: `save` e `settings` de poucos KB, `progress`, `ghosts` com teto de 160 KB e `playlog` com teto de 250 KB; os tetos de `ghosts` e `playlog` já somam 410 KB, então o MB inteiro não é tanta folga quanto parece).
 2. **Um** caminho raiz, valendo para todos os sistemas, e **substituições de raiz** (Root Overrides) para
    Linux e macOS. Três raízes independentes, uma por sistema, **não** sincronizam entre si: o save do PC não
    chegaria ao Steam Deck. A documentação da Steamworks diz que, para save entre plataformas, se define uma

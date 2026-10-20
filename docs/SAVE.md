@@ -201,3 +201,21 @@ em Opções › Acessibilidade › "Alta em curva". **Global** (vale para a Alta
 abrem com `false`, a Alta aprovada de sempre; lixo no campo vira `false`. A 0.1.7 lê as opções novas sem erro e sem perder nada (o saneador dela é lista branca: o campo novo não muda nenhum outro);
 se ela regravar as opções, o campo cai e a Alta volta à aprovada — o único efeito. Só renderização e opções: nada no núcleo, na rede, em `hashRace` ou `sim-golden`.
 Testes: `tests/camera-curva-opcao.test.ts` (opções literais da 0.1.7, a lista de campos do saneador, a pose, a sessão e a tela).
+
+## Voltar a uma versão anterior (A1, 20/10/2026)
+
+Medido passando o save "jogado" da 0.1.8 (`tests/fixtures/saves-antigos/v0.1.8-completo.json`) pelos saneadores de cada versão
+(`npx tsx scripts/comparar-versoes.mts feed <raiz> <save>` num worktree da versão). O que cada uma **descarta ao regravar** (as
+chaves `speed-tche.*` que ela não lê ficam intactas no `localStorage` e no arquivo — `cloudsave.ts` e `storage.cjs` são idênticos desde a 0.1.4):
+
+| Volta para | Perde |
+|---|---|
+| 0.1.7 e 0.1.6 | só `highCurveCamera` (a Alta em curva volta desligada). Nada mais: `progress`, carros, copa e recordes iguais. |
+| 0.1.5 e 0.1.4 | `assistOfferDeclined` e `cartoonEffects` (e, na 0.1.4, `seatCameras` e os botões de câmera); **os 12 carros novos (2 livres, 8 à venda e 2 de conquista)**: `carsUnlocked`, a garagem da Expedição (`owned`, as peças dos carros novos e o `carId` se for um deles), o carro lembrado em `seatCars`, e **a copa em andamento inteira se algum humano corre com carro novo**. **O dinheiro gasto neles não volta.** A maestria (`speed-tche.progress`) não é lida nem apagada; o nível segue as estatísticas. |
+| 0.1.3 | o acima, mais `lockFps30` e `autoQuality` (antes da 0.1.4) e as estrelas (`stars`). |
+| 0.1.2 e 0.1.1 | o acima, mais `sessionStart`/`recap` (o quadro "Desde a última vez"); a 0.1.1 também as pinturas novas (`seatLooks`) e os botões de derrapar, olhar para trás e buzina. |
+
+Ao voltar para a 0.1.8 depois disso: os carros de **conquista** (Furgãozinho, Gaúcho V8) reaparecem sozinhos (`syncConquestCars` lê as conquistas,
+que as versões antigas guardam como texto); os **comprados** não. `bestLaps`/`bestRaces`/`stats` ficam. Aceitável para a versão de teste desde que
+o LEIA-ME diga (diz); para a loja, a saída é gravar a versão que gravou o save e, ao abrir uma versão **mais antiga**, copiar `saves/*.json`
+para `saves/backup/<versão>/` antes de qualquer regravação (a subpasta fica fora do Auto-Cloud, que sincroniza só `saves/*.json`, sem recursão).
