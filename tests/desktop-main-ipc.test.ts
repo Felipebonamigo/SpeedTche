@@ -1,6 +1,6 @@
 // A1 (docs/ondas/A1-auditoria-save.md, achados 4a e 4b): o main.cjs RODA aqui de verdade, com o `electron` e o `steamworks.js` falsos, e os
 // handlers de IPC são chamados como a página os chama. Até a A1 só havia teste de TEXTO sobre ele (regex em desktop-storage.test.ts).
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +18,7 @@ interface FakeSteam {
 }
 
 /** Carrega o main.cjs com um `electron` falso (userData numa pasta temporária) e devolve os handlers registrados. */
-async function loadMain(appData: string, steam: FakeSteam | null): Promise<Map<string, Handler>> {
+async function loadMain(appData: string, steam: FakeSteam | null, version = '0.1.8'): Promise<Map<string, Handler>> {
   const handlers = new Map<string, Handler>();
   const paths: Record<string, string> = {};
   class FakeWindow {
@@ -33,7 +33,7 @@ async function loadMain(appData: string, steam: FakeSteam | null): Promise<Map<s
     app: {
       getPath: (n: string) => paths[n] ?? (n === 'appData' ? appData : join(appData, n)),
       setPath: (n: string, p: string) => { paths[n] = p; },
-      requestSingleInstanceLock: () => true, quit() { /* nada */ }, on() { /* nada */ }, isPackaged: false, getLocale: () => 'pt-BR',
+      requestSingleInstanceLock: () => true, quit() { /* nada */ }, on() { /* nada */ }, isPackaged: false, getLocale: () => 'pt-BR', getVersion: () => version,
       whenReady: () => Promise.resolve(), commandLine: { appendSwitch() { /* nada */ } },
     },
     BrowserWindow: FakeWindow,
@@ -158,5 +158,106 @@ describe('main.cjs: o save em arquivo que não gravou deixa rastro no errors.log
     writeFileSync(join(savesDir(), 'speed-tche.save.json'), '{}');
     await invoke(h, 'store:readAll');
     expect(errorsLog()).toBe('');
+  });
+});
+
+// A2 (docs/ondas/A2-backup.md): na 1ª abertura depois de mudar de versão, saves/*.json é copiado para saves/backup/<versão anterior>/.
+describe('main.cjs: backup dos saves na troca de versão (A2)', () => {
+  const backupDir = () => join(savesDir(), 'backup');
+  const seed = (files: Record<string, string>) => {
+    mkdirSync(savesDir(), { recursive: true });
+    for (const [n, c] of Object.entries(files)) writeFileSync(join(savesDir(), n), c);
+  };
+  const backups = () => (existsSync(backupDir()) ? readdirSync(backupDir()).sort() : []);
+
+  it('1ª instalação (sem saves): nenhum backup, só o marcador da versão', async () => {
+    await loadMain(appData, null, '0.1.8');
+    expect(backups()).toEqual([]);
+    expect(readFileSync(join(savesDir(), '.versao'), 'utf8').trim()).toBe('0.1.8');
+    expect(errorsLog()).toBe('');
+  });
+
+  it('versão diferente da do marcador: copia saves/*.json com os mesmos bytes para backup/<anterior>/', async () => {
+    seed({ '.versao': '0.1.7\n', 'speed-tche.save.json': '{"cars":[1,2,3]}', 'speed-tche.settings.json': '{"a":1}', 'speed-tche.save.json.tmp': 'parcial', 'leia.txt': 'x' });
+    await loadMain(appData, null, '0.1.8');
+    expect(backups()).toEqual(['0.1.7']);
+    const dir = join(backupDir(), '0.1.7');
+    expect(readdirSync(dir).sort()).toEqual(['speed-tche.save.json', 'speed-tche.settings.json']); // sem .tmp e sem o que não é .json
+    expect(readFileSync(join(dir, 'speed-tche.save.json'), 'utf8')).toBe('{"cars":[1,2,3]}');
+    expect(readFileSync(join(savesDir(), 'speed-tche.save.json'), 'utf8')).toBe('{"cars":[1,2,3]}'); // o original fica
+    expect(readFileSync(join(savesDir(), '.versao'), 'utf8').trim()).toBe('0.1.8');
+    expect(errorsLog()).toBe('');
+  });
+
+  it('sem marcador mas com saves (instalação antiga): backup como "desconhecida"', async () => {
+    seed({ 'speed-tche.save.json': '{"x":1}' });
+    await loadMain(appData, null, '0.1.8');
+    expect(backups()).toEqual(['desconhecida']);
+    expect(readFileSync(join(backupDir(), 'desconhecida', 'speed-tche.save.json'), 'utf8')).toBe('{"x":1}');
+  });
+
+  it('mesma versão: nada é copiado, nem de novo a cada abertura', async () => {
+    seed({ '.versao': '0.1.8', 'speed-tche.save.json': '{"x":1}' });
+    await loadMain(appData, null, '0.1.8');
+    await loadMain(appData, null, '0.1.8');
+    expect(backups()).toEqual([]);
+  });
+
+  it('guarda só os 3 backups mais recentes: na 4ª troca o mais antigo sai', async () => {
+    seed({ '.versao': '0.1.4', 'speed-tche.save.json': '{"x":1}' });
+    for (const v of ['0.1.5', '0.1.6', '0.1.7', '0.1.8']) await loadMain(appData, null, v);
+    expect(backups()).toEqual(['0.1.5', '0.1.6', '0.1.7']); // 0.1.4 (o mais antigo) saiu
+    expect(existsSync(join(savesDir(), 'speed-tche.save.json'))).toBe(true); // nada fora de backup/ é apagado
+    expect(existsSync(join(savesDir(), '.versao'))).toBe(true);
+  });
+
+  it('voltar a uma versão já guardada substitui a cópia dela em vez de lançar', async () => {
+    seed({ '.versao': '0.1.7', 'speed-tche.save.json': '{"v":"a"}' });
+    await loadMain(appData, null, '0.1.8');
+    writeFileSync(join(savesDir(), 'speed-tche.save.json'), '{"v":"b"}');
+    await loadMain(appData, null, '0.1.7'); // 0.1.8 -> 0.1.7: guarda a 0.1.8
+    writeFileSync(join(savesDir(), 'speed-tche.save.json'), '{"v":"c"}');
+    await loadMain(appData, null, '0.1.8'); // 0.1.7 -> 0.1.8: guarda a 0.1.7 de novo
+    expect(readFileSync(join(backupDir(), '0.1.7', 'speed-tche.save.json'), 'utf8')).toBe('{"v":"c"}');
+    expect(errorsLog()).toBe('');
+  });
+
+  it('um arquivo que não copia não derruba a abertura: uma linha no errors.log (chave, sem conteúdo), o resto é copiado e o marcador não avança', async () => {
+    seed({ '.versao': '0.1.7', 'speed-tche.save.json': '{"segredo":"SENHA-123"}' });
+    mkdirSync(join(savesDir(), 'speed-tche.ruim.json')); // "arquivo" que é pasta: copyFile recusa
+    const h = await loadMain(appData, null, '0.1.8');
+    expect(h.has('store:readAll')).toBe(true); // a abertura seguiu
+    const log = errorsLog();
+    expect((log.match(/backup-failed/g) ?? []).length).toBe(1);
+    expect(log).toContain('0.1.7');
+    expect(log).toContain('speed-tche.ruim');
+    expect(log).not.toContain('SENHA-123');
+    expect(readFileSync(join(backupDir(), '0.1.7', 'speed-tche.save.json'), 'utf8')).toBe('{"segredo":"SENHA-123"}');
+    expect(readFileSync(join(savesDir(), '.versao'), 'utf8').trim()).toBe('0.1.7');
+  });
+
+  it('falha ao criar backup/ (é um arquivo): também só deixa uma linha no log', async () => {
+    seed({ '.versao': '0.1.7', 'speed-tche.save.json': '{"x":1}' });
+    writeFileSync(backupDir(), 'sou um arquivo');
+    await loadMain(appData, null, '0.1.8');
+    expect((errorsLog().match(/backup-failed/g) ?? []).length).toBe(1);
+    expect(readFileSync(join(savesDir(), '.versao'), 'utf8').trim()).toBe('0.1.7'); // marcador não avança: tenta de novo na próxima
+  });
+
+  it('o storage não lê nada de backup/ nem do marcador: store:readAll devolve só os saves de verdade', async () => {
+    seed({ '.versao': '0.1.7', 'speed-tche.save.json': '{"x":1}' });
+    const h = await loadMain(appData, null, '0.1.8');
+    expect(existsSync(join(backupDir(), '0.1.7', 'speed-tche.save.json'))).toBe(true);
+    const all = (await invoke(h, 'store:readAll')) as Record<string, string | null>;
+    expect(Object.keys(all)).toEqual(['speed-tche.save']);
+  });
+
+  it('marcador com lixo (nome de pasta perigoso) não escapa de backup/', async () => {
+    seed({ '.versao': '../../fora', 'speed-tche.save.json': '{"x":1}' });
+    await loadMain(appData, null, '0.1.8');
+    expect(existsSync(join(appData, 'fora'))).toBe(false);
+    expect(existsSync(join(appData, 'SpeedTche', 'fora'))).toBe(false);
+    expect(backups().length).toBe(1);
+    expect(backups()[0]).not.toContain('/');
   });
 });
