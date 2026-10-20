@@ -355,6 +355,8 @@ function drive(o: { speed?: number; nitro?: boolean; skid?: boolean }): void {
   me.skidTicks = o.skid ? 6 : 0;
 }
 
+/** V13: com o relógio preso, `snapshot` e `diffFromSnapshot` desenham o MESMO instante (a única diferença entre as duas imagens é o que o teste mudou). */
+let holdClock = false;
 let snapBuf: Uint8Array | null = null;
 function readBuf(): Uint8Array {
   const ctx = gl.getContext();
@@ -364,7 +366,7 @@ function readBuf(): Uint8Array {
 }
 /** Desenha `frames` quadros e guarda a imagem (o "sem efeito" de uma comparação por pixel). */
 function snapshot(quality: Quality, frames: number): void {
-  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  for (let i = 0; i < frames; i++) { if (!holdClock) tick++; renderer.render(frameFor(quality)); }
   snapBuf = readBuf();
 }
 export interface DiffStat { changed: number; warm: number; bright: number; luma: number }
@@ -374,7 +376,7 @@ export interface DiffStat { changed: number; warm: number; bright: number; luma:
  */
 function diffFromSnapshot(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>, thr = 8): DiffStat[] {
   if (!snapBuf) throw new Error('lab.snapshot primeiro');
-  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  for (let i = 0; i < frames; i++) { if (!holdClock) tick++; renderer.render(frameFor(quality)); }
   const now = readBuf(); const ctx = gl.getContext();
   const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
   return boxes.map(([fx0, fy0, fx1, fy1]) => {
@@ -485,7 +487,102 @@ function flameDiff(quality: Quality, frames: number, box: Box, mouth?: Box): Fla
   return { ...measure(box), ...(mouth ? { mouth: measure(mouth) } : {}) };
 }
 
+/** V13: onde vão os triângulos e as chamadas de um quadro, por viewport, por categoria e por passe (cena principal × mapa de sombra). */
+export interface PerfilLinha { cat: string; main: number; shadow: number; mainCalls: number; shadowCalls: number; instances: number }
+export interface PerfilViewport { total: number; calls: number; rows: PerfilLinha[]; other: number }
+type Hooked = THREE.Object3D & { __perfilCat?: string; __perfilDone?: boolean };
+
+/** A categoria de um objeto da cena (só para o perfil): o filho direto da cena a que ele pertence, e o nome do lote do cenário. */
+function perfilCategories(): Map<THREE.Object3D, string> {
+  const out = new Map<THREE.Object3D, string>();
+  const groups = scene.children.filter((c) => c.type === 'Group');
+  const nameOfTop = new Map<THREE.Object3D, string>();
+  // A ordem de criação em renderer.ts: Sky (grupo), carros (grupo grande), terreno, estrada, cenário (name 'scenery'), efeitos (fx-*).
+  for (const g of groups) {
+    if (g.name === 'scenery') nameOfTop.set(g, 'cenário');
+    else if (g.children.some((c) => c.name.startsWith('fx-'))) nameOfTop.set(g, 'efeitos');
+    else if (g.children.length > 40) nameOfTop.set(g, 'carros');
+  }
+  const rest = groups.filter((g) => !nameOfTop.has(g));
+  // sobram: céu (4 filhos, o primeiro grupo), terreno (9), estrada (6)
+  for (const g of rest) nameOfTop.set(g, g === groups[0] ? 'céu' : g.children.length >= 9 ? 'terreno' : 'pista');
+  scene.traverse((o) => {
+    let top: THREE.Object3D = o;
+    while (top.parent && top.parent !== scene) top = top.parent;
+    const base = nameOfTop.get(top) ?? 'outros';
+    const idx = top.children.indexOf(o.parent === top ? o : o);
+    if (base === 'cenário') out.set(o, `cenário:${o.name.replace('scenery:', '')}`);
+    else if (base === 'carros') {
+      const m = o as THREE.InstancedMesh;
+      const tri = m.geometry ? (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3 : 0;
+      out.set(o, `carros:${m.isInstancedMesh ? (tri > 2000 ? 'casco lod0' : tri > 600 ? 'casco lod1/roda' : 'rodas/blob/chama') : 'outros'}`);
+    } else if (base === 'terreno' || base === 'pista' || base === 'céu') out.set(o, `${base}#${top.children.indexOf(o) >= 0 ? top.children.indexOf(o) : idx}${o.name ? ':' + o.name : ''}`);
+    else out.set(o, `${base}${o.name ? ':' + o.name : ''}`);
+  });
+  return out;
+}
+
+/**
+ * V13: renderiza `frames` quadros e devolve, por viewport do último, os triângulos e as chamadas por categoria, separando a cena principal do mapa de sombra
+ * (ganchos onBefore/AfterRender e onBefore/AfterShadow de cada objeto: a diferença do `renderer.info`). `other` = o que sobra (pós-processamento, quadros cheios).
+ */
+function perfil(quality: Quality, frames: number): PerfilViewport[] {
+  if (!current) throw new Error('lab.setup primeiro');
+  render(quality, 2); // cria o que nasce tarde (lotes de carro, anéis)
+  const cats = perfilCategories();
+  const acc = new Map<string, PerfilLinha>();
+  let vp = 0;
+  const rows: Array<Map<string, PerfilLinha>> = [new Map(), new Map(), new Map(), new Map()];
+  let t0 = 0; let c0 = 0;
+  const row = (o: Hooked): PerfilLinha => {
+    const k = cats.get(o) ?? 'outros';
+    let r = rows[vp].get(k);
+    if (!r) { r = { cat: k, main: 0, shadow: 0, mainCalls: 0, shadowCalls: 0, instances: 0 }; rows[vp].set(k, r); }
+    return r;
+  };
+  const hooks: Array<() => void> = [];
+  // O viewport vem da câmera da chamada `render(scene, camera)` (o mapa de sombra desenha dentro dela, com outra câmera nos ganchos).
+  const origRender = gl.render.bind(gl);
+  gl.render = ((sc: THREE.Object3D, cam: THREE.Camera) => { if (sc === scene) { const i = cams.indexOf(cam as THREE.PerspectiveCamera); if (i >= 0) vp = i; } return origRender(sc, cam); }) as typeof gl.render;
+  hooks.push(() => { gl.render = origRender as typeof gl.render; });
+  scene.traverse((o) => {
+    const h = o as Hooked;
+    const any = o as unknown as { isMesh?: boolean; isPoints?: boolean; isLine?: boolean; isSprite?: boolean };
+    if (!(any.isMesh || any.isPoints || any.isLine || any.isSprite)) return;
+    const oBR = o.onBeforeRender; const oAR = o.onAfterRender; const oBS = o.onBeforeShadow; const oAS = o.onAfterShadow;
+    o.onBeforeRender = function (this: THREE.Object3D, ...a: Parameters<typeof oBR>) { t0 = gl.info.render.triangles; c0 = gl.info.render.calls; oBR.apply(this, a); };
+    o.onAfterRender = function (this: THREE.Object3D, ...a: Parameters<typeof oAR>) {
+      oAR.apply(this, a); const r = row(h); r.main += gl.info.render.triangles - t0; r.mainCalls += gl.info.render.calls - c0;
+      const ic = o as THREE.InstancedMesh; r.instances = Math.max(r.instances, ic.isInstancedMesh ? ic.count : 0);
+    };
+    o.onBeforeShadow = function (this: THREE.Object3D, ...a: Parameters<typeof oBS>) { t0 = gl.info.render.triangles; c0 = gl.info.render.calls; oBS.apply(this, a); };
+    o.onAfterShadow = function (this: THREE.Object3D, ...a: Parameters<typeof oAS>) { oAS.apply(this, a); const r = row(h); r.shadow += gl.info.render.triangles - t0; r.shadowCalls += gl.info.render.calls - c0; };
+    hooks.push(() => { o.onBeforeRender = oBR; o.onAfterRender = oAR; o.onBeforeShadow = oBS; o.onAfterShadow = oAS; });
+  });
+  void acc;
+  try {
+    // o último quadro vale (a sombra alterna com 3 e 4 jogadores: dois quadros, o pior de cada viewport)
+    const per: Array<Array<Map<string, PerfilLinha>>> = [];
+    const dbg: DebugInfo[] = [];
+    for (let f = 0; f < frames; f++) {
+      for (const m of rows) m.clear();
+      dbg.push(render(quality, 1)[0]);
+      per.push(rows.map((m) => new Map([...m].map(([k, v]) => [k, { ...v }]))));
+    }
+    const d = dbg[dbg.length - 1];
+    return d.viewports.map((v, i) => {
+      // o quadro com mais triângulos neste viewport (o pior dos `frames`)
+      let best = 0;
+      dbg.forEach((x, j) => { if (x.viewports[i].triangles > dbg[best].viewports[i].triangles) best = j; });
+      const list = [...per[best][i].values()];
+      const attributed = list.reduce((s, r) => s + r.main + r.shadow, 0);
+      return { total: dbg[best].viewports[i].triangles, calls: dbg[best].viewports[i].calls, rows: list.sort((a, b) => b.main + b.shadow - a.main - a.shadow), other: dbg[best].viewports[i].triangles - attributed };
+    });
+  } finally { for (const h of hooks) h(); }
+}
+
 const lab = {
+  hold: (on: boolean): void => { holdClock = on; },
   freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
   setReduce: (on: boolean): void => { reduceFx = on; },
@@ -497,7 +594,7 @@ const lab = {
   /** As preferências visuais que o renderizador lê fora da corrida (render/prefs.ts); nulo as devolve ao começo. */
   prefs: (p: { quality: Quality; reduceEffects: boolean; lockFps30?: boolean } | null) => { if (p) setRenderPrefs(p); else resetRenderPrefs(); },
   cameras: (list: CameraMode[] | null) => { seatCameras = list ?? undefined; },
-  renderer, setup, render, idle, programs, collect, blob, fxScene, liveScene,
+  renderer, setup, render, idle, programs, collect, perfil, blob, fxScene, liveScene,
   /** A cena (para um teste ligar e desligar uma luz, ou o reflexo do céu, e isolar a causa de um brilho). */
   scene,
   resize: (w: number, h: number, dpr: number) => renderer.resize(w, h, dpr),

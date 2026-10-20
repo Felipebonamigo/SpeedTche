@@ -346,7 +346,10 @@ export class Scenery {
       for (const e of mine) inst += e.s.cap;
       const mesh = new THREE.BatchedMesh(Math.max(1, inst), Math.max(3, verts), 0, this.materials[key]);
       mesh.name = `scenery:${key}`;
-      mesh.perObjectFrustumCulled = false;
+      // V13: corte por objeto (esfera da geometria × câmera, e × a caixa do mapa de sombra no passe de sombra). Antes cada lote desenhava a janela inteira do
+      // RoadFrame nos dois passes, mesmo o que estava atrás da câmera, fora do quadro ou fora do mapa de sombra (±80 m): ~30% dos triângulos de Sampa 4p Média,
+      // 0,35 ms de CPU por quadro com 4 viewports. A imagem é a mesma (tests/folga-gl.test.ts compara pixel a pixel). Sem ordenação: nada é transparente aqui que dependa dela.
+      mesh.perObjectFrustumCulled = true;
       mesh.sortObjects = false;
       mesh.frustumCulled = false;
       mesh.castShadow = key === 'flat' || key === 'office' || key === 'apartment' || key === 'classic' || key === 'house';
