@@ -184,6 +184,15 @@ Idioma: só na 1ª abertura (sem opções e sem save) as opções são gravadas 
 
 Testes: `tests/progression-save.test.ts` (fixture literal da 0.1.4), `tests/progression*.test.ts`, `tests/idioma.test.ts`.
 
+### Sequência no Saci Mirim (V6d)
+
+Campo aditivo e opcional `saciStreak` em cada perfil de `speed-tche.progress`: `{ "name": "Ana", "cars": {...}, "saciStreak": 3 }`. Conta as vitórias SEGUIDAS, em corrida de
+verdade, com o Saci Mirim (`saci`); 5 libera "Hora de entrega" (a 2ª forma; a 1ª, 10 vitórias sem comprar carro, não mudou) e o Furgãozinho da Firma. Qualquer corrida do mesmo perfil com outro
+carro, ou sem vitória, zera; o contra-relógio não conta nem zera. Dois assentos com o mesmo nome são um perfil só e a sequência sobe 1 por corrida, só se todos venceram de Saci. Saneador
+(`sanitizeProgress`, nunca lança): número finito, arredondado, 1..999; ausente, 0 ou lixo = sem o campo (0). Save sem o campo abre igual; o save principal (`speed-tche.save`) não muda.
+A 0.1.8 e a 0.1.7 reconstroem cada perfil só com `name` e `cars`: abrem o progresso novo sem perder nada e, **ao regravá-lo, descartam o contador** (a sequência recomeça do 0; a conquista
+já ganha continua no save principal). Testes: `tests/saci-sequencia.test.ts`.
+
 ## Recusa da oferta de assistência (T8)
 
 Campo aditivo `assistOfferDeclined` nas opções (`speed-tche.settings`): `true` quando o jogador respondeu "Seguir assim" à oferta de

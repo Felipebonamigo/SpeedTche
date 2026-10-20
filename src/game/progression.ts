@@ -142,7 +142,16 @@ export interface ProgressProfile {
   name: string;
   /** Carro → XP feito com ele. */
   cars: Record<string, number>;
+  /**
+   * V6d: vitórias seguidas, em corrida de verdade, com o Saci Mirim (a 2ª forma de "Hora de entrega"). Opcional e aditivo: ausente = 0,
+   * e 0 não é gravado. Qualquer corrida do perfil com outro carro, ou sem vitória, zera; o contra-relógio não conta nem zera.
+   */
+  saciStreak?: number;
 }
+
+/** O carro da sequência de V6d e o teto do contador (bem acima do alvo da conquista, só para o número não crescer sem limite). */
+export const SACI_STREAK_CAR = 'saci';
+export const SACI_STREAK_MAX = 999;
 
 export interface ProgressData {
   /** Do mais recente para o mais antigo, no máximo MAX_PROFILES (como as estatísticas). */
@@ -196,10 +205,14 @@ export interface ProgressNews {
   carXp: number;
   mastery: { before: number; after: number };
   unlocks: Unlock[];
+  /** V6d: a sequência de vitórias no Saci Mirim do perfil depois desta corrida (ausente = 0). */
+  saciStreak?: number;
 }
 
 export interface ProgressInput {
   state: RaceState;
+  /** Modo da corrida; o contra-relógio (também por `state.config.timeTrial`) não mexe na sequência do Saci Mirim. */
+  mode?: string;
   /** O que `recordRaceStats` devolveu (só os humanos locais; as estatísticas já têm a corrida somada). */
   contributions: readonly Contribution[];
 }
@@ -229,6 +242,18 @@ export function settleProgress(data: ProgressData, stats: StatsData, input: Prog
   const gainOf = (c: Contribution) => xpOfStats(c.stats);
   const profileGain = new Map<string, number>();
   for (const c of input.contributions) profileGain.set(profileKey(c.name), (profileGain.get(profileKey(c.name)) ?? 0) + gainOf(c));
+  // V6d: a sequência é por perfil. Dois assentos com o mesmo nome (um perfil só) mantêm a sequência só se TODOS venceram com o Saci Mirim.
+  const timeTrial = input.mode === 'timetrial' || input.state.config.timeTrial === true;
+  const saciKept = new Map<string, boolean>();
+  if (!timeTrial) {
+    for (const c of input.contributions) {
+      if (!cleanName(c.name)) continue;
+      const carId = input.state.cars[carIndexOfSeat(input.state, c.seat)]?.carId;
+      const key = profileKey(c.name);
+      saciKept.set(key, (saciKept.get(key) ?? true) && carId === SACI_STREAK_CAR && c.stats.wins > 0);
+    }
+  }
+  const streakDone = new Set<string>();
   const out: ProgressNews[] = [];
   // Do último para o primeiro na lista de perfis: o P1 termina no topo (o mais recente), como as estatísticas.
   const ordered = [...input.contributions].sort((a, b) => a.seat - b.seat);
@@ -249,11 +274,18 @@ export function settleProgress(data: ProgressData, stats: StatsData, input: Prog
     const carAfter = Math.min(CAR_XP_MAX, carBefore + xp);
     profile.cars[carId] = carAfter;
     const mastery = { before: masteryOf(carBefore).level, after: masteryOf(carAfter).level };
+    let saciStreak = profile.saciStreak ?? 0;
+    const streakKey = profileKey(c.name);
+    if (!timeTrial && !streakDone.has(streakKey)) {
+      streakDone.add(streakKey);
+      saciStreak = saciKept.get(streakKey) ? Math.min(SACI_STREAK_MAX, saciStreak + 1) : 0;
+      if (saciStreak > 0) profile.saciStreak = saciStreak; else delete profile.saciStreak;
+    }
     const unlocks = levelUnlocks(level.before, level.after);
     for (const r of MASTERY_REWARDS) {
       if (r.mastery > mastery.before && r.mastery <= mastery.after) unlocks.push({ kind: 'cosmetic', field: r.field, value: r.value, carId, mastery: r.mastery });
     }
-    news.set(c.seat, { seat: c.seat, name: profile.name, carId, xp, pilotXp, level, carXp: carAfter, mastery, unlocks });
+    news.set(c.seat, { seat: c.seat, name: profile.name, carId, xp, pilotXp, level, carXp: carAfter, mastery, unlocks, saciStreak });
   }
   for (const c of ordered) { const n = news.get(c.seat); if (n) out.push(n); }
   return out;
@@ -283,7 +315,9 @@ export function sanitizeProgress(raw: unknown): ProgressData {
         if (xp > 0) cars[id] = xp;
       }
     }
-    profiles.push({ name, cars });
+    // V6d: campo opcional; número finito arredondado e preso em 1..999 (0, ausente ou lixo = sem campo).
+    const streak = typeof item.saciStreak === 'number' && Number.isFinite(item.saciStreak) ? Math.min(SACI_STREAK_MAX, Math.round(item.saciStreak)) : 0;
+    profiles.push(streak > 0 ? { name, cars, saciStreak: streak } : { name, cars });
   }
   return { profiles };
 }

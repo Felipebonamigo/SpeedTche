@@ -42,7 +42,7 @@ O QUE TESTAR
 - NOVIDADES DA 0.1.6 (sobre a 0.1.5):
   * 12 CARROS NACIONAIS NOVOS, inspirados nos que todo brasileiro conhece (sem marca nem logo): Cuiabano e Tupiniquim (livres),
     Jabuti, Caipora, Lambari, Besouro, Pampeiro, Barão, Pão de Forma e Trilheiro (à venda na Expedição), e dois por conquista:
-    Furgãozinho da Firma ("Hora de entrega": 10 vitórias sem comprar carro; tem escada no teto que balança) e Gaúcho V8
+    Furgãozinho da Firma ("Hora de entrega": 10 vitórias sem comprar carro ou 5 seguidas com o Saci Mirim; tem escada no teto que balança) e Gaúcho V8
     ("Cavalo de aço": Maestria 3 com o Trovão V12). Os carros novos ainda NÃO aparecem como rivais da IA.
   * CARROS MAIS BEM DESENHADOS: o Falcão GT e os outros 10 estilos foram refeitos (vidro escuro, lanternas embutidas, faixas, roda com
     aro fundo, tinta que mantém a cor, sombra embaixo do carro). Digam o que acharam de cada um.
