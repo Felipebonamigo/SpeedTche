@@ -103,11 +103,14 @@ const LAMP_HOT_MAX = 0.6;
  */
 const LAMP_RED_MAX = 0.9;
 
-/** O emissivo (linear) da lanterna de cor `rgb` no peso `w` com o brilho `glow`: a conta que o GLSL (`carLamp`) espelha. */
-export function lampEmission(rgb: readonly number[], w: number, glow: number): [number, number, number] {
+/**
+ * O emissivo (linear) da lanterna de cor `rgb` no peso `w` com o brilho `glow`: a conta que o GLSL (`carLamp`) espelha. `wRed` é o peso da parte VERMELHA (a tira, com patamar:
+ * `lensWeight`); o miolo quente (e o bloom que ele acende) segue o peso linear `w`: o patamar no miolo dobrava a área acesa e o bloom dela clareava a pista à noite (estrada-gl).
+ */
+export function lampEmission(rgb: readonly number[], w: number, glow: number, wRed: number = w): [number, number, number] {
   const sm = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const hot = sm(LAMP_CORE_FROM, 1, w) * Math.min(LAMP_HOT_MAX, Math.max(0, (glow - LAMP_HOT_FROM) / 3));
-  const red = Math.min(w * glow, LAMP_RED_MAX);
+  const red = Math.min(wRed * glow, LAMP_RED_MAX);
   return [0, 1, 2].map((i) => rgb[i] * red + (LAMP_HOT[i] * w * glow - rgb[i] * red) * hot) as [number, number, number];
 }
 
@@ -302,9 +305,9 @@ uniform vec3 uStylizeSkyHorizon;
 uniform vec3 uStylizeGround;
 varying float vLens;
 // Lanterna (lampEmission em material.ts): a parte vermelha fica abaixo do joelho do Neutral (LAMP_RED_MAX); o miolo esquenta para LAMP_HOT acima de LAMP_HOT_FROM.
-vec3 carLamp( vec3 lens, float w, float glow ) {
+vec3 carLamp( vec3 lens, float w, float wRed, float glow ) {
   float hot = smoothstep( ${LAMP_CORE_FROM.toFixed(2)}, 1.0, w ) * clamp( ( glow - ${LAMP_HOT_FROM.toFixed(2)} ) / 3.0, 0.0, ${LAMP_HOT_MAX.toFixed(2)} );
-  return mix( lens * min( w * glow, ${LAMP_RED_MAX.toFixed(2)} ), vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ) * ( w * glow ), hot );
+  return mix( lens * min( wRed * glow, ${LAMP_RED_MAX.toFixed(2)} ), vec3( ${LAMP_HOT.map((v) => v.toFixed(3)).join(', ')} ) * ( w * glow ), hot );
 }
 // Verniz estilizado (cor-brilho): a lataria reflete o céu do período (topo → horizonte) e, abaixo da linha do horizonte, o chão escuro, por um Fresnel de
 // cartum (expoente 3). Analítico: nenhuma amostra de textura, nenhuma chamada; as cores vêm de setStylizePalette (uniformes compartilhados).
@@ -472,8 +475,10 @@ ${VERT_MOVE}`);
         float selfLum = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
         totalEmissiveRadiance += diffuseColor.rgb * uSelfLight * ( 1.0 - fMetal * 0.6 ) * ( 1.0 - 0.65 * selfLum ) * ( 1.0 - wChrome );
         // Lente com miolo e borda (aLens: 0 no centro da tampa, 1 na borda; kit.ts, lensRadius).
-        float lensW = 1.0 - ( 1.0 - ${LENS_RIM.toFixed(2)} ) * smoothstep( ${LENS_PLATEAU.toFixed(2)}, 1.0, vLens );
-        totalEmissiveRadiance += diffuseColor.rgb * ( vMat.z * lensW * uHeadGlow ) + carLamp( diffuseColor.rgb, vMat.w * lensW, mix( uTailGlow, uBrakeGlow, vBrake ) );
+        // A lanterna é uma tira (patamar, lensWeight) só na parte VERMELHA: o miolo quente (que acende o bloom) e o farol seguem com a rampa linear de sempre (V14: o patamar no miolo dobrava a área acesa e o bloom clareava a pista à noite: estrada-gl).
+        float lensW = mix( 1.0, ${LENS_RIM.toFixed(2)}, vLens );
+        float tailW = 1.0 - ( 1.0 - ${LENS_RIM.toFixed(2)} ) * smoothstep( ${LENS_PLATEAU.toFixed(2)}, 1.0, vLens );
+        totalEmissiveRadiance += diffuseColor.rgb * ( vMat.z * lensW * uHeadGlow ) + carLamp( diffuseColor.rgb, vMat.w * lensW, vMat.w * tailW, mix( uTailGlow, uBrakeGlow, vBrake ) );
         totalEmissiveRadiance += mix( vec3( 1.0 ), diffuseColor.rgb * 2.2, 0.5 ) * fFlake * 0.9;
         // V14: o halo da lanterna escorre pela lataria em volta da lente (fora da própria lente), no brilho dela (período e freio).
         totalEmissiveRadiance += vec3( 1.0, 0.14, 0.07 ) * ( carLampHalo( vLocal ) * uSheen.z * ( 1.0 - step( 0.01, vMat.w ) ) * carHaloEmission( mix( uTailGlow, uBrakeGlow, vBrake ) ) );`)

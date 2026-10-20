@@ -132,6 +132,18 @@ describe('2. lanternas em tira de LED', () => {
     for (let r = 0; r <= 1.0001; r += 0.05) { const v = w(r); expect(v).toBeLessThanOrEqual(prev + 1e-9); prev = v; }
   });
 
+  it('a tira acende só a parte VERMELHA com o patamar: o ombro vermelho é mais forte que com a rampa linear, e o miolo quente (que acende o bloom) não cresce (G ≤ 8% do R fora do miolo)', () => {
+    // O patamar no miolo quente dobrava a área acesa e o bloom dela clareava a pista à noite (estrada-gl: B − R de 9 para 2 na pista de Sampa). Só o vermelho (abaixo do joelho do Neutral, sem bloom) ganha o patamar.
+    const le = (M as unknown as { lampEmission: (rgb: readonly number[], w: number, glow: number, wRed?: number) => number[] }).lampEmission;
+    const w = lensWeight as NonNullable<typeof lensWeight>;
+    const linear = le(TAIL.rgb, 0.5, 1.6);
+    const strip = le(TAIL.rgb, 0.5, 1.6, w(0.5));
+    expect(strip[0], `ombro com patamar ${strip[0].toFixed(3)} × linear ${linear[0].toFixed(3)}`).toBeGreaterThan(linear[0] * 1.1); // o vermelho tem teto (LAMP_RED_MAX 0,9): 0,90 contra 0,80
+    expect(strip[1] / strip[0], 'o ombro segue vermelho').toBeLessThanOrEqual(0.08);
+    // o miolo quente (w ≥ 0,75) vem do peso linear: com o mesmo w, o patamar do vermelho não o muda
+    expect(le(TAIL.rgb, 0.8, 7, 1)[1], 'miolo quente à noite').toBeCloseTo(le(TAIL.rgb, 0.8, 7)[1], 6);
+  });
+
   it('o halo é discreto de dia e abaixo do teto do bloom (≤ 0,5 × o limiar), e à noite mais forte que de dia; o freio brilha mais que a lanterna', () => {
     expect(haloEmission, 'haloEmission não existe em cars/material.ts').toBeTypeOf('function');
     const h = haloEmission as NonNullable<typeof haloEmission>;

@@ -48,7 +48,7 @@ const nitroAt = Number(q.get('nitroat') ?? -1);
 const winSeconds = q.get('win') === null ? -1 : Number(q.get('win'));
 // carview=side|rear34|front34|rear|front: câmera extra num carro parado (body=<estilo> ou car=<id> escolhe o carro);
 // showroom=1: os 13 estilos em grade na pista (carview escolhe o lado, padrão front34);
-// sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros;
+// sheet=side|rear34|front34|rear: folha de contato com os 13 estilos (e o 2º GT) em quadros (allcars=1: os 26 carros do jogo, 6 × 5);
 // ghost=1: fantasma do contra-relógio ao lado do carro do jogador; brake=1: lanternas de freio acesas.
 // paints=<id>,<id>…: pintura de cada humano (P1, P2…; ids de src/game/paints.ts; vazio = Original), como a sessão monta;
 // paintsheet=<carro>: folha de contato com o carro nas 16 pinturas da paleta (carview escolhe a vista, padrão front34).
@@ -170,7 +170,8 @@ if (q.get('dynscale')) { renderer.setDynamicResolution(true); renderer.pinDynami
 // copiado para a folha — 15 vezes menos pixels que desenhar a janela inteira por estilo.
 // A folha de pinturas tem 16 quadros (4 × 4); a de estilos, 14 (5 × 3).
 const LOOK_GRID = { finish: [3, 2], wheel: [3, 2], wheelall: [3, 3], stripe: [3, 2], rim: [3, 2], flame: [3, 3] };
-const SHEET_COLS = paintSheet ? 4 : lookSheet ? (LOOK_GRID[lookSheet] ?? [3, 3])[0] : 5; const SHEET_ROWS = paintSheet ? 4 : lookSheet ? (LOOK_GRID[lookSheet] ?? [3, 3])[1] : 3;
+const allCars = q.get('allcars') === '1'; // V14: a folha com os 26 carros do jogo (em vez dos 13 estilos), 6 × 5
+const SHEET_COLS = allCars ? 6 : paintSheet ? 4 : lookSheet ? (LOOK_GRID[lookSheet] ?? [3, 3])[0] : 5; const SHEET_ROWS = allCars ? 5 : paintSheet ? 4 : lookSheet ? (LOOK_GRID[lookSheet] ?? [3, 3])[1] : 3;
 const tileW = Math.floor(innerWidth / SHEET_COLS); const tileH = Math.floor(innerHeight / SHEET_ROWS);
 function resize() {
   if (sheet !== null) renderer.resize(tileW, tileH, Number(q.get('dpr') ?? 1));
@@ -211,6 +212,7 @@ function renderSheet() {
   if (second) tiles.push({ id: second.id, label: `gt · ${second.name}` });
   const first = CARS.find((c) => c.body === 'gt');
   if (first) tiles[0].label = `gt · ${first.name}`;
+  if (allCars) tiles = CARS.map((c) => ({ id: c.id, label: c.name }));
   // Folha de pinturas: o mesmo carro nas 16 opções da paleta (a Original primeiro).
   if (paintSheet) tiles = PAINT_IDS.map((id) => ({ id: paintSheet, look: id === 'original' ? null : { paint: id }, label: t(`ui.paint.${id}`) }));
   // Folha de visuais (N3): o mesmo carro variando UM campo do look sobre o look de partida (lookbase).
