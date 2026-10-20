@@ -102,6 +102,78 @@ function writeSave(dir, key, json) {
   }
 }
 
+/** Quantos backups de versão ficam em `saves/backup/` (o mais antigo sai quando entra o quarto). */
+const BACKUP_KEEP = 3;
+const VERSION_MARKER = '.versao';
+const UNKNOWN_VERSION = 'desconhecida';
+
+/** Nome de pasta seguro a partir do texto do marcador (que é arquivo do usuário: pode ter lixo). */
+function backupFolderName(text) {
+  const v = String(text ?? '').trim().slice(0, 40).replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '_');
+  return v || UNKNOWN_VERSION;
+}
+
+/**
+ * A2: na primeira abertura depois de mudar de versão, copia `<dir>/*.json` para `<dir>/backup/<versão anterior>/` ANTES de qualquer
+ * leitura ou gravação da nova versão. Quem voltar a uma versão antiga (que descarta o que não conhece ao regravar) acha a cópia.
+ * A versão da última abertura fica em `<dir>/.versao`. Sem marcador: só faz backup (como "desconhecida") se já houver `*.json`.
+ * `backup/` não termina em `.json` e é subpasta: o Auto-Cloud (`*.json`, sem recursão) e `readAllSaves` não a enxergam.
+ * Nunca lança. Cada arquivo é copiado para uma pasta temporária que só vira `backup/<versão>` por rename; guarda os
+ * BACKUP_KEEP mais recentes e só apaga dentro de `backup/`. Falha: `onError({ from, to, files, failed, error })` (nomes e códigos de
+ * erro, nunca conteúdo) e o marcador NÃO avança, para tentar de novo na próxima abertura. Devolve 'none' | 'backed-up' | 'failed'.
+ */
+function backupSavesOnVersionChange(dir, version, onError = () => {}) {
+  const current = String(version ?? '').trim();
+  if (!current) return 'none';
+  const report = (info) => { try { onError(info); } catch { /* o log nunca derruba a abertura */ } };
+  let previous = null;
+  try { previous = fs.readFileSync(path.join(dir, VERSION_MARKER), 'utf8').trim() || null; } catch { previous = null; }
+  if (previous === current) return 'none';
+  let result = 'none';
+  let names = [];
+  try { names = fs.readdirSync(dir).filter((n) => { try { return n.endsWith('.json') && fs.statSync(path.join(dir, n)).isFile(); } catch { return false; } }); } catch { names = []; }
+  if (names.length > 0) {
+    const from = backupFolderName(previous ?? UNKNOWN_VERSION);
+    const root = path.join(dir, 'backup');
+    const failed = [];
+    let error = '';
+    try {
+      fs.mkdirSync(root, { recursive: true });
+      for (const n of fs.readdirSync(root)) if (n.startsWith('.parcial-')) fs.rmSync(path.join(root, n), { recursive: true, force: true });
+      const tmp = path.join(root, `.parcial-${process.pid}-${Date.now()}`);
+      fs.mkdirSync(tmp);
+      for (const n of names) {
+        try { fs.copyFileSync(path.join(dir, n), path.join(tmp, n)); } catch (e) { failed.push(n.slice(0, -'.json'.length).slice(0, MAX_KEY_LENGTH)); error = (e && e.code) || 'erro'; }
+      }
+      const dest = path.join(root, from);
+      fs.rmSync(dest, { recursive: true, force: true });
+      fs.renameSync(tmp, dest);
+      // Ordem de "mais recente" = mtime da pasta; garante que a nova seja estritamente a mais nova mesmo no mesmo milissegundo.
+      let newest = 0;
+      const others = fs.readdirSync(root).filter((n) => n !== from && !n.startsWith('.'));
+      for (const n of others) { try { newest = Math.max(newest, fs.statSync(path.join(root, n)).mtimeMs); } catch { /* sumiu */ } }
+      const t = new Date(Math.max(Date.now(), newest + 1));
+      fs.utimesSync(dest, t, t);
+      const kept = others.map((n) => ({ n, m: fs.statSync(path.join(root, n)).mtimeMs })).concat([{ n: from, m: t.getTime() }]).sort((a, b) => b.m - a.m);
+      for (const old of kept.slice(BACKUP_KEEP)) fs.rmSync(path.join(root, old.n), { recursive: true, force: true });
+      result = 'backed-up';
+    } catch (e) {
+      failed.push('(pasta)');
+      error = (e && e.code) || 'erro';
+      result = 'failed';
+    }
+    if (failed.length > 0) { result = 'failed'; report({ from, to: current, files: names.length, failed, error }); }
+  }
+  if (result === 'failed') return result;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, VERSION_MARKER), current, 'utf8');
+  } catch (e) {
+    report({ from: previous, to: current, files: 0, failed: [VERSION_MARKER], error: (e && e.code) || 'erro' });
+  }
+  return result;
+}
+
 /** Acrescenta `text` a `<dir>/errors.log`, girando para errors.1.log quando passaria de `maxBytes`. */
 function appendLog(dir, text, maxBytes = LOG_MAX_BYTES) {
   if (typeof text !== 'string' || text.length === 0) return false;
@@ -156,4 +228,4 @@ function folderFor(userData, kind) {
   return path.join(userData, kind);
 }
 
-module.exports = { isSaveKey, readAllSaves, migrateLegacyUserData, writeSave, appendLog, benchQuery, writeBench, folderFor, LOG_MAX_BYTES, MAX_SAVE_BYTES, LOG_ENTRY_MAX_CHARS };
+module.exports = { isSaveKey, readAllSaves, migrateLegacyUserData, writeSave, backupSavesOnVersionChange, appendLog, benchQuery, writeBench, folderFor, LOG_MAX_BYTES, MAX_SAVE_BYTES, LOG_ENTRY_MAX_CHARS };

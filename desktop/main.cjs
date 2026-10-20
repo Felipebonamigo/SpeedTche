@@ -19,6 +19,12 @@ app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_DIR_NAME));
 const savesDir = () => path.join(app.getPath('userData'), 'saves');
 const logsDir = () => path.join(app.getPath('userData'), 'logs');
 
+// A2: na 1ª abertura depois de mudar de versão, copia saves/*.json para saves/backup/<versão anterior>/ (docs/ondas/A2-backup.md).
+// Tem que ser antes de qualquer leitura ou gravação desta versão; nunca lança (falha = uma linha no errors.log e o jogo abre).
+try {
+  storage.backupSavesOnVersionChange(savesDir(), app.getVersion(), (info) => logProcessEvent('backup-failed', info));
+} catch { /* nunca derruba a abertura */ }
+
 // Banco de prova (--bench, docs/DESEMPENHO.md §4): sem teto de quadros, para medir a folga. Switch só vale antes do `ready`.
 const bench = storage.benchQuery(process.argv);
 if (bench) {

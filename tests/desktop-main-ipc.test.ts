@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const nodeRequire = createRequire(import.meta.url);
+const fs = nodeRequire('node:fs') as typeof import('node:fs'); // o mesmo objeto que o storage.cjs usa (o namespace ESM não aceita spy)
 const DESKTOP = join(__dirname, '..', 'desktop');
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
@@ -123,7 +124,7 @@ describe('main.cjs: o save em arquivo que não gravou deixa rastro no errors.log
 
   it('gravação recusada (pasta de saves impossível de criar): devolve falso E registra a chave e o tamanho', async () => {
     const h = await loadMain(appData, null);
-    mkdirSync(join(appData, 'SpeedTche'), { recursive: true });
+    rmSync(savesDir(), { recursive: true, force: true }); // (a abertura já criou saves/ para o marcador da versão)
     writeFileSync(savesDir(), 'sou um arquivo, não uma pasta'); // mkdir(saves) falha: o disco "recusa"
     expect(await invoke(h, 'store:write', 'speed-tche.save', '{"a":1}')).toBe(false);
     const log = errorsLog();
@@ -224,13 +225,19 @@ describe('main.cjs: backup dos saves na troca de versão (A2)', () => {
 
   it('um arquivo que não copia não derruba a abertura: uma linha no errors.log (chave, sem conteúdo), o resto é copiado e o marcador não avança', async () => {
     seed({ '.versao': '0.1.7', 'speed-tche.save.json': '{"segredo":"SENHA-123"}' });
-    mkdirSync(join(savesDir(), 'speed-tche.ruim.json')); // "arquivo" que é pasta: copyFile recusa
-    const h = await loadMain(appData, null, '0.1.8');
+    writeFileSync(join(savesDir(), 'speed-tche.ruim.json'), '{"segredo":"SENHA-123"}');
+    const real = fs.copyFileSync;
+    const spy = vi.spyOn(fs, 'copyFileSync').mockImplementation((from, to, mode) => {
+      if (String(from).endsWith('speed-tche.ruim.json')) throw Object.assign(new Error('ENOSPC: sem espaço /x/SENHA-123'), { code: 'ENOSPC' });
+      return real(from, to, mode);
+    });
+    const h = await loadMain(appData, null, '0.1.8').finally(() => spy.mockRestore());
     expect(h.has('store:readAll')).toBe(true); // a abertura seguiu
     const log = errorsLog();
     expect((log.match(/backup-failed/g) ?? []).length).toBe(1);
     expect(log).toContain('0.1.7');
     expect(log).toContain('speed-tche.ruim');
+    expect(log).toContain('ENOSPC');
     expect(log).not.toContain('SENHA-123');
     expect(readFileSync(join(backupDir(), '0.1.7', 'speed-tche.save.json'), 'utf8')).toBe('{"segredo":"SENHA-123"}');
     expect(readFileSync(join(savesDir(), '.versao'), 'utf8').trim()).toBe('0.1.7');
