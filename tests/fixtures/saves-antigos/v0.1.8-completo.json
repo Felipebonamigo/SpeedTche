@@ -1,0 +1,491 @@
+{
+ "save": {
+  "cupsCompleted": [
+   "br_rj",
+   "br_sp",
+   "br_mg"
+  ],
+  "cupsUnlocked": [],
+  "stamps": [
+   "RJ",
+   "SP",
+   "MG"
+  ],
+  "bestLaps": {
+   "copacabana": {
+    "ticks": 3200,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "9fb16efb"
+   },
+   "pampulha": {
+    "ticks": 3300,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "0140b7fd"
+   },
+   "sampa_noite": {
+    "ticks": 3400,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "93fce7ab"
+   },
+   "roma": {
+    "ticks": 3500,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "5ceaba3d"
+   }
+  },
+  "bestRaces": {
+   "copacabana:3": {
+    "ticks": 9800,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "9fb16efb"
+   },
+   "pampulha:3": {
+    "ticks": 9900,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "0140b7fd"
+   },
+   "sampa_noite:3": {
+    "ticks": 10000,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "93fce7ab"
+   },
+   "roma:3": {
+    "ticks": 10100,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "fp": "5ceaba3d"
+   }
+  },
+  "achievements": [
+   "PRIMEIRA_VITORIA",
+   "COPA_EUA",
+   "COPA_JAPAO",
+   "COPA_EUROPA",
+   "COPA_AFRICA_DO_SUL",
+   "COPA_AUSTRALIA",
+   "COPA_ESCANDINAVIA",
+   "COPA_MEDITERRANEO",
+   "EQUIPE_COMPLETA",
+   "SEM_BOX",
+   "NITRO_TRIPLO",
+   "EMPURRAO",
+   "VOLTA_PERFEITA",
+   "CAMPEAO",
+   "PRIMEIRA_CORRIDA",
+   "CAVALO_DE_ACO",
+   "HORA_DE_ENTREGA",
+   "SUBIU_DE_NIVEL"
+  ],
+  "racesRun": 41,
+  "racesWon": 12,
+  "seatNames": [
+   "Ana",
+   "Beto",
+   "P3",
+   "P4"
+  ],
+  "seatCars": [
+   "jabuti",
+   "gaucho",
+   "caipora",
+   "furgao"
+  ],
+  "seatLooks": [
+   {
+    "pororoca": {
+     "paint": "onix",
+     "finish": "cromado",
+     "rim": "dourado"
+    }
+   },
+   {},
+   {},
+   {}
+  ],
+  "stats": {
+   "totals": {
+    "races": 9,
+    "wins": 2,
+    "podiums": 4,
+    "laps": 27,
+    "meters": 61000,
+    "nitros": 30,
+    "towsGiven": 0,
+    "towsReceived": 0,
+    "collisions": 5,
+    "crashes": 2,
+    "pitStops": 1,
+    "raceTicks": 200000,
+    "coopWins": 0,
+    "bestPositions": {
+     "copacabana": 1
+    }
+   },
+   "players": [
+    {
+     "name": "Ana",
+     "races": 9,
+     "wins": 2,
+     "podiums": 4,
+     "laps": 27,
+     "meters": 61000,
+     "nitros": 30,
+     "towsGiven": 0,
+     "towsReceived": 0,
+     "collisions": 5,
+     "crashes": 2,
+     "pitStops": 1,
+     "raceTicks": 200000,
+     "coopWins": 0,
+     "bestPositions": {
+      "copacabana": 1
+     }
+    }
+   ]
+  },
+  "carsUnlocked": [
+   "pororoca",
+   "sucuri",
+   "iara",
+   "jabuti",
+   "caipora",
+   "gaucho",
+   "furgao"
+  ],
+  "career": {
+   "version": 1,
+   "coop": false,
+   "drivers": [
+    {
+     "name": "Ana",
+     "garage": {
+      "carId": "jabuti",
+      "owned": [
+       "pororoca",
+       "sucuri",
+       "iara",
+       "jabuti",
+       "caipora",
+       "gaucho",
+       "furgao"
+      ],
+      "upgrades": {
+       "pororoca": {
+        "engine": 1,
+        "turbo": 0,
+        "tires": 1,
+        "brakes": 0,
+        "tank": 0,
+        "nitro": 0
+       }
+      }
+     },
+     "earnings": 34000
+    }
+   ],
+   "wallets": [
+    417600
+   ],
+   "cupId": "br_rj",
+   "champ": null,
+   "rosterSeed": 0,
+   "attempts": 1,
+   "completed": false,
+   "racesRun": 7,
+   "lastReport": null
+  },
+  "cupInProgress": {
+   "champ": {
+    "cupId": "br_sp",
+    "raceIndex": 0,
+    "standings": [],
+    "teams": [],
+    "coop": false,
+    "eliminated": false,
+    "completed": false,
+    "lastRace": null,
+    "lastVerdict": null
+   },
+   "cupSeed": 4242,
+   "humans": [
+    {
+     "seat": 0,
+     "name": "Ana",
+     "carId": "pororoca",
+     "teamId": 0,
+     "color": "#e53935"
+    },
+    {
+     "seat": 1,
+     "name": "Beto",
+     "carId": "caipora",
+     "teamId": 1,
+     "color": "#1e88e5"
+    }
+   ]
+  },
+  "tutorialDone": true,
+  "sessionStart": {
+   "at": "2026-10-13T20:00:00.000Z",
+   "racesRun": 40,
+   "racesWon": 12,
+   "stamps": 1,
+   "cupsCompleted": 3,
+   "achievements": 12,
+   "carsBought": 3,
+   "earned": 0
+  },
+  "recap": null,
+  "stars": {
+   "profiles": [
+    {
+     "name": "Ana",
+     "tracks": {
+      "copacabana": 7
+     },
+     "rivals": {}
+    }
+   ],
+   "last": []
+  }
+ },
+ "settings": {
+  "language": "en",
+  "masterVolume": 0.5,
+  "musicVolume": 0.6,
+  "sfxVolume": 0.9,
+  "fullscreen": false,
+  "quality": "ultra",
+  "renderStyle": "modern",
+  "showMinimap": true,
+  "screenShake": true,
+  "difficulty": "campeao",
+  "manualGear": false,
+  "assists": {
+   "sharedNitro": true,
+   "tow": true,
+   "teamDraft": true,
+   "catchup": true
+  },
+  "totalCars": 12,
+  "quickLaps": 5,
+  "music": "auto",
+  "telemetryConsent": 1,
+  "controls": {
+   "kb1": {
+    "throttle": [
+     "ArrowUp"
+    ],
+    "brake": [
+     "ArrowDown"
+    ],
+    "left": [
+     "ArrowLeft"
+    ],
+    "right": [
+     "ArrowRight"
+    ],
+    "nitro": [
+     "Space"
+    ],
+    "gearUp": [
+     "KeyM"
+    ],
+    "gearDown": [
+     "KeyN"
+    ],
+    "drift": [
+     "ShiftRight"
+    ],
+    "lookBack": [
+     "KeyB"
+    ],
+    "horn": [
+     "KeyH"
+    ],
+    "pause": [
+     "Escape"
+    ],
+    "camera": [
+     "KeyC"
+    ]
+   },
+   "kb2": {
+    "throttle": [
+     "KeyW"
+    ],
+    "brake": [
+     "KeyS"
+    ],
+    "left": [
+     "KeyA"
+    ],
+    "right": [
+     "KeyD"
+    ],
+    "nitro": [
+     "KeyF"
+    ],
+    "gearUp": [
+     "KeyE"
+    ],
+    "gearDown": [
+     "KeyQ"
+    ],
+    "drift": [
+     "ShiftLeft"
+    ],
+    "lookBack": [
+     "KeyR"
+    ],
+    "horn": [
+     "KeyG"
+    ],
+    "pause": [
+     "Escape"
+    ],
+    "camera": [
+     "KeyV"
+    ]
+   },
+   "gamepad": {
+    "throttle": [
+     0,
+     7
+    ],
+    "brake": [
+     2,
+     1,
+     6
+    ],
+    "left": [
+     14
+    ],
+    "right": [
+     15
+    ],
+    "nitro": [
+     4,
+     3
+    ],
+    "gearUp": [
+     12
+    ],
+    "gearDown": [
+     13
+    ],
+    "drift": [
+     5
+    ],
+    "lookBack": [
+     11
+    ],
+    "horn": [
+     10
+    ],
+    "pause": [
+     9
+    ],
+    "camera": [
+     8
+    ]
+   }
+  },
+  "vibration": true,
+  "serverUrl": "ws://localhost:8787",
+  "ghost": false,
+  "seatAssists": [
+   "brake",
+   "none",
+   "none",
+   "none"
+  ],
+  "colorPalette": "default",
+  "hudScale": 1.2,
+  "largeText": false,
+  "reduceEffects": false,
+  "cartoonEffects": true,
+  "landmarkCaptions": true,
+  "lockFps30": false,
+  "seatCameras": [
+   "high",
+   "high",
+   "high",
+   "high"
+  ],
+  "highCurveCamera": true,
+  "assistOfferDeclined": true,
+  "autoQuality": "high"
+ },
+ "progress": {
+  "profiles": [
+   {
+    "name": "Ana",
+    "cars": {
+     "pororoca": 900,
+     "falcao": 120,
+     "trovao": 2300
+    }
+   }
+  ]
+ },
+ "ghosts": {
+  "ghosts": {
+   "copacabana": {
+    "trackId": "copacabana",
+    "ticks": 4498,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "data": "BDB8uBIgeFECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECLECJECJECLECJECF59Cg9D39CE39C",
+    "fp": "9fb16efb",
+    "savedAt": "2026-10-12T20:00:00.000Z"
+   },
+   "pampulha": {
+    "trackId": "pampulha",
+    "ticks": 4498,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "data": "BDB8uBIoiBCECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECEACECECECECECECECECECECECECECECECECECECECECE59Cg9D39CE39C",
+    "fp": "0140b7fd",
+    "savedAt": "2026-10-12T20:00:00.000Z"
+   },
+   "sampa_noite": {
+    "trackId": "sampa_noite",
+    "ticks": 4498,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "data": "BDB8uBI8eACEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEJCEHCEJCEJCEJCEHCEJCEJCEJCEJCEA59Cg9D39CE39C",
+    "fp": "93fce7ab",
+    "savedAt": "2026-10-12T20:00:00.000Z"
+   },
+   "roma": {
+    "trackId": "roma",
+    "ticks": 4498,
+    "name": "Ana",
+    "carId": "falcao",
+    "date": "2026-10-12T20:00:00.000Z",
+    "data": "BDB8uBIkfECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECAECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECECEC59Cg9D39CE39C",
+    "fp": "5ceaba3d",
+    "savedAt": "2026-10-12T20:00:00.000Z"
+   }
+  }
+ }
+}
