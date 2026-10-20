@@ -1,5 +1,5 @@
 // V15 (heróis dos outros estilos): o contrato do asset de cada carro herói `Hull`-based além do Falcão GT — hyper (Pororoca V10), wedge (Iara Turbo), prototype (Beija-Flor),
-// roadster (Curupira S) —, `src/assets/cars/hero/<estilo>.glb`, feitos no Blender por script (`tools/blender/build_hero.py`, gaiola exportada do `hull.ts` do estilo; 10 a 20 mil △).
+// roadster (Curupira S), muscle (Trovão V12) e rally (Carcará RS) —, `src/assets/cars/hero/<estilo>.glb`, feitos no Blender por script (`tools/blender/build_hero.py`, gaiola exportada do `hull.ts` do estilo; 10 a 20 mil △).
 // O mesmo contrato do GT herói (`heroi-asset.test.ts`): nós, materiais, rodas do projeto, escapes e seat do estilo, mesma pegada e mesmos eixos (a física e a chama não mudam), tinta,
 // faixas A/B, acento, vidro e lanternas como no estilo de sempre; sem logo nem marca. As LANTERNAS em tira (o HC2 usa tiras de LED) valem para os estilos que pedem tira.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -20,13 +20,17 @@ const BRANDS = new RegExp(`\\b(${['gol', 'palio', 'corsa', 'uno', 'fiat', 'vw', 
 const EMBLEMS = /logo|emblem|badge|brand|marca|insignia|monogram/i;
 
 interface Spec {
-  body: 'hyper' | 'wedge' | 'prototype' | 'roadster';
+  body: 'hyper' | 'wedge' | 'prototype' | 'roadster' | 'muscle' | 'rally';
   car: string;
   /** Lanterna em TIRA larga (o HC2) ou redonda (a identidade do estilo). */
   tail: 'strip' | 'round';
   /** Tira: largura mínima de cada lado (m) e altura máxima; redonda: quantas lentes em leque. */
   tailMinW?: number; tailMaxH?: number; tailLenses?: number;
   exhausts: 1 | 2;
+  /** Escape único: o x dele (0 = no meio); o resto da malha é simétrico. */
+  exhaustX?: number;
+  /** As pontas do casco em z (jogo): o padrão é ±2,2. */
+  ends?: [number, number];
   /** Peças (prefixo do nome do nó) que o herói tem de trazer, com o mínimo de triângulos de cada uma. */
   parts: Record<string, number>;
   /** Peças que existem dos dois lados (`_l` e `_r`). */
@@ -49,7 +53,7 @@ const SPECS: Spec[] = [
     sided: { escape: 80, retrovisor: 40, entrada_ar: 60 }, stripeZ: [[-2.1, 2.1]], cabin: true,
   },
   {
-    body: 'prototype', car: 'beijaflor', tail: 'strip', tailMinW: 0.55, tailMaxH: 0.22, exhausts: 1,
+    body: 'prototype', car: 'beijaflor', tail: 'strip', tailMinW: 0.55, tailMaxH: 0.22, exhausts: 1, exhaustX: 0,
     parts: { lamp_tail: 500, led: 80, difusor: 200, asa: 60, suporte: 40, lamp_head: 100, entradas_frente: 40, divisor: 8, barbatana: 12, painel_numero: 8, venezianas: 30 },
     sided: { retrovisor: 40, entrada_ar: 30 }, stripeZ: [[-2.1, 2.1]], cabin: true,
   },
@@ -57,6 +61,16 @@ const SPECS: Spec[] = [
     body: 'roadster', car: 'curupira', tail: 'round', tailLenses: 4, exhausts: 2,
     parts: { lamp_tail: 500, led: 80, difusor: 150, lamp_head: 100, cockpit: 200, bancos: 150, piloto: 100, parabrisa: 20, santantonio: 40, corcovas: 20, painel_traseiro: 20 },
     sided: { escape: 80, retrovisor: 40, farol_redondo: 60 }, stripeZ: [[-2.1, -0.6], [0.9, 1.6]], cabin: false,
+  },
+  {
+    body: 'muscle', car: 'trovao', tail: 'strip', tailMinW: 0.45, tailMaxH: 0.24, exhausts: 2,
+    parts: { lamp_tail: 500, led: 80, placa: 2, difusor: 200, asa: 60, suporte: 40, lamp_head: 20, entradas_frente: 40, divisor: 8, fresta_porta: 20, tomada_capo: 40 },
+    sided: { escape: 80, retrovisor: 40, entrada_ar: 30, farol_redondo: 60, macaneta: 8 }, stripeZ: [[-2.1, 2.1]], cabin: true,
+  },
+  {
+    body: 'rally', car: 'carcara', tail: 'strip', tailMinW: 0.4, tailMaxH: 0.3, exhausts: 1, exhaustX: 0.55, ends: [-2.15, 2.12],
+    parts: { lamp_tail: 500, led: 80, difusor: 150, asa: 60, suporte: 40, lamp_head: 100, entradas_frente: 40, divisor: 8, fresta_porta: 20, tomada_teto: 30, painel_numero: 8, para_barros: 20 },
+    sided: { retrovisor: 40, farol_milha: 60 }, stripeZ: [[-2.1, 2.0]], cabin: true,
   },
 ];
 
@@ -166,7 +180,7 @@ for (const spec of SPECS) {
       for (const i of mine) {
         const [a, b, c] = key(-pos.getX(i), pos.getY(i), pos.getZ(i)).split(',').map(Number);
         const near = [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => [-1, 0, 1].some((dz) => set.has(`${a + dx},${b + dy},${c + dz}`))));
-        if (!near && !(spec.exhausts === 1 && Math.abs(pos.getX(i)) < 0.02)) miss++;
+        if (!near && !(spec.exhausts === 1 && pos.getZ(i) > 2.0 && Math.abs(pos.getX(i) - spec.exhaustX!) < 0.12)) miss++;
       }
       expect(miss / mine.length).toBeLessThan(0.012);
     });
@@ -275,7 +289,7 @@ for (const spec of SPECS) {
           if (-v.z > 2.0 && v.y < 0.45 && Math.abs(v.x) < 0.8) fins.add(Math.round((-v.x * 100) / 3));
         }
       }
-      const baseFins = { hyper: 7, wedge: 6, prototype: 8, roadster: 4 }[spec.body];
+      const baseFins = { hyper: 7, wedge: 6, prototype: 8, roadster: 4, muscle: 6, rally: 4 }[spec.body];
       expect(fins.size, `posições em x das aletas (≥ ${baseFins + 2})`).toBeGreaterThanOrEqual(baseFins + 2);
       for (const nm of spec.exhausts === 2 ? ['escape_l', 'escape_r'] : ['escape_l']) {
         expect(P.tris(nm), nm).toBeGreaterThanOrEqual(80);
@@ -291,6 +305,22 @@ for (const spec of SPECS) {
         expect(Math.abs(wing.min.z), 'a asa chega ao fim do carro (a mesma pegada de sempre)').toBeGreaterThan(bw.max.z - 0.35);
       }
     });
+
+    if (spec.body === 'wedge') {
+      it('os faróis escamoteáveis da cunha: tampa, parede e lente "popup" (sobem com o farol à noite), dois lados, a lente acesa na frente e a junta atrás', () => {
+        const pr = probe(model);
+        const pop = pr.T.filter((t) => pr.popup(t.i));
+        expect(pop.length, 'triângulos que sobem à noite').toBeGreaterThanOrEqual(120);
+        for (const sd of [1, -1]) {
+          const mine = pop.filter((t) => t.c[0] * sd > 0);
+          expect(mine.length, `lado ${sd}`).toBeGreaterThan(60);
+          expect(mine.every((t) => t.c[2] < -1.5 && t.c[2] > -1.9), 'no capô, à frente').toBe(true);
+          expect(mine.some((t) => pr.isHead(t.i)), 'a lente do farol sobe junto').toBe(true);
+          expect(mine.some((t) => pr.painted(t.i) && t.n[1] > 0.5), 'a tampa pintada, rente ao capô').toBe(true);
+        }
+        expect(pr.T.filter((t) => pr.isHead(t.i) && !pr.popup(t.i)).length, 'os pisca e as luzes de posição não sobem').toBeGreaterThan(0);
+      });
+    }
 
     it('regra de marca: nenhum nome de marca ou modelo, nenhum logo ou emblema, nenhuma textura (a placa, onde há, é lisa)', () => {
       const names = [...json.nodes, ...json.materials, ...json.meshes].map((x) => x.name ?? '');
@@ -318,7 +348,7 @@ describe('a gaiola de cada herói segue o estilo de sempre (a exportação do hu
       const cage = JSON.parse(readFileSync(file, 'utf8')) as { axles: Array<{ z: number; r: number; x: number; w: number }>; zFront: number; zBack: number; stations: Array<{ ring: number[][] }>; cabin: unknown[] | null };
       const base = buildModel(spec.body);
       cage.axles.forEach((a, i) => { for (const k of ['z', 'r', 'x', 'w'] as const) expect(a[k], `eixo ${i} ${k}`).toBeCloseTo(base.axles[i][k], 3); });
-      expect(cage.zFront).toBeCloseTo(-2.2, 3); expect(cage.zBack).toBeCloseTo(2.2, 3);
+      expect(cage.zFront).toBeCloseTo(spec.ends?.[0] ?? -2.2, 3); expect(cage.zBack).toBeCloseTo(spec.ends?.[1] ?? 2.2, 3);
       for (const s of cage.stations) expect(s.ring.length).toBe(26);
       if (spec.cabin) expect(cage.cabin).toHaveLength(4); else expect(cage.cabin).toBeNull();
     });
@@ -333,7 +363,7 @@ describe('regra de marca: nada no código das ferramentas que geram os heróis (
   it('nenhum nome de marca ou modelo nos .py, .ts, .json e .sh de herói', () => {
     const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
     const files = walk(join(ROOT, 'tools', 'blender')).filter((f) => /\.(py|md|sh|json|ts)$/.test(f) && /hero|heroi/.test(f));
-    expect(files.length, 'há os geradores dos heróis').toBeGreaterThanOrEqual(6);
+    expect(files.length, 'há os geradores dos heróis').toBeGreaterThanOrEqual(8);
     for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(BRANDS);
   });
 });

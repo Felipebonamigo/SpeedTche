@@ -5,7 +5,7 @@ set -e
 PY="${BPY_PYTHON:-/home/user/venv-bpy/bin/python}"
 cd "$(dirname "$0")/../../.."
 mkdir -p src/assets/cars/hero
-STYLES="${*:-hyper wedge prototype roadster}"
+STYLES="${*:-hyper wedge prototype roadster muscle rally}"
 for s in $STYLES; do
   npx tsx tools/blender/hero/exportar-gaiola.ts "$s" > "tools/blender/hero/$s-gaiola.json"
   "$PY" -I tools/blender/build_hero.py "$s" "src/assets/cars/hero/$s.glb"

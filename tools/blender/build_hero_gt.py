@@ -26,7 +26,7 @@ CAGE = json.load(open(os.path.join(HERE, "hero", "gt-gaiola.json")))
 AXLES = CAGE["axles"]
 RING = 26
 # Configuração do que muda de estilo para estilo (o GT é o padrão; `use_cage` troca): raio da borda do teto da cabine, vãos de vidro (0 = para-brisa, 2 = vidro de trás) e a abertura do cockpit.
-CFG = {"edge": 0.1, "roof_glass_gaps": (0, 2), "pit": None, "belt_paint_gaps": ()}
+CFG = {"edge": 0.1, "roof_glass_gaps": (0, 2), "pit": None, "belt_paint_gaps": (), "arch_trim": False}
 
 
 def use_cage(path):
@@ -226,6 +226,8 @@ def build_body():
                 m = "interior"  # debaixo da cabine: o vão do vidro mostra o interior escuro, não pintura
             if CFG["pit"] and region in ("top", "stripe", "center") and CFG["pit"][0] < zc < CFG["pit"][1]:
                 continue  # cockpit aberto (roadster): sem as faces de cima entre as portas
+            if CFG["arch_trim"] and region in ("sill", "lower") and st[i]["archY"] is not None and st[i + 1]["archY"] is not None:
+                m = "trim"  # a borda preta do arco (os para-lamas em caixa do carro de rali)
             try:
                 f = bm.faces.new(vs)
             except ValueError:
@@ -290,7 +292,7 @@ def relax(ob):
         for a in AXLES:
             if abs(co.y - a["z"]) < a["r"] + 0.25 and abs(co.x) < a["x"] + a["w"] / 2 + 0.2 and co.z < a["r"] * 2 + 0.2:
                 pinned.add(v.index)
-        if abs(co.y) > 2.17:
+        if co.y < CAGE["zFront"] + 0.03 or co.y > CAGE["zBack"] - 0.03:  # as duas pontas do casco (±2,17 no GT; o carro de rali é mais curto)
             pinned.add(v.index)
     free = [v for v in bm.verts if v.index not in pinned]
     for it in range(RELAX_ITERS):

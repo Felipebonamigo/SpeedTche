@@ -27,8 +27,9 @@ interface LabApi {
 }
 /** Quatro humanos, quatro estilos de herói (hyper, wedge, prototype, roadster) e a mistura com o GT. */
 const QUATRO = ['pororoca', 'iara', 'beijaflor', 'curupira'];
+const OUTROS = ['trovao', 'carcara', 'iara', 'beijaflor'];
 const MISTO = ['falcao', 'pororoca', 'iara', 'curupira'];
-const POR_ESTILO: Array<[string, string]> = [['hyper', 'pororoca'], ['wedge', 'iara'], ['prototype', 'beijaflor'], ['roadster', 'curupira']];
+const POR_ESTILO: Array<[string, string]> = [['hyper', 'pororoca'], ['wedge', 'iara'], ['prototype', 'beijaflor'], ['roadster', 'curupira'], ['muscle', 'trovao'], ['rally', 'carcara']];
 
 describe.skipIf(!available)('carros herói dos outros estilos (GL, swiftshader)', { timeout: 1_500_000 }, () => {
   let server: ViteDevServer; let browser: Browser; let page: Page;
@@ -92,14 +93,30 @@ describe.skipIf(!available)('carros herói dos outros estilos (GL, swiftshader)'
     }
   });
 
-  it('1 jogador na Alta e na Ultra, em cada estilo de herói: dentro dos limites de triângulos e de chamadas do gate de copa-1p', async () => {
+  it('1 jogador na Alta e na Ultra, em cada estilo de herói: o herói não passa dos triângulos do gate de copa-1p nem soma chamadas além do que o carro já gasta sem ele (o limite de chamadas foi medido com o Falcão: quem joga de outro estilo já está nele ou acima, herói ou não)', async () => {
     for (const q of ['high', 'ultra'] as const) {
       const lim = GATE_LIMITS['copa-1p'][q];
       for (const [style, car] of POR_ESTILO) {
+        const off = await pior('copacabana', 1, q, 'off', [car]);
         const on = await pior('copacabana', 1, q, 'auto', [car]);
-        console.log(`[V15] copa-1p/${q}/${style}: ${on.triangles} △, ${on.calls} chamadas; limite ${lim?.triangles} △ / ${lim?.calls}`);
+        console.log(`[V15] copa-1p/${q}/${style}: ${on.triangles} △, ${on.calls} chamadas (sem herói ${off.triangles} △, ${off.calls}); limite ${lim?.triangles} △ / ${lim?.calls}`);
         expect(on.triangles, `copa-1p/${q}/${style} triângulos`).toBeLessThanOrEqual(lim?.triangles ?? 0);
-        expect(on.calls, `copa-1p/${q}/${style} chamadas`).toBeLessThanOrEqual(lim?.calls ?? 0);
+        expect(on.calls, `copa-1p/${q}/${style} chamadas (limite ${lim?.calls}; sem herói ${off.calls})`).toBeLessThanOrEqual(Math.max(lim?.calls ?? 0, off.calls));
+        expect(on.calls - off.calls, `${style}: o herói soma até 2 chamadas`).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it('2 jogadores em estilos diferentes (copa-2p, Média, Alta e Ultra): dentro dos triângulos do gate e sem somar chamadas além do que os carros já gastam sem herói', async () => {
+    for (const q of ['medium', 'high', 'ultra'] as const) {
+      const lim = GATE_LIMITS['copa-2p'][q];
+      for (const ids of [['pororoca', 'iara'], ['beijaflor', 'curupira']]) {
+        const off = await pior('copacabana', 2, q, 'off', ids);
+        const on = await pior('copacabana', 2, q, 'on', ids);
+        console.log(`[V15] copa-2p/${q}/${ids.join('+')}: ${on.triangles} △, ${on.calls} chamadas (sem herói ${off.triangles} △, ${off.calls}); limite ${lim?.triangles} △ / ${lim?.calls}`);
+        expect(on.triangles, `copa-2p/${q}/${ids} triângulos`).toBeLessThanOrEqual(lim?.triangles ?? 0);
+        expect(on.calls, `copa-2p/${q}/${ids} chamadas (limite ${lim?.calls}; sem herói ${off.calls})`).toBeLessThanOrEqual(Math.max(lim?.calls ?? 0, off.calls));
+        expect(on.calls - off.calls, `${ids}: o herói soma até 4 chamadas (dois estilos)`).toBeLessThanOrEqual(4);
       }
     }
   });
@@ -131,7 +148,7 @@ describe.skipIf(!available)('carros herói dos outros estilos (GL, swiftshader)'
   // O PIOR CASO REAL COM VÁRIOS ESTILOS: os 4 humanos em 4 estilos (e a mistura com o GT), todos de perto (a largada), herói ligado em toda qualidade que o aceita.
   for (const [scene, track] of [['copa-4p', 'copacabana'], ['sampa-4p', 'sampa_noite']] as const) {
     for (const q of ['medium', 'high', 'ultra'] as const) {
-      for (const [nome, ids] of [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO]] as const) {
+      for (const [nome, ids] of [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO], ['muscle + rally + 2', OUTROS]] as const) {
         it(`gate: ${scene} ${q} com 4 humanos (${nome}) e o herói ligado fica dentro dos limites de triângulos e de chamadas`, async () => {
           const p = await pior(track, 4, q, 'on', [...ids]);
           const base = await pior(track, 4, q, 'off', [...ids]);

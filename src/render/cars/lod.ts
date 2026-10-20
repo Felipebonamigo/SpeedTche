@@ -32,7 +32,7 @@ export const HERO_MAX_TRIANGLES = 20000;
  * Os estilos que têm casco herói (`src/assets/cars/hero/<estilo>.glb`): o Falcão GT (V9) e os de V15 (hyper, wedge, prototype, roadster). O jogo carrega o que há na pasta; esta lista é o
  * contrato que `tests/herois-lod.test.ts` confere com ela (estilo novo = arquivo + linha aqui + linha em `docs/ARTE.md` + teste de contrato em `tests/herois-asset.test.ts`).
  */
-export const HERO_STYLES: readonly CarBody[] = ['gt', 'hyper', 'wedge', 'prototype', 'roadster'];
+export const HERO_STYLES: readonly CarBody[] = ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally'];
 
 /** Raio (m, em torno do carro do viewport) dentro do qual um carro humano é herói, com 1 jogador; é metade na tela dividida (`screenLodScale`). */
 export const HERO_RADIUS_M = 24;

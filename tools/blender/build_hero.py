@@ -25,6 +25,7 @@ def main():
     mod = importlib.import_module(f"hero_styles.{style}")
     H.CFG["roof_glass_gaps"] = mod.ROOF_GLASS_GAPS
     H.CFG["belt_paint_gaps"] = getattr(mod, "BELT_PAINT_GAPS", ())
+    H.CFG["arch_trim"] = getattr(mod, "ARCH_TRIM", False)
     cl.reset_scene()
     cl.MATERIALS.update(H.HERO_MATERIALS)
     root = cl.empty("lod0")

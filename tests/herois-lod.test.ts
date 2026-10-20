@@ -71,13 +71,13 @@ function scene(humans: Array<{ carId: string; ahead: number }>, ai: Array<{ carI
   return { cars, draw, state };
 }
 
-const STYLE_OF = { pororoca: 'hyper', iara: 'wedge', beijaflor: 'prototype', curupira: 'roadster', falcao: 'gt' } as const;
+const STYLE_OF = { pororoca: 'hyper', iara: 'wedge', beijaflor: 'prototype', curupira: 'roadster', falcao: 'gt', trovao: 'muscle', carcara: 'rally' } as const;
 
 describe('quais estilos têm herói (HERO_STYLES) e o carregamento por estilo', () => {
-  it('a lista do jogo é a das pastas: gt, hyper, wedge, prototype e roadster, cada um com o seu arquivo', () => {
+  it('a lista do jogo é a das pastas: gt, hyper, wedge, prototype, roadster, muscle e rally, cada um com o seu arquivo', () => {
     const files = readdirSync(DIR).filter((f) => f.endsWith('.glb')).map((f) => f.replace(/\.glb$/, '')).sort();
     expect([...HERO_STYLES].sort()).toEqual(files);
-    for (const s of ['gt', 'hyper', 'wedge', 'prototype', 'roadster']) expect(HERO_STYLES, s).toContain(s);
+    for (const s of ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally']) expect(HERO_STYLES, s).toContain(s);
   });
 
   it('o jogo aceita todos os arquivos herói (nenhum recusado) e cada estilo ganha o SEU casco herói, de 10 a 20 mil △', async () => {
@@ -93,7 +93,7 @@ describe('quais estilos têm herói (HERO_STYLES) e o carregamento por estilo', 
     }
     const shells = new Set(HERO_STYLES.map((s) => buildModel(s).hero!.shell));
     expect(shells.size, 'um casco por estilo, nenhum dividido').toBe(HERO_STYLES.length);
-    for (const s of ['hatch', 'sedan', 'muscle', 'rally', 'electric', 'classic', 'pickup', 'micro']) if (!HERO_STYLES.includes(s as never)) expect(buildModel(s).hero, `${s} segue sem herói`).toBeUndefined();
+    for (const s of ['hatch', 'sedan', 'electric', 'classic', 'pickup', 'micro']) expect(buildModel(s).hero, `${s} segue sem herói`).toBeUndefined();
   }, 120_000);
 });
 
@@ -138,11 +138,11 @@ describe('a seleção de LOD por estilo no Cars', () => {
     off.cars.dispose();
   }, 120_000);
 
-  it('carro de estilo sem herói (muscle, rally) não ganha lote nem instância herói; os estilos com herói seguem independentes', async () => {
+  it('carro de estilo sem herói (hatch, sedan) não ganha lote nem instância herói; os estilos com herói seguem independentes', async () => {
     await loadCarAssets({}, heroFiles());
-    const { cars, draw } = scene([{ carId: 'trovao', ahead: 0 }, { carId: 'carcara', ahead: 5 }, { carId: 'iara', ahead: 8 }], []);
+    const { cars, draw } = scene([{ carId: 'tornado', ahead: 0 }, { carId: 'camelo', ahead: 5 }, { carId: 'iara', ahead: 8 }], []);
     draw();
-    for (const style of ['muscle', 'rally']) {
+    for (const style of ['hatch', 'sedan']) {
       const lot = lots(cars).find((l) => l.model.body === style)!;
       expect(lot.hero, style).toBeNull();
       expect(lot.count, `${style} no casco de sempre`).toBe(1);

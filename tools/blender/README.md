@@ -36,3 +36,19 @@ node tools/heroi-folha.mjs                            # folha HC2 × GT atual ×
 - As peças (`lamp_tail`, `led`, `grade_colmeia`, `placa`, `difusor`, `escape_l/r`, `asa`, `suporte_l/r`, `lamp_head`, `farol_projetor_l/r`, `naca`, `fresta_*`, `macaneta_*`, `entrada_ar_*`, `retrovisor_*`, `pincas`) são geometria própria: sólidos de revolução (`lathe`), extrusões e **remendos conformes** (`patch_on`: o contorno 2D preenchido por uma grade recortada e assentado na pele subdividida por raios). Os nomes dos nós e materiais são os do contrato do GT (`paint`, `stripe_a/b`, `accent`, `glass`, `headlight*`, `taillight*`...), em cor linear dos pincéis de `paints.ts`.
 - `--backfaces` pinta de magenta, na prévia, o que o jogo não desenha (face virada para dentro): as rodas de `carlib.py` aparecem assim e não importam (o jogo usa a roda do catálogo).
 - Sem marca: `tests/heroi-asset.test.ts` varre o `.glb` e este diretório.
+
+## Carros herói dos outros estilos (V15) — `build_hero.py`
+
+O mesmo método do herói do GT para os estilos `Hull`-based: **hyper** (Pororoca V10), **wedge** (Iara Turbo), **prototype** (Beija-Flor) e **roadster** (Curupira S). Cada estilo é a **gaiola** do `Hull` do estilo (`hero/<estilo>-gaiola.json`, exportada por `hero/exportar-gaiola.ts`, que espia o `Hull` dentro do construtor do estilo: mesmos eixos, pegada e escapes, 8 facetas no arco, 8 cm de folga) + subdivisão lisa + as peças do estilo em `hero_styles/<estilo>.py`.
+
+```bash
+npm run carros-herois                       # exporta as quatro gaiolas e gera src/assets/cars/hero/{hyper,wedge,prototype,roadster}.glb (ou: npm run carros-herois wedge)
+/home/user/venv-bpy/bin/python -I tools/blender/build_hero.py hyper scratch/x.glb --preview scratch/prev --views tras_perto,tras34,frente_perto --big [--backfaces]
+HERO_SO_CASCO=1 /home/user/venv-bpy/bin/python -I tools/blender/build_hero.py wedge scratch/x.glb --preview scratch/prev --views capo   # só o casco e a cabine
+node tools/herois-folha.mjs scratch/herois                   # folhas HC2 × atual × herói por estilo e o resumo, no jogo
+node tools/herois-gate.mjs                                   # as chamadas e os triângulos do pior caso (4 humanos em 4 estilos) nas cenas do gate
+```
+
+- `build_hero_gt.py` é a biblioteca (casco, cabine, `Part`, `lathe`, `patch_on`, `strip_on`...; `use_cage` troca a gaiola, `CFG` leva o que muda de estilo: borda do teto, vãos de vidro, cockpit aberto); `hero_parts.py` traz o que os estilos repetem: **lanterna e farol em TIRA de LED** (`strip_lamp`: moldura em relevo, poço, lente em leque de uma peça só — o `aLens` e o halo da lanterna seguem valendo —, divisórias, venezianas e LEDs), asa, difusor, ponteira de escape, retrovisor, lanterna redonda, caixa e extrusão de cantos arredondados.
+- O jogo aplica ao herói de cada estilo a mesma tinta, faixas A/B, acento, roda, chama e verniz do estilo de sempre (mesmos nomes de nó e de material; a tampa dos faróis escamoteáveis da cunha usa `*_popup` no nome do material, que o jogo sobe à noite).
+- Sem marca: `tests/herois-asset.test.ts` varre os `.glb` e este diretório.
