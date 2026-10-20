@@ -6,7 +6,8 @@ import type { HumanEntry } from '../src/core/types';
 import { evaluateAchievements, newTelemetry, openAchievements, SACI_STREAK_TARGET, unlockAchievements } from '../src/game/achievements';
 import { carAvailable, syncConquestCars } from '../src/game/career-save';
 import type { SaveData } from '../src/game/contracts';
-import { emptyProgress, loadProgress, PROGRESS_KEY, sanitizeProgress, saveProgress, settleProgress, type ProgressNews } from '../src/game/progression';
+import { settleRace, type SettleOptions, type SettleTarget } from '../src/game/raceEnd';
+import { emptyProgress, loadProgress, PROGRESS_KEY, type ProgressData, sanitizeProgress, saveProgress, settleProgress, type ProgressNews } from '../src/game/progression';
 import { sanitizeSave } from '../src/game/save';
 import { emptyPlayerStats, emptyStats, type Contribution } from '../src/game/stats';
 import { lockText } from '../src/ui/screens/progress';
@@ -203,5 +204,46 @@ describe('textos: a conquista e o cadeado dizem as duas formas', () => {
     expect(t('stats.achDesc.HORA_DE_ENTREGA')).toMatch(/10 races.*5 .*Saci Mirim/s);
     expect(lockText(CARS.find((c) => c.id === 'furgao')!)).toMatch(/10 wins.*5 .*Saci Mirim/s);
     setLanguage('pt');
+  });
+});
+
+describe('de ponta a ponta pelo settleRace (como a sessão fecha a corrida)', () => {
+  function soloRace(mode: SettleTarget['mode'], car: string) {
+    const humans: HumanEntry[] = [{ ...human(0, 0, car), name: 'Ana' }];
+    const { state, track } = quickRace({ track: syntheticTrack([{ op: 'straight', length: 300 }]), humans, totalCars: 1, laps: 1, seed: 5, timeTrial: mode === 'timetrial' });
+    run(state, track, 60 * 240);
+    expect(state.phase).toBe('finished');
+    return { state, track, mode, humans, telemetry: newTelemetry(), outcome: null } as SettleTarget;
+  }
+  const opts = (progress: ProgressData, fx: { achievements: string[] }): SettleOptions => ({
+    champ: null, difficulty: 'profissional', hudTtl: 3.5,
+    effects: { achievement: (id) => { fx.achievements.push(id); }, hud: () => undefined, persist: () => undefined, persistProgress: () => undefined },
+    progress,
+  });
+
+  it('a 5ª vitória seguida libera HORA_DE_ENTREGA e o Furgão; a 4ª não; depois dela não repete', () => {
+    const save = sanitizeSave({});
+    const progress: ProgressData = { profiles: [{ name: 'Ana', cars: {}, saciStreak: 3 }] };
+    const fx = { achievements: [] as string[] };
+    const fourth = settleRace(save, soloRace('quick', 'saci'), opts(progress, fx));
+    expect(fourth.progress?.[0].saciStreak).toBe(4);
+    expect(save.achievements).not.toContain('HORA_DE_ENTREGA');
+    const fifth = settleRace(save, soloRace('quick', 'saci'), opts(progress, fx));
+    expect(fifth.progress?.[0].saciStreak).toBe(5);
+    expect(save.achievements).toContain('HORA_DE_ENTREGA');
+    expect(carAvailable(save, CARS.find((c) => c.id === 'furgao')!)).toBe(true);
+    settleRace(save, soloRace('quick', 'saci'), opts(progress, fx));
+    expect(fx.achievements.filter((id) => id === 'HORA_DE_ENTREGA')).toHaveLength(1);
+  });
+
+  it('com outro carro a sequência zera; o contra-relógio não mexe', () => {
+    const save = sanitizeSave({});
+    const progress: ProgressData = { profiles: [{ name: 'Ana', cars: {}, saciStreak: 4 }] };
+    const fx = { achievements: [] as string[] };
+    settleRace(save, soloRace('timetrial', 'trovao'), opts(progress, fx));
+    expect(progress.profiles[0].saciStreak).toBe(4);
+    settleRace(save, soloRace('quick', 'trovao'), opts(progress, fx));
+    expect(progress.profiles[0].saciStreak).toBeUndefined();
+    expect(save.achievements).not.toContain('HORA_DE_ENTREGA');
   });
 });

@@ -65,7 +65,7 @@ registerStrings('stats', {
     'achDesc.NITRO_NA_BANDEIRA': 'Cruzar a linha de chegada com o nitro ligado e a barra sem nenhuma carga: gastou tudo até a bandeirada.',
     'achDesc.DEZ_VITORIAS': 'Somar 10 vitórias (o contra-relógio não conta).',
     'achDesc.CAVALO_DE_ACO': 'Chegar à Maestria 3 com o Trovão V12: ganha o Gaúcho V8.',
-    'achDesc.HORA_DE_ENTREGA': 'Somar 10 vitórias sem comprar nenhum carro: ganha o Furgãozinho da Firma.',
+    'achDesc.HORA_DE_ENTREGA': 'Somar 10 vitórias sem comprar nenhum carro, ou vencer 5 corridas seguidas com o Saci Mirim: ganha o Furgãozinho da Firma.',
     'achDesc.GIRO_COMPLETO': 'Correr em todas as pistas do jogo (o contra-relógio não conta).',
     'achDesc.RIVAL_DERROTADO': 'Concluir uma copa terminando à frente do rival da copa em todas as corridas.',
     /** Toda REGIAO_<REGIÃO> (Expedição Brasil), com o nome de core.region.<id>. */
@@ -143,7 +143,7 @@ registerStrings('stats', {
     'achDesc.NITRO_NA_BANDEIRA': 'Cross the finish line with nitro active and no charge left in the bar: you spent it all before the flag.',
     'achDesc.DEZ_VITORIAS': 'Win 10 races (time trial does not count).',
     'achDesc.CAVALO_DE_ACO': 'Reach Mastery 3 with the Trovão V12: unlocks the Gaúcho V8.',
-    'achDesc.HORA_DE_ENTREGA': 'Win 10 races without buying a single car: unlocks the Firm Delivery Van.',
+    'achDesc.HORA_DE_ENTREGA': 'Win 10 races without buying a single car, or win 5 races in a row with the Saci Mirim: unlocks the Firm Delivery Van.',
     'achDesc.GIRO_COMPLETO': 'Race on every track in the game (time trial does not count).',
     'achDesc.RIVAL_DERROTADO': 'Finish a cup ahead of the cup rival in every race.',
     achDescRegion: 'Stamp every state of the {region} region in your passport.',

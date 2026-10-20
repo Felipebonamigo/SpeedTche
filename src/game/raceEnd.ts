@@ -103,7 +103,7 @@ export function settleRace(save: SaveData, r: SettleTarget, o: SettleOptions): R
     // rendeu); uma falha aqui é registrada e não leva junto o que vem depois (copa, conquistas, estrelas, gravação).
     if (o.progress) {
       progressTouched = true;
-      try { out.progress = settleProgress(o.progress, save.stats, { state: r.state, contributions }); } catch (e) { reportError(e); out.progress = []; }
+      try { out.progress = settleProgress(o.progress, save.stats, { state: r.state, contributions, mode: r.mode }); } catch (e) { reportError(e); out.progress = []; }
     }
     let cupJustCompleted: string | null = null;
     let cupChamp: ChampionshipState | null = null;

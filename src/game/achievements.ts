@@ -30,6 +30,8 @@ export const WINS_TARGET = 10;
 /** CAVALO_DE_ACO (V6c): Maestria 3 com o Trovão V12 (o V8 grave do jogo; a maestria vem do XP por carro, `progression.ts`: nenhum contador novo no save). */
 export const IRON_HORSE_CAR = 'trovao';
 export const IRON_HORSE_MASTERY = 3;
+/** HORA_DE_ENTREGA, 2ª forma (V6d): vitórias seguidas no Saci Mirim (o contador mora em `speed-tche.progress`, `ProgressProfile.saciStreak`). */
+export const SACI_STREAK_TARGET = 5;
 /** NITRO_TRIPLO (O5, com a barra da N1): cargas juntas na barra ao mesmo tempo. */
 export const TRIPLE_NITRO_CHARGES = 3;
 /**
@@ -239,6 +241,7 @@ export function unlockAchievements(
     if (n.level.after >= MAX_LEVEL) add('NIVEL_MAXIMO', [n.seat]);
     if (n.mastery.after >= MAX_MASTERY) add('MAESTRIA_MAXIMA', [n.seat]);
     if (n.carId === IRON_HORSE_CAR && n.mastery.after >= IRON_HORSE_MASTERY) add('CAVALO_DE_ACO', [n.seat]); // V6c: libera o Gaúcho V8
+    if ((n.saciStreak ?? 0) >= SACI_STREAK_TARGET) add('HORA_DE_ENTREGA', [n.seat]); // V6d: a 2ª forma (a mesma conquista; `add` não duplica)
   }
   // O5: economia e coleção leem o save (a compra é na garagem; a conquista sai no fim da corrida seguinte, e na abertura).
   for (const id of economyAchievements(save)) add(id, everyone);
@@ -314,6 +317,7 @@ export function openAchievements(save: Pick<SaveData, 'achievements' | 'career' 
   if (levels.some((l) => l >= 2)) out.add('SUBIU_DE_NIVEL');
   if (levels.some((l) => l >= MAX_LEVEL)) out.add('NIVEL_MAXIMO');
   if (progress.profiles.some((p) => Object.values(p.cars).some((xp) => masteryOf(xp).level >= MAX_MASTERY))) out.add('MAESTRIA_MAXIMA');
+  if (progress.profiles.some((p) => (p.saciStreak ?? 0) >= SACI_STREAK_TARGET)) out.add('HORA_DE_ENTREGA'); // V6d
   if (progress.profiles.some((p) => masteryOf(p.cars[IRON_HORSE_CAR] ?? 0).level >= IRON_HORSE_MASTERY)) out.add('CAVALO_DE_ACO');
   return [...out].filter((id) => !save.achievements.includes(id));
 }
