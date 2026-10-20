@@ -41,8 +41,11 @@ let seatCameras: CameraMode[] | undefined;
 let cartoonFx = false;
 /** A opção "Reduzir efeitos" no quadro (V10: a diferença entre o quadro com ela e sem ela é só dos efeitos). */
 let reduceFx = false;
-/** O interruptor "Carros em alta definição" no quadro (V9): o padrão do jogo é o automático (Alta e Ultra). */
-let heroMode: HeroSetting = 'auto';
+/**
+ * O interruptor "Carros em alta definição" no quadro (V9). O laboratório nasce DESLIGADO: o gate de contagem e os testes de imagem existentes continuam medindo o casco de
+ * sempre (V13); o custo do herói é medido à parte (`lab.setHero('on'|'auto')`, tests/heroi-gl.test.ts, tools/heroi-gate.mjs).
+ */
+let heroMode: HeroSetting = 'off';
 
 /** Monta uma corrida como o bench (src/bench/run.ts): humanos no piloto automático, `ticks` passos, a câmera de cada um. */
 function setup(trackId: string, humansN: number, ticks: number, tod?: 'day' | 'dusk' | 'night', looks?: CarLook[], carIds?: string[]): void {

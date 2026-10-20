@@ -22,16 +22,17 @@
 /* Tela de acessibilidade. */
 .scr-access .access-columns { align-items: start; }
 /* 12 seletores na coluna da direita desde as câmeras por assento (4 de direção, 4 de câmera, 30 fps): linhas e descrição mais enxutas para caber em 1024×640 e 1280×720. */
-.scr-access .options-col .sel { padding-top: calc(2 * var(--u)); padding-bottom: calc(2 * var(--u)); }
-.scr-access .options-col { gap: calc(1 * var(--u)); }
+.scr-access .options-col .sel { padding-top: calc(1 * var(--u)); padding-bottom: calc(1 * var(--u)); }
+.scr-access .options-col { gap: 0; }
+/* 10 seletores na direita desde "Carros em alta definição" (V9): linhas, descrição e rodapé ainda mais enxutos (medido: sobram ≥ 40 px em 1024×640 com texto grande). */
 .access-swatches { display: flex; gap: calc(8 * var(--u)); padding: calc(2 * var(--u)) calc(18 * var(--u)) calc(6 * var(--u)); }
 .access-swatch { flex: 1; text-align: center; padding: calc(3 * var(--u)) 0; border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 800;
   color: #0b0f16; background: var(--seat); }
 .sel-seat .sel-label::before { content: ''; display: inline-block; width: calc(12 * var(--u)); height: calc(12 * var(--u)); margin-right: calc(10 * var(--u));
   border-radius: 50%; background: var(--seat, var(--accent)); vertical-align: middle; }
-.access-desc { width: min(100%, calc(1300 * var(--u))); box-sizing: border-box; margin: calc(6 * var(--u)) auto 0; padding: calc(7 * var(--u)) calc(18 * var(--u));
-  min-height: calc(2.3 * var(--fs)); color: var(--text); font-size: var(--fs); text-align: left; }
-.access-actions { display: flex; justify-content: center; margin-top: calc(6 * var(--u)); }
+.access-desc { width: min(100%, calc(1300 * var(--u))); box-sizing: border-box; margin: calc(3 * var(--u)) auto 0; padding: calc(3 * var(--u)) calc(18 * var(--u));
+  min-height: calc(2.1 * var(--fs)); color: var(--text); font-size: var(--fs); text-align: left; }
+.access-actions { display: flex; justify-content: center; margin-top: calc(3 * var(--u)); }
 .sel-access .sel-value { color: var(--accent); }
 
 /* Direção assistida no cartão do lobby: linha compacta, para o carro (nome, desenho e barras) caber em 720p. */

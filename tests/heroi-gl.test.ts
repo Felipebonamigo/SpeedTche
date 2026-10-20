@@ -100,6 +100,17 @@ describe.skipIf(!available)('carro herói (GL, swiftshader)', { timeout: 1_500_0
     }
   });
 
+  it('1 jogador na Alta e na Ultra: o herói soma 1 ou 2 chamadas (o lote dele, cena e sombra) sobre o gate de copa-1p; o que passa do limite fica registrado, não escondido', async () => {
+    for (const q of ['high', 'ultra'] as const) {
+      const off = await pior('copacabana', 1, q, 'off', null);
+      const on = await pior('copacabana', 1, q, 'auto', null);
+      const lim = GATE_LIMITS['copa-1p'][q];
+      console.log(`[V9] copa-1p/${q} (padrão do jogo): herói ${on.triangles} △, ${on.calls} chamadas (sem ${off.triangles} △, ${off.calls}); limite ${lim?.triangles} △ / ${lim?.calls}`);
+      expect(on.calls - off.calls).toBeLessThanOrEqual(2);
+      expect(on.triangles, `copa-1p/${q} triângulos`).toBeLessThanOrEqual(lim?.triangles ?? 0);
+    }
+  });
+
   it('sem programa de shader novo: o herói reaproveita o programa do carro (a contagem de programas não muda ao ligá-lo no meio da corrida)', async () => {
     const r = await page.evaluate(() => {
       const L = (window as unknown as { lab: LabApi }).lab;
