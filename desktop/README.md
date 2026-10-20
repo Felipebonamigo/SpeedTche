@@ -207,6 +207,7 @@ Dentro dela:
 - `saves/speed-tche.settings.json`, `saves/speed-tche.save.json` (e toda chave `speed-tche.*` que o jogo gravar
   por `writeJson`) — **é isto que vai para a nuvem**. Gravação atômica (temporário + rename), só JSON válido,
   no máximo 1 MB por arquivo.
+- `saves/backup/<versão>/` e `saves/.versao` — **ficam fora da nuvem** (o Auto-Cloud pega só `saves/*.json`, sem recursão) e fora do que o jogo lê. Na 1ª abertura depois de mudar de versão, `saves/*.json` é copiado para `backup/<versão anterior>/` (3 mais recentes; falha = linha `backup-failed` no `errors.log`, o jogo abre). Como restaurar: `docs/SAVE.md` ("Backup na troca de versão").
 - `logs/errors.log` (+ `errors.1.log`, rotação em 512 KB) — relatório de erros; **fica fora da nuvem**.
 - `Local Storage/`, `Cache/`, `GPUCache/`… — do Chromium. O `localStorage` continua sendo onde o jogo lê e grava
   durante a partida, mas é um LevelDB com arquivos que mudam de nome e ficam travados com o jogo aberto: **não**

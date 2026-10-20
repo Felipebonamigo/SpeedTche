@@ -228,3 +228,18 @@ Ao voltar para a 0.1.8 depois disso: os carros de **conquista** (Furgãozinho, G
 que as versões antigas guardam como texto); os **comprados** não. `bestLaps`/`bestRaces`/`stats` ficam. Aceitável para a versão de teste desde que
 o LEIA-ME diga (diz); para a loja, a saída é gravar a versão que gravou o save e, ao abrir uma versão **mais antiga**, copiar `saves/*.json`
 para `saves/backup/<versão>/` antes de qualquer regravação (a subpasta fica fora do Auto-Cloud, que sincroniza só `saves/*.json`, sem recursão).
+
+### Backup na troca de versão (A2, 20/10/2026)
+
+Na primeira abertura depois de mudar de versão, o Electron copia `saves/*.json` para `saves/backup/<versão anterior>/` **antes** de qualquer
+leitura ou gravação da nova versão (`storage.backupSavesOnVersionChange`, chamado no topo de `desktop/main.cjs`).
+- **Onde:** `<userData>/saves/backup/<versão>/` (`%APPDATA%\SpeedTche\saves\backup\0.1.7\` no Windows, `~/.config/SpeedTche/saves/backup/0.1.7/` no Linux).
+  A versão da última abertura fica em `saves/.versao`. Sem esse arquivo mas com saves = pasta `desconhecida`; sem saves (1ª instalação) = nada.
+- **Quantos:** os 3 mais recentes; o quarto apaga o mais antigo. Só se apaga dentro de `backup/`. Voltar a uma versão já guardada substitui a cópia dela.
+- **Fora da nuvem e do jogo:** o Auto-Cloud sincroniza só `saves/*.json`, sem recursão, e `readAllSaves` só lê `*.json` de `saves/`: `backup/` e `.versao` não entram em nenhum dos dois.
+- **Falha** (disco cheio, permissão): uma linha `backup-failed` em `logs/errors.log` (versões, nomes de chave, código do erro; nunca o conteúdo) e o jogo abre. O marcador
+  não avança, então a próxima abertura tenta de novo. `.tmp` não é copiado.
+- **Restaurar à mão:** feche o jogo, copie os `.json` de `saves/backup/<versão>/` para dentro de `saves/` (substituindo), apague `saves/.versao`
+  se for abrir uma versão mais antiga (assim ela não é tratada como "troca" e não cobre a cópia boa), e abra o jogo. "Abrir pasta" nas Opções leva a `saves/`.
+  Atenção: com a Steam Cloud ligada, a nuvem pode devolver o arquivo mais novo por cima; desligue a sincronização antes de restaurar.
+
