@@ -9,8 +9,11 @@ import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 
 const [modo, ...resto] = process.argv.slice(2);
-const TODOS = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro'];
-const NOMES = { cuiabano: 'Cuiabano', tupiniquim: 'Tupiniquim', caipora: 'Caipora', pampeiro: 'Pampeiro' };
+const HATCHES = ['cuiabano', 'tupiniquim', 'caipora', 'pampeiro'];
+const OUTROS = ['barao', 'furgao', 'besouro', 'paodeforma', 'gaucho', 'trilheiro', 'lambari', 'jabuti']; // V20
+const TODOS = process.env.GRUPO === 'outros' ? OUTROS : HATCHES;
+const VERSAO = process.env.VERSAO ?? (process.env.GRUPO === 'outros' ? 'V20' : 'V19');
+const NOMES = { cuiabano: 'Cuiabano', tupiniquim: 'Tupiniquim', caipora: 'Caipora', pampeiro: 'Pampeiro', barao: 'Barão', furgao: 'Furgãozinho', besouro: 'Besouro', paodeforma: 'Pão de Forma', gaucho: 'Gaúcho V8', trilheiro: 'Trilheiro', lambari: 'Lambari', jabuti: 'Jabuti' };
 const VISTAS = [
   ['corrida', 'câmera de corrida · dia', 'track=copacabana&seg=300&hud=0&hero=0', null],
   ['tras34', '3/4 de trás', 'track=copacabana&seg=300&hud=0&carview=rear34&hero=0', [380, 280, 520, 230]],
@@ -33,7 +36,7 @@ if (modo === 'fotos') {
   for (const car of carros) {
     for (const [id, , qs, clip] of VISTAS) {
       if (so && !so.includes(id)) continue;
-      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: clip ? 2 : 1 });
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: clip ? Number(process.env.DSF ?? 2) : 1 });
       const p = await ctx.newPage(); p.setDefaultTimeout(300000);
       // o longe: o jogador vai de Falcão (casco de sempre) e o adversário à frente é o carro pedido
       const q = id === 'longe' ? `${qs}&car=falcao&aicar=${car}` : `${qs}&car=${car}`;
@@ -57,7 +60,7 @@ if (modo === 'fotos') {
   for (const car of carros) {
     const pg = await b.newPage({ viewport: { width: 150 + (W + 6) * VISTAS.length, height: 800 } });
     const linha = (rot, dir) => `<div style="width:130px;padding:6px">${rot}</div>${VISTAS.map(([id]) => cell(dir, car, id)).join('')}`;
-    await pg.setContent(`<body style="margin:0;background:#101018;font:600 20px sans-serif;color:#fff"><div style="font-size:28px;padding:10px 8px">${NOMES[car]}, casco normal: antes (V6c) × depois (V19) · ${VISTAS.map((v) => v[1]).join(' · ')}</div><div style="display:grid;grid-template-columns:140px repeat(${VISTAS.length},${W}px);gap:6px">${linha('antes', antes)}${linha('depois', depois)}</div></body>`);
+    await pg.setContent(`<body style="margin:0;background:#101018;font:600 20px sans-serif;color:#fff"><div style="font-size:28px;padding:10px 8px">${NOMES[car]}, casco normal: antes (V6c) × depois (${VERSAO}) · ${VISTAS.map((v) => v[1]).join(' · ')}</div><div style="display:grid;grid-template-columns:140px repeat(${VISTAS.length},${W}px);gap:6px">${linha('antes', antes)}${linha('depois', depois)}</div></body>`);
     await pg.waitForTimeout(500);
     await pg.screenshot({ path: `${saida}/folha-${car}.png`, fullPage: true });
     await pg.screenshot({ path: `${saida}/folha-${car}.jpg`, fullPage: true, type: 'jpeg', quality: 86 });
@@ -69,7 +72,7 @@ if (modo === 'fotos') {
   const w = 480; const h = 210;
   const im = (dir, car, id) => `<img src="${data(`${dir}/${car}-${id}.png`)}" style="width:${w}px;height:${h}px;object-fit:cover;display:block">`;
   const lin = (car) => ['antes', 'depois'].map((k) => `<div style="padding:4px">${NOMES[car]} · ${k}</div>${['tras34', 'frente34', 'longe'].map((id) => im(k === 'antes' ? antes : depois, car, id)).join('')}`).join('');
-  await pg.setContent(`<body style="margin:0;background:#101018;font:600 18px sans-serif;color:#fff"><div style="font-size:26px;padding:10px 8px">Casco normal dos hatches nacionais: V6c (em cima) × V19 (embaixo) · 3/4 de trás · 3/4 da frente · de longe</div><div style="display:grid;grid-template-columns:200px repeat(3,${w}px);gap:4px">${carros.map(lin).join('')}</div></body>`);
+  await pg.setContent(`<body style="margin:0;background:#101018;font:600 18px sans-serif;color:#fff"><div style="font-size:26px;padding:10px 8px">Casco normal dos nacionais: V6c (em cima) × ${VERSAO} (embaixo) · 3/4 de trás · 3/4 da frente · de longe</div><div style="display:grid;grid-template-columns:200px repeat(3,${w}px);gap:4px">${carros.map(lin).join('')}</div></body>`);
   await pg.waitForTimeout(800);
   await pg.screenshot({ path: `${saida}/folha-resumo.png`, fullPage: true });
   await pg.screenshot({ path: `${saida}/folha-resumo.jpg`, fullPage: true, type: 'jpeg', quality: 86 });

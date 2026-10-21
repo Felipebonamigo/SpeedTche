@@ -19,12 +19,15 @@ const MISTO = ['falcao', 'pororoca', 'iara', 'curupira'];
 // V17: os nacionais livres (herói do carro): o começo do jogo, e a mistura com os heróis de estilo
 const NACIONAIS = ['cuiabano', 'tupiniquim', 'cuiabano', 'tupiniquim'];
 const NAC_MISTO = ['cuiabano', 'tupiniquim', 'pororoca', 'iara'];
+// V20: os oito nacionais que não são hatch (casco normal): OUTROS=1 acrescenta dois casos de 4 humanos com eles (com o herói desligado o jogo desenha o casco normal deles)
+const OUTROS_A = ['barao', 'besouro', 'gaucho', 'trilheiro'];
+const OUTROS_B = ['paodeforma', 'lambari', 'jabuti', 'furgao'];
 const cenasTodas = [['copa-1p', 'copacabana', 1], ['copa-2p', 'copacabana', 2], ['copa-4p', 'copacabana', 4], ['sampa-4p', 'sampa_noite', 4]];
 const cenas = cenasTodas.filter(([id]) => !process.env.CENAS || process.env.CENAS.split(',').includes(id));
 const quals = (process.env.QUAL ?? 'medium,high,ultra').split(',');
 const casos = (n) => (n === 1
   ? [['falcao (gt)', ['falcao']], ['pororoca (hyper)', ['pororoca']], ['iara (wedge)', ['iara']], ['beijaflor (prototype)', ['beijaflor']], ['curupira (roadster)', ['curupira']], ['cuiabano (carro)', ['cuiabano']], ['tupiniquim (carro)', ['tupiniquim']]]
-  : n === 2 ? [['pororoca + iara', ['pororoca', 'iara']], ['beijaflor + curupira', ['beijaflor', 'curupira']], ['cuiabano + tupiniquim', ['cuiabano', 'tupiniquim']]] : [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO], ['2 Cuiabano + 2 Tupiniquim', NACIONAIS], ['Cuiabano + Tupiniquim + 2 estilos', NAC_MISTO]]);
+  : n === 2 ? [['pororoca + iara', ['pororoca', 'iara']], ['beijaflor + curupira', ['beijaflor', 'curupira']], ['cuiabano + tupiniquim', ['cuiabano', 'tupiniquim']]] : [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO], ['2 Cuiabano + 2 Tupiniquim', NACIONAIS], ['Cuiabano + Tupiniquim + 2 estilos', NAC_MISTO], ...(process.env.OUTROS === '1' ? [['Barão + Besouro + Gaúcho + Trilheiro', OUTROS_A], ['Pão de Forma + Lambari + Jabuti + Furgão', OUTROS_B]] : [])]);
 const res = {};
 for (const [id, track, n] of cenas) {
   for (const q of quals) {
