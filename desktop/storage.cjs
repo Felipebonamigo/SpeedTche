@@ -105,6 +105,7 @@ function writeSave(dir, key, json) {
 /** Quantos backups de versão ficam em `saves/backup/` (o mais antigo sai quando entra o quarto). */
 const BACKUP_KEEP = 3;
 const VERSION_MARKER = '.versao';
+const ORDER_FILE = '.backup-ordem';
 const UNKNOWN_VERSION = 'desconhecida';
 
 /** Nome de pasta seguro a partir do texto do marcador (que é arquivo do usuário: pode ter lixo). */
@@ -148,14 +149,17 @@ function backupSavesOnVersionChange(dir, version, onError = () => {}) {
       const dest = path.join(root, from);
       fs.rmSync(dest, { recursive: true, force: true });
       fs.renameSync(tmp, dest);
-      // Ordem de "mais recente" = mtime da pasta; garante que a nova seja estritamente a mais nova mesmo no mesmo milissegundo.
-      let newest = 0;
-      const others = fs.readdirSync(root).filter((n) => n !== from && !n.startsWith('.'));
-      for (const n of others) { try { newest = Math.max(newest, fs.statSync(path.join(root, n)).mtimeMs); } catch { /* sumiu */ } }
-      const t = new Date(Math.max(Date.now(), newest + 1));
-      fs.utimesSync(dest, t, t);
-      const kept = others.map((n) => ({ n, m: fs.statSync(path.join(root, n)).mtimeMs })).concat([{ n: from, m: t.getTime() }]).sort((a, b) => b.m - a.m);
-      for (const old of kept.slice(BACKUP_KEEP)) fs.rmSync(path.join(root, old.n), { recursive: true, force: true });
+      // Ordem de "mais recente" = `<dir>/.backup-ordem` (lista de nomes, o mais novo no fim). O mtime da pasta não serve: em trocas seguidas
+      // ele empata ou inverte (relógio grosso do sistema de arquivos) e a poda apagava um backup novo no lugar do antigo.
+      const orderFile = path.join(dir, ORDER_FILE);
+      let order = [];
+      try { const parsed = JSON.parse(fs.readFileSync(orderFile, 'utf8')); if (Array.isArray(parsed)) order = parsed.filter((n) => typeof n === 'string'); } catch { order = []; }
+      const present = fs.readdirSync(root).filter((n) => !n.startsWith('.'));
+      // Pastas que existem mas não estão na lista (backup de antes deste arquivo, ou lista perdida): entram antes, pelo mtime — melhor esforço.
+      const unlisted = present.filter((n) => n !== from && !order.includes(n)).map((n) => { let m = 0; try { m = fs.statSync(path.join(root, n)).mtimeMs; } catch { /* sumiu */ } return { n, m }; }).sort((x, y) => x.m - y.m).map((x) => x.n);
+      const ranked = unlisted.concat(order.filter((n) => n !== from && present.includes(n)), [from]);
+      for (const old of ranked.slice(0, Math.max(0, ranked.length - BACKUP_KEEP))) fs.rmSync(path.join(root, old), { recursive: true, force: true });
+      try { fs.writeFileSync(orderFile, JSON.stringify(ranked.slice(-BACKUP_KEEP)), 'utf8'); } catch { /* sem a lista, o próximo backup cai no mtime */ }
       result = 'backed-up';
     } catch (e) {
       failed.push('(pasta)');
