@@ -1,13 +1,15 @@
-**Speed Tchê 0.1.15 — versão de teste para amigos** (build de 27/10/2026)
+**Speed Tchê 0.1.16 — versão de teste para amigos** (build de 28/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Versão de **teste**: pode ter bugs; nome, arte e equilíbrio ainda vão mudar.
 
-**Baixar:** `SpeedTche-0.1.15-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.15-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
+**Baixar:** `SpeedTche-0.1.16-teste-windows-x64.zip` (Windows) ou `SpeedTche-0.1.16-teste-linux-x64.tar.gz` (Linux). Mac ainda não tem.
 
 - **Windows:** descompacte e abra `SpeedTche.exe`. Sem assinatura digital ainda: no aviso "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
 - **Linux:** descompacte e rode `./speedtche`.
 - **Online ainda não funciona** nesta versão — joguem juntos na mesma máquina (teclado + controles).
 - Controles, o que testar e como mandar problema: `LEIA-ME.txt` (dentro do pacote e aqui nos anexos).
+
+Novidades da 0.1.16: **corpo curvo em todas as qualidades** nos hatches nacionais (Cuiabano, Tupiniquim, Caipora, Pampeiro), também nos adversários e sem "Carros em HD".
 
 Novidades da 0.1.15: **corpo curvo** no Cuiabano e no Tupiniquim em HD (teto, para-lamas, capô, vidro, lanterna maior) e **roda de fábrica clara** nos hatches.
 
