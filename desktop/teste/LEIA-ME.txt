@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.12, build de 24/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.13, build de 25/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,10 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.13 (sobre a 0.1.12):
+  * O JOGO ABRE MAIS RÁPIDO: os carros em alta definição (7 arquivos) só são lidos quando "Carros em HD" está ligado (automático = Alta e
+    Ultra), e entram em segundo plano se vocês ligarem a opção no meio da sessão. Nada muda no visual nem na jogabilidade.
+  * BACKUP DOS SAVES: ao trocar de versão, o jogo guarda os 3 backups mais recentes; antes, em trocas seguidas, podia apagar o errado.
 - NOVIDADES DA 0.1.12 (sobre a 0.1.11):
   * CARROS EM ALTA DEFINIÇÃO EM MAIS ESTILOS: além do Falcão GT, agora Pororoca (hipercarro), Iara Turbo (cunha), Beija-Flor (protótipo),
     Curupira S (roadster), Trovão V12 (muscle) e Carcará RS (rali) têm a malha detalhada quando estão perto da sua câmera
