@@ -9,7 +9,7 @@ import { PAINT_IDS, paintsOfLooks, raceLooks } from '../src/game/paints.ts';
 import { FINISH_IDS, FLAME_IDS, RIM_IDS, STRIPE_IDS, WHEEL_IDS, WHEEL_LISTS } from '../src/game/cosmetics.ts';
 import { createRenderer } from '../src/render/renderer.ts';
 import { CAMERA_EXPERIMENT } from '../src/render/camera-base.ts';
-import { loadCarAssets } from '../src/render/cars/assets.ts';
+import { ensureHeroes, loadCarAssets } from '../src/render/cars/assets.ts';
 import { heroEnabled } from '../src/render/cars/lod.ts';
 import { loadLandmarkAssets, loadLandmarkParts } from '../src/render/scenery/landmarks/assets.ts';
 import { setLanguage, t } from '../src/i18n/index.ts';
@@ -159,6 +159,9 @@ const canvas = document.getElementById('game');
 const hud = document.getElementById('hud');
 // Carros da arte (src/assets/cars/*.glb), como no jogo: o que vier de arquivo aparece em window.carAssets.
 window.carAssets = await loadCarAssets();
+// Cascos herói sob demanda (V16): a harness os pede sempre (o `hero=` da URL só liga o desenho) e junta o resultado ao relatório.
+const heroReport = await ensureHeroes();
+window.carAssets = { ...window.carAssets, heroes: heroReport.heroes, rejected: [...window.carAssets.rejected, ...heroReport.rejected], warnings: [...window.carAssets.warnings, ...heroReport.warnings] };
 // Peças baixadas (src/assets/landmarks/parts/<peça>.glb) e marcos da arte (src/assets/landmarks/<id>.glb), idem: o
 // que vier de arquivo aparece em window.landmarkParts e window.landmarkAssets.
 window.landmarkParts = await loadLandmarkParts();

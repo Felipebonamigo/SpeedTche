@@ -60,8 +60,12 @@ export async function readAsset(url: string): Promise<ArrayBuffer> {
   return res.arrayBuffer();
 }
 
-/** Carrega os arquivos e registra os aceitos. `files` = caminho → função que devolve a URL (ou data URL) do .glb. */
-export async function loadCarAssets(files: Record<string, () => Promise<string>> = FILES, heroFiles: Record<string, () => Promise<string>> = files === FILES ? HERO_FILES : {}): Promise<CarAssetReport> {
+/**
+ * Carrega os arquivos e registra os aceitos. `files` = caminho → função que devolve a URL (ou data URL) do .glb.
+ * Os cascos herói NÃO entram por padrão (V16): ~1 MB cada, 7 deles, lidos e parseados na abertura custavam ~0,6–1 s mesmo com "Carros em HD" desligado.
+ * Quem precisa deles chama `ensureHeroes()` (a sessão e o palco, quando `heroEnabled` é verdadeiro; as ferramentas de medição, explicitamente).
+ */
+export async function loadCarAssets(files: Record<string, () => Promise<string>> = FILES, heroFiles: Record<string, () => Promise<string>> = {}): Promise<CarAssetReport> {
   const report: CarAssetReport = { loaded: [], heroes: [], rejected: [], warnings: [] };
   for (const [path, load] of Object.entries(files)) {
     const file = path.slice(path.lastIndexOf('/') + 1);
@@ -80,7 +84,13 @@ export async function loadCarAssets(files: Record<string, () => Promise<string>>
       report.rejected.push({ file, problems: [`não carregou: ${e instanceof Error ? e.message : String(e)}`] });
     }
   }
-  // Cascos herói (V9): o arquivo recusado fica de fora com o motivo e o modelo segue sem herói (o jogo é o de sempre).
+  await loadHeroFiles(heroFiles, report);
+  last = report;
+  return report;
+}
+
+/** Lê, parseia e registra os cascos herói de `heroFiles`, somando o resultado a `report` (V9). Arquivo recusado fica de fora com o motivo e o modelo segue sem herói. */
+async function loadHeroFiles(heroFiles: Record<string, () => Promise<string>>, report: CarAssetReport): Promise<void> {
   for (const [path, load] of Object.entries(heroFiles)) {
     const file = `hero/${path.slice(path.lastIndexOf('/') + 1)}`;
     const name = file.slice(5).replace(/\.glb$/i, '');
@@ -98,6 +108,27 @@ export async function loadCarAssets(files: Record<string, () => Promise<string>>
       report.rejected.push({ file, problems: [`não carregou: ${e instanceof Error ? e.message : String(e)}`] });
     }
   }
-  last = report;
-  return report;
+}
+
+// Uma promessa por conjunto de arquivos (a identidade do objeto): chamadas repetidas e concorrentes dividem a mesma, e cada arquivo é lido uma vez só.
+// atalho: arquivo que falhou NÃO é tentado de novo na sessão (a falha fica no relatório); reabrir o jogo tenta outra vez.
+const heroLoads = new WeakMap<object, Promise<CarAssetReport>>();
+
+/**
+ * Carrega os cascos herói sob demanda (V16) e os registra em `models.ts`; o `Cars` já criado os adota no quadro seguinte (`Cars.adoptHeroes`).
+ * Idempotente: a primeira chamada começa a leitura, as outras recebem a mesma promessa. Nunca rejeita: a falha de um arquivo fica em `rejected`, os outros entram,
+ * e `lastCarAssetReport()` passa a incluir os heróis e as recusas deles. O relatório devolvido é só o dos heróis.
+ */
+export function ensureHeroes(heroFiles: Record<string, () => Promise<string>> = HERO_FILES): Promise<CarAssetReport> {
+  let p = heroLoads.get(heroFiles);
+  if (!p) {
+    p = (async () => {
+      const report: CarAssetReport = { loaded: [], heroes: [], rejected: [], warnings: [] };
+      await loadHeroFiles(heroFiles, report);
+      last = { loaded: last.loaded, heroes: [...new Set([...last.heroes, ...report.heroes])], rejected: [...last.rejected, ...report.rejected], warnings: [...last.warnings, ...report.warnings] };
+      return report;
+    })();
+    heroLoads.set(heroFiles, p);
+  }
+  return p;
 }

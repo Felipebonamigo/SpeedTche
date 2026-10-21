@@ -7,7 +7,7 @@ import { CARS, createRace, getTrack, seatColor, stepRace, type AiBrain, type Hum
 import type { CarLook, Track } from '../src/core/types';
 import { DEFAULT_SETTINGS, type Quality, type RenderFrame } from '../src/game/contracts';
 import { paintsOfLooks, raceLooks } from '../src/game/paints';
-import { loadCarAssets } from '../src/render/cars/assets';
+import { ensureHeroes, loadCarAssets } from '../src/render/cars/assets';
 import { buildModel, modelKey } from '../src/render/cars/models';
 import { heroEnabled, type HeroSetting } from '../src/render/cars/lod';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
@@ -22,6 +22,8 @@ const hud = document.getElementById('hud') as HTMLElement;
 const q = new URLSearchParams(location.search);
 // Os carros de arte (src/assets/cars/*.glb) entram ANTES do renderizador, como no jogo (main.ts): o gate mede o que o jogador de fato desenha.
 await loadCarAssets();
+// Os cascos herói são sob demanda no jogo (V16); o laboratório mede o que o jogador desenha com a opção ligada, então os pede aqui (o `hero=` da URL só liga ou desliga o desenho).
+await ensureHeroes();
 const renderer = createRenderer(canvas, hud);
 renderer.setDynamicResolution(false); // o laboratório mede contagem: a escala só muda quando o teste a fixa
 const gl = (renderer as unknown as { __gl: import('three').WebGLRenderer }).__gl;

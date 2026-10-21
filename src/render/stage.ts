@@ -12,6 +12,7 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CARS } from '../core/data/cars';
 import type { Quality } from '../game/contracts';
 import type { Cars, DisplayCar } from './cars';
+import { ensureHeroes } from './cars/assets';
 import { heroEnabled } from './cars/lod';
 import { hash2 } from './noise';
 import { palette, type Palette } from './palette';
@@ -340,7 +341,9 @@ export class Stage {
     this.lastTime = time;
     const n = items.length;
     const q = stageQuality(items[0].lp.panel.quality, n);
-    this.cars.setHero(heroEnabled({ quality: q, reduceEffects: items[0].lp.panel.reduceEffects, setting: getRenderPrefs().heroCars })); // a vitrine usa o casco herói, se ligado (V9)
+    const heroOn = heroEnabled({ quality: q, reduceEffects: items[0].lp.panel.reduceEffects, setting: getRenderPrefs().heroCars });
+    if (heroOn) void ensureHeroes(); // V16: os cascos herói só são lidos quando alguém os quer; até chegarem a vitrine mostra o casco de sempre (Cars.setHero adota o lote quando vierem)
+    this.cars.setHero(heroOn); // a vitrine usa o casco herói, se ligado (V9)
     if (q !== this.quality) {
       this.quality = q;
       this.cars.setQuality(q);

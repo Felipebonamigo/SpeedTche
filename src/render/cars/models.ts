@@ -45,7 +45,12 @@ const heroes = new Map<string, CarLod>();
 /** Registra (ou, com null, tira) o casco herói de um modelo. */
 export function setHeroOverride(key: string, hero: CarLod | null): void {
   if (hero) heroes.set(key, hero); else heroes.delete(key);
+  heroRev++;
 }
+
+/** Sobe a cada herói registrado ou tirado (V16: os heróis chegam depois da abertura): o `Cars` compara com o que já adotou, um inteiro por quadro, sem ouvinte. */
+let heroRev = 0;
+export function heroRevision(): number { return heroRev; }
 
 /** Troca (ou, com null, devolve ao procedural) o modelo de um carro ou de um estilo. */
 export function setModelOverride(key: string, model: CarModel | null): void {

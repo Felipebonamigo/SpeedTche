@@ -26,7 +26,7 @@ import { createCarMaterial, FINISH_SHIFT, setCarLamps, setCarQuality, setCarShee
 import type { Lamp } from './cars/kit';
 import { applyStylize } from './stylize';
 import type { CarModel } from './cars/model';
-import { buildModel, modelKey, modelKeys } from './cars/models';
+import { buildModel, heroRevision, modelKey, modelKeys } from './cars/models';
 import { carDetail } from './cars/lod';
 import { carPaint, defaultAccent, LIVERY_B, stripeBits, WHEEL_RIM } from './cars/paints';
 import { buildSimpleWheel, buildWheel, spinStep, WHEEL_DESIGNS, type WheelDesign, type WheelModel } from './cars/wheels';
@@ -63,7 +63,7 @@ interface Batch {
  * Um modelo: estilo (`gt`) ou carro com arquivo próprio (`falcao`). `lod1` = o lote do casco simplificado (carros longe). `hero` = o lote do casco herói (V9:
  * alta definição, só o carro humano perto da câmera; só existe se o modelo tem `src/assets/cars/hero/<modelo>.glb`) — um lote por MODELO, nunca por carro.
  */
-interface StyleBatch extends Batch { readonly key: string; readonly model: CarModel; readonly wheels: WheelBatch; readonly lod1: Batch | null; readonly hero: Batch | null }
+interface StyleBatch extends Batch { readonly key: string; readonly model: CarModel; readonly wheels: WheelBatch; readonly lod1: Batch | null; hero: Batch | null; /** o material do casco comum do modelo, de onde o herói que chega depois tira o dele */ readonly rig: Rig }
 interface WheelBatch extends Batch { readonly model: WheelModel; readonly label: string }
 /** Material e uniformes de um programa de carro: o comum e um por modelo com atlas. */
 interface Rig { readonly material: THREE.MeshPhysicalMaterial; readonly uniforms: CarUniforms }
@@ -126,6 +126,8 @@ export class Cars {
   private lowQuality = false;
   /** Carros em alta definição ligado neste quadro (V9; `RenderOptions.heroCars`, e o palco por `setHero`). */
   private heroOn = false;
+  /** A revisão dos cascos herói já adotada (`heroRevision`): os que chegam depois da abertura entram em `adoptHeroes`. */
+  private heroRev = heroRevision();
   /** Histerese do herói (cars/lod.ts): por viewport (a posição do carro do viewport + 1; 0 = fundo do menu) e por carro; 1 = era herói no quadro anterior. */
   private readonly heroSeen = new Uint8Array((MAX_CARS + 1) * MAX_CARS);
   private readonly blob: THREE.InstancedMesh;
@@ -199,16 +201,7 @@ export class Cars {
       // V14: o halo das lanternas é uma distância às lentes DO CASCO no fragmento; as lanternas entram nos uniformes do material. Um material por casco com lanternas
       // (o casco de sempre e o herói do mesmo modelo têm lentes em lugares diferentes): o three só reenvia os uniformes quando o material muda de um desenho para o outro.
       // Mesmo programa (a chave não muda: `onBeforeCompile` só reata os uniformes), então nenhum programa novo; as rodas e o lod1 (lente chata, sem halo) ficam no `rig`.
-      const lampRig = (g: THREE.BufferGeometry): Rig => {
-        const { lamps, glassY } = g.userData as { lamps?: ReadonlyArray<Lamp>; glassY?: [number, number] | null };
-        if ((!lamps || lamps.length === 0) && !glassY) return rig;
-        const own = createCarMaterial();
-        own.material.map = rig.material.map;
-        own.material.normalMap = rig.material.normalMap;
-        setCarLamps(own.uniforms, lamps, glassY);
-        this.rigs.push(own);
-        return own;
-      };
+      const lampRig = (g: THREE.BufferGeometry): Rig => this.lampRigFor(rig, g, false);
       // A roda do arquivo é de um modelo só; as dos estilos dividem por desenho. Rodas não fazem sombra: ficam dentro da
       // sombra da carroceria e da de contato.
       const wheelKey: WheelDesign | CarModel = model.wheelModel ? model : model.wheel;
@@ -221,7 +214,7 @@ export class Cars {
       }
       const lod1 = model.lod1 ? this.batch(model.lod1.shell, MAX_CARS, true, lampRig(model.lod1.shell).material) : null;
       const hero = model.hero ? this.batch(model.hero.shell, MAX_CARS, true, lampRig(model.hero.shell).material) : null;
-      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, lampRig(model.shell).material), key, model, wheels, lod1, hero };
+      const style: StyleBatch = { ...this.batch(model.shell, MAX_CARS, true, lampRig(model.shell).material), key, model, wheels, lod1, hero, rig };
       style.mesh.receiveShadow = true;
       if (lod1) lod1.mesh.receiveShadow = true;
       if (hero) hero.mesh.receiveShadow = true;
@@ -293,6 +286,54 @@ export class Cars {
     return { mesh, extra, count: 0 };
   }
 
+  /**
+   * O material de um casco com lanternas: um por casco, com o atlas do `rig` do modelo (V14). `late` = o casco chegou depois da abertura (herói sob demanda, V16): o material
+   * novo copia o ESTADO dos uniformes e do verniz dos que já existem (luz, faróis, qualidade, brilho), que de outro modo ficariam nos valores de fábrica. A chave de programa é a
+   * mesma de todos os carros (`customProgramCacheKey`) e os parâmetros que entram nela (verniz, atlas) saem iguais: o three reaproveita o programa, nada compila no meio da corrida.
+   */
+  private lampRigFor(rig: Rig, g: THREE.BufferGeometry, late: boolean): Rig {
+    const { lamps, glassY } = g.userData as { lamps?: ReadonlyArray<Lamp>; glassY?: [number, number] | null };
+    if ((!lamps || lamps.length === 0) && !glassY) return rig;
+    const own = createCarMaterial();
+    own.material.map = rig.material.map;
+    own.material.normalMap = rig.material.normalMap;
+    if (late) {
+      own.material.clearcoat = rig.material.clearcoat;
+      const from = rig.uniforms as unknown as Record<string, { value: unknown }>;
+      const to = own.uniforms as unknown as Record<string, { value: unknown }>;
+      for (const k of Object.keys(from)) {
+        const a = from[k].value as { copy?: (o: unknown) => unknown } | number | null;
+        const b = to[k]?.value as { copy?: (o: unknown) => unknown } | number | null | undefined;
+        if (typeof a === 'number') to[k].value = a;
+        else if (a && b && typeof b === 'object' && typeof b.copy === 'function') b.copy(a);
+      }
+    }
+    setCarLamps(own.uniforms, lamps, glassY);
+    this.rigs.push(own);
+    return own;
+  }
+
+  /** Cascos herói que chegaram depois do `Cars` (V16, `ensureHeroes`): cria o lote deles, uma vez por modelo. Um inteiro por quadro quando não há nada novo. */
+  private adoptHeroes(): void {
+    const rev = heroRevision();
+    if (rev === this.heroRev) return;
+    this.heroRev = rev;
+    for (const st of this.styles) {
+      if (st.hero) continue;
+      const hero = buildModel(st.key).hero;
+      if (!hero) continue;
+      const b = this.batch(hero.shell, MAX_CARS, true, this.lampRigFor(st.rig, hero.shell, true).material);
+      b.mesh.receiveShadow = true;
+      b.mesh.frustumCulled = false;
+      b.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      b.mesh.count = 0;
+      b.mesh.visible = false;
+      this.group.add(b.mesh);
+      st.hero = b;
+      this.batches.push(b);
+    }
+  }
+
   /** `light` = palette.light (1 dia, 0,7 entardecer, 0,32 noite). */
   setLight(light: number): void {
     const night = light < 0.5;
@@ -322,6 +363,7 @@ export class Cars {
   /** Liga ou desliga o casco herói (V9): a corrida o recebe do quadro (`update`) e o palco, das opções (`stage.ts`). */
   setHero(on: boolean): void {
     this.heroOn = on;
+    if (on) this.adoptHeroes();
   }
 
   /** Verniz (clearcoat) só na alta; média e baixa ficam no programa sem a segunda camada. */
@@ -383,6 +425,7 @@ export class Cars {
     this.looksIn = frame.looks;
     this.paints = frame.paints;
     this.heroOn = frame.options.heroCars === true;
+    if (this.heroOn) this.adoptHeroes();
     const cars = frame.state.cars;
     const segs = frame.track.segments;
     for (let i = 0; i < cars.length && i < MAX_CARS; i++) {

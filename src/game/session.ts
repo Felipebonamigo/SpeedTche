@@ -21,6 +21,7 @@ import { assistedHumans, withRaceAssists } from '../access/humans';
 import { createAudio } from '../audio/audio';
 import { songForScenery } from '../audio/music';
 import { createRenderer } from '../render/renderer';
+import { ensureHeroes } from '../render/cars/assets';
 import { heroEnabled } from '../render/cars/lod';
 import { createRetroRenderer } from '../render-pseudo3d/renderer';
 import { trackOutline } from '../render/minimap';
@@ -592,6 +593,16 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
     return [sc.a, sc.b].some((id) => { const c = r.state.cars.find((x) => x.id === id); return c !== undefined && c.seat >= 0 && r.localSeats.includes(c.seat); });
   }
 
+  /**
+   * "Carros em HD" ligado neste quadro (interruptor × qualidade × "Reduzir efeitos"). Ligado, pede os cascos herói (V16: não são lidos na abertura); a chamada repetida é só uma
+   * consulta à promessa em cache. Até chegarem, o carro segue no casco de sempre e o `Cars` adota o lote herói no quadro seguinte (ligar no meio da sessão idem).
+   */
+  function heroCarsOn(): boolean {
+    const on = heroEnabled({ quality: settings.quality, reduceEffects: settings.reduceEffects, setting: settings.heroCars });
+    if (on) void ensureHeroes();
+    return on;
+  }
+
   function buildFrame(r: ActiveRace): RenderFrame {
     const viewports: ViewportSpec[] = r.humans
       .filter((h) => r.localSeats.includes(h.seat))
@@ -607,7 +618,7 @@ export function createSession(canvas: HTMLCanvasElement, hudRoot: HTMLElement, u
       });
     return {
       state: r.afterFlag?.display ?? r.state, track: r.track, viewports,
-      options: { quality: settings.quality, showMinimap: settings.showMinimap, screenShake: settings.screenShake, reduceEffects: settings.reduceEffects, cartoonEffects: settings.cartoonEffects, palette: settings.colorPalette, landmarkCaptions: settings.landmarkCaptions, highCurveCamera: settings.highCurveCamera, heroCars: heroEnabled({ quality: settings.quality, reduceEffects: settings.reduceEffects, setting: settings.heroCars }) },
+      options: { quality: settings.quality, showMinimap: settings.showMinimap, screenShake: settings.screenShake, reduceEffects: settings.reduceEffects, cartoonEffects: settings.cartoonEffects, palette: settings.colorPalette, landmarkCaptions: settings.landmarkCaptions, highCurveCamera: settings.highCurveCamera, heroCars: heroCarsOn() },
       time: elapsed, paused: session.paused, coop: r.humans.length >= 2 && r.humans.every((h) => h.teamId === r.humans[0].teamId),
       showHud: menus.current() === null || menus.current() === 'pause' || (r.driver !== null && online.quitOpen),
       ghost: r.ghost?.frame(r.state),
