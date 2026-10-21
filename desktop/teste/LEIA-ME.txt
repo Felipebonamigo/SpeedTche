@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.16, build de 28/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.17, build de 29/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,12 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.17 (sobre a 0.1.16):
+  * CORPO ARREDONDADO NOS OITO NACIONAIS QUE FALTAVAM, cada um com a forma do seu tipo: Barão (ombro vincado, porta-malas abaulado), Furgãozinho
+    e Jabuti (cantos redondos, teto em leve arco), Besouro (cúpula e para-lamas bojudos), Pão de Forma (cantos de furgão arredondados),
+    Gaúcho V8 (calombo no capô, ombro traseiro largo), Trilheiro (linha reta com as arestas arredondadas) e Lambari (vidro grande, teto em
+    cúpula). Silhueta de perfil, rodas e colisão são as mesmas; os triângulos diminuíram um pouco. O ganho é moderado: lê "arredondado", não
+    "esculpido". Vale em todas as qualidades. Ainda há um recorte escuro no canto de baixo do para-choque traseiro de alguns.
 - NOVIDADES DA 0.1.16 (sobre a 0.1.15):
   * CORPO CURVO EM TODAS AS QUALIDADES para os quatro hatches nacionais (Cuiabano, Tupiniquim, Caipora, Pampeiro): o casco normal, que é o que
     se vê nos adversários, na qualidade Média/Baixa e em Alta sem "Carros em HD", ganhou cintura abaulada, teto com arco, para-lamas
