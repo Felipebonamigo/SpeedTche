@@ -38,6 +38,7 @@ DEFAULTS = dict(
     station_crease=0.45,
     end_crease=0.25,
     nose_anchor=0.0,     # V19: 1 = o centro da frente fica onde estava e os cantos recuam (a caixa do carro não cresce); 0 = o centro avança (herói)
+    z5_frac=0.60,        # V20: onde o ponto 5 do anel fica entre a cintura e o canto do teto (0,60 de V18; mais alto = vidro lateral maior)
     arch_anchor=0.0,     # V19: fração do arco do teto que o teto 'paga' descendo nas pontas (0 = o meio sobe o arco todo, herói; 0,5 = o topo sobe só metade)
 )
 
@@ -49,6 +50,8 @@ def sstep(t):
 
 def marks(sp):
     """cowl, frente do teto, fim do teto, base do vidro de trás: as estações de mesmo lugar nos dois specs."""
+    if "marks" in sp:  # V20: os specs que não têm o arranjo de estações dos hatches dizem onde estão (casco_forma.MARKS)
+        return sp["marks"]
     st = sp["stations"]
     return st[5], st[6], st[10], st[11]
 
@@ -71,7 +74,7 @@ def make_ring(F):
         zlow = fl + (belt - fl) * F["zlow"]
         z4 = belt + min(0.035, h * 0.5)
         z6 = max(top - min(F["edge_drop"] * cab + 0.035 * (1 - cab), h * 0.5), z4)
-        z5 = z4 + (z6 - z4) * 0.60
+        z5 = z4 + (z6 - z4) * F["z5_frac"]
         x4 = hwb - g("belt_in")
         xr = hwr
         # fração do meio-teto em que muda de faixa: o vidro de trás deixa uma coluna C larga (a faixa 6 vira pintura), o para-brisa vai até o canto
