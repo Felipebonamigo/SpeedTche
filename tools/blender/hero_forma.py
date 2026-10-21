@@ -37,6 +37,8 @@ DEFAULTS = dict(
     crease_points={3: 0.80, 6: 0.15, 1: 0.50},
     station_crease=0.45,
     end_crease=0.25,
+    nose_anchor=0.0,     # V19: 1 = o centro da frente fica onde estava e os cantos recuam (a caixa do carro não cresce); 0 = o centro avança (herói)
+    arch_anchor=0.0,     # V19: fração do arco do teto que o teto 'paga' descendo nas pontas (0 = o meio sobe o arco todo, herói; 0,5 = o topo sobe só metade)
 )
 
 
@@ -154,7 +156,7 @@ def shape_body(ob, sp, F):
         rr = min(1.0, a / 0.80)
         if y < nose + 0.16:  # o para-choque é o que mais avança; o capô recua um pouco
             zr = math.exp(-(((z - 0.50) / 0.24) ** 2))
-            dy -= F["nose_bulge"] * (1.0 - rr ** 2) * zr * sstep((nose + 0.16 - y) / 0.12)
+            dy -= F["nose_bulge"] * ((1.0 - rr ** 2) - F["nose_anchor"]) * zr * sstep((nose + 0.16 - y) / 0.12)
         if y > tail - 0.16:
             zr = math.exp(-(((z - 0.62) / 0.34) ** 2))
             dy += F["tail_bulge"] * (1.0 - rr ** 2) * zr * sstep((y - (tail - 0.16)) / 0.12)
@@ -162,7 +164,7 @@ def shape_body(ob, sp, F):
         if roof_f - 0.1 < y < roof_r + 0.1 and top - belt > 0.3:
             vv = sstep(((z - belt) / (top - belt) - 0.70) / 0.25)
             t = (y - (roof_f + roof_r) / 2) / ((roof_r - roof_f) / 2 + 0.1)
-            dz += F["roof_arch"] * max(0.0, 1.0 - t * t) * vv
+            dz += F["roof_arch"] * (max(0.0, 1.0 - t * t) - F["arch_anchor"] * sstep((1.0 - abs(t)) / 0.3)) * vv
         v.co = Vector((x + dx, y + dy, z + dz))
     me.update()
 

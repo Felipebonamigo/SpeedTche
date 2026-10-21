@@ -37,6 +37,7 @@ const hitFrame = q.get('hit') === null ? -1 : Number(q.get('hit'));
 const driftLevelForced = Number(q.get('driftlevel') ?? 0);
 const topForced = Number(q.get('top') ?? 0);
 const draftForced = q.get('draft') === '1';
+const aheadM = q.get('ahead') === null ? 0 : Number(q.get('ahead')); // V19: um adversário (aicar=<id>) a tantos metros à frente do jogador (o carro de longe, no LOD far a partir de 30 m)
 const reduceFx = q.get('reduce') === '1';
 // cartoon=1: a opção "Efeitos de cartum" (V8: POW, estrelinhas, rodopio e squash & stretch na batida; o padrão é a batida realista).
 const cartoonFx = q.get('cartoon') === '1';
@@ -268,6 +269,7 @@ function loop(now) {
     if (q.get('brake') === '1') { me.speed = Math.max(400, 5000 - frames * 250); me.collisionCooldown = 0; }
     if (forceDrift) { me.driftDir = forceDrift; me.driftTicks = 30; if (driftLevelForced > 0) me.driftCharge = [45, 100, 160][driftLevelForced - 1]; }
     if (topForced > 0) me.speed = me.stats.topSpeed * topForced;
+    if (aheadM > 0) { const lead = state.cars.find((c) => c !== me); if (lead) { if (q.get('aicar')) lead.carId = q.get('aicar'); lead.z = (me.z + aheadM / SEG_M) % track.length; lead.x = me.x; lead.speed = me.speed; } }
     if (draftForced) { const lead = state.cars.find((c) => c !== me); if (lead) { lead.z = (me.z + 700) % track.length; lead.x = me.x; lead.speed = lead.stats.topSpeed; } }
     if (hitFrame >= 0) { const top = me.stats.topSpeed; if (frames < hitFrame) { me.speed = top * 0.8; me.collisionCooldown = 0; } else if (frames === hitFrame) { me.speed = top * 0.4; me.collisionCooldown = 20; } else me.collisionCooldown = Math.max(0, 20 - (frames - hitFrame)); }
     ageMessages(dt);

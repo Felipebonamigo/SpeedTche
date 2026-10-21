@@ -11,18 +11,25 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "specs"))
 import bpy  # noqa: E402
 import carlib as cl  # noqa: E402
+import casco_forma as CF  # noqa: E402
 
 
 def tri_count(root):
     return sum(sum(len(p.vertices) - 2 for p in ob.data.polygons) for ob in root.children if ob.type == "MESH")
 
 
-def build_lod(sp, lod, levels):
+def build_lod(sp, lod, levels, forma=None):
+    """`forma` (V19): os parâmetros de forma do casco (`casco_forma.py`); sem eles, o casco de V6c de sempre."""
     root = cl.empty("lod%d" % lod)
+    sp0 = sp
+    if forma is not None:
+        sp = CF.spec_com_forma(sp, forma, lod)
     body = cl.build_shell(sp, lod)
     cl.subsurf(body, levels)
     cl.cut_wheel_arches(body, sp, lod)
     cl.symmetrize(body)
+    if forma is not None and lod == 0:
+        CF.deformar(body, sp, forma)
     body.parent = root
     cl.wheel_wells(sp, lod).parent = root
     cl.add_patches(sp, body, lod, root)
@@ -46,8 +53,9 @@ def main():
         cl.EXTRA_CUTS, cl.ARCH_SEG = 1, 48
     sp = importlib.import_module(name).SPEC
     cl.reset_scene()
-    r0 = build_lod(sp, 0, levels)
-    r1 = build_lod(sp, 1, 0)
+    forma = CF.forma_de(name) if "--sem-forma" not in args and estilo == "cartoon" else None  # V19: o casco normal dos hatches nacionais leva a forma do V18 (`--sem-forma` = o V6c)
+    r0 = build_lod(sp, 0, levels, forma)
+    r1 = build_lod(sp, 1, 0, forma)
     cl.finish_wheels_and_empties(sp)
     print("lod0 triângulos:", tri_count(r0), "| lod1:", tri_count(r1))
     print("  partes lod0:", {ob.name: sum(len(p.vertices) - 2 for p in ob.data.polygons) for ob in r0.children if ob.type == "MESH"})

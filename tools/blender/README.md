@@ -78,3 +78,7 @@ O V17 deu relevo às peças, mas o casco seguia uma caixa de painéis planos. `h
 - o vidro deixou de ser faixa do casco: é PAINEL de contorno redondo (`hero_nac.pane`, `window`, `round_poly`) assentado na pele, com o friso preto chanfrado em volta; o reflexo do céu (`streak`) é uma faixa inclinada de cantos redondos DENTRO do painel;
 - `hero_nac.flares` corta o arco do alargamento abaixo da cintura.
 Parâmetros por carro em `FORMA` de `hero_nacionais/<carro>.py` (os de fábrica: `hero_forma.DEFAULTS`). Medidas de forma: `tests/forma-medidas.ts`, `tests/herois-forma.test.ts`.
+
+## Forma do casco normal dos hatches (V19) — `casco_forma.py`
+
+O casco NORMAL (≤ 4.500 △) do Cuiabano, Tupiniquim, Caipora e Pampeiro leva a forma do herói de V18 na versão barata: `build_car.py` troca o anel pelo de `hero_forma.make_ring`, fecha as pontas em elipse, aplica `shape_body` sobre a pele de subdivisão 1 e tira o piso (`docs/ondas/V19-forma-casco.md`). Parâmetros por carro em `FORMAS`. `build_car.py ... --sem-forma` gera o V6c de sempre. Medidas: `tests/casco-forma.test.ts`.
