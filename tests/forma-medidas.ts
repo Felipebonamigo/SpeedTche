@@ -22,7 +22,8 @@ export interface Forma {
 
 const deg = (r: number): number => (r * 180) / Math.PI;
 
-export function formaDe(model: Pick<CarModel, 'shell' | 'axles'>): Forma {
+/** `roofZ`: onde medir o arco longitudinal do teto [início, meio, fim] (m); o padrão serve aos hatches de teto longo; o do Caipora acaba antes de 1,5 m (V19). */
+export function formaDe(model: Pick<CarModel, 'shell' | 'axles'>, roofZ: readonly [number, number, number] = [0.0, 0.7, 1.5]): Forma {
   const P = probe(model);
   const paint = (i: number): boolean => P.painted(i);
   const up = (x: number, z: number): number => P.fromAbove(Math.abs(x), z, paint)?.y ?? NaN;
@@ -48,7 +49,7 @@ export function formaDe(model: Pick<CarModel, 'shell' | 'axles'>): Forma {
   const zMid = 0.0;
   const axles = model.axles.map((a) => a.z);
   const roofCamber = up(0, 0.7) - up(0.62, 0.7);
-  const roofArch = up(0, 0.7) - (up(0, 0.0) + up(0, 1.5)) / 2;
+  const roofArch = up(0, roofZ[1]) - (up(0, roofZ[0]) + up(0, roofZ[2])) / 2;
   const flankSweep = sideX(0.62, zMid) - sideX(0.30, zMid);
   let fender = -Infinity;
   for (const a of axles) fender = Math.max(fender, sideX(0.85, a) - sideX(0.85, zMid));
