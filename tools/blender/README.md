@@ -52,3 +52,19 @@ node tools/herois-gate.mjs                                   # as chamadas e os 
 - `build_hero_gt.py` é a biblioteca (casco, cabine, `Part`, `lathe`, `patch_on`, `strip_on`...; `use_cage` troca a gaiola, `CFG` leva o que muda de estilo: borda do teto, vãos de vidro, cockpit aberto); `hero_parts.py` traz o que os estilos repetem: **lanterna e farol em TIRA de LED** (`strip_lamp`: moldura em relevo, poço, lente em leque de uma peça só — o `aLens` e o halo da lanterna seguem valendo —, divisórias, venezianas e LEDs), asa, difusor, ponteira de escape, retrovisor, lanterna redonda, caixa e extrusão de cantos arredondados.
 - O jogo aplica ao herói de cada estilo a mesma tinta, faixas A/B, acento, roda, chama e verniz do estilo de sempre (mesmos nomes de nó e de material; a tampa dos faróis escamoteáveis da cunha usa `*_popup` no nome do material, que o jogo sobe à noite).
 - Sem marca: `tests/herois-asset.test.ts` varre os `.glb` e este diretório.
+
+## Carros herói dos nacionais livres (V17) — `build_hero_nacional.py`
+
+O casco de ALTA definição do **Cuiabano** e do **Tupiniquim** (`src/assets/cars/hero/<id do carro>.glb`: a chave do herói é o carro, não o estilo hatch; 10 a 20 mil △). Mesmo casco de V6c (`specs/<carro>.py`: silhueta, proporção, eixos, escapes e pegada) com subdivisão nível 2 e o vão de roda em 48 lados; os remendos chapados de farol, lanterna, para-choque, placa e frisos saem e entram **peças em relevo** assentadas na pele por raio (`hero_nac.py`: `raised` = parede + topo chanfrado; `lamp_cell` = célula de lanterna ou farol com poço, refletor e lente em leque; retrovisor, maçaneta, limpador, antena, escapamento) e as do carro em `hero_nacionais/<carro>.py`.
+
+```bash
+npm run carros-herois-nacionais             # gera src/assets/cars/hero/{cuiabano,tupiniquim}.glb (ou: npm run carros-herois-nacionais cuiabano)
+/home/user/venv-bpy/bin/python -I tools/blender/build_hero_nacional.py cuiabano scratch/x.glb --preview scratch/prev --views tras_perto,frente_perto,lado_perto,capo --big [--backfaces]
+HERO_SO_CASCO=1 /home/user/venv-bpy/bin/python -I tools/blender/build_hero_nacional.py tupiniquim scratch/x.glb --preview scratch/prev   # só o casco
+node tools/herois-folha.mjs scratch/nac cuiabano tupiniquim   # folhas atual × herói, no jogo
+```
+
+- Caráter de carro popular, não de esportivo: nenhuma tira de LED, difusor, asa, colmeia nem carbono. O contrato do jogo exige o escapamento nos dois lados (a chama do nitro sai dos dois vazios `exhaust_*`): a ponteira de verdade é uma só (`escape_l`, com abafador) e a outra é um toco escuro (`escape_r`).
+- O herói de um carro é conferido contra o `.glb` do PRÓPRIO carro (`parseHeroGlb(body, dados, { base, carId })`, `assets.ts`): sem ele carregado, o herói é recusado com o motivo.
+- A roda é a do catálogo do estilo (o jogo desenha a escolhida pelo jogador): o herói só dá posição e tamanho dela; calota e roda de aço não são deste arquivo.
+- Sem marca: `tests/herois-nacionais-asset.test.ts` varre os `.glb` e os `.py` deste diretório.

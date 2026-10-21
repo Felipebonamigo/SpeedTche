@@ -5,7 +5,7 @@ Cada `<nome>.glb` desta pasta substitui um modelo procedural no jogo — no nave
 - `<carro>.glb` (ex.: `falcao.glb`, o ID do carro em `src/core/data/cars.ts`): o modelo é **só daquele carro**; o Boitatá segue com o GT procedural.
 - `<estilo>.glb` (ex.: `gt.glb`): vale para o estilo todo; o arquivo do carro vence o do estilo.
 
-- `hero/<estilo ou carro>.glb` (ex.: `hero/gt.glb`, V9): o casco **herói** daquele modelo, em alta definição (até `HERO_MAX_TRIANGLES`, 20.000 △), que o jogo usa só no carro humano perto da câmera (`src/render/cars/lod.ts`); o modelo de sempre continua sendo o intermediário. Mesmo contrato dos outros, mais os mesmos eixos, pegada e escapes do modelo de sempre (`heroProblems`). Gerado por `npm run carro-heroi`.
+- `hero/<estilo ou carro>.glb` (ex.: `hero/gt.glb`, V9): o casco **herói** daquele modelo, em alta definição (até `HERO_MAX_TRIANGLES`, 20.000 △), que o jogo usa só no carro humano perto da câmera (`src/render/cars/lod.ts`); o modelo de sempre continua sendo o intermediário. Mesmo contrato dos outros, mais os mesmos eixos, pegada e escapes do modelo de sempre (`heroProblems`). Gerado por `npm run carro-heroi`. V17: o herói de um CARRO com arquivo próprio (`hero/cuiabano.glb`, `hero/tupiniquim.glb`) vale só para ele e é conferido contra o `.glb` do carro; gerado por `npm run carros-herois-nacionais`.
 
 Sem arquivo, o modelo continua procedural. Antes de pôr um arquivo aqui: `npm run check-car -- caminho/<carro>.glb`. Arquivo recusado não
 quebra o jogo: fica de fora, com o motivo no console (`[carros] … recusado`). Todo arquivo precisa de uma linha de licença em

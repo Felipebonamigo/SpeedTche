@@ -305,11 +305,13 @@ export async function parseCarGlb(body: CarBody, data: ArrayBuffer, opts: { carI
 /**
  * O casco HERÓI de um estilo (V9, `src/assets/cars/hero/<estilo>.glb`): o mesmo contrato dos carros da arte (nós, materiais, rodas do projeto, escapes), com o teto
  * `HERO_MAX_TRIANGLES`, e a geometria base do estilo intacta — a física, os rastros e a chama não podem notar a troca. Devolve os problemas de um e de outro.
+ * Herói de um CARRO (V17: `hero/cuiabano.glb`): `opts.carId` (o arquivo decide as próprias faixas) e `opts.base` = o modelo do próprio carro (o `.glb` dele: roda, eixos e
+ * escapes que o hatch procedural do estilo não tem); sem `base`, a conferência é contra o procedural do estilo.
  */
-export async function parseHeroGlb(body: CarBody, data: ArrayBuffer): Promise<GltfCar> {
-  const r = await parseCarGlb(body, data, { maxTriangles: HERO_MAX_TRIANGLES });
+export async function parseHeroGlb(body: CarBody, data: ArrayBuffer, opts: { base?: CarModel; carId?: string } = {}): Promise<GltfCar> {
+  const r = await parseCarGlb(body, data, { maxTriangles: HERO_MAX_TRIANGLES, ...(opts.carId ? { carId: opts.carId } : {}) });
   if (!r.model) return r;
-  return { ...r, problems: [...r.problems, ...heroProblems(r.model, MODEL_BUILDERS[body]())] };
+  return { ...r, problems: [...r.problems, ...heroProblems(r.model, opts.base ?? MODEL_BUILDERS[body]())] };
 }
 
 /** O que o herói tem de manter do modelo de sempre: eixos, bitola e tamanho das rodas, escapes (2 cm) e a pegada (6 cm). */

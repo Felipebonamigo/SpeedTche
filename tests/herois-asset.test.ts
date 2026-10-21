@@ -353,9 +353,9 @@ describe('a gaiola de cada herói segue o estilo de sempre (a exportação do hu
       if (spec.cabin) expect(cage.cabin).toHaveLength(4); else expect(cage.cabin).toBeNull();
     });
   }
-  it('a pasta do herói só tem os estilos que têm teste de contrato aqui (e o GT, que tem o dele)', () => {
+  it('a pasta do herói só tem os estilos que têm teste de contrato aqui, o GT (que tem o dele) e os dois nacionais livres (V17: herois-nacionais-asset.test.ts)', () => {
     const files = readdirSync(join(ROOT, 'src', 'assets', 'cars', 'hero')).filter((f) => f.endsWith('.glb')).map((f) => f.replace(/\.glb$/, '')).sort();
-    expect(files).toEqual(['gt', ...SPECS.map((s) => s.body)].sort());
+    expect(files).toEqual(['gt', 'cuiabano', 'tupiniquim', ...SPECS.map((s) => s.body)].sort());
   });
 });
 

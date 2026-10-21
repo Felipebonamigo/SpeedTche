@@ -13,7 +13,7 @@ import { Cars } from '../src/render/cars';
 import { loadCarAssets } from '../src/render/cars/assets';
 import { HERO_MAX_TRIANGLES, HERO_STYLES } from '../src/render/cars/lod';
 import type { CarModel } from '../src/render/cars/model';
-import { setHeroOverride } from '../src/render/cars/models';
+import { setHeroOverride, setModelOverride } from '../src/render/cars/models';
 import { buildRoadFrame } from '../src/render/roadframe';
 import { installNodeFileReader } from '../scripts/lib/node-filereader';
 import { installNodeImage } from '../scripts/lib/node-image';
@@ -21,12 +21,15 @@ import { installNodeImage } from '../scripts/lib/node-image';
 const DIR = join(__dirname, '..', 'src', 'assets', 'cars', 'hero');
 const dataUrl = (b: Buffer) => `data:model/gltf-binary;base64,${b.toString('base64')}`;
 /** Os heróis de verdade, como o jogo os carrega (caminho → URL); só os do estilo pedido, ou todos. */
+/** Os .glb dos carros com herói próprio (V17: Cuiabano e Tupiniquim): o herói de um carro só vale sobre o arquivo dele, carregado antes (a abertura do jogo). */
+const CARS_DIR = join(DIR, '..');
+const carFiles = (): Record<string, () => Promise<string>> => Object.fromEntries(['cuiabano', 'tupiniquim'].map((k) => [`../../assets/cars/${k}.glb`, async () => dataUrl(readFileSync(join(CARS_DIR, `${k}.glb`)))]));
 const heroFiles = (only?: readonly string[]): Record<string, () => Promise<string>> => Object.fromEntries(
   readdirSync(DIR).filter((f) => f.endsWith('.glb') && (!only || only.includes(f.replace(/\.glb$/, '')))).map((f) => [`../../assets/cars/hero/${f}`, async () => dataUrl(readFileSync(join(DIR, f)))]),
 );
 
 beforeAll(() => { installNodeFileReader(); installNodeImage(); });
-afterEach(() => { vi.unstubAllGlobals(); for (const k of ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally']) setHeroOverride(k, null); });
+afterEach(() => { vi.unstubAllGlobals(); for (const k of ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally', 'cuiabano', 'tupiniquim']) { setHeroOverride(k, null); } setModelOverride('cuiabano', null); setModelOverride('tupiniquim', null); });
 
 function fakeCanvasDocument(): void {
   const ctx = new Proxy({} as Record<string | symbol, unknown>, {
@@ -81,7 +84,7 @@ describe('quais estilos têm herói (HERO_STYLES) e o carregamento por estilo', 
   });
 
   it('o jogo aceita todos os arquivos herói (nenhum recusado) e cada estilo ganha o SEU casco herói, de 10 a 20 mil △', async () => {
-    const report = await loadCarAssets({}, heroFiles());
+    const report = await loadCarAssets(carFiles(), heroFiles());
     expect(report.rejected).toEqual([]);
     expect([...report.heroes].sort()).toEqual([...HERO_STYLES].sort());
     const { buildModel } = await import('../src/render/cars/models');
@@ -99,7 +102,7 @@ describe('quais estilos têm herói (HERO_STYLES) e o carregamento por estilo', 
 
 describe('a seleção de LOD por estilo no Cars', () => {
   it('quatro humanos de estilos diferentes de perto: cada estilo usa o SEU lote herói, um lote por modelo (nunca por carro)', async () => {
-    await loadCarAssets({}, heroFiles());
+    await loadCarAssets(carFiles(), heroFiles());
     const { cars, draw } = scene([{ carId: 'pororoca', ahead: 0 }, { carId: 'iara', ahead: 6 }, { carId: 'beijaflor', ahead: 12 }, { carId: 'curupira', ahead: 18 }], []);
     draw();
     for (const [id, style] of [['pororoca', 'hyper'], ['iara', 'wedge'], ['beijaflor', 'prototype'], ['curupira', 'roadster']] as const) {
@@ -112,7 +115,7 @@ describe('a seleção de LOD por estilo no Cars', () => {
   }, 120_000);
 
   it('dois humanos do mesmo estilo dividem o lote herói (1 lote, 2 instâncias); a IA do mesmo estilo, por perto que esteja, fica no casco de sempre', async () => {
-    await loadCarAssets({}, heroFiles());
+    await loadCarAssets(carFiles(), heroFiles());
     const { cars, draw } = scene([{ carId: 'pororoca', ahead: 0 }, { carId: 'pororoca', ahead: 7 }], [{ carId: 'pororoca', ahead: 3 }]);
     draw();
     const lot = lots(cars).find((l) => l.model.body === 'hyper')!;
@@ -122,7 +125,7 @@ describe('a seleção de LOD por estilo no Cars', () => {
   }, 120_000);
 
   it('humano fora do raio (24 m; 12 m na tela dividida) não é herói; com o interruptor desligado, ninguém é', async () => {
-    await loadCarAssets({}, heroFiles());
+    await loadCarAssets(carFiles(), heroFiles());
     const far = scene([{ carId: 'pororoca', ahead: 0 }, { carId: 'iara', ahead: 28 }], []);
     far.draw();
     expect(lots(far.cars).find((l) => l.model.body === 'wedge')!.hero!.count).toBe(0);
@@ -139,7 +142,7 @@ describe('a seleção de LOD por estilo no Cars', () => {
   }, 120_000);
 
   it('carro de estilo sem herói (hatch, sedan) não ganha lote nem instância herói; os estilos com herói seguem independentes', async () => {
-    await loadCarAssets({}, heroFiles());
+    await loadCarAssets(carFiles(), heroFiles());
     const { cars, draw } = scene([{ carId: 'tornado', ahead: 0 }, { carId: 'camelo', ahead: 5 }, { carId: 'iara', ahead: 8 }], []);
     draw();
     for (const style of ['hatch', 'sedan']) {
@@ -152,12 +155,45 @@ describe('a seleção de LOD por estilo no Cars', () => {
   }, 120_000);
 
   it('o número de lotes herói é o de estilos distintos de herói em cena, não o de carros: 4 humanos em 4 estilos = 4 lotes herói', async () => {
-    await loadCarAssets({}, heroFiles());
+    await loadCarAssets(carFiles(), heroFiles());
     const { cars, draw } = scene([{ carId: 'falcao', ahead: 0 }, { carId: 'iara', ahead: 4 }, { carId: 'beijaflor', ahead: 8 }, { carId: 'curupira', ahead: 12 }], []);
     draw();
     const withHero = lots(cars).filter((l) => (l.hero?.count ?? 0) > 0);
     expect(withHero.map((l) => l.model.body).sort()).toEqual(['gt', 'prototype', 'roadster', 'wedge']);
     expect(STYLE_OF.pororoca).toBe('hyper');
     cars.dispose();
+  }, 120_000);
+});
+
+describe('V17: os nacionais livres têm o SEU lote herói (o herói é do carro, não do estilo hatch)', () => {
+  const byCar = (cars: Cars, id: string) => lots(cars).find((l) => l.model.carId === id)!;
+  const hatch = (cars: Cars) => lots(cars).find((l) => l.model.body === 'hatch' && !l.model.carId)!;
+
+  it('o humano de Cuiabano de perto é herói no lote do Cuiabano; o lote do estilo hatch e o de sempre do Cuiabano ficam vazios', async () => {
+    await loadCarAssets(carFiles(), heroFiles());
+    const { cars, draw } = scene([{ carId: 'cuiabano', ahead: 0 }, { carId: 'tupiniquim', ahead: 6 }], []);
+    draw();
+    for (const id of ['cuiabano', 'tupiniquim']) {
+      const lot = byCar(cars, id);
+      expect(lot.hero, `${id} tem lote herói`).not.toBeNull();
+      expect(lot.hero!.count, `${id}: o humano de perto é herói`).toBe(1);
+      expect(lot.count, `${id}: o lote de sempre esvazia`).toBe(0);
+    }
+    expect(hatch(cars).hero, 'o estilo hatch segue sem herói').toBeNull();
+    cars.dispose();
+  }, 120_000);
+
+  it('a IA de Cuiabano, por perto que esteja, e o humano de um hatch sem herói (Tornado) ficam no casco de sempre; o interruptor desligado tira o herói de todos', async () => {
+    await loadCarAssets(carFiles(), heroFiles());
+    const { cars, draw } = scene([{ carId: 'tornado', ahead: 0 }, { carId: 'cuiabano', ahead: 5 }], [{ carId: 'cuiabano', ahead: 3 }]);
+    draw();
+    expect(byCar(cars, 'cuiabano').hero!.count, 'só o humano é herói').toBe(1);
+    expect(byCar(cars, 'cuiabano').count, 'a IA fica no lod0').toBe(1);
+    expect(hatch(cars).count, 'o Tornado (hatch procedural) no casco de sempre').toBe(1);
+    cars.dispose();
+    const off = scene([{ carId: 'cuiabano', ahead: 0 }, { carId: 'tupiniquim', ahead: 5 }], [], false);
+    off.draw();
+    for (const l of lots(off.cars)) expect(l.hero?.count ?? 0, `${l.model.carId ?? l.model.body}`).toBe(0);
+    off.cars.dispose();
   }, 120_000);
 });

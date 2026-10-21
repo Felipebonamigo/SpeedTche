@@ -16,12 +16,15 @@ await page.goto(`http://127.0.0.1:${port}/tools/render-harness.lab.html`);
 await page.waitForFunction(() => window.labReady === true, null, { timeout: 3_600_000, polling: 1000 });
 const QUATRO = ['pororoca', 'iara', 'beijaflor', 'curupira'];
 const MISTO = ['falcao', 'pororoca', 'iara', 'curupira'];
+// V17: os nacionais livres (herói do carro): o começo do jogo, e a mistura com os heróis de estilo
+const NACIONAIS = ['cuiabano', 'tupiniquim', 'cuiabano', 'tupiniquim'];
+const NAC_MISTO = ['cuiabano', 'tupiniquim', 'pororoca', 'iara'];
 const cenasTodas = [['copa-1p', 'copacabana', 1], ['copa-2p', 'copacabana', 2], ['copa-4p', 'copacabana', 4], ['sampa-4p', 'sampa_noite', 4]];
 const cenas = cenasTodas.filter(([id]) => !process.env.CENAS || process.env.CENAS.split(',').includes(id));
 const quals = (process.env.QUAL ?? 'medium,high,ultra').split(',');
 const casos = (n) => (n === 1
-  ? [['falcao (gt)', ['falcao']], ['pororoca (hyper)', ['pororoca']], ['iara (wedge)', ['iara']], ['beijaflor (prototype)', ['beijaflor']], ['curupira (roadster)', ['curupira']]]
-  : n === 2 ? [['pororoca + iara', ['pororoca', 'iara']], ['beijaflor + curupira', ['beijaflor', 'curupira']]] : [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO]]);
+  ? [['falcao (gt)', ['falcao']], ['pororoca (hyper)', ['pororoca']], ['iara (wedge)', ['iara']], ['beijaflor (prototype)', ['beijaflor']], ['curupira (roadster)', ['curupira']], ['cuiabano (carro)', ['cuiabano']], ['tupiniquim (carro)', ['tupiniquim']]]
+  : n === 2 ? [['pororoca + iara', ['pororoca', 'iara']], ['beijaflor + curupira', ['beijaflor', 'curupira']], ['cuiabano + tupiniquim', ['cuiabano', 'tupiniquim']]] : [['4 estilos', QUATRO], ['GT + 3 estilos', MISTO], ['2 Cuiabano + 2 Tupiniquim', NACIONAIS], ['Cuiabano + Tupiniquim + 2 estilos', NAC_MISTO]]);
 const res = {};
 for (const [id, track, n] of cenas) {
   for (const q of quals) {

@@ -23,6 +23,9 @@ const ESTILOS = {
   prototype: { car: 'beijaflor', nome: 'Beija-Flor (prototype)', ref: { corrida: ['hc2-8.webp', 28, 55, 36, 38], tras34: ['hc2-8.webp', 33, 58, 30, 36], frente34: ['hc2-9.webp', 53, 56, 24, 28], garagem: ['hc2-8.webp', 28, 55, 36, 38] } },
   muscle: { car: 'trovao', nome: 'Trovão V12 (muscle)', ref: { corrida: ['hc2-7.webp', 19, 55, 22, 18], tras34: ['hc2-7.webp', 19, 55, 22, 18], frente34: ['hc2-9.webp', 53, 56, 24, 28], garagem: ['hc2-6.webp', 53, 60, 26, 24] } },
   rally: { car: 'carcara', nome: 'Carcará RS (rally)', ref: { corrida: ['hc2-6.webp', 28, 55, 22, 24], tras34: ['hc2-6.webp', 28, 55, 22, 24], frente34: ['hc2-9.webp', 53, 56, 24, 28], garagem: ['hc2-6.webp', 28, 55, 22, 24] } },
+  // V17: os nacionais livres (herói do CARRO, sem recorte do HC2: a folha é atual × herói, em duas colunas)
+  cuiabano: { car: 'cuiabano', nome: 'Cuiabano (hatch livre)', ref: null },
+  tupiniquim: { car: 'tupiniquim', nome: 'Tupiniquim (hatch livre)', ref: null },
   roadster: { car: 'curupira', nome: 'Curupira S (roadster)', ref: { corrida: ['hc2-6.webp', 53, 60, 26, 24], tras34: ['hc2-6.webp', 53, 60, 26, 24], frente34: ['hc2-9.webp', 53, 56, 24, 28], garagem: ['hc2-6.webp', 53, 60, 26, 24] } },
 };
 const estilos = (pedidos.length ? pedidos : ['hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally']).filter((e) => ESTILOS[e]);
@@ -115,9 +118,10 @@ const linhas = [['corrida', 'câmera de corrida · dia'], ['tras34', '3/4 de tr�
 for (const e of estilos) {
   const { nome, ref } = ESTILOS[e];
   if (!linhas.every(([id]) => existsSync(`${saida}/${e}-${id}-atual.png`) && existsSync(`${saida}/${e}-${id}-heroi.png`))) { console.log('faltam fotos de', e); continue; }
-  const pg = await b2.newPage({ viewport: { width: 2416, height: 1000 } });
-  await pg.setContent(`<body style="margin:0;background:#101018;font:600 20px sans-serif;color:#fff"><div style="font-size:28px;padding:10px 8px">${nome}: HC2 × atual × herói</div><div style="display:grid;grid-template-columns:${W}px ${W}px ${W}px;gap:8px;padding:8px;width:${W * 3 + 32}px">${linhas.map(([id, l]) => refCell(l, ref[id]) + ownCell(`${nome} atual · ${l}`, `${saida}/${e}-${id}-atual.png`) + ownCell(`${nome} herói · ${l}`, `${saida}/${e}-${id}-heroi.png`)).join('')}</div></body>`);
-  await posRef(pg);
+  const cols = ref ? 3 : 2; // sem recorte do HC2 (os nacionais): atual × herói
+  const pg = await b2.newPage({ viewport: { width: W * cols + 32, height: 1000 } });
+  await pg.setContent(`<body style="margin:0;background:#101018;font:600 20px sans-serif;color:#fff"><div style="font-size:28px;padding:10px 8px">${nome}: ${ref ? 'HC2 × ' : ''}atual × herói</div><div style="display:grid;grid-template-columns:${`${W}px `.repeat(cols)};gap:8px;padding:8px;width:${W * cols + 32}px">${linhas.map(([id, l]) => (ref ? refCell(l, ref[id]) : '') + ownCell(`${nome} atual · ${l}`, `${saida}/${e}-${id}-atual.png`) + ownCell(`${nome} herói · ${l}`, `${saida}/${e}-${id}-heroi.png`)).join('')}</div></body>`);
+  if (ref) await posRef(pg);
   await pg.waitForTimeout(600);
   await pg.screenshot({ path: `${saida}/folha-${e}.png`, fullPage: true });
   await pg.screenshot({ path: `${saida}/folha-${e}.jpg`, fullPage: true, type: 'jpeg', quality: 86 }); // a cópia leve, a que vai para docs/

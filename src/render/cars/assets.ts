@@ -5,7 +5,7 @@
 import { CAR_BODIES, CARS } from '../../core/data/cars';
 import type { CarBody } from '../../core/types';
 import { parseCarGlb, parseHeroGlb } from './gltf';
-import { setHeroOverride, setModelOverride } from './models';
+import { buildModel, modelSource, setHeroOverride, setModelOverride } from './models';
 
 /** Esquema do protocolo próprio do Electron (desktop/assets.cjs, o mesmo texto): a página é `file://` e o `fetch` de `file:` não funciona. */
 export const ASSET_SCHEME = 'speedtche-asset';
@@ -100,8 +100,13 @@ async function loadHeroFiles(heroFiles: Record<string, () => Promise<string>>, r
       report.rejected.push({ file, problems: [`"${name}" não é um carro nem um estilo (o herói tem o nome do modelo que ele atende)`] });
       continue;
     }
+    // Herói de um CARRO (V17): vale sobre o .glb do próprio carro (a base da conferência de eixos, escapes e pegada); sem ele carregado, o herói não tem sobre o que ficar.
+    if (car && modelSource(name) !== 'glb') {
+      report.rejected.push({ file, problems: [`o herói do ${car.name} só vale sobre o .glb do próprio carro (cars/${name}.glb), que não foi carregado`] });
+      continue;
+    }
     try {
-      const { model, problems, warnings } = await parseHeroGlb(body, await readAsset(await load()));
+      const { model, problems, warnings } = await parseHeroGlb(body, await readAsset(await load()), car ? { base: buildModel(name), carId: car.id } : {});
       report.warnings.push(...warnings.map((w) => `${file}: ${w}`));
       if (model && problems.length === 0) { setHeroOverride(name, { shell: model.shell, triangles: model.triangles }); report.heroes.push(name); } else report.rejected.push({ file, problems });
     } catch (e) {

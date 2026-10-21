@@ -1,6 +1,5 @@
 // A distância do casco simplificado (LOD1) e da roda simples dos carros, pelo tamanho que o carro tem NA TELA (V13, docs/ondas/V13-folga.md).
 // Puro: sem three, sem DOM (tests/folga-lod.test.ts).
-import type { CarBody } from '../../core/types';
 import type { Quality } from '../../game/contracts';
 import { atLeast } from '../../game/quality';
 
@@ -29,10 +28,11 @@ export function screenLodScale(viewports: number): number {
 export const HERO_MAX_TRIANGLES = 20000;
 
 /**
- * Os estilos que têm casco herói (`src/assets/cars/hero/<estilo>.glb`): o Falcão GT (V9) e os de V15 (hyper, wedge, prototype, roadster). O jogo carrega o que há na pasta; esta lista é o
- * contrato que `tests/herois-lod.test.ts` confere com ela (estilo novo = arquivo + linha aqui + linha em `docs/ARTE.md` + teste de contrato em `tests/herois-asset.test.ts`).
+ * Os modelos que têm casco herói (`src/assets/cars/hero/<chave>.glb`): a chave é um **estilo** (V9, V15: `gt`, `hyper`, `wedge`, `prototype`, `roadster`, `muscle`, `rally`: o herói vale para o estilo
+ * todo) ou o **id de um carro** com arquivo próprio (V17: `cuiabano`, `tupiniquim`, os hatches livres do começo do jogo; o herói vale só para aquele carro e é conferido contra o `.glb` dele).
+ * O jogo carrega o que há na pasta; esta lista é o contrato que `tests/herois-lod.test.ts` confere com ela (modelo novo = arquivo + linha aqui + linha em `docs/ARTE.md` + teste de contrato).
  */
-export const HERO_STYLES: readonly CarBody[] = ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally'];
+export const HERO_STYLES: readonly string[] = ['gt', 'hyper', 'wedge', 'prototype', 'roadster', 'muscle', 'rally', 'cuiabano', 'tupiniquim'];
 
 /** Raio (m, em torno do carro do viewport) dentro do qual um carro humano é herói, com 1 jogador; é metade na tela dividida (`screenLodScale`). */
 export const HERO_RADIUS_M = 24;
