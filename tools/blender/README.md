@@ -68,3 +68,13 @@ node tools/herois-folha.mjs scratch/nac cuiabano tupiniquim   # folhas atual × 
 - O herói de um carro é conferido contra o `.glb` do PRÓPRIO carro (`parseHeroGlb(body, dados, { base, carId })`, `assets.ts`): sem ele carregado, o herói é recusado com o motivo.
 - A roda é a do catálogo do estilo (o jogo desenha a escolhida pelo jogador): o herói só dá posição e tamanho dela; calota e roda de aço não são deste arquivo.
 - Sem marca: `tests/herois-nacionais-asset.test.ts` varre os `.glb` e os `.py` deste diretório.
+
+## Forma dos heróis nacionais (V18) — `hero_forma.py`
+
+O V17 deu relevo às peças, mas o casco seguia uma caixa de painéis planos. `hero_forma.py` dá CURVATURA ao casco do Cuiabano e do Tupiniquim sem mexer em silhueta, eixos, escapes nem pegada (`docs/ondas/V18-forma-nacionais.md`):
+- `make_ring`: o anel de 9 pontos do herói (cintura abaulada e soleira recolhida, vidro com caimento e barriga, canto do teto que rola, teto com ~7 cm de abaulado transversal), ligado ao `carlib.build_shell` pelas chaves opcionais `ring_points` e `station_crease` do spec (sem elas, nada muda nos carros de V6c);
+- `_closed`: pontas do carro fechadas em elipse em planta (o canto do para-choque tem raio, não quina de 4 cm) e duas estações a mais na traseira para sustentá-la;
+- `shape_body`: deformação suave sobre a pele subdividida (para-lamas bojudos, capô abaulado com a ponta caindo, frente e traseira abaulados, arco longitudinal do teto); `drop_floor` tira o piso (~600 △ que ninguém vê);
+- o vidro deixou de ser faixa do casco: é PAINEL de contorno redondo (`hero_nac.pane`, `window`, `round_poly`) assentado na pele, com o friso preto chanfrado em volta; o reflexo do céu (`streak`) é uma faixa inclinada de cantos redondos DENTRO do painel;
+- `hero_nac.flares` corta o arco do alargamento abaixo da cintura.
+Parâmetros por carro em `FORMA` de `hero_nacionais/<carro>.py` (os de fábrica: `hero_forma.DEFAULTS`). Medidas de forma: `tests/forma-medidas.ts`, `tests/herois-forma.test.ts`.

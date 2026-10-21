@@ -30,17 +30,17 @@ def rear(tree):
     Pl = Part("lamp_tail")
     for sd in (1, -1):
         # painel escuro em "L" atrás das células, um pouco maior que a lanterna
-        poly = N.scaled_outline(TAIL_L, 1.05)
+        poly = N.scaled_outline(TAIL_L, 1.16)
         poly = poly if sd > 0 else N.mirror_x(poly)
         patch_on(Pl, tree, poly, "back", "trim", h=0.06, off=0.004)
         # o "L" inteiro em vermelho apagado sob as células: de longe a lanterna lê como um L cheio, de perto são as células com a moldura
         poly_fill = N.scaled_outline(TAIL_L, 0.99)
         poly_fill = poly_fill if sd > 0 else N.mirror_x(poly_fill)
         patch_on(Pl, tree, poly_fill, "back", "taillight_dim", h=0.05, off=0.0065)
-        N.lamp_cell(Pl, tree, "back", sd * 0.445, 0.923, 0.208, 0.040, N.RED, n=4.0, N=26, ring_w=0.011, bezel=0.008)                    # a barra de cima
-        N.lamp_cell(Pl, tree, "back", sd * 0.575, 0.7825, 0.092, 0.1025, N.RED, n=4.0, N=22, ring_w=0.013, bezel=0.008)               # a perna: lanterna e freio, encostada na barra
-        N.lamp_cell(Pl, tree, "back", sd * 0.570, 0.652, 0.085, 0.026, N.CLEAR, n=3.6, N=14, ring_w=0.008, bezel=0.008)                # luz de ré, clara
-        N.lamp_cell(Pl, tree, "back", sd * 0.570, 0.594, 0.085, 0.018, N.AMBER, n=3.6, N=14, ring_w=0.006, bezel=0.007)                # pisca âmbar
+        N.lamp_cell(Pl, tree, "back", sd * 0.445, 0.925, 0.208, 0.047, N.RED, n=4.0, N=18, ring_w=0.009, bezel=0.008)                    # a barra de cima
+        N.lamp_cell(Pl, tree, "back", sd * 0.572, 0.7825, 0.100, 0.1025, N.RED, n=4.0, N=16, ring_w=0.009, bezel=0.008)               # a perna: lanterna e freio, encostada na barra
+        N.lamp_cell(Pl, tree, "back", sd * 0.570, 0.652, 0.085, 0.026, N.CLEAR, n=3.6, N=10, ring_w=0.007, bezel=0.008)                # luz de ré, clara
+        N.lamp_cell(Pl, tree, "back", sd * 0.570, 0.594, 0.085, 0.018, N.AMBER, n=3.6, N=10, ring_w=0.005, bezel=0.007)                # pisca âmbar
     out.append(Pl.finish())
     P3 = Part("luz_freio")
     raised(P3, tree, "back", rrect(0.0, 1.045, 0.40, 0.034, 0.012, seg=2), 0.012, "trim", inset=0.004, cell=0.1, step=0.055)
@@ -58,9 +58,9 @@ def rear(tree):
     patch_on(Pp, tree, rrect(0.0, 0.63, 0.31, 0.10, 0.008, seg=1), "back", "plate", h=0.3, off=0.0145)
     out.append(Pp.finish())
     Pt = Part("fresta_tampa")
-    strip_on(Pt, tree, [(-0.70, 0.555), (0.0, 0.56), (0.70, 0.555)], 0.007, "back", "under", off=0.0055, step=0.04)
+    strip_on(Pt, tree, [(-0.70, 0.555), (0.0, 0.56), (0.70, 0.555)], 0.007, "back", "under", off=0.0055, step=0.075)
     for sd in (1, -1):
-        strip_on(Pt, tree, [(sd * 0.745, 0.60), (sd * 0.735, 0.80), (sd * 0.715, 0.94)], 0.007, "back", "under", off=0.0055, step=0.04)
+        strip_on(Pt, tree, [(sd * 0.745, 0.60), (sd * 0.735, 0.80), (sd * 0.715, 0.94)], 0.007, "back", "under", off=0.0055, step=0.075)
     out.append(Pt.finish())
     out.append(N.exhaust_pipe("escape_l", EXHAUST[0], EXHAUST[1] - 0.02, EXHAUST[2], ro=0.040, depth=0.15).finish())
     out.append(N.stub_pipe("escape_r", -EXHAUST[0], EXHAUST[1] + 0.02, EXHAUST[2]).finish())
@@ -70,7 +70,7 @@ def rear(tree):
     # desembaçador do vidro de trás: fios finos, de ponta a ponta, mais claros que o vidro
     Pd = Part("desembacador")
     for y in (1.74, 1.80, 1.86, 1.92, 1.98):
-        strip_on(Pd, tree, [(-0.52, y), (0.0, y), (0.52, y)], 0.006, "top", "trim_soft", off=0.0055, step=0.13)
+        strip_on(Pd, tree, [(-0.43, y), (0.0, y), (0.43, y)], 0.006, "top", "trim_soft", off=N.GLASS_H + 0.0015, step=0.13)
     out.append(Pd.finish())
     return out
 
@@ -87,9 +87,9 @@ def front(tree):
         poly = N.scaled_outline(HEAD, 1.07)
         poly = poly if sd > 0 else N.mirror_x(poly)
         patch_on(Pl, tree, poly, "front", "trim", h=0.06, off=0.004)
-        N.lamp_cell(Pl, tree, "front", sd * 0.545, 0.700, 0.130, 0.050, N.mats_of("headlight", "reflector", floor="reflector", wall="housing", lip="chrome"), n=3.6, N=28, ring_w=0.030, bezel=0.009, lip=True, slope=sd * SLOPE)
-        N.lamp_cell(Pl, tree, "front", sd * 0.520, 0.696, 0.060, 0.028, N.mats_of("headlight_dim", "reflector", floor="reflector", wall="chrome_soft", lip="chrome"), n=3.2, N=20, ring_w=0.011, bezel=0.006, height=0.032, floor=0.022, slope=sd * SLOPE)
-        N.lamp_cell(Pl, tree, "front", sd * 0.705, 0.723, 0.026, 0.030, N.AMBER, n=3.2, N=14, ring_w=0.008, bezel=0.007)
+        N.lamp_cell(Pl, tree, "front", sd * 0.545, 0.700, 0.130, 0.050, N.mats_of("headlight", "reflector", floor="reflector", wall="housing", lip="chrome"), n=3.6, N=20, ring_w=0.030, bezel=0.009, lip=True, slope=sd * SLOPE)
+        N.lamp_cell(Pl, tree, "front", sd * 0.520, 0.696, 0.060, 0.028, N.mats_of("headlight_dim", "reflector", floor="reflector", wall="chrome_soft", lip="chrome"), n=3.2, N=14, ring_w=0.011, bezel=0.006, height=0.032, floor=0.022, slope=sd * SLOPE)
+        N.lamp_cell(Pl, tree, "front", sd * 0.705, 0.723, 0.026, 0.030, N.AMBER, n=3.2, N=10, ring_w=0.008, bezel=0.007)
     out.append(Pl.finish())
     Pg = Part("grade")
     raised(Pg, tree, "front", rrect(0.0, 0.672, 0.66, 0.095, 0.025), 0.010, "trim", inset=0.007, cell=0.1, step=0.055)
@@ -108,10 +108,10 @@ def front(tree):
     patch_on(Pp, tree, rrect(0.0, 0.434, 0.30, 0.088, 0.008, seg=1), "front", "plate", h=0.3, off=0.0475)
     out.append(Pp.finish())
     Pc = Part("fresta_capo")
-    strip_on(Pc, tree, [(-0.72, -0.78), (0.0, -0.78), (0.72, -0.78)], 0.010, "top", "under", off=0.0055, step=0.04)
+    strip_on(Pc, tree, [(-0.72, -0.78), (0.0, -0.78), (0.72, -0.78)], 0.010, "top", "under", off=0.0055, step=0.075)
     for sd in (1, -1):
-        strip_on(Pc, tree, [(sd * 0.745, -0.82), (sd * 0.75, -1.2), (sd * 0.72, -1.82)], 0.010, "top", "under", off=0.0055, step=0.04)
-    strip_on(Pc, tree, [(-0.62, -1.90), (0.0, -1.915), (0.62, -1.90)], 0.010, "top", "under", off=0.0055, step=0.04)
+        strip_on(Pc, tree, [(sd * 0.745, -0.82), (sd * 0.75, -1.2), (sd * 0.72, -1.82)], 0.010, "top", "under", off=0.0055, step=0.075)
+    strip_on(Pc, tree, [(-0.62, -1.90), (0.0, -1.915), (0.62, -1.90)], 0.010, "top", "under", off=0.0055, step=0.075)
     out.append(Pc.finish())
     Pw = Part("limpador")
     N.wiper(Pw, tree, (0.56, -0.745), (-0.10, -0.675), ((0.34, -0.715), (-0.10, -0.675)))
@@ -125,16 +125,29 @@ def sides(tree):
                           antenna_at=(-0.74, -1.10), door_z=(0.325, 0.93), mirror_mat="trim")
 
 
-def glints(tree):
-    P = Part("reflexo_vidro")
-    patch_on(P, tree, [(-0.34, -0.70), (-0.20, -0.70), (0.10, -0.30), (-0.04, -0.30)], "top", "glint", h=0.07, off=0.0035)
-    patch_on(P, tree, [(0.06, -0.70), (0.11, -0.70), (0.30, -0.42), (0.25, -0.42)], "top", "glint", h=0.07, off=0.0035)
-    patch_on(P, tree, [(0.22, 1.74), (0.27, 1.74), (0.17, 2.02), (0.12, 2.02)], "top", "glint", h=0.07, off=0.0035)
+def panes(tree, sp):
+    """Os vidros (V18): painéis de contorno redondo na pele; para-brisa e vidro de trás vistos de cima (x, y), janelas laterais de lado (y, z) com a borda de cima no canto do teto."""
+    P = Part("vidro")
+    rp = N.round_poly
+    N.pane(P, tree, "top", rp([(-0.64, -0.70), (0.64, -0.70), (0.56, -0.20), (-0.56, -0.20)], 0.07), cell=0.22, step=0.12)          # para-brisa
+    N.pane(P, tree, "top", rp([(-0.47, 1.73), (0.47, 1.73), (0.50, 2.045), (-0.50, 2.045)], 0.075), cell=0.22, step=0.12)            # vidro de trás
     for ax in ("side+", "side-"):
-        patch_on(P, tree, [(-0.52, 1.0), (-0.40, 1.0), (-0.14, 1.30), (-0.26, 1.30)], ax, "glint", h=0.07, off=0.0035)
-        patch_on(P, tree, [(0.80, 1.0), (0.85, 1.0), (1.00, 1.24), (0.95, 1.24)], ax, "glint", h=0.07, off=0.0035)
+        N.pane(P, tree, ax, rp(N.window(sp, -0.60, 0.44, 1.03, (0.44, 0.40)), 0.06), cell=0.2, step=0.12)                              # porta da frente
+        N.pane(P, tree, ax, rp(N.window(sp, 0.70, 1.52, 1.03, (1.56, 1.36)), 0.06), cell=0.2, step=0.12)                               # janela de trás
+    return [P.finish()]
+
+
+def glints(tree):
+    """Reflexo do céu: uma folha por vidro, sobre o painel."""
+    P = Part("reflexo_vidro")
+    top = N.GLASS_H + 0.0025
+    patch_on(P, tree, N.streak((0.32, -0.66), (-0.18, -0.25), 0.12), "top", "glint", h=0.14, off=top)
+    patch_on(P, tree, N.streak((0.20, 1.80), (0.02, 2.02), 0.07), "top", "glint", h=0.14, off=top)
+    for ax in ("side+", "side-"):
+        patch_on(P, tree, N.streak((0.05, 1.07), (0.22, 1.35), 0.075), ax, "glint", h=0.14, off=top)
+        patch_on(P, tree, N.streak((0.86, 1.07), (1.02, 1.34), 0.06), ax, "glint", h=0.14, off=top)
     return [P.finish()]
 
 
 def build(tree, sp):
-    return rear(tree) + front(tree) + sides(tree) + glints(tree) + N.flares(tree, sp)
+    return rear(tree) + front(tree) + sides(tree) + panes(tree, sp) + glints(tree) + N.flares(tree, sp)

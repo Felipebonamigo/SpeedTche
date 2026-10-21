@@ -102,9 +102,11 @@ function build(design: WheelDesign): { b: MeshBuilder; n: number } {
       return { b, n: 5 };
     }
     case 'multi': {
-      tireAndRim(b, 0.72, GUNMETAL, UNDER);
-      spokes(b, 10, 0.14, 0.67, 0.045, 0.22, 0.4, GUNMETAL);
-      hub(b, 0.15, 0.2, 0.44, GUNMETAL);
+      // Liga de dez raios finos. V18: raios, lábio e cubo em liga CLARA (a camada B do aro: prata de fábrica, na cor escolhida quando o aro está ligado), em vez de grafite: a roda de fábrica
+      // dos hatches lia como um disco azul-marinho chapado de longe, sem contraste com o pneu. Mesmo número de triângulos; o `grafite` do seletor de aro devolve o visual de antes.
+      tireAndRim(b, 0.72, RIM_B, UNDER);
+      spokes(b, 10, 0.14, 0.67, 0.055, 0.22, 0.4, RIM_B);
+      hub(b, 0.15, 0.2, 0.44, RIM_B);
       hub(b, 0.06, 0.43, 0.46, ACCENT, 6);
       return { b, n: 10 };
     }

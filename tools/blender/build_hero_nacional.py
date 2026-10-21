@@ -18,23 +18,45 @@ import bpy  # noqa: E402,F401
 import build_hero_gt as H  # noqa: E402
 import carlib as cl  # noqa: E402
 import hero_nac  # noqa: E402,F401  (registra os materiais a mais)
+import hero_forma as HF  # noqa: E402
 
 
-def build_body(sp, keep):
+def forma_of(mod):
+    return dict(HF.DEFAULTS, **getattr(mod, "FORMA", {}))
+
+
+def hero_material_of(sp, F):
+    """O material do casco de V6c sem a faixa de vidro: a pintura sobe até o painel de vidro (que é peça, com o friso preto dele); a coluna B segue preta."""
+    base = sp["material_of"]
+
+    def material_of(y0, y1, strip, j):
+        m = base(y0, y1, strip, j)
+        if m == "glass":
+            return "paint"
+        if strip == 3 and m == "trim":
+            return "paint"  # o friso preto da cintura sai: o preto fica no friso do vidro
+        return m
+    return material_of
+
+
+def build_body(sp, keep, F=None):
     """Casco de V6c com mais subdivisão e só os remendos de `keep` (a faixa do projeto, a soleira, a cintura e os alargamentos dos para-lamas); o resto vira peça em relevo."""
-    cl.EXTRA_CUTS, cl.ARCH_SEG = 1, 48
+    cl.EXTRA_CUTS, cl.ARCH_SEG = 1, 36
+    F = F or dict(HF.DEFAULTS)
+    sp = HF.hero_spec(sp, F, hero_material_of(sp, F))
     root = cl.empty("lod0")
     body = cl.build_shell(sp, 0)
     cl.subsurf(body, 2)
     cl.cut_wheel_arches(body, sp, 0)
     cl.symmetrize(body)
+    HF.shape_body(body, sp, F)
+    HF.drop_floor(body)
     body.parent = root
     cl.wheel_wells(sp, 0).parent = root
     # os remendos que ficam (faixa, soleira, cintura, alargamentos) sobem um pouco mais: sobre a pele de nível 2 a folga de V6c deixava pontos do casco furarem a borda
     sp2 = dict(sp, patches=[dict(p, offset=p.get("offset", 0.006) + 0.006) for p in sp["patches"] if any(p["name"].startswith(k) for k in keep)], misc=[], cyls=[])
     cl.add_patches(sp2, body, 0, root)
-    glass = cl.split_material(body, "glass", "glass")
-    glass.parent = root
+    glass = None  # V18: o vidro não é mais faixa do casco, é painel de contorno redondo assentado na pele (`hero_nac.pane`, `hero_nacionais/<carro>.py`)
     return root, body, glass
 
 
@@ -46,8 +68,8 @@ def main():
     mod = importlib.import_module(f"hero_nacionais.{car}")
     cl.reset_scene()
     cl.MATERIALS.update(H.HERO_MATERIALS)
-    root, body, glass = build_body(sp, mod.KEEP)
-    tree = H.surface_tree([body, glass])
+    root, body, glass = build_body(sp, mod.KEEP, forma_of(mod))
+    tree = H.surface_tree([body])
     for ob in ([] if os.environ.get("HERO_SO_CASCO") else mod.build(tree, sp)):  # HERO_SO_CASCO=1: só o casco, sem as peças
         if ob is not None:
             ob.parent = root

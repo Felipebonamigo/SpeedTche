@@ -105,6 +105,40 @@ def raised(P, tree, axis, outline, h, mat_top, mat_wall=None, inset=0.010, off0=
     patch_on(P, tree, topr, axis, mat_top, h=cell, off=h)
 
 
+def round_poly(pts, r, seg=3):
+    """Contorno com os cantos arredondados (raio r, curva de Bézier quadrática de `seg` passos por canto): janelas e painéis de vidro de forma qualquer."""
+    out = []
+    n = len(pts)
+    for i in range(n):
+        p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % n]
+        a = (p0[0] - p1[0], p0[1] - p1[1])
+        b = (p2[0] - p1[0], p2[1] - p1[1])
+        la, lb = math.hypot(*a) or 1.0, math.hypot(*b) or 1.0
+        k = min(r, la * 0.45, lb * 0.45)
+        s = (p1[0] + a[0] / la * k, p1[1] + a[1] / la * k)
+        e = (p1[0] + b[0] / lb * k, p1[1] + b[1] / lb * k)
+        for j in range(seg + 1):
+            t = j / seg
+            out.append(((1 - t) ** 2 * s[0] + 2 * (1 - t) * t * p1[0] + t * t * e[0], (1 - t) ** 2 * s[1] + 2 * (1 - t) * t * p1[1] + t * t * e[1]))
+    return out
+
+
+def window(sp, y0, y1, zb, rear_edge, margin=0.095, zcap=1.45, step=0.1):
+    """Contorno (y, z) de uma janela lateral: base reta em `zb`, a borda de cima segue o canto do teto (curva `top` do spec menos o abaulado e `margin`) e a de trás é inclinada,
+    de (yb, zb) a (yt, ·) = `rear_edge`. Assim o painel nunca passa da pele lateral para o para-brisa."""
+    top = sp["curves"]["top"]
+    drop = 0.075
+    zt = lambda y: min(zcap, top(y) - drop - margin)
+    yb, yt = rear_edge
+    ys = [y0 + (yt - y0) * i / max(1, int(abs(yt - y0) / step)) for i in range(max(1, int(abs(yt - y0) / step)) + 1)]
+    return [(y0, zb), (yb, zb), (yt, zt(yt))] + [(y, zt(y)) for y in reversed(ys[:-1])]
+
+
+def pane(P, tree, axis, outline, h=0.011, inset=0.017, cell=0.085, step=0.05):
+    """Painel de vidro assentado na pele: topo liso de vidro e friso preto chanfrado em volta (a parede inclinada), em vez de um bloco preto da cor da faixa do casco."""
+    raised(P, tree, axis, outline, h, "glass", "trim", inset=inset, off0=-0.002, cell=cell, step=step)
+
+
 def lamp_cell(Pl, tree, axis, cx, cz, a, b, mats, n=4.5, N=28, height=0.026, floor=0.007, bezel=0.011, ring_w=0.015, lip=False, ribs=(), slope=0.0, dome=0.003):
     """Uma célula de lanterna ou de farol: moldura em relevo, poço com refletor, coroa e lente em leque (`HP.strip_lamp`, o miolo e a borda do `aLens`)."""
     dummy = Part("_led")
@@ -140,10 +174,22 @@ def door_handle(P, tree, axis, y, z, length=0.15, mat="trim"):
     raised(P, tree, axis, rrect(y, z + 0.004, length, 0.028, 0.012, seg=2), 0.017, mat, inset=0.005, cell=0.05, step=0.03)
 
 
+GLASS_H = 0.011  # o topo do painel de vidro, acima da pele (V18): o que vai SOBRE o vidro (limpador, desembaçador, reflexo) sobe isto
+
+
+def streak(p0, p1, w):
+    """Reflexo do céu: faixa inclinada de p0 a p1 (2D), larga (w) no começo e mais fina (0,3 w) na ponta, de cantos arredondados. Faixa de ponta cega lia como cano, e a folha de ponta aguda como faca."""
+    dx, dz = p1[0] - p0[0], p1[1] - p0[1]
+    L = math.hypot(dx, dz) or 1.0
+    nx, nz = -dz / L, dx / L
+    quad = [(p0[0] + nx * w / 2, p0[1] + nz * w / 2), (p1[0] + nx * w * 0.15, p1[1] + nz * w * 0.15), (p1[0] - nx * w * 0.15, p1[1] - nz * w * 0.15), (p0[0] - nx * w / 2, p0[1] - nz * w / 2)]
+    return round_poly(quad, min(0.03, w * 0.35), seg=2)
+
+
 def wiper(P, tree, pivot, tip, blade, width_arm=0.014, width_blade=0.024, mat_arm="trim_soft", mat_blade="trim_soft"):
     """Limpador de para-brisa (ou de vidro de trás), visto de cima: o braço do pivô ao fim da lâmina e a palheta ao longo do vidro; `blade` = (início, fim) da palheta."""
-    raised(P, tree, "top", ribbon([pivot, tip], width_arm), 0.012, mat_arm, inset=0.004, cell=0.12, step=0.08)
-    raised(P, tree, "top", ribbon(list(blade), width_blade), 0.016, mat_blade, inset=0.005, cell=0.12, step=0.08)
+    raised(P, tree, "top", ribbon([pivot, tip], width_arm), 0.012 + GLASS_H, mat_arm, inset=0.004, cell=0.12, step=0.08)
+    raised(P, tree, "top", ribbon(list(blade), width_blade), 0.016 + GLASS_H, mat_blade, inset=0.005, cell=0.12, step=0.08)
 
 
 def antenna(name, tree, x, y, height=0.40, lean=0.05):
@@ -188,9 +234,9 @@ def sides_common(tree, doors_y, handles, rub_z=0.375, rub_y=(-0.90, 1.22), marke
     Pf = Part("fresta_porta")
     for ax in ("side+", "side-"):
         for y in doors_y:
-            strip_on(Pf, tree, [(y, door_z[0]), (y + 0.004, (door_z[0] + door_z[1]) / 2), (y + 0.006, door_z[1])], 0.010, ax, "under", off=0.0055, step=0.04)
+            strip_on(Pf, tree, [(y, door_z[0]), (y + 0.004, (door_z[0] + door_z[1]) / 2), (y + 0.006, door_z[1])], 0.010, ax, "under", off=0.0055, step=0.075)
         for ya, yb in zip(doors_y[:-1], doors_y[1:]):
-            strip_on(Pf, tree, [(ya, door_z[0] + 0.003), (yb, door_z[0] + 0.003)], 0.010, ax, "under", off=0.0055, step=0.04)
+            strip_on(Pf, tree, [(ya, door_z[0] + 0.003), (yb, door_z[0] + 0.003)], 0.010, ax, "under", off=0.0055, step=0.075)
     out.append(Pf.finish())
     for ax, nm, sd in (("side+", "l", 1), ("side-", "r", -1)):
         Ph = Part(f"macaneta_{nm}")
@@ -214,11 +260,29 @@ def sides_common(tree, doors_y, handles, rub_z=0.375, rub_y=(-0.90, 1.22), marke
 
 
 def flares(tree, sp, width=0.05, h=0.016):
-    """Alargamento dos para-lamas: o anel de plástico em torno de cada vão de roda (frente e trás), em relevo com a quina chanfrada, dos dois lados. Não usa o remendo de V6c: sobre a pele de nível 2 ele serrilhava."""
+    """Alargamento dos para-lamas: o anel de plástico em torno de cada vão de roda (frente e trás), em relevo com a quina chanfrada, dos dois lados. Não usa o remendo de V6c: sobre a pele de nível 2 ele serrilhava.
+    O arco é cortado abaixo da cintura (V18: com o capô e o para-lama com caimento, o topo do arco passava da cintura e o raio batia no capô)."""
     out = []
+    belt = sp["curves"]["belt"]
+    r_in = sp["wheel"]["r"] + sp["wheel"]["arch_gap"] + 0.002
+    cz = sp["wheel"]["r"]
     for ax, nm in (("side+", "l"), ("side-", "r")):
         P = Part(f"alargamento_{nm}")
-        for p in cl.arch_flares(sp, width=width):
-            raised(P, tree, ax, p["outline"], h, "bumper", inset=0.009, cell=0.12, step=0.06)
+        for (y, sd) in sp["wheel_positions"]():
+            if sd < 0:
+                continue
+            zlim = belt(y) - 0.045
+            ro = r_in + width
+            amax = math.degrees(math.asin(max(-1.0, min(1.0, (zlim - cz) / ro))))
+            a_hi = min(172.0, 180.0 - 8.0, 90.0 + (90.0 - amax) if amax < 90.0 else 172.0)
+            a_lo = max(8.0, 180.0 - a_hi)
+            if a_hi - a_lo < 30.0:
+                continue
+            angs = [math.radians(a_lo + (a_hi - a_lo) * k / 14) for k in range(15)]
+            outer = [(y + ro * math.cos(a), cz + min(ro * math.sin(a), zlim - cz)) for a in angs]
+            inner = [(y + r_in * math.cos(a), cz + min(r_in * math.sin(a), zlim - cz - width * 0.5)) for a in angs]
+            raised(P, tree, ax, outer + list(reversed(inner)), h, "bumper", inset=0.009, cell=0.2, step=0.1)
         out.append(P.finish())
     return out
+
+

@@ -177,7 +177,7 @@ def build_shell(sp, lod):
     bm = bmesh.new()
     rings = []
     for y in ys:
-        pts = ring_points(sp, y)
+        pts = sp.get("ring_points", ring_points)(sp, y)  # V18: o herói traz o anel dele (teto abaulado, vidro com caimento)
         right = pts[1:8]
         left = [(-x, z) for (x, z) in reversed(pts[1:8])]
         full = [pts[0]] + right + [pts[8]] + left  # 16 pontos
@@ -229,7 +229,7 @@ def build_shell(sp, lod):
             if s0 in (0, len(ys) - 1):
                 e[crease] = sp.get("end_crease", 0.6)
             elif ys[s0] in sp.get("crease_stations", ()):
-                e[crease] = 0.8
+                e[crease] = sp.get("station_crease", 0.8)
     bm.normal_update()
     ob = new_object("body", bm, mat_names)
     return ob
