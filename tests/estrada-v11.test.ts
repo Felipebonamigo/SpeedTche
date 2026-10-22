@@ -335,3 +335,83 @@ describe('V11 · o chão fora da pista (tom e relevo suave)', () => {
     for (const x of v) { expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(1); }
   });
 });
+
+// ───────────────────────────── V22/F2 · o material da pista (relevo, brilho, borracha na curva) ─────────────────────────────
+// Média e acima ganham o mapa de normais e o de rugosidade no asfalto; a Baixa não (o mesmo material, sem os dois mapas). A curva escurece a borda de FORA do asfalto (a borracha
+// que os pneus deixam). Sem geometria nova: as cores por vértice que o Road.update já grava, e duas texturas.
+describe('V22/F2 · a pista com relevo e brilho (Média+) e borracha na curva', { timeout: 120_000 }, () => {
+  let restore = (): void => {};
+  beforeEach(() => { restore = fakeCanvasDocument(); });
+  afterEach(() => restore());
+  type Mat = import('three').MeshStandardMaterial;
+  const asphalt = (r: Road): Mat => (r as unknown as { asphaltMaterial: Mat }).asphaltMaterial;
+  const texturesOf = (r: Road): import('three').Texture[] => (r as unknown as { textures: import('three').Texture[] }).textures;
+
+  it('Média, Alta e Ultra: o asfalto tem normalMap e roughnessMap (dados, sem espaço de cor, com mipmap); a Baixa não tem nenhum dos dois', () => {
+    for (const q of ['medium', 'high', 'ultra'] as const) {
+      const r = new Road(8, 8); r.setPalette(palette('desert', 'day'), false, `f2-${q}`); r.setQuality(q);
+      const m = asphalt(r);
+      expect(m.normalMap, `${q}: normalMap`).not.toBeNull(); expect(m.roughnessMap, `${q}: roughnessMap`).not.toBeNull();
+      for (const t of [m.normalMap, m.roughnessMap]) { expect(t?.colorSpace, `${q}: dado, não cor`).toBe('');  expect(t?.generateMipmaps, `${q}: mipmap`).toBe(true); }
+      expect(texturesOf(r), `${q}: as duas entram na lista que o setPalette libera`).toEqual(expect.arrayContaining([m.normalMap, m.roughnessMap]));
+    }
+    const low = new Road(8, 8); low.setPalette(palette('desert', 'day'), false, 'f2-low'); low.setQuality('low');
+    expect(asphalt(low).normalMap, 'Baixa: sem normalMap').toBeNull(); expect(asphalt(low).roughnessMap, 'Baixa: sem roughnessMap').toBeNull();
+  });
+
+  it('trocar a qualidade põe e tira os mapas sem refazer a paleta; o normalMap NÃO muda a cor (o albedo é o mesmo): material.map é a mesma textura', () => {
+    const r = new Road(8, 8); r.setPalette(palette('coast', 'day'), false, 'f2-q'); r.setQuality('low');
+    const map = asphalt(r).map;
+    r.setQuality('high'); expect(asphalt(r).normalMap).not.toBeNull(); expect(asphalt(r).map).toBe(map);
+    r.setQuality('low'); expect(asphalt(r).normalMap).toBeNull(); expect(asphalt(r).roughnessMap).toBeNull();
+    r.setQuality('medium'); expect(asphalt(r).normalMap).not.toBeNull();
+  });
+
+  it('a corrida que muda (pista com período seguinte) usa os MESMOS mapas nas duas pontas, e trocar de pista libera os mapas da anterior (nada vaza)', () => {
+    const r = new Road(8, 8); r.setQuality('high');
+    r.setPalette(palette('coast', 'day'), false, 'f2-a', palette('coast', 'dusk'));
+    const n1 = asphalt(r).normalMap; const g1 = asphalt(r).roughnessMap;
+    expect(n1).not.toBeNull();
+    let disposed = 0; for (const t of [n1, g1]) t?.addEventListener('dispose', () => { disposed++; });
+    r.setPalette(palette('desert', 'day'), false, 'f2-b');
+    expect(disposed, 'os dois mapas da pista anterior foram liberados').toBe(2);
+    expect(asphalt(r).normalMap, 'e a pista nova tem os dela').not.toBe(n1);
+    expect(asphalt(r).normalMap).not.toBeNull();
+  });
+
+  it('os mapas não pesam: as duas texturas novas ≤ 6 MB de GPU (com mipmap)', () => {
+    const r = new Road(8, 8); r.setQuality('high'); r.setPalette(palette('desert', 'day'), false, 'f2-m');
+    const m = asphalt(r); let bytes = 0;
+    for (const t of [m.normalMap, m.roughnessMap]) { const im = t?.image as { width: number; height: number } | undefined; bytes += (im?.width ?? 0) * (im?.height ?? 0) * 4 * (4 / 3); }
+    expect(bytes / 1048576, `${(bytes / 1048576).toFixed(2)} MB`).toBeGreaterThan(0);
+    expect(bytes / 1048576).toBeLessThanOrEqual(6);
+  });
+
+  it('borracha na curva: a borda de FORA do asfalto escurece ≥ 7% nas curvas fortes (|curva| ≥ 4), a de dentro e as retas ficam como estavam, e o escurecer é gradual (≤ 5% entre segmentos vizinhos)', () => {
+    const track = getTrack('xingo');
+    const i4 = track.segments.findIndex((s) => Math.abs(s.curve) >= 4);
+    expect(i4, 'a pista tem curva forte').toBeGreaterThan(30);
+    const r = new Road(160, 1);
+    r.setPalette(palette('desert', 'day'), false, 'f2-r');
+    const frame = buildRoadFrame(track, (i4 - 40) * 200, 10, 120);
+    r.update(frame, track);
+    const colors = (r as unknown as { asphalt: { color: { array: Float32Array } } }).asphalt.color.array;
+    const outer: number[] = []; const inner: number[] = []; const kinds: Array<'curva' | 'reta' | 'meio'> = [];
+    for (let j = 0; j < frame.count; j++) {
+      const s = track.segments[frame.segIndex[j]];
+      const band = s.band ? [0.93, 0.93, 0.94] : [1, 1, 1];
+      const tl = RT.stretchTint(s.index, -1); const tr = RT.stretchTint(s.index, 1);
+      const left = colors[j * 6] / (band[0] * tl[0]); const right = colors[j * 6 + 3] / (band[0] * tr[0]);
+      // curva > 0 = para a direita: o lado de fora é o esquerdo (vértice 0).
+      outer.push(s.curve > 0 ? left : right); inner.push(s.curve > 0 ? right : left);
+      kinds.push(Math.abs(s.curve) >= 4 ? 'curva' : Math.abs(s.curve) <= 0.5 ? 'reta' : 'meio');
+    }
+    const pick = (k: string, v: number[]): number[] => v.filter((_, j) => kinds[j] === k);
+    expect(pick('curva', outer).length, 'há curva forte na janela').toBeGreaterThan(10);
+    expect(Math.max(...pick('curva', outer)), 'fora, nas curvas fortes').toBeLessThanOrEqual(0.93);
+    expect(Math.min(...pick('curva', inner)), 'dentro, nas curvas fortes').toBeGreaterThanOrEqual(0.995);
+    expect(Math.min(...pick('reta', outer)), 'retas: fora').toBeGreaterThanOrEqual(0.995);
+    let worst = 0; for (let j = 1; j < outer.length; j++) worst = Math.max(worst, Math.abs(outer[j] - outer[j - 1]));
+    expect(worst, 'salto entre segmentos vizinhos').toBeLessThanOrEqual(0.05);
+  });
+});

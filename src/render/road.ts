@@ -9,8 +9,8 @@ import { lightsAmount, mix, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
 import type { Quality } from '../game/contracts';
 import {
-  ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintShoulder, paintStartDecal, PIT_REPEAT_M,
-  PIT_X0, PIT_X1, ROAD_ANISOTROPY, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND, stretchTint,
+  ASPHALT_REPEAT_M, KERB_REPEAT_M, paintAsphalt, paintKerb, paintPit, paintPool, paintRoadDetail, paintShoulder, paintStartDecal, PIT_REPEAT_M,
+  PIT_X0, PIT_X1, ROAD_ANISOTROPY, ROAD_ROUGHNESS, SHOULDER_REPEAT_M, START_AHEAD, START_BEHIND, stretchTint, type RoadDetail,
 } from './road-textures';
 import type { RoadFrame } from './roadframe';
 import { LAMP_HEAD_X } from './scenery/props';
@@ -35,6 +35,16 @@ const MAX_POOLS = 48;
 
 /** Segmento com zebra: curva de média para cima (|curve| ≥ 2). */
 export function hasKerb(s: Segment): boolean { return Math.abs(s.curve) >= 2; }
+
+/**
+ * V22/F2: a borracha que os pneus deixam na curva. A borda de FORA do asfalto escurece até `CURVE_RUBBER` (de |curva| 1 a 4, suave: nenhum salto entre segmentos), pelo mesmo caminho
+ * da cor por vértice do tom do trecho — sem geometria nem textura a mais. `curve` > 0 = direita, então o lado de fora é o esquerdo.
+ */
+const CURVE_RUBBER = 0.12;
+export function curveRubber(curve: number): number {
+  const t = Math.max(0, Math.min(1, (Math.abs(curve) - 1) / 3));
+  return CURVE_RUBBER * t * t * (3 - 2 * t);
+}
 
 /** Faixa contínua ao longo da janela, com `lanes` vértices por ponto. */
 class Strip {
@@ -194,6 +204,10 @@ export class Road {
   private readonly pools: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private readonly poolTexture: THREE.CanvasTexture;
   private textures: THREE.Texture[] = [];
+  /** V22/F2: o relevo (normais) e o brilho (rugosidade) do asfalto; só da Média para cima (`quality` desconhecida = nenhum, até o renderizador dizer). */
+  private detail: RoadDetail | null = null;
+  private quality: Quality | null = null;
+  private earth = 0;
   private paletteKey = '';
   private night = false;
   /** M6 (b): o uniforme de mistura (0 = textura da pista, 1 = a do período seguinte), compartilhado pelos materiais; só vale com `live`. */
@@ -263,13 +277,33 @@ export class Road {
 
   /**
    * V4: a anisotropia das texturas da pista pela qualidade (Baixa 4, Média 8, Alta e Ultra 16; limitada pela placa). Só parâmetro de amostragem: as
-   * texturas são reenviadas uma vez (nenhum programa compila).
+   * texturas são reenviadas uma vez (nenhum programa compila). V22/F2: da Média para cima o asfalto ganha o mapa de normais e o de rugosidade (a Baixa não os tem nem os pinta:
+   * 1,5 milhão de texels e 4 MB de GPU a menos; trocar de degrau já recompila os materiais, `ensureQuality` do renderizador).
    */
   setQuality(q: Quality): void {
+    this.quality = q;
+    this.syncDetail();
     const a = Math.max(1, Math.min(ROAD_ANISOTROPY[q], this.maxAnisotropy));
     if (a === this.anisotropy) return;
     this.anisotropy = a;
     for (const t of this.textures) { t.anisotropy = a; t.needsUpdate = true; }
+  }
+
+  /** Põe ou tira o relevo e o brilho do asfalto conforme a qualidade e a pista (a terra tem seixos; o asfalto, agregado). */
+  private syncDetail(): void {
+    const want = this.quality !== null && this.quality !== 'low' && this.paletteKey !== '';
+    if (!want) {
+      if (this.detail) {
+        for (const t of [this.detail.normal, this.detail.rough]) { t.dispose(); this.textures = this.textures.filter((x) => x !== t); }
+        this.detail = null;
+        this.asphaltMaterial.normalMap = null; this.asphaltMaterial.roughnessMap = null; this.asphaltMaterial.needsUpdate = true;
+      }
+      return;
+    }
+    if (this.detail) return;
+    this.detail = paintRoadDetail(this.earth, this.anisotropy);
+    this.textures.push(this.detail.normal, this.detail.rough);
+    this.asphaltMaterial.normalMap = this.detail.normal; this.asphaltMaterial.roughnessMap = this.detail.rough; this.asphaltMaterial.needsUpdate = true;
   }
 
   /**
@@ -284,6 +318,8 @@ export class Road {
     this.blend.value = 0;
     this.lampPool = pTo?.lampPool ?? p.lampPool;
     for (const t of this.textures) t.dispose();
+    this.detail = null; // as duas texturas novas estavam na lista acima; o material ainda aponta para elas até o `syncDetail` abaixo
+    this.earth = p.roadEarth;
     const asphalt = paintAsphalt(p, this.anisotropy);
     const kerb = paintKerb(p, this.anisotropy);
     const shoulder = paintShoulder(p, this.anisotropy);
@@ -291,12 +327,13 @@ export class Road {
     const decal = paintStartDecal(p, SEGMENT_M, this.anisotropy);
     this.textures = [asphalt.map, asphalt.glow, kerb, shoulder, pit, decal];
     const a = this.asphaltMaterial;
+    a.normalMap = null; a.roughnessMap = null; // o `syncDetail` (fim do método) os repõe, da pista nova, se a qualidade pede
     a.map = asphalt.map;
     a.emissiveMap = asphalt.glow;
     a.emissive.set(p.lane);
     a.emissiveIntensity = p.markingGlow;
     // À noite o asfalto fica acetinado: pega o brilho das poças e dos faróis sem virar espelho.
-    a.roughness = night ? 0.6 : 0.9;
+    a.roughness = night ? 0.6 : ROAD_ROUGHNESS; // o mapa de rugosidade (Média+) a multiplica: trilhas polidas, faixa limpa áspera
     a.envMapIntensity = night ? 0.9 : 0.15; // de dia o céu no env map pintava a sombra de azul-marinho
     a.needsUpdate = true;
     this.kerbMaterial.map = kerb;
@@ -337,6 +374,7 @@ export class Road {
     // Faixas de 3 segmentos um pouco mais claras/escuras: o ritmo que dá sensação de velocidade.
     this.cBand[0].setRGB(1, 1, 1); this.cBand[1].setRGB(0.93, 0.93, 0.94);
     this.pools.material.color.set(p.lampPool ?? '#000000');
+    this.syncDetail();
   }
 
   /**
@@ -352,7 +390,7 @@ export class Road {
     const a = this.asphaltMaterial;
     a.emissive.set(p.lane);
     a.emissiveIntensity = p.markingGlow;
-    a.roughness = 0.9 - 0.3 * night;
+    a.roughness = ROAD_ROUGHNESS - 0.3 * night;
     a.envMapIntensity = 0.15 + 0.75 * night;
     this.kerbMaterial.emissiveIntensity = p.markingGlow * 0.5;
     this.decalMaterial.emissiveIntensity = p.markingGlow * 0.6;
@@ -380,8 +418,11 @@ export class Road {
       const band = this.cBand[s.band];
       // V11: o tom do trecho (mais claro/quente/frio por dezenas de metros, um lado mais gasto que o outro) multiplica a textura por vértice: sem geometria nova.
       const tl = stretchTint(s.index, -1); const tr = stretchTint(s.index, 1);
-      this.asphalt.set(j, 0, px - W * cx, py, pz - W * sz, 0, v, band.r * tl[0], band.g * tl[1], band.b * tl[2]);
-      this.asphalt.set(j, 1, px + W * cx, py, pz + W * sz, 1, v, band.r * tr[0], band.g * tr[1], band.b * tr[2]);
+      // V22/F2: a borracha da curva escurece a borda de FORA (curva > 0 = direita: a de fora é a esquerda).
+      const rub = curveRubber(s.curve);
+      const kl = s.curve > 0 ? 1 - rub : 1; const kr = s.curve < 0 ? 1 - rub : 1;
+      this.asphalt.set(j, 0, px - W * cx, py, pz - W * sz, 0, v, band.r * tl[0] * kl, band.g * tl[1] * kl, band.b * tl[2] * kl);
+      this.asphalt.set(j, 1, px + W * cx, py, pz + W * sz, 1, v, band.r * tr[0] * kr, band.g * tr[1] * kr, band.b * tr[2] * kr);
       // Acostamento: u = 0 junto do asfalto, 1 no terreno (a textura escurece a borda de dentro).
       const o = W + SHOULDER_M;
       const vs = dist / SHOULDER_REPEAT_M;
