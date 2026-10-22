@@ -71,7 +71,8 @@ uniform sampler2D uSprite;
 varying float vAlpha; varying vec3 vColor; varying vec2 vSpr;
 vec4 cloudAt(vec2 c, float s, float k) {
   vec2 p = vec2(k * c.x + s * c.y, -s * c.x + k * c.y);
-  vec2 f = vec2(mod(vSpr.x, 2.0), floor(vSpr.x * 0.5));
+  float fi = floor(vSpr.x + 0.5);
+  vec2 f = vec2(mod(fi, 2.0), floor(fi * 0.5));
   return texture2D(uSprite, (f + clamp(p * 0.5 + 0.5, 0.004, 0.996)) * 0.5);
 }
 void main() {
