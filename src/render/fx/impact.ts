@@ -93,7 +93,7 @@ export function emitImpact(at: Contact, speed: number, drop: number, factor: num
     chip({
       z: at.z + (rnd() - 0.5) * 16, x: at.x + side * 0.02 * rnd(), h: at.h,
       vz: speed * (0.82 + 0.15 * rnd()), vx: (side * (2 + 3 * rnd())) / M_PER_X, vh: 2 + 2.5 * rnd(),
-      life: 0.55 + 0.35 * rnd(), size: 0.035 + 0.05 * rnd(), grow: 0, gravity: 9.8, r, g, b,
+      life: 0.55 + 0.35 * rnd(), size: 0.035 + 0.05 * rnd(), grow: 0, gravity: 9.8, r, g, b, frame: -1, // pedaço duro (V22 F8): o pool não o desenha como nuvem
     });
   }
 }
