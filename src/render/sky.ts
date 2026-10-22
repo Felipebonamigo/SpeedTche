@@ -12,6 +12,7 @@ import { hash2 } from './noise';
 import { buildLensFlare } from './lensflare';
 import { bodyColor, lightsAmount, mix, palette, starAlpha, type LivePalette, type Palette } from './palette';
 import { applyGrade } from './stylize';
+import { daylight, SKY_GRADIENT_GLSL } from './sky-paint';
 
 export { FLARE_ELEMENTS, flareFade, lensFlareLayout } from './lensflare';
 
@@ -29,31 +30,60 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
-const SKY_FRAG = /* glsl */ `
+export const SKY_FRAG = /* glsl */ `
 uniform vec3 uTop; uniform vec3 uMid; uniform vec3 uHorizon; uniform vec3 uGlow; uniform vec3 uBelow;
 uniform vec3 uSunDir; uniform vec3 uSunColor;
 uniform float uSunSize; uniform float uHalo; uniform float uGlowAmt; uniform float uDisc; uniform float uMoon;
+// V22/F3: a pintura nova. uPaint liga e desliga tudo de uma vez (0 = o céu de antes, exato: é o que o env map da IBL do carro vê); uDay = a luz do dia (0..1) das paradas
+// do gradiente; uBloom = a bolha larga do lado do sol; uCirrus (0..1) e uCirrusCol = a camada alta de cirros, uCirrusQ (0 Baixa, 1 Média, 2 Alta/Ultra) = quantas oitavas, uCirrusT = o vento.
+uniform float uPaint; uniform float uDay; uniform float uBloom; uniform float uCirrus; uniform float uCirrusQ; uniform float uCirrusT; uniform vec3 uCirrusCol;
 varying vec3 vDir;
+${SKY_GRADIENT_GLSL}
+// Hash e ruído de valor 2D (sem textura): só os cirros e o dither leem.
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 void main() {
   vec3 d = normalize(vDir);
   float h = d.y;
   float hp = max(h, 0.0);
-  // Gradiente forte: o horizonte ocupa pouco, o meio sobe rápido e o topo fica saturado.
-  vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.2, hp));
-  col = mix(col, uTop, smoothstep(0.16, 0.75, hp));
+  float day = uDay * uPaint;
+  // Gradiente: o de antes (horizonte → meio → topo) e, de dia, mais paradas (bruma clara rente ao chão, zênite anil).
+  vec3 col = skyGradient(hp, uTop, uMid, uHorizon, day);
   // O horizonte do lado do sol puxa para o brilho do período (o laranja do entardecer).
   vec2 sh = normalize(uSunDir.xz + vec2(1e-5));
   vec2 dh = normalize(d.xz + vec2(1e-5));
   float az = dot(dh, sh) * 0.5 + 0.5;
   float band = exp(-hp * 6.0);
   col = mix(col, uGlow, band * az * az * az * uGlowAmt);
+  // Dois tons por lado do sol (só de dia): o lado do sol esquenta numa faixa mais larga, o lado de lá esfria e puxa para o azul. O entardecer e a noite ficam como eram.
+  float wide = exp(-hp * 3.2);
+  col = mix(col, uGlow, wide * az * az * 0.16 * day);
+  col *= mix(vec3(1.0), vec3(0.94, 0.985, 1.04), wide * (1.0 - az) * day);
+  // A bolha larga do sol (sem disco): lava o céu em volta dele, de dia o sol fica fora do quadro e é isto que dá "lado" ao céu.
+  float cs = clamp(dot(d, uSunDir), -1.0, 1.0);
+  float bl = smoothstep(0.5, 1.0, cs); bl *= bl;
+  col = mix(col, uGlow, bl * uBloom * uPaint);
+  // Cirros: uma camada fina e alta, por ruído numa placa em perspectiva (esticada ao longo do vento), mais forte em cima do que rente ao horizonte.
+  if (uCirrusQ > 0.5 && uCirrus * uPaint > 0.01 && hp > 0.05) {
+    vec2 q = d.xz / (hp + 0.18) * 2.6;
+    q.x += uCirrusT;
+    vec2 s = vec2(q.x * 0.55, q.y * 2.4);
+    s.x += vn(s * 0.8 + 7.0) * 1.6;
+    float n = vn(s) * 0.55 + vn(s * 2.1 + 3.0) * 0.3;
+    n = uCirrusQ > 1.5 ? n + vn(s * 4.3 + 9.0) * 0.15 : n / 0.85;
+    float cir = smoothstep(0.54, 0.86, n) * smoothstep(0.05, 0.22, hp) * (1.0 - 0.5 * smoothstep(0.6, 1.0, hp));
+    col = mix(col, mix(uCirrusCol, uGlow, bl * 0.5), cir * uCirrus * 0.42 * uPaint);
+  }
   // Abaixo do horizonte: a cor da névoa, para o chão distante sumir sem emenda.
   col = mix(col, uBelow, smoothstep(0.0, -0.06, h));
-  float c = clamp(dot(d, uSunDir), -1.0, 1.0);
+  float c = cs;
   float ang = acos(c);
   float halo = exp(-ang * uHalo);
-  float wide = exp(-ang * uHalo * 0.22);
-  col += uSunColor * (halo * 0.5 + wide * 0.07) * step(-0.02, h);
+  float wideHalo = exp(-ang * uHalo * 0.22);
+  col += uSunColor * (halo * 0.5 + wideHalo * 0.07) * step(-0.02, h);
   // Disco com borda nítida; a lua ganha crateras (ruído barato no plano do disco).
   float disc = (1.0 - smoothstep(uSunSize * 0.9, uSunSize, ang)) * step(0.0, h);
   vec3 discCol = uSunColor * uDisc;
@@ -66,21 +96,29 @@ void main() {
     discCol *= mix(1.0, 0.86 + 0.1 * smoothstep(0.2, 0.9, cr) - 0.12 * smoothstep(0.5, 1.0, length(p)), uMoon);
   }
   col = mix(col, discCol, disc);
+  // Dither de 1 LSB (triangular), no espaço linear do quadro e na escala do degrau de 8 bits da cor que sai: quebra o banding do gradiente suave. uPaint = 0 não põe nada.
+  vec3 lsb = pow(max(col, vec3(0.0031308)), vec3(0.5833)) * 0.00892;
+  col += (h21(gl_FragCoord.xy) + h21(gl_FragCoord.xy + vec2(17.0, 31.0)) - 1.0) * lsb * uPaint;
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
 
-const CLOUD_VERT = /* glsl */ `
-attribute vec3 aRight; attribute float aTone;
+export const CLOUD_VERT = /* glsl */ `
+attribute vec3 aRight; attribute float aTone; attribute float aDrift;
+uniform float uDrift;
 varying vec2 vUv; varying vec3 vW; varying vec3 vN; varying vec3 vR; varying float vTone;
 void main() {
   vUv = uv;
   vTone = aTone;
-  vec4 wp = modelMatrix * vec4(position, 1.0);
+  // V22/F3: cada nuvem gira em torno do eixo do céu pela deriva dela (a baixa e longe devagar, a alta mais depressa): paralaxe sem chamada nova.
+  // Antes: o objeto inteiro girava (clouds.rotation.y), todas na mesma velocidade.
+  float ang = uDrift * aDrift; float cs = cos(ang); float sn = sin(ang);
+  mat3 spin = mat3(cs, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, cs);
+  vec4 wp = modelMatrix * vec4(spin * position, 1.0);
   vW = wp.xyz;
-  vN = normalize(mat3(modelMatrix) * normal);
-  vR = normalize(mat3(modelMatrix) * aRight);
+  vN = normalize(mat3(modelMatrix) * (spin * normal));
+  vR = normalize(mat3(modelMatrix) * (spin * aRight));
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
@@ -115,13 +153,13 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-interface SunSetup { dir: THREE.Vector3; size: number; halo: number; glow: number; disc: number; moon: boolean }
+interface SunSetup { dir: THREE.Vector3; size: number; halo: number; glow: number; disc: number; moon: boolean; bloom: number }
 
 /** O disco e o halo do período (o tamanho cresce no pôr do sol); a direção vem da paleta (`sunAz`, `sunEl`). */
 function sunLook(time: TimeOfDay): Omit<SunSetup, 'dir'> {
-  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false }; // sol a 34°: sombras longas, halo no alto da tela
-  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false }; // sol grande e baixo, à frente, horizonte em brasa
-  return { size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true }; // lua grande a 20°, para aparecer nas retas que apontam para ela
+  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false, bloom: 0.17 }; // sol a 34°: sombras longas, halo no alto da tela; V22/F3: a bolha larga pinta o lado do sol (a luz não muda)
+  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false, bloom: 0 }; // o entardecer (a cena que funciona, §3.4) fica como era: a bolha larga lavava o rosa do céu // sol grande e baixo, à frente, horizonte em brasa
+  return { size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true, bloom: 0 }; // lua grande a 20°, para aparecer nas retas que apontam para ela
 }
 
 /** Direção absoluta (x direita, y cima, −z frente na largada) do azimute e da elevação em graus. */
@@ -170,11 +208,45 @@ function buildStars(): THREE.Points {
 // Até a V4: 9 cúmulos de icosaedros a 10°–25° de elevação (quase todos acima do quadro da câmera Alta, que vê o céu de 0° a ~18°) e ~20 mil
 // triângulos. Agora: impostores (2 triângulos por nuvem) com a normal pintada num atlas, muitos e na faixa baixa do céu, numa malha só.
 
-/** Uma nuvem do céu: azimute (rad, 0 = à frente na largada, + = à direita), elevação (graus) do centro, distância (m), tamanho (m), célula do atlas. */
-export interface CloudSpec { az: number; el: number; dist: number; w: number; h: number; cell: number; flip: boolean; streak: boolean; tone: number }
+/**
+ * Atlas das nuvens (V22/F3): 2 colunas × 5 linhas de células de 448 × 224 = 896 × 1120 (4 MiB; o de antes, 4 células de 512 × 256, tinha 2 MiB). Células 0–7 = cúmulos
+ * (0–2 são os de antes, na escala da célula nova; 3–7 são novos: torre, achatado, par, inclinado, esgarçado); 8 e 9 = as duas faixas baixas (estratos).
+ */
+export const CLOUD_ATLAS = { w: 896, h: 1120, cellW: 448, cellH: 224, cols: 2, cumulus: 8, cells: 10 } as const;
+
+/**
+ * Uma nuvem do céu: azimute (rad, 0 = à frente na largada, + = à direita), elevação (graus) do centro, distância (m), tamanho (m), célula do atlas e a deriva (V22/F3:
+ * quanto da velocidade-base de giro ela leva; as baixas e distantes andam mais devagar que as altas: paralaxe, sem chamada nova).
+ */
+export interface CloudSpec { az: number; el: number; dist: number; w: number; h: number; cell: number; flip: boolean; streak: boolean; tone: number; drift: number }
 
 /** Quantas nuvens por qualidade (cúmulos, faixas baixas): a Baixa paga menos pixels transparentes. */
 const CLOUD_COUNT: Readonly<Record<Quality, [number, number]>> = { low: [20, 5], medium: [28, 7], high: [36, 8], ultra: [36, 8] };
+
+/** Velocidade-base do giro das nuvens (rad/s), a de antes da F3; cada nuvem a multiplica por `drift`. */
+export const CLOUD_DRIFT_RAD_S = 0.004;
+
+/**
+ * V22/F3: a célula de cada cúmulo da volta (36 na Alta), na ordem do azimute: as 8 células do atlas, a menos usada primeiro, e NUNCA a mesma célula a menos de 4 posições
+ * (a volta fecha): numa vista de ~80° cabem ~9 nuvens, e o olho não pode ver o mesmo desenho duas vezes. A célula é do índice `j` da Alta (a Baixa e a Média, subconjuntos, herdam).
+ */
+function cumulusCells(n: number): number[] {
+  const out: number[] = []; const used = new Array<number>(CLOUD_ATLAS.cumulus).fill(0);
+  for (let j = 0; j < n; j++) {
+    const banned = new Set(out.slice(-4));
+    const k = n - 1 - j; // as últimas posições também ficam a < 4 das primeiras, pela volta
+    if (k < 3) for (const c of out.slice(0, 3 - k)) banned.add(c);
+    let best = -1; let bestScore = Infinity;
+    for (let c = 0; c < CLOUD_ATLAS.cumulus; c++) {
+      if (banned.has(c)) continue;
+      const score = used[c] + 0.5 * hash2(j, 700 + c); // a menos usada; o desempate é por hash (deterministico)
+      if (score < bestScore) { bestScore = score; best = c; }
+    }
+    used[best]++; out.push(best);
+  }
+  return out;
+}
+const CUMULUS_CELL = cumulusCells(CLOUD_COUNT.high[0]);
 
 /** As nuvens de uma qualidade (puro, determinístico): azimutes estratificados (cobrem a volta toda), elevação baixa, tamanho que cresce para cima. */
 export function cloudLayout(q: Quality): CloudSpec[] {
@@ -192,7 +264,9 @@ export function cloudLayout(q: Quality): CloudSpec[] {
     const dist = 950 + 300 * hash2(j, 405);
     const ang = (8 + 9 * hash2(j, 406)) * (0.72 + 0.28 * Math.min(1, el / 12)); // graus de largura: perto do horizonte, menor (mais longe)
     const w = dist * Math.tan((ang * Math.PI) / 180);
-    out.push({ az, el, dist, w, h: w * (0.44 + 0.14 * hash2(j, 407)), cell: Math.floor(hash2(j, 408) * 3), flip: hash2(j, 409) < 0.5, streak: false, tone: 0.93 + 0.1 * hash2(j, 410) });
+    // Paralaxe: a deriva cresce com a elevação (a nuvem alta está "mais perto" e passa mais depressa) e varia 10% por nuvem.
+    const drift = (0.55 + 0.95 * Math.min(1, Math.max(0, (el - 2.5) / 18.5))) * (0.9 + 0.2 * hash2(j, 411));
+    out.push({ az, el, dist, w, h: w * (0.44 + 0.14 * hash2(j, 407)), cell: CUMULUS_CELL[j], flip: hash2(j, 409) < 0.5, streak: false, tone: 0.93 + 0.1 * hash2(j, 410), drift });
   }
   for (let k = 0; k < ns; k++) {
     const j = Math.floor((k * CLOUD_COUNT.high[1]) / ns);
@@ -200,29 +274,27 @@ export function cloudLayout(q: Quality): CloudSpec[] {
     const dist = 1150 + 120 * hash2(j, 502);
     const ang = 13 + 9 * hash2(j, 503);
     const w = dist * Math.tan((ang * Math.PI) / 180);
-    out.push({ az, el: 1.3 + 2.6 * hash2(j, 504), dist, w, h: w * (0.1 + 0.05 * hash2(j, 505)), cell: 3, flip: hash2(j, 506) < 0.5, streak: true, tone: 0.95 + 0.06 * hash2(j, 507) });
+    out.push({ az, el: 1.3 + 2.6 * hash2(j, 504), dist, w, h: w * (0.1 + 0.05 * hash2(j, 505)), cell: CLOUD_ATLAS.cumulus + (j % 2), flip: hash2(j, 506) < 0.5, streak: true, tone: 0.95 + 0.06 * hash2(j, 507), drift: 0.5 * (0.9 + 0.2 * hash2(j, 508)) });
   }
   return out;
 }
 
-/** Atlas das nuvens: 2 × 2 células de 512 × 256 (3 cúmulos e 1 faixa). */
-export const CLOUD_ATLAS = { w: 1024, h: 512, cellW: 512, cellH: 256 } as const;
-
 /**
  * As nuvens numa malha só (2 triângulos por nuvem, de frente para o centro do céu, onde a câmera está): posição, uv da célula (espelhada ou não),
- * a normal (para a câmera) e o "direita" do quadro (o shader monta a normal pintada no mundo), e o tom da nuvem.
+ * a normal (para a câmera) e o "direita" do quadro (o shader monta a normal pintada no mundo), o tom da nuvem e a deriva dela (`aDrift`).
  */
 export function buildClouds(q: Quality): THREE.BufferGeometry {
   const list = cloudLayout(q);
-  const pos: number[] = []; const nor: number[] = []; const uv: number[] = []; const right: number[] = []; const tone: number[] = []; const idx: number[] = [];
+  const pos: number[] = []; const nor: number[] = []; const uv: number[] = []; const right: number[] = []; const tone: number[] = []; const drift: number[] = []; const idx: number[] = [];
   const c = new THREE.Vector3(); const r = new THREE.Vector3(); const u = new THREE.Vector3(); const Y = new THREE.Vector3(0, 1, 0);
+  const { cols, cellW, cellH, w: AW, h: AH } = CLOUD_ATLAS;
   list.forEach((cl, i) => {
     c.copy(fromAngles(cl.el, (cl.az * 180) / Math.PI));
     r.crossVectors(c, Y).normalize();
     u.crossVectors(r, c).normalize();
     const center = c.clone().multiplyScalar(cl.dist);
-    const cx = cl.cell % 2; const cy = Math.floor(cl.cell / 2);
-    const u0 = cx * 0.5; const u1 = u0 + 0.5; const v0 = cy * 0.5; const v1 = v0 + 0.5;
+    const cx = cl.cell % cols; const cy = Math.floor(cl.cell / cols);
+    const u0 = (cx * cellW) / AW; const u1 = ((cx + 1) * cellW) / AW; const v0 = (cy * cellH) / AH; const v1 = ((cy + 1) * cellH) / AH;
     const [ul, ur] = cl.flip ? [u1, u0] : [u0, u1];
     // A barriga reta da célula fica 16% acima da borda de baixo: o centro do quadro sobe para a nuvem ficar na elevação dela.
     for (const [sx, sy, uu, vv] of [[-1, -1, ul, v0], [1, -1, ur, v0], [1, 1, ur, v1], [-1, 1, ul, v1]] as const) {
@@ -234,6 +306,7 @@ export function buildClouds(q: Quality): THREE.BufferGeometry {
       right.push(r.x * rr, r.y * rr, r.z * rr);
       uv.push(uu, vv);
       tone.push(cl.tone);
+      drift.push(cl.drift);
     }
     const o = i * 4;
     idx.push(o, o + 1, o + 2, o, o + 2, o + 3); // anti-horário visto do centro (a câmera)
@@ -244,6 +317,7 @@ export function buildClouds(q: Quality): THREE.BufferGeometry {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('aRight', new THREE.Float32BufferAttribute(right, 3));
   g.setAttribute('aTone', new THREE.Float32BufferAttribute(tone, 1));
+  g.setAttribute('aDrift', new THREE.Float32BufferAttribute(drift, 1));
   g.setIndex(idx);
   return g;
 }
@@ -251,38 +325,97 @@ export function buildClouds(q: Quality): THREE.BufferGeometry {
 /** Uma bolha do cúmulo (px na célula, y para cima) e o quanto ela vem para a frente (`z`, px). */
 interface Puff { x: number; y: number; r: number; z: number; sx: number }
 
-/** As bolhas de uma célula: fileira de baixo (barriga reta), o miolo maior por cima e uma ou duas torres. */
+/** Escala das medidas absolutas (px) que a pintura de antes tinha numa célula de 512: a célula é de 448 agora. */
+const PX = CLOUD_ATLAS.cellW / 512;
+
+/** As bolhas de uma célula do atlas (a barriga reta fica em `base`): cada arquétipo é uma silhueta diferente. */
 function cellPuffs(cell: number): { puffs: Puff[]; base: number } {
   const W = CLOUD_ATLAS.cellW; const H = CLOUD_ATLAS.cellH;
-  const seed = 900 + cell * 37;
   const puffs: Puff[] = [];
-  if (cell === 3) {
-    // Faixa baixa (estrato): bolhas achatadas e compridas ao longo, bordas macias.
-    for (let k = 0; k < 7; k++) {
-      const t = k / 6;
-      puffs.push({ x: 150 + t * (W - 300), y: H * (0.42 + 0.12 * (hash2(seed, k) - 0.5)), r: H * (0.1 + 0.1 * Math.sin(Math.PI * t)) * (0.85 + 0.3 * hash2(seed, 20 + k)), z: 0, sx: 2.2 });
+  const base = H * 0.17;
+  if (cell >= CLOUD_ATLAS.cumulus) {
+    // Faixa baixa (estrato): bolhas achatadas e compridas ao longo, bordas macias. A 8 é a de antes; a 9 é mais curta e mais irregular.
+    const seed = cell === 8 ? 900 + 3 * 37 : 1500;
+    const n = cell === 8 ? 7 : 6;
+    for (let k = 0; k < n; k++) {
+      const t = k / (n - 1);
+      const span = cell === 8 ? W - 300 * PX : (W - 300 * PX) * 0.78;
+      const x0 = cell === 8 ? 150 * PX : (W - span) / 2;
+      puffs.push({ x: x0 + t * span, y: H * (0.42 + (cell === 8 ? 0.12 : 0.2) * (hash2(seed, k) - 0.5)), r: H * (cell === 8 ? 0.1 + 0.1 * Math.sin(Math.PI * t) : 0.09 + 0.07 * Math.sin(Math.PI * t) ** 0.8) * (0.85 + 0.3 * hash2(seed, 20 + k)), z: 0, sx: cell === 8 ? 2.2 : 2.6 });
     }
     return { puffs, base: H * 0.18 };
   }
-  const base = H * 0.17;
-  const n = 5 + Math.floor(hash2(seed, 1) * 2);
-  for (let k = 0; k < n; k++) {
-    const t = (k + 0.5) / n;
-    const r = H * (0.17 + 0.07 * hash2(seed, 10 + k)) * (0.75 + 0.35 * Math.sin(Math.PI * t));
-    puffs.push({ x: W * (0.1 + 0.8 * t) + (hash2(seed, 30 + k) - 0.5) * 18, y: base + r * 0.62, r, z: r * 0.25, sx: 1 });
+  const seed = cell < 3 ? 900 + cell * 37 : 900 + (10 + cell) * 37;
+  const J = (k: number, amp: number): number => (hash2(seed, k) - 0.5) * amp * PX;
+  if (cell < 3) {
+    // Os três cúmulos de antes (a pintura que o diagnóstico elogiou): barriga, miolo e uma ou duas torres.
+    const n = 5 + Math.floor(hash2(seed, 1) * 2);
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n;
+      const r = H * (0.17 + 0.07 * hash2(seed, 10 + k)) * (0.75 + 0.35 * Math.sin(Math.PI * t));
+      puffs.push({ x: W * (0.1 + 0.8 * t) + J(30 + k, 18), y: base + r * 0.62, r, z: r * 0.25, sx: 1 });
+    }
+    const m = 2 + Math.floor(hash2(seed, 2) * 2);
+    for (let k = 0; k < m; k++) {
+      const t = (k + 0.5) / m;
+      puffs.push({ x: W * (0.27 + 0.46 * t) + J(60 + k, 40), y: base + H * 0.3 + J(70 + k, 22), r: H * (0.25 + 0.07 * hash2(seed, 50 + k)), z: 0, sx: 1 });
+    }
+    const tops = 2 + Math.floor(hash2(seed, 3) * 2);
+    for (let k = 0; k < tops; k++) {
+      const r = H * (0.13 + 0.06 * hash2(seed, 80 + k));
+      puffs.push({ x: W * (0.3 + 0.4 * ((k + hash2(seed, 90 + k)) / tops)), y: base + H * (0.5 + 0.1 * hash2(seed, 95 + k)), r, z: -r * 0.15, sx: 1 });
+    }
+    return { puffs, base };
   }
-  const m = 2 + Math.floor(hash2(seed, 2) * 2);
-  for (let k = 0; k < m; k++) {
-    const t = (k + 0.5) / m;
-    const r = H * (0.25 + 0.07 * hash2(seed, 50 + k));
-    puffs.push({ x: W * (0.27 + 0.46 * t) + (hash2(seed, 60 + k) - 0.5) * 40, y: base + H * 0.3 + (hash2(seed, 70 + k) - 0.5) * 22, r, z: 0, sx: 1 });
-  }
-  const tops = 2 + Math.floor(hash2(seed, 3) * 2);
-  for (let k = 0; k < tops; k++) {
-    const r = H * (0.13 + 0.06 * hash2(seed, 80 + k));
-    puffs.push({ x: W * (0.3 + 0.4 * ((k + hash2(seed, 90 + k)) / tops)), y: base + H * (0.5 + 0.1 * hash2(seed, 95 + k)), r, z: -r * 0.15, sx: 1 });
+  // A fileira da barriga: as bolhas se tocam com folga (espaçamento ≤ 1,5 do raio médio: com a junta quase fechada a fresta vira um desfiladeiro e a normal pintada gira de golpe).
+  const belly = (x0: number, x1: number, _n: number, rMin: number, rMax: number, tag: number): void => {
+    const n = Math.max(2, Math.ceil((W * (x1 - x0)) / (1.45 * H * (rMin * 0.9 + rMax * 0.1))));
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n;
+      const r = H * (rMin + (rMax - rMin) * hash2(seed, tag + k)) * (0.8 + 0.25 * Math.sin(Math.PI * t));
+      puffs.push({ x: W * (x0 + (x1 - x0) * t) + J(tag + 20 + k, 14), y: base + r * 0.62, r, z: r * 0.25, sx: 1 });
+    }
+  };
+  const lump = (x: number, up: number, r: number, z = 0): void => { puffs.push({ x: W * x, y: base + H * up, r: H * r, z: H * z, sx: 1 }); };
+  if (cell === 3) {
+    // Torre (cúmulo congestus): estreita e alta, uma pilha de bolhas que afina para cima.
+    belly(0.24, 0.76, 4, 0.13, 0.17, 10);
+    lump(0.42, 0.22, 0.18); lump(0.58, 0.2, 0.17); lump(0.5, 0.38, 0.18);
+    lump(0.47, 0.53, 0.14, -0.03); lump(0.55, 0.63, 0.11, -0.03);
+  } else if (cell === 4) {
+    // Achatado (cúmulo humilis): largo e baixo, quase sem torre.
+    belly(0.16, 0.84, 6, 0.1, 0.14, 10);
+    lump(0.4, 0.2, 0.15); lump(0.62, 0.18, 0.14); lump(0.5, 0.25, 0.13, -0.03);
+  } else if (cell === 5) {
+    // Par: dois cúmulos lado a lado, o da esquerda maior, com vão no meio.
+    belly(0.08, 0.44, 3, 0.14, 0.19, 10);
+    lump(0.22, 0.36, 0.22); lump(0.3, 0.55, 0.14, -0.03);
+    belly(0.56, 0.9, 3, 0.1, 0.14, 40);
+    lump(0.74, 0.26, 0.17); lump(0.79, 0.38, 0.13, -0.03);
+  } else if (cell === 6) {
+    // Inclinado: um lóbulo grande à esquerda que se arrasta em bolhas cada vez menores para a direita (o vento).
+    belly(0.12, 0.6, 4, 0.16, 0.22, 10);
+    lump(0.3, 0.4, 0.27); lump(0.22, 0.62, 0.15, -0.03); lump(0.38, 0.58, 0.14, -0.03);
+    belly(0.7, 0.95, 3, 0.08, 0.11, 40);
+    lump(0.78, 0.1, 0.1); lump(0.88, 0.08, 0.08);
+  } else {
+    // Esgarçado (cumulus fractus): um bando de bolhas pequenas soltas, de alturas diferentes.
+    for (let k = 0; k < 7; k++) {
+      const t = (k + 0.5) / 7;
+      const r = H * (0.07 + 0.06 * hash2(seed, 10 + k));
+      puffs.push({ x: W * (0.14 + 0.72 * t) + J(30 + k, 20), y: base + r * 0.6 + H * 0.26 * hash2(seed, 50 + k) * (1 - Math.abs(t - 0.5)), r, z: 0, sx: 1 + 0.5 * hash2(seed, 70 + k) });
+    }
   }
   return { puffs, base };
+}
+
+/** Desfoque de caixa 3 × 3, `passes` vezes, no lugar (a borda repete o pixel de dentro). */
+function smoothHeights(h: Float32Array, W: number, H: number, passes: number): void {
+  const t = new Float32Array(h.length);
+  for (let p = 0; p < passes; p++) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) t[y * W + x] = (h[y * W + Math.max(0, x - 1)] + h[y * W + x] + h[y * W + Math.min(W - 1, x + 1)]) / 3;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) h[y * W + x] = (t[Math.max(0, y - 1) * W + x] + t[y * W + x] + t[Math.min(H - 1, y + 1) * W + x]) / 3;
+  }
 }
 
 /**
@@ -293,12 +426,13 @@ function cellPuffs(cell: number): { puffs: Puff[]; base: number } {
 let cloudAtlasCache: { width: number; height: number; data: Uint8Array } | null = null;
 export function cloudAtlasImage(): { width: number; height: number; data: Uint8Array } {
   if (cloudAtlasCache) return cloudAtlasCache; // constante: montado uma vez por processo (cada Sky tem a sua textura, com os mesmos pixels)
-  const { w: AW, h: AH, cellW: W, cellH: H } = CLOUD_ATLAS;
+  const { w: AW, h: AH, cellW: W, cellH: H, cols } = CLOUD_ATLAS;
   const data = new Uint8Array(AW * AH * 4);
   const hgt = new Float32Array(W * H); const cov = new Float32Array(W * H);
-  for (let cell = 0; cell < 4; cell++) {
+  for (let cell = 0; cell < CLOUD_ATLAS.cells; cell++) {
     const { puffs, base } = cellPuffs(cell);
-    const soft = cell === 3 ? 7 : 1.6;
+    const streak = cell >= CLOUD_ATLAS.cumulus;
+    const soft = streak ? 7 * PX : 1.6 * PX;
     let top = 0;
     for (const p of puffs) top = Math.max(top, p.y + p.r);
     // Metabolas: a soma de gaussianas das bolhas é lisa em todo lugar (a borda de uma bolha dentro de outra não vira risco); a forma é onde a soma
@@ -316,30 +450,33 @@ export function cloudAtlasImage(): { width: number; height: number; data: Uint8A
         sum += e; rw += e * p.r; wsum += e;
       }
       const i = y * W + x;
-      const r = wsum > 1e-6 ? rw / wsum : 40;
+      const r = wsum > 1e-6 ? rw / wsum : 40 * PX;
       hgt[i] = sum > T ? r * 1.1 * Math.sqrt((sum - T) / (1 - T)) : 0;
       // Cobertura antisserrilhada: a soma cruza T com inclinação ~slope/r por pixel.
       const d = (sum - T) / ((slope / r) * soft);
       // A barriga reta: abaixo da base a cobertura cai (borda macia).
-      const belly = Math.min(1, Math.max(0, (y + 0.5 - base + 2) / 5));
+      const belly = Math.min(1, Math.max(0, (y + 0.5 - base + 2 * PX) / (5 * PX)));
       cov[i] = Math.min(1, Math.max(0, 0.5 + 0.5 * d)) * belly;
     }
-    const ox = (cell % 2) * W; const oy = Math.floor(cell / 2) * H;
+    // Os cúmulos novos (3–7): um desfoque leve da altura antes da normal (a junta entre bolhas de tamanhos diferentes afunda; a normal pintada tem de seguir lisa, < 12° entre
+    // pixels vizinhos: tests/horizonte-suave.test.ts). Os de antes e as faixas ficam como estavam.
+    if (cell >= 3 && !streak) smoothHeights(hgt, W, H, 3);
+    const ox = (cell % cols) * W; const oy = Math.floor(cell / cols) * H;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = y * W + x;
       const hx = (hgt[y * W + Math.min(W - 1, x + 1)] - hgt[y * W + Math.max(0, x - 1)]) / 2;
       const hy = (hgt[Math.min(H - 1, y + 1) * W + x] - hgt[Math.max(0, y - 1) * W + x]) / 2;
-      const flat = cell === 3 ? 2.2 : 1;
+      const flat = streak ? 2.2 : 1;
       let nx = -hx; let ny = -hy; let nz = flat;
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len; ny /= len; nz /= len;
       // Oclusão: a barriga escurece (de baixo até ~45% da altura) e a fresta entre bolhas (onde a altura afunda) também.
       const up = Math.min(1, Math.max(0, (y - base) / Math.max(1, (top - base) * 0.45)));
-      const crease = Math.min(1, hgt[i] / 30);
+      const crease = Math.min(1, hgt[i] / (30 * PX));
       const ao = (0.35 + 0.65 * up * up * (3 - 2 * up)) * (0.72 + 0.28 * crease);
       const o = ((oy + y) * AW + ox + x) * 4;
       data[o] = Math.round(255 * (0.5 + 0.5 * nx)); data[o + 1] = Math.round(255 * (0.5 + 0.5 * ny));
-      data[o + 2] = Math.round(255 * Math.min(1, cell === 3 ? 0.75 + 0.25 * ao : ao)); data[o + 3] = Math.round(255 * cov[i]);
+      data[o + 2] = Math.round(255 * Math.min(1, streak ? 0.75 + 0.25 * ao : ao)); data[o + 3] = Math.round(255 * cov[i]);
     }
   }
   cloudAtlasCache = { width: AW, height: AH, data };
@@ -355,7 +492,7 @@ type SunLook = Omit<SunSetup, 'dir' | 'moon'> & { moon: number };
 /** `sunLook` com a lua como 0..1 e interpolado entre dois períodos (o sol grande e baixo do entardecer encolhe e vira a lua grande da noite). */
 function lerpLook(a: Omit<SunSetup, 'dir'>, b: Omit<SunSetup, 'dir'>, t: number): SunLook {
   const l = (x: number, y: number): number => x + (y - x) * t;
-  return { size: l(a.size, b.size), halo: l(a.halo, b.halo), glow: l(a.glow, b.glow), disc: l(a.disc, b.disc), moon: l(a.moon ? 1 : 0, b.moon ? 1 : 0) };
+  return { size: l(a.size, b.size), halo: l(a.halo, b.halo), glow: l(a.glow, b.glow), disc: l(a.disc, b.disc), moon: l(a.moon ? 1 : 0, b.moon ? 1 : 0), bloom: l(a.bloom, b.bloom) };
 }
 
 /** Quanto do entardecer há na luz `light` (1 em 0,7; 0 de dia e à noite): a borda acesa das nuvens e o laranja do horizonte. */
@@ -407,6 +544,7 @@ export class Sky {
         uGlow: { value: new THREE.Color('#fff6d0') }, uBelow: { value: new THREE.Color('#bfe6ff') },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color('#fff3a0') },
         uSunSize: { value: 0.03 }, uHalo: { value: 9 }, uGlowAmt: { value: 0.3 }, uDisc: { value: 6 }, uMoon: { value: 0 },
+        uPaint: { value: 1 }, uDay: { value: 0 }, uBloom: { value: 0 }, uCirrus: { value: 0 }, uCirrusQ: { value: 2 }, uCirrusT: { value: 0 }, uCirrusCol: { value: new THREE.Color('#ffffff') },
       },
     });
     applyGrade(mat);
@@ -429,7 +567,7 @@ export class Sky {
       uniforms: {
         uAtlas: { value: this.cloudAtlas },
         uLit: { value: new THREE.Color('#ffffff') }, uShade: { value: new THREE.Color('#c8d8f0') }, uRim: { value: new THREE.Color('#000000') },
-        uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal }, uFade: { value: 1 },
+        uHorizon: { value: new THREE.Color('#d0f0ff') }, uSunDir: { value: this.sunDirLocal }, uFade: { value: 1 }, uDrift: { value: 0 },
       },
     });
     applyGrade(cloudMat);
@@ -467,6 +605,7 @@ export class Sky {
       this.sun.shadow.mapSize.set(size, size);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
+    this.dome.material.uniforms.uCirrusQ.value = atLeast(q, 'high') ? 2 : atLeast(q, 'medium') ? 1 : 0; // a Baixa não paga os cirros; a Média, 2 oitavas
     this.fogBase = FOG_DENSITY[q];
     this.fog.density = this.fogBase * this.fogMul;
     this.flareQualityOk = atLeast(q, 'medium'); // a Baixa não paga os pixels aditivos do reflexo
@@ -526,6 +665,7 @@ export class Sky {
     (u.uSunDir.value as THREE.Vector3).copy(this.sunDirAbs);
     (u.uSunColor.value as THREE.Color).set(live.body);
     u.uSunSize.value = look.size; u.uHalo.value = look.halo; u.uGlowAmt.value = look.glow; u.uDisc.value = look.disc; u.uMoon.value = look.moon;
+    u.uBloom.value = look.bloom; u.uDay.value = daylight(p.light); // V22/F3: a pintura nova do céu, só uniforme
     // Estrelas: a opacidade segue a luz do período (todas à noite, nenhuma no entardecer); sem interpolar um booleano.
     const stars = t <= 0 ? (a.stars ? 1 : 0) : t >= 1 ? (b.stars ? 1 : 0) : starAlpha(p.light);
     const sm = this.stars.material as THREE.PointsMaterial;
@@ -543,6 +683,8 @@ export class Sky {
     (cu.uHorizon.value as THREE.Color).set(p.sky[2]);
     // Somem com a noite pela luz (as luzes da cidade acendendo), sem piscar; à noite fechada, `visible` desliga a chamada.
     cu.uFade.value = 1 - lightsAmountNight(p.light);
+    // Cirros: a mesma luz e o mesmo sumiço das nuvens (a noite dissolve os dois).
+    u.uCirrus.value = cu.uFade.value * (0.55 + 0.45 * daylight(p.light)); // no entardecer, mais fraco (o céu rosa já funciona) (u.uCirrusCol.value as THREE.Color).copy(cu.uLit.value as THREE.Color);
     this.sun.color.set(p.sunLight);
     this.sun.intensity = p.sunIntensity;
     // Sombra um pouco aberta: a hemisférica (céu) pinta o que o sol não alcança (mais aberta à noite).
@@ -569,12 +711,14 @@ export class Sky {
     // V12: a IBL (a luz difusa que o carro recebe do céu) vê o céu "de luz", e não o roxo da noite: as cores do domo trocam só durante a captura do env map (rara: troca de
     // pista, passo da corrida que muda) e voltam. Mesmos uniformes, nenhum programa novo.
     const u = this.dome.material.uniforms;
+    const paint = u.uPaint.value as number; u.uPaint.value = 0; // V22/F3: a IBL (a luz que o carro recebe) vê o céu de antes: a pintura nova é só para o olho
     const slots = [['uTop', 'top'], ['uMid', 'mid'], ['uHorizon', 'horizon'], ['uBelow', 'below']] as const;
     for (const [uni, k] of slots) { this.envSaved[k].copy(u[uni].value as THREE.Color); (u[uni].value as THREE.Color).copy(this.envSky[k]); }
     try {
       this.envTarget = this.pmrem.fromScene(envScene, 0.02, 1, SKY_RADIUS * 1.5);
     } finally {
       for (const [uni, k] of slots) (u[uni].value as THREE.Color).copy(this.envSaved[k]);
+      u.uPaint.value = paint;
     }
     this.scene.environment = this.envTarget.texture;
   }
@@ -582,7 +726,9 @@ export class Sky {
   /** Gira o céu e a luz pelo rumo absoluto; anima nuvens e a sombra que segue o carro. */
   update(absHeading: number, time: number): void {
     this.group.rotation.y = absHeading;
-    this.clouds.rotation.y = time * 0.004;
+    // V22/F3: a deriva é por nuvem, no vertex shader (aDrift): o objeto não gira mais; os cirros andam com o vento.
+    this.clouds.material.uniforms.uDrift.value = time * CLOUD_DRIFT_RAD_S;
+    this.dome.material.uniforms.uCirrusT.value = time * 0.012;
     const d = this.sunDirAbs;
     const c = Math.cos(absHeading); const s = Math.sin(absHeading);
     this.sunDirLocal.set(d.x * c + d.z * s, d.y, -d.x * s + d.z * c);

@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
+import { FOREST_FRAG_PARS, FOREST_VERT_BODY, FOREST_VERT_PARS, forestFragBody, ringFoliage, ringForestAmp } from './horizon-rings';
 import { valueNoise } from './noise';
 import type { Palette } from './palette';
 import { applyGrade } from './stylize';
@@ -143,10 +144,15 @@ export class Horizon extends THREE.Group {
       if (!chunk.includes('vColor *= color;')) throw new Error('horizon: o three mudou o color_vertex (vColor *= color não achado)');
       shader.uniforms.uHorizonBlend = this.blend;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', () => '#include <common>\nattribute vec3 colorB;\nuniform float uHorizonBlend;')
-        .replace('#include <color_vertex>', () => chunk.replace('vColor *= color;', 'vColor *= mix( color, colorB, uHorizonBlend );'));
+        .replace('#include <common>', () => `#include <common>\nattribute vec3 colorB;\nuniform float uHorizonBlend;${FOREST_VERT_PARS}`)
+        .replace('#include <color_vertex>', () => `${chunk.replace('vColor *= color;', 'vColor *= mix( color, colorB, uHorizonBlend );')}${FOREST_VERT_BODY}`);
+      // V22/F3: o arvoredo fino e o contorno de copas (horizon-rings.ts), os mesmos dos anéis do terrain.ts; sem `aForest` (as cúpulas) o atributo é 0 e nada muda.
+      if (!shader.fragmentShader.includes('#include <color_fragment>')) throw new Error('horizon: o three mudou o MeshBasicMaterial (color_fragment não achado)');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', () => `#include <common>${FOREST_FRAG_PARS}`)
+        .replace('#include <color_fragment>', () => `#include <color_fragment>${forestFragBody('diffuseColor.rgb')}`);
     };
-    material.customProgramCacheKey = () => `${prevKey.call(material)}|horizon-blend-v1`;
+    material.customProgramCacheKey = () => `${prevKey.call(material)}|horizon-blend-v2-forest`;
   }
   setBlend(t: number): void { this.blend.value = Math.max(0, Math.min(1, t)); }
   override dispose(): void {
@@ -170,9 +176,11 @@ function layerColors(p: Palette, layer: number): { top: THREE.Color; mid: THREE.
 function ringMesh(name: string, layer: number, points: number, p: Palette, material: THREE.Material, only?: 'ultra'): THREE.Mesh {
   const R = HORIZON_RADII[layer];
   const { top, mid, base } = layerColors(p, layer);
-  const pos: number[] = []; const col: number[] = [];
+  const pos: number[] = []; const col: number[] = []; const forest: number[] = [];
+  const amp = ringForestAmp('coast', layer);
   const B = -70; const ro = 1.02; const ri = 0.975;
-  const push = (x: number, y: number, z: number, k: THREE.Color, f = 1): void => { pos.push(x, y, z); col.push(k.r * f, k.g * f, k.b * f); };
+  // `aForest` (horizon-rings.ts) = (mancha, contorno, 1 na crista) × a parte de mata (1 − granito): a pedra nua fica lisa.
+  const push = (x: number, y: number, z: number, k: THREE.Color, f = 1, keep = 1, crest = 0): void => { pos.push(x, y, z); col.push(k.r * f, k.g * f, k.b * f); forest.push(amp.speckle * keep, amp.fringe * keep, crest, 0); };
   const hAt = (i: number): number => ridgeHeight(layer, ((i % points) / points) * Math.PI * 2, only);
   for (let i = 0; i < points; i++) {
     const a0 = (i / points) * Math.PI * 2; const a1 = ((i + 1) / points) * Math.PI * 2;
@@ -184,16 +192,21 @@ function ringMesh(name: string, layer: number, points: number, p: Palette, mater
     const arc = (R * Math.PI * 2) / points;
     const f = 1 + 0.14 * Math.max(-1, Math.min(1, -(h1 - h0) / (arc * 1.2)));
     const g0 = graniteAt(layer, a0, only); const g1 = graniteAt(layer, a1, only);
-    const t0 = top.clone().lerp(GRANITE, g0 * 0.75); const t1 = top.clone().lerp(GRANITE, g1 * 0.75);
+    // V22/F3: o arvoredo e o cume (horizon-rings.ts) só onde há mata: a pedra nua (granito) fica lisa. Mesmo índice nas cores A e B (a corrida que muda).
+    const f0 = ringFoliage('coast', layer, i, points); const f1 = ringFoliage('coast', layer, i + 1, points);
+    const k0 = 1 + (f0.shade * f0.crest - 1) * (1 - g0); const k1 = 1 + (f1.shade * f1.crest - 1) * (1 - g1);
+    const t0 = top.clone().lerp(GRANITE, g0 * 0.75).multiplyScalar(k0); const t1 = top.clone().lerp(GRANITE, g1 * 0.75).multiplyScalar(k1);
     const mc = mid.clone().lerp(top, 0.35);
-    push(x0 * ro, B, z0 * ro, base); push(x1 * ro, B, z1 * ro, base); push(x0 * ro, m0, z0 * ro, mid, f);
-    push(x1 * ro, B, z1 * ro, base); push(x1 * ro, m1, z1 * ro, mid, f); push(x0 * ro, m0, z0 * ro, mid, f);
-    push(x0 * ro, m0, z0 * ro, mc, f); push(x1 * ro, m1, z1 * ro, mc, f); push(x0 * ri, h0, z0 * ri, t0, f);
-    push(x1 * ro, m1, z1 * ro, mc, f); push(x1 * ri, h1, z1 * ri, t1, f); push(x0 * ri, h0, z0 * ri, t0, f);
+    const q0 = 1 - g0; const q1 = 1 - g1;
+    push(x0 * ro, B, z0 * ro, base, 1, q0); push(x1 * ro, B, z1 * ro, base, 1, q1); push(x0 * ro, m0, z0 * ro, mid, f, q0);
+    push(x1 * ro, B, z1 * ro, base, 1, q1); push(x1 * ro, m1, z1 * ro, mid, f, q1); push(x0 * ro, m0, z0 * ro, mid, f, q0);
+    push(x0 * ro, m0, z0 * ro, mc, f, q0); push(x1 * ro, m1, z1 * ro, mc, f, q1); push(x0 * ri, h0, z0 * ri, t0, f, q0, 1);
+    push(x1 * ro, m1, z1 * ro, mc, f, q1); push(x1 * ri, h1, z1 * ri, t1, f, q1, 1); push(x0 * ri, h0, z0 * ri, t0, f, q0, 1);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 4));
   const mesh = new THREE.Mesh(g, material);
   mesh.name = name; mesh.frustumCulled = false; mesh.renderOrder = -5 + (2 - layer);
   return mesh;
