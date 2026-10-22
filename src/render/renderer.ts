@@ -227,6 +227,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     sky.setQuality(q);
     cars.setQuality(q);
     road.setQuality(q);
+    terrain.setQuality(q); // V22/F1: o detalhe do chão por degrau (uniformes)
     rebuildHorizon();
     // Materiais com sombra precisam recompilar quando o shadow map liga/desliga.
     scene.traverse((o) => { if (o instanceof THREE.Mesh) { const m = o.material as THREE.Material; m.needsUpdate = true; } });
