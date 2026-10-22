@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.17, build de 29/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.18, build de 30/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,17 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.18 (sobre a 0.1.17) — ACABAMENTO GRÁFICO (a prioridade agora é o visual):
+  * CHÃO COM DETALHE: o capim, a areia e a terra ao lado da pista deixam de ser cor lisa; ganham manchas em duas escalas (12 m e 2,4 m), ceifa/
+    ondulado por tipo de terreno e uma borda irregular entre o acostamento e o chão. O detalhe fica preso à pista (não "nada" quando o carro anda).
+  * ESTRADA: sem hexágonos na terra nem remendos com contorno; asfalto com manchas em três escalas, junta suave, trincas finas, faixa gasta e
+    (em Média ou melhor) relevo e brilho de trilha de pneu ao sol. Zebra com bisel e borracha. A primeira pista da sessão demora um pouco mais para abrir.
+  * VEGETAÇÃO: 22 formas novas de árvore, cor e tamanho diferentes em cada uma, saia da copa sem o "chapéu" escuro, tapete de capim rente à pista,
+    e mais densidade quando se joga em 1 ou 2 jogadores (em 3 ou 4 é igual a antes).
+  * CARROS: oclusão (sombra de contato) nos cantos, vãos de roda e dobras, reflexo de horizonte na pintura e metal neutro: as rodas e escapamentos deixam
+    de ficar azuis e viram prata. O efeito no corpo é sutil; nas rodas é bem visível. Vale para todos os carros e os heróis.
+  * Se o jogo engasgar, avisem qual pista, qualidade e quantos jogadores. O custo de abertura dos carros subiu um pouco.
+  * Ainda aparece, no Passo Alpino, uma faixa reta de rocha à distância (a névoa de distância vem na próxima leva).
 - NOVIDADES DA 0.1.17 (sobre a 0.1.16):
   * CORPO ARREDONDADO NOS OITO NACIONAIS QUE FALTAVAM, cada um com a forma do seu tipo: Barão (ombro vincado, porta-malas abaulado), Furgãozinho
     e Jabuti (cantos redondos, teto em leve arco), Besouro (cúpula e para-lamas bojudos), Pão de Forma (cantos de furgão arredondados),
