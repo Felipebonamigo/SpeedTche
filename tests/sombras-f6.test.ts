@@ -217,7 +217,7 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
       const host = [...crowns, ...thins].find((e) => {
         const dx = c.x - e.x; const dz = c.z - e.z;
         const u = (dx * e.ex + dz * e.ez) / (e.a * e.a); const v = (dx * e.fx + dz * e.fz) / (e.b * e.b);
-        return u * u + v * v <= 1.0001 && c.b < e.b + 1e-6 && Math.abs(c.y - e.y) < 0.2;
+        return u * u + v * v <= 1.0001 && c.b < e.b + 1e-6; // no plano do chão (x, z): a elipse deita no declive, então o y do centro dela sobe com o comprimento
       });
       if (host) dentro++;
     }
@@ -228,6 +228,51 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
     const ms = (await manchas('copacabana', 0.3, undefined)).filter((b) => b.kind === 'crown' || b.kind === 'thin');
     expect(ms.length).toBeGreaterThanOrEqual(8);
     for (const b of ms) expect(Number.isFinite(b.a) && Number.isFinite(b.b)).toBe(true);
+  }, 120000);
+
+  it('a mancha acompanha a INCLINAÇÃO da pista: o quadrado deita no plano do declive (a normal tem a inclinação do trecho), senão em subida o chão fica acima do olho e o quadrado horizontal vira de costas (cull) e some — o Cânion inteiro ficava sem mancha', async () => {
+    const { Scenery } = await import('../src/render/scenery/runtime');
+    const track = getTrack('canion');
+    const s = new Scenery();
+    const frame = buildRoadFrame(track, 130 * 200 % track.length, 30, 200);
+    (s.update as (...a: unknown[]) => void).call(s, frame, track, 1, 1, true, sunTo(34, -42));
+    const g = s as unknown as { batches: Array<{ key: string; mesh: THREE.BatchedMesh }>; slots: Array<{ start: number; used: number }>; blobSlots: Record<string, number> };
+    const mesh = g.batches.find((b) => b.key === 'blob')?.mesh as THREE.BatchedMesh;
+    const m = new THREE.Matrix4();
+    let testados = 0; let inclinados = 0;
+    for (const kind of ['crown', 'thin', 'contact']) {
+      const sl = g.slots[g.blobSlots[kind]];
+      for (let k = 0; k < sl.used; k++) {
+        mesh.getMatrixAt(sl.start + k, m);
+        const e = m.elements;
+        const X = new THREE.Vector3(e[0], e[1], e[2]); const Z = new THREE.Vector3(e[8], e[9], e[10]);
+        const n = new THREE.Vector3().crossVectors(Z, X).normalize();
+        // O trecho: o ponto da pista mais perto do pé do objeto ao longo do rumo.
+        let best = -1; let bestD = Infinity;
+        for (let j = 0; j + 1 < frame.count; j++) {
+          const fx = Math.sin(frame.heading[j]); const fz = -Math.cos(frame.heading[j]);
+          const d = Math.abs((e[12] - frame.px[j]) * fx + (e[14] - frame.pz[j]) * fz - 2);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        if (best < 0) continue;
+        // O trecho do objeto é um dos vizinhos do mais próximo (o rumo muda ao longo do trecho): vale o que mais bate.
+        let erro = Infinity; let slope = 0;
+        const viz = kind === 'contact' ? 1 : 4; // o centro da elipse anda até 12 m do pé (outro trecho); o contato está no pé
+        for (let q = Math.max(0, best - viz); q <= Math.min(frame.count - 2, best + viz); q++) {
+          const sl = (frame.py[q + 1] - frame.py[q]) / 4;
+          const fx = Math.sin(frame.heading[q]); const fz = -Math.cos(frame.heading[q]);
+          const eY = Math.abs(n.y - 1 / Math.sqrt(1 + sl * sl)); const eF = Math.abs(n.x * fx + n.z * fz + sl / Math.sqrt(1 + sl * sl));
+          if (Math.max(eY, eF) < erro) { erro = Math.max(eY, eF); slope = sl; }
+        }
+        testados++;
+        expect(n.y, `${kind} ${k}`).toBeGreaterThan(0.9); // nunca de costas
+        expect(erro, `${kind} ${k}: normal (${n.x.toFixed(3)}, ${n.y.toFixed(3)}, ${n.z.toFixed(3)}) contra o declive ${slope.toFixed(3)}`).toBeLessThan(0.03);
+        if (Math.abs(slope) > 0.05) inclinados++;
+      }
+    }
+    expect(testados, 'manchas medidas').toBeGreaterThan(30);
+    expect(inclinados, 'o trecho do teste tem declive de verdade (> 5%)').toBeGreaterThan(5);
+    s.dispose();
   }, 120000);
 
   it('opacidade ≤ 0,34 nos três períodos (setLive) e a cor da mancha é de sombra (B ≥ R), sem programa novo (version)', async () => {

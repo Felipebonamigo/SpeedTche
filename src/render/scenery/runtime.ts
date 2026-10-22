@@ -564,28 +564,33 @@ export class Scenery {
     if (blob && ref.blob > 0 && this.blobSlots[thin ? 'thin' : 'crown'] >= 0) {
       const r = ref.blob * Math.max(p.sx, p.sz);
       const gy = y + 0.07;
+      // O declive da pista no trecho (m de subida por m à frente): a mancha deita no plano dele. Horizontal, em subida o chão fica ACIMA do olho e o quadrado (de frente para cima)
+      // é visto de costas e some (cull): o Cânion inteiro ficava sem mancha. A frente da pista é (sH, −cH); o plano sobe `m` por metro nela.
+      const m = (frame.py[j + 1] - frame.py[j]) / SEGMENT_M;
+      const fx = sH; const fz = -cH;
       if (this.sun) {
         // V22/F6: elipse esticada para longe do sol (eixo X da mancha = a direção da sombra; Z = X × Y, a mesma mão da mancha de antes) com a ponta de trás no raio de antes.
         const sh = blobShape(this.sun, r, ref.height * p.sy, thin, this.shape);
-        e[0] = sh.dirX * sh.along; e[1] = 0; e[2] = sh.dirZ * sh.along; e[3] = 0;
+        const dx = sh.dirX; const dz = sh.dirZ;
+        e[0] = dx * sh.along; e[1] = m * (fx * dx + fz * dz) * sh.along; e[2] = dz * sh.along; e[3] = 0;
         e[4] = 0; e[5] = 1; e[6] = 0; e[7] = 0;
-        e[8] = -sh.dirZ * sh.across; e[9] = 0; e[10] = sh.dirX * sh.across; e[11] = 0;
-        e[12] = x + sh.dirX * sh.shift; e[13] = gy; e[14] = z + sh.dirZ * sh.shift; e[15] = 1;
+        e[8] = -dz * sh.across; e[9] = m * (-fx * dz + fz * dx) * sh.across; e[10] = dx * sh.across; e[11] = 0;
+        e[12] = x + dx * sh.shift; e[13] = gy + m * (fx * dx + fz * dz) * sh.shift; e[14] = z + dz * sh.shift; e[15] = 1;
       } else {
         // Sem sol: o disco alinhado ao rumo da pista, como antes (giro −h: cos = cH, sen = −sH).
-        e[0] = cH * r; e[1] = 0; e[2] = sH * r; e[3] = 0;
+        e[0] = cH * r; e[1] = m * (fx * cH + fz * sH) * r; e[2] = sH * r; e[3] = 0;
         e[4] = 0; e[5] = 1; e[6] = 0; e[7] = 0;
-        e[8] = -sH * r; e[9] = 0; e[10] = cH * r; e[11] = 0;
+        e[8] = -sH * r; e[9] = m * (-fx * sH + fz * cH) * r; e[10] = cH * r; e[11] = 0;
         e[12] = x; e[13] = gy; e[14] = z; e[15] = 1;
       }
       this.writeSlot(this.blobSlots[thin ? 'thin' : 'crown'], null);
       if (!contactWanted(ref.height)) return;
       // O contato: discos curtos e escuros empilhados no pé (a oclusão de onde o objeto toca o chão): a opacidade do material é ≤ 0,34, e dois discos somam ~0,5 no miolo.
       const c = contactRadius(r, thin);
-      e[1] = 0; e[2] = 0; e[8] = 0; e[9] = 0; e[12] = x; e[14] = z;
+      e[2] = 0; e[8] = 0; e[12] = x; e[14] = z;
       for (let k = 0; k < CONTACT_LAYERS; k++) {
         const ck = c * CONTACT_LAYER_SCALE[k];
-        e[0] = ck; e[10] = ck; e[13] = gy + 0.005 * (k + 1);
+        e[0] = ck; e[1] = m * fx * ck; e[9] = m * fz * ck; e[10] = ck; e[13] = gy + 0.005 * (k + 1);
         this.writeSlot(this.blobSlots.contact, null);
       }
     }
