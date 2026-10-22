@@ -106,7 +106,8 @@ export function ambientMote(k: number, time: number, carZ: number, _carX: number
   const zm = carZ * M_PER_UNIT;
   const base = u * SPAN + time * (0.3 + 0.5 * s);
   const rel = ((((base - zm + BEHIND) % SPAN) + SPAN) % SPAN) - BEHIND;
-  const fade = smooth(-BEHIND, -BEHIND + 8, rel) * (1 - smooth(48, SPAN - BEHIND, rel));
+  // apagada até 3 m à frente do carro (câmera e chão sob o carro ficam limpos: o detalhe da estrada na captura não pode borrar) e cheia só a partir de 12 m
+  const fade = smooth(3, 12, rel) * (1 - smooth(48, SPAN - BEHIND, rel));
   const twinkle = 0.6 + 0.4 * Math.sin(time * (0.5 + 0.6 * v) + ph);
   out.z = (zm + rel) / M_PER_UNIT;
   out.x = ((w - 0.5) * 17 + 0.6 * Math.sin(time * 0.3 + ph)) / M_PER_X;

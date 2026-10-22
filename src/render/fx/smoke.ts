@@ -105,22 +105,24 @@ export function emitGrassDust(c: PuffCar, color: readonly [number, number, numbe
 
 /** Abaixo disto (0..1) a pista já não é terra: asfalto e pedra (`roadEarth` da paleta: alpina 0,3, litoral 0,1) não levantam poeira rodando. */
 const EARTH_MIN = 0.3;
+/** Abaixo disto (u/s; 60 m/s) a estrada de terra não levanta trilha; a taxa sobe em rampa até 5.000. Carro lento (largada, harness do `estrada-gl`) não borra a estrada. */
+const ROAD_DUST_MIN = 3000;
 
 /**
  * V22 F8: a poeira da PRÓPRIA estrada de terra (`roadEarth` ≥ 0,3: a terra avermelhada da mata, a alaranjada do deserto, a ocre da savana): o carro rodando em cima dela
- * levanta, das duas rodas traseiras, uma trilha de nuvens baixas na cor da pista — mais forte quanto mais terra (0,3 → nada, 1 → 65% da taxa do degrau). Fora do
+ * levanta, das duas rodas traseiras, uma trilha de nuvens baixas na cor da pista — mais forte quanto mais terra (0,3 → nada, 1 → 40% da taxa do degrau). Fora do
  * asfalto (grama, areia) quem solta é `emitGrassDust`; este só vale com as rodas na pista. `trail.rate` é a taxa do degrau.
  */
 export function emitRoadDust(c: PuffCar, color: readonly [number, number, number], earth: number, f: number, rnd: () => number, out: (s: PuffSpec) => void, scale: number, trail: Trail): void {
-  if (f <= 0 || c.skidTicks > 0 || c.speed < MIN_SPEED) return;
-  const e = Math.min(1, Math.max(0, (earth - EARTH_MIN) / (1 - EARTH_MIN)));
+  if (f <= 0 || c.skidTicks > 0 || c.speed < ROAD_DUST_MIN) return;
+  const e = Math.min(1, Math.max(0, (earth - EARTH_MIN) / (1 - EARTH_MIN))) * Math.min(1, (c.speed - ROAD_DUST_MIN) / 2000 + 0.001);
   if (e <= 0) return;
-  trailPoints(c, trail, 0.65 * e, (k, z) => {
+  trailPoints(c, trail, 0.4 * e, (k, z) => {
     const side = k % 2 === 0 ? -1 : 1;
     const [r, g, b] = toned(color, rnd, 0.1);
     out(puff({
       z, x: c.x + side * (WHEEL_X + 0.03 * rnd()), h: 0.12 + 0.12 * rnd(), vz: c.speed * (0.68 + rnd() * 0.2), vx: side * (0.12 + 0.3 * rnd()) + (rnd() - 0.5) * 0.1,
-      vh: 0.5 + 0.9 * rnd(), life: 0.55 + rnd() * 0.45 + 0.4 * (scale - 1), size: 0.55 * scale * (0.75 + 0.5 * rnd()), grow: 1.5 * scale * (0.85 + 0.3 * rnd()),
+      vh: 0.5 + 0.9 * rnd(), life: 0.55 + rnd() * 0.45 + 0.4 * (scale - 1), size: 0.28 * scale * (0.75 + 0.5 * rnd()), grow: 0.7 * scale * (0.85 + 0.3 * rnd()),
       gravity: 0.4, r, g, b,
     }, rnd));
   });

@@ -174,6 +174,12 @@ describe('F8: trilha contínua na terra e na grama', () => {
     expect(rate(0.25).n).toBe(0); expect(rate(0).n).toBe(0);
     expect(rate(1, 100).n).toBe(0);
   });
+  it('lento não levanta trilha na estrada de terra: zero abaixo de 3.000 u/s (60 m/s), rampa até 5.000 (regressão do estrada-gl Foz: o carro lento do harness borrava a estrada)', () => {
+    const n = (speed: number): number => { seed = 3; let c = 0; for (let i = 0; i < 600; i++) emitRoadDust(car({ skidTicks: 0, speed, z: 20000 + i * (speed / 60) }), GRASS, 1, 1, rnd, () => { c++; }, 1.8, { dt: 1 / 60, rate: 100 }); return c; };
+    for (const v of [1500, 2000, 2900, 2999]) expect(n(v), `${v} u/s`).toBe(0);
+    expect(n(4000)).toBeGreaterThan(0);
+    expect(n(4000)).toBeLessThan(n(5000));
+  });
 });
 
 // ───────────────────────────── 4. partículas ambientes ─────────────────────────────
@@ -206,6 +212,15 @@ describe('F8: partículas ambientes sutis', () => {
     expect(visible, 'a maioria está acesa').toBeGreaterThan(100);
     const a = { ...M }; ambientMote(3, 5, 30000, 0.1, M); const b = { ...M }; ambientMote(3, 5, 30000, 0.1, M);
     expect(b).toEqual({ ...M }); expect(a).toBeDefined();
+  });
+  it('nunca sobre o chão sob o carro nem atrás da câmera: alfa 0 a menos de 3 m à frente do carro, cheio só a partir de 12 m', () => {
+    let perto = 0;
+    for (let t = 0; t < 60; t += 0.9) for (let k = 0; k < 16; k++) {
+      ambientMote(k, t, 30000, 0, M);
+      const rel = (M.z - 30000) / 50;
+      if (rel < 3) { expect(M.alpha, `rel ${rel.toFixed(1)}`).toBe(0); perto++; }
+    }
+    expect(perto, 'há partículas nessa faixa para provar').toBeGreaterThan(10);
   });
   it('estáveis no mundo: o carro anda 10 m e a mesma partícula continua no mesmo ponto da pista (não "nada" com o carro); só muda no giro do ciclo, apagada', () => {
     let achou = 0;
