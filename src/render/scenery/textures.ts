@@ -24,13 +24,13 @@ const S = 256;
 const CELL = S / 4;
 
 /**
- * V22/F5: as janelas acesas têm 3 NÍVEIS de luz (antes todas à mesma força, só mudava o tom): fraco (abajur, TV: luma ~0,23), médio (~0,53) e forte (luz de teto: ~0,88).
+ * V22/F5: as janelas acesas têm 3 NÍVEIS de luz (antes todas à mesma força, só mudava o tom): fraco (abajur, TV: luma ~0,28), médio (~0,53) e forte (luz de teto: ~0,88).
  * O mapa de luz é sRGB (a emissiva sai ao quadrado no linear): o fraco emite ~5% do forte, e é isso que dá a variedade de uma cidade de verdade (cada apartamento
  * numa hora). Cada janela escolhe o nível pela semente; as bandas medidas por `tests/predios-f5.test.ts` (≥ 8% da área acesa em cada uma).
  */
-export const LIT_BANDS = [[0.22, 0.45], [0.45, 0.75], [0.75, 1]] as const;
+export const LIT_BANDS = [[0.27, 0.45], [0.45, 0.75], [0.75, 1]] as const;
 const LIT_COLORS: ReadonlyArray<readonly string[]> = [['#ff9a5a', '#8fb0ff', '#ffa86a'], ['#ffd79a', '#ffe8c4', '#ffcf8f'], ['#ffe0a8', '#fff0c8', '#cfe4ff']];
-const LIT_SCALE = [0.34, 0.62, 1] as const;
+const LIT_SCALE = [0.42, 0.62, 1] as const;
 function litLevel(seed: number): number {
   // Sequência de razão áurea sobre a semente (as janelas vizinhas têm sementes seguidas): reparte os três níveis por igual até numa célula com poucas janelas acesas, onde o sorteio puro deixava um nível de fora.
   const u = (seed * 0.6180339887 + 0.62 + hash2(seed, 93) * 0.12) % 1;
@@ -57,7 +57,7 @@ function litRect(l: CanvasRenderingContext2D, x: number, y: number, w: number, h
 let lightCtx: CanvasRenderingContext2D | null = null;
 const SKY_GLOW = '#2a2038';
 /** A luz difusa da parede: no entardecer a face à sombra do sol não fica preta, e o topo de cada andar (sob a laje) fica mais escuro (o mesmo beiral do albedo). */
-const WALL_LIGHT = '#342c44';
+const WALL_LIGHT = '#44385a';
 function wallLight(l: CanvasRenderingContext2D, ox: number, oy: number): void {
   for (let r = 0; r < 4; r++) {
     const y = oy + r * CELL;

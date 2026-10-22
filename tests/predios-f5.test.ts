@@ -34,13 +34,13 @@ describe('F5 · fachada: janelas com 3 níveis de acendimento, sombra do beiral,
   const origin = (look: number): [number, number] => [(look % 2) * S, (1 - Math.floor(look / 2)) * S];
 
   for (const style of STYLES) for (let look = 0; look < 4; look++) {
-    it(`${style} visual ${look}: as janelas acesas têm 3 níveis de luz (fraco 0,22–0,45 · médio 0,45–0,75 · forte ≥ 0,75), cada um com ≥ 8% da área acesa (antes: tudo no forte, 0,85–0,92)`, () => {
+    it(`${style} visual ${look}: as janelas acesas têm 3 níveis de luz (fraco 0,27–0,45 · médio 0,45–0,75 · forte ≥ 0,75), cada um com ≥ 8% da área acesa (antes: tudo no forte, 0,85–0,92)`, () => {
       const l = tex.get(style)?.light; if (!l) throw new Error('sem textura');
       const [ox, oy] = origin(look);
       const bands = [0, 0, 0]; let lit = 0;
       for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
         const v = lumaAt(l.raster, ox + x, oy + y);
-        if (v < 0.22) continue; // o fundo da parede (luz difusa, ≤ 0,16) não é janela
+        if (v < 0.27) continue; // o fundo da parede (luz difusa, ≤ 0,26) não é janela
         lit++; bands[v < 0.45 ? 0 : v < 0.75 ? 1 : 2]++;
       }
       expect(lit, 'há janela acesa').toBeGreaterThan(2000);
@@ -66,8 +66,8 @@ describe('F5 · fachada: janelas com 3 níveis de acendimento, sombra do beiral,
       for (let x = 0; x < S; x++) {
         let y = 0;
         while (y < S) {
-          if (lumaAt(l.raster, ox + x, oy + y) < 0.22) { y++; continue; }
-          let y1 = y; while (y1 < S && lumaAt(l.raster, ox + x, oy + y1) >= 0.22) y1++;
+          if (lumaAt(l.raster, ox + x, oy + y) < 0.27) { y++; continue; }
+          let y1 = y; while (y1 < S && lumaAt(l.raster, ox + x, oy + y1) >= 0.27) y1++;
           const len = y1 - y;
           if (len >= 12) {
             const q = Math.max(2, Math.floor(len / 4)); let top = 0; let foot = 0;
@@ -83,14 +83,14 @@ describe('F5 · fachada: janelas com 3 níveis de acendimento, sombra do beiral,
   }
 
   for (const style of STYLES) {
-    it(`${style}: a parede tem uma luz difusa própria no mapa de luz (mediana 0,04–0,2), para não ficar preta quando a face está à sombra do sol (entardecer); antes: 0`, () => {
+    it(`${style}: a parede tem uma luz difusa própria no mapa de luz (mediana 0,04–0,26), para não ficar preta quando a face está à sombra do sol (entardecer); antes: 0`, () => {
       const l = tex.get(style)?.light; if (!l) throw new Error('sem textura');
       const vals: number[] = [];
       for (let y = 0; y < S * 2; y += 3) for (let x = 0; x < S * 2; x += 3) vals.push(lumaAt(l.raster, x, y));
       vals.sort((a, b) => a - b);
       const med = vals[Math.floor(vals.length / 2)];
       expect(med).toBeGreaterThanOrEqual(0.04);
-      expect(med).toBeLessThanOrEqual(0.2);
+      expect(med).toBeLessThanOrEqual(0.26);
     });
   }
 });

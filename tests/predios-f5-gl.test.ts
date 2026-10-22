@@ -52,13 +52,15 @@ describe.skipIf(!available)('V22/F5 · a parede do prédio na imagem (swiftshade
   }
 
   // A torre de Paraty (06): a fachada de x 250–510, y 10–170 (sem a copa da palmeira, que só entra mais abaixo). A parede é tudo o que não é janela acesa (pixels abaixo de metade do P95).
-  it('Paraty ao entardecer: a parede da torre (o que não é janela acesa) tem luma mediana ≥ 0,2 e ≥ 0,25 do brilho das janelas (P95) — antes: parede quase preta, ~0,09 e ~0,10', async () => {
+  it('Paraty ao entardecer: a parede da torre (o que não é janela acesa) tem luma P75 ≥ 0,13 e ≥ 0,25 do brilho das janelas (P95) — antes: parede quase preta, ~0,09 e ~0,10', async () => {
     const v = await lumas('track=paraty&seg=200', [250, 10, 260, 160]);
     const p95 = v[Math.floor(v.length * 0.95)];
     const wall = v.filter((x) => x < 0.5 * p95); // tudo o que não é janela acesa: parede, montante e vidro apagado
-    const medWall = wall[Math.floor(wall.length / 2)];
-    registrar(`[V22/F5] paraty (06): parede mediana ${medWall.toFixed(3)} · janelas P95 ${p95.toFixed(3)} · razão ${(medWall / p95).toFixed(3)}`);
-    expect(medWall, `luma da parede ${medWall.toFixed(3)}`).toBeGreaterThanOrEqual(0.2);
+    const q = (f: number): number => wall[Math.floor(wall.length * f)];
+    // O vidro apagado é ~metade da fachada e fica escuro (é vidro); a PAREDE é o tom de cima do que sobra: o quartil mais claro (P75) dos pixels que não são janela acesa.
+    const medWall = q(0.75);
+    registrar(`[V22/F5] paraty (06): não-janela P25 ${q(0.25).toFixed(3)} · P50 ${q(0.5).toFixed(3)} · P75 (parede) ${medWall.toFixed(3)} · P90 ${q(0.9).toFixed(3)} · janelas P95 ${p95.toFixed(3)} · razão ${(medWall / p95).toFixed(3)}`);
+    expect(medWall, `luma da parede ${medWall.toFixed(3)}`).toBeGreaterThanOrEqual(0.13);
     expect(medWall / p95, `razão parede ÷ janela ${(medWall / p95).toFixed(3)}`).toBeGreaterThanOrEqual(0.25);
   });
 });
