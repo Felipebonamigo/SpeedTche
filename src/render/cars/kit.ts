@@ -6,6 +6,7 @@
 // Puro (só Three, sem DOM): os testes montam os 13 modelos no Node.
 import * as THREE from 'three';
 import { CREASE, smoothNormals } from '../normals';
+import { bakeOcclusion, type OcclusionOptions } from './occlusion';
 
 export type P3 = readonly [number, number, number];
 /** Nível de detalhe do casco procedural: 0 = completo, 1 = o casco simples dos carros longe e da qualidade Baixa (M4). */
@@ -133,7 +134,7 @@ export class MeshBuilder {
   positions(): Float32Array { return new Float32Array(this.pos); }
 
   /** Monta a geometria; `crease` é o vinco (graus) da normal suave: o de carro, ou o de roda em wheels.ts. */
-  build(crease: number = CREASE.car): THREE.BufferGeometry {
+  build(crease: number = CREASE.car, occlusion: OcclusionOptions | false = {}): THREE.BufferGeometry {
     const n = this.pos.length / 3;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -151,6 +152,9 @@ export class MeshBuilder {
     g.userData.lamps = lamps; // V14: o halo das lanternas (cars.ts as leva ao material, lote a lote)
     g.userData.glassY = glassY; // V14: a faixa de altura do vidro (o reflexo do céu fica na parte de cima)
     smoothNormals(g, crease);
+    // V21: a oclusão ambiente assada (0 aberto, 1 fechado), com a normal suave já pronta e as rodas de proxy (`occlusion.axles`). Atributo ausente vale 0 = aberto: nenhuma geometria sem ele quebra.
+    // A roda (`false`) não leva: a roda unitária custava ~64 ms POR DESENHO de roda (grade de 3 milhões de células para 416 triângulos), 9 desenhos = o grosso do custo, e o vão do para-lama já a escurece pelos proxies.
+    if (occlusion !== false) g.setAttribute('aOcc', new THREE.BufferAttribute(Uint8Array.from(bakeOcclusion(this.pos, g.getAttribute('normal').array, occlusion), q8), 1, true));
     g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
   }

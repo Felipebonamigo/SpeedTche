@@ -184,7 +184,7 @@ const PAINT_RIM = withBrush(TRIM, { rough: 0.45, metal: 0.4, layer: 2 });
 
 export function buildWheel(design: WheelDesign): WheelModel {
   const { b, n } = build(design);
-  return { design, geometry: b.build(CREASE.wheel), symmetry: (Math.PI * 2) / n, triangles: b.triangles };
+  return { design, geometry: b.build(CREASE.wheel, false), symmetry: (Math.PI * 2) / n, triangles: b.triangles };
 }
 
 /**
@@ -195,7 +195,7 @@ export function buildSimpleWheel(): WheelModel {
   const b = new MeshBuilder();
   lathe(b, X(0), [[0, -0.4], [0.86, -0.5], [1, -0.28], [1, 0.28], [0.88, 0.5], [0.62, 0.5], [0.6, 0.34], [0, 0.34]], 12,
     (i) => [UNDER, TIRE_SIDE, TIRE, TIRE_SIDE, TIRE_SIDE, RIM_B, RIM_B][i]);
-  return { design: 'hubcap', geometry: b.build(CREASE.wheel), symmetry: Math.PI * 2, triangles: b.triangles };
+  return { design: 'hubcap', geometry: b.build(CREASE.wheel, false), symmetry: Math.PI * 2, triangles: b.triangles };
 }
 
 /** Fração do ângulo de repetição do desenho que a roda pode girar por quadro na tela (anti-estroboscópio). */

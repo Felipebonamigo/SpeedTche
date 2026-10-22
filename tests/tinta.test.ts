@@ -54,7 +54,7 @@ describe('1. tinta com brilho alongado: o shader', () => {
   });
 
   it('a chave do programa subiu para v9 (o shader mudou)', () => {
-    expect(M.createCarMaterial().material.customProgramCacheKey()).toContain('speed-tche-car-v9');
+    expect(M.createCarMaterial().material.customProgramCacheKey()).toContain('speed-tche-car-v10');
   });
 
   it('o material guarda os uniformes em userData (o laboratório e o lote leem de lá), com o brilho, as lanternas e o halo', () => {

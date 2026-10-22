@@ -11,6 +11,7 @@ import { ensureHeroes, loadCarAssets } from '../src/render/cars/assets';
 import { buildModel, modelKey } from '../src/render/cars/models';
 import { heroEnabled, type HeroSetting } from '../src/render/cars/lod';
 import { createRenderer, type DebugInfo } from '../src/render/renderer';
+import { stylizeUniforms } from '../src/render/stylize';
 import { GATE_SCENES, type GateSample } from '../src/bench/gate';
 import { resetRenderPrefs, setRenderPrefs } from '../src/render/prefs';
 import { ViewportPipeline } from '../src/render/postfx/pipeline';
@@ -642,8 +643,77 @@ function carUniform(name: string, value: number[]): void {
   });
 }
 
+/** V21: o quadro desenhado como PNG (data URL), recortado: (x, y, w, h) em pixels do quadro, y de cima para baixo. Para as fotos rápidas de tools/acabamento-lab.mjs. */
+function grab(x: number, y: number, w: number, h: number): string {
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const s = ((H - 1 - (y + j)) * W + (x + i)) * 4; const d = (j * w + i) * 4;
+    out[d] = buf[s]; out[d + 1] = buf[s + 1]; out[d + 2] = buf[s + 2]; out[d + 3] = 255;
+  }
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d')?.putImageData(new ImageData(out, w, h), 0, 0);
+  return c.toDataURL('image/png');
+}
+
+/** V21: a câmera extra do render-harness.html (3/4 de trás, 3/4 da frente, lado) sobre a cena que o último `shoot` desenhou, para a foto rápida do carro parado: devolve o PNG recortado. */
+const EXTRA_VIEWS: Record<string, [[number, number, number], [number, number, number]]> = {
+  side: [[-7.6, 1.25, 0.3], [0, 0.55, 0]], rear34: [[5.4, 2.0, 7.0], [0, 0.6, 0.4]], front34: [[-6.4, 1.9, -7.4], [0, 0.6, 0]], rear: [[0, 1.5, 8.6], [0, 0.6, 0]], front: [[0, 1.5, -8.6], [0, 0.6, 0]],
+};
+function grabView(view: string, clip: [number, number, number, number]): string {
+  const cam = new THREE.PerspectiveCamera(38, 1, 0.1, 4000);
+  const v = EXTRA_VIEWS[view] ?? EXTRA_VIEWS.rear34;
+  const W = canvas.width; const H = canvas.height;
+  cam.aspect = W / H; cam.updateProjectionMatrix();
+  cam.position.set(...v[0]); cam.lookAt(...v[1]);
+  gl.setViewport(0, 0, W, H); gl.setScissor(0, 0, W, H);
+  gl.render(scene, cam);
+  return grab(clip[0], clip[1], clip[2], clip[3]);
+}
+
+/** V21: a caixa do casco do carro (referencial do carro: +z = trás) e os escapes dele, para os testes porem as sondas. */
+function hullInfo(carId: string): { box: [number, number, number, number, number, number]; exhausts: number[][] } {
+  const def = CARS.find((c) => c.id === carId);
+  if (!def) throw new Error(`carro ${carId}`);
+  const m = buildModel(modelKey(def));
+  const b = m.shell.boundingBox as THREE.Box3;
+  return { box: [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z], exhausts: m.exhausts.map((e) => [...e]) };
+}
+
+/** V21: os valores atuais dos uniformes do material dos carros (o primeiro que houver na cena), para a ferramenta devolvê-los entre uma variante e outra. */
+function carUniformsDump(): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  let done = false;
+  scene.traverse((o) => {
+    if (done) return;
+    const u = ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData as { carUniforms?: Record<string, { value: unknown }> } | undefined;
+    if (!u?.carUniforms) return;
+    done = true;
+    for (const [k, v] of Object.entries(u.carUniforms)) {
+      const x = v.value as { toArray?: () => number[] } | number | unknown[];
+      if (typeof x === 'number') out[k] = [x]; else if (x && !Array.isArray(x) && typeof x.toArray === 'function') out[k] = x.toArray();
+    }
+  });
+  return out;
+}
+
+/** V21: um uniforme COMPARTILHADO da estilização (luz de borda, terminador...), para ligar e desligar a causa de um aspecto de "desenho" (tools/acabamento-lab.mjs, STY=). */
+function stylizeUniform(name: string, value: number[]): void {
+  const u = (stylizeUniforms as unknown as Record<string, { value: unknown }>)[name];
+  const slot = u?.value as { set?: (...a: number[]) => void } | number | undefined;
+  if (slot && typeof slot === 'object' && slot.set) slot.set(...value); else if (u && typeof slot === 'number') u.value = value[0];
+}
+
+function stylizeUniformGet(name: string): number[] {
+  const x = ((stylizeUniforms as unknown as Record<string, { value: unknown }>)[name]?.value) as { toArray?: () => number[] } | number | undefined;
+  return typeof x === 'number' ? [x] : x?.toArray ? x.toArray() : [];
+}
+
 const lab = {
-  glassPoints, lamps, carUniform, carIds: (): string[] => CARS.map((c) => c.id),
+  hullInfo, stylizeUniformGet, carUniformsDump, stylizeUniform, grabView, grab, glassPoints, lamps, carUniform, carIds: (): string[] => CARS.map((c) => c.id),
   hold: (on: boolean): void => { holdClock = on; },
   freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
