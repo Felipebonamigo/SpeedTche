@@ -98,7 +98,7 @@ void main() {
     float life = clamp(vAlpha / 0.88, 0.0, 1.0);
     float thr = (1.0 - life) * 0.8;
     float body = t.a * mix(0.62, 1.0, t.r);
-    float a = smoothstep(thr, thr + 0.3, body) * min(1.0, life * 2.2) * 0.84;
+    float a = smoothstep(thr, thr + 0.3, body) * min(1.0, life * 2.2) * 0.72;
     if (a < 0.01) discard;
     float lit = t.g - cloudAt(p + vec2(-0.14, -0.3), s, k).g;
     float shade = clamp(0.86 + 1.5 * lit, 0.55, 1.14) * (1.0 - 0.16 * clamp(p.y * 0.5 + 0.5, 0.0, 1.0)) * (0.94 + 0.12 * t.r);

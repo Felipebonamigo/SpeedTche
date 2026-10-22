@@ -108,14 +108,14 @@ const EARTH_MIN = 0.3;
 
 /**
  * V22 F8: a poeira da PRÓPRIA estrada de terra (`roadEarth` ≥ 0,3: a terra avermelhada da mata, a alaranjada do deserto, a ocre da savana): o carro rodando em cima dela
- * levanta, das duas rodas traseiras, uma trilha de nuvens baixas na cor da pista — mais forte quanto mais terra (0,3 → nada, 1 → 80% da taxa do degrau). Fora do
+ * levanta, das duas rodas traseiras, uma trilha de nuvens baixas na cor da pista — mais forte quanto mais terra (0,3 → nada, 1 → 65% da taxa do degrau). Fora do
  * asfalto (grama, areia) quem solta é `emitGrassDust`; este só vale com as rodas na pista. `trail.rate` é a taxa do degrau.
  */
 export function emitRoadDust(c: PuffCar, color: readonly [number, number, number], earth: number, f: number, rnd: () => number, out: (s: PuffSpec) => void, scale: number, trail: Trail): void {
   if (f <= 0 || c.skidTicks > 0 || c.speed < MIN_SPEED) return;
   const e = Math.min(1, Math.max(0, (earth - EARTH_MIN) / (1 - EARTH_MIN)));
   if (e <= 0) return;
-  trailPoints(c, trail, 0.8 * e, (k, z) => {
+  trailPoints(c, trail, 0.65 * e, (k, z) => {
     const side = k % 2 === 0 ? -1 : 1;
     const [r, g, b] = toned(color, rnd, 0.1);
     out(puff({
