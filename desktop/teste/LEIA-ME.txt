@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.18, build de 30/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.19, build de 31/10/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,14 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.19 (sobre a 0.1.18) — MAIS ACABAMENTO GRÁFICO:
+  * PRÉDIOS E PLACAS: o pé do prédio e a barriga das lajes escurecem (sombra de contato), sombra de beiral na fachada, janelas com três
+    níveis de acendimento e reflexo de céu, adereços de telhado (condicionadores, caixa-d'água, chaminé, antena), poste e outdoor com suporte.
+    Os prédios do entardecer deixam de ser paredes pretas. À noite ficaram um pouco mais claros e lilás.
+  * POEIRA E FUMAÇA: a nuvem deixa de ser uma esfera perfeita (agora irregular, girando, desfazendo pelas bordas); trilha contínua de poeira
+    na grama, na areia e na estrada de terra quando o carro anda rápido; partículas de ar bem sutis. "Reduzir efeitos" desliga as de ar.
+  * O CARTÃO DO MARCO subiu para o alto da tela e não cobre mais o carro. Pode dividir espaço por uns 3 s com avisos do alto (pit, pouco combustível).
+  * Em tela dividida de 4 jogadores na qualidade Média os prédios custam cerca de 1% mais triângulos.
 - NOVIDADES DA 0.1.18 (sobre a 0.1.17) — ACABAMENTO GRÁFICO (a prioridade agora é o visual):
   * CHÃO COM DETALHE: o capim, a areia e a terra ao lado da pista deixam de ser cor lisa; ganham manchas em duas escalas (12 m e 2,4 m), ceifa/
     ondulado por tipo de terreno e uma borda irregular entre o acostamento e o chão. O detalhe fica preso à pista (não "nada" quando o carro anda).
