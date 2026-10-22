@@ -86,7 +86,7 @@ export function emitGrassDust(c: PuffCar, color: readonly [number, number, numbe
       const [r, g, b] = toned(color, rnd, 0.12);
       out(puff({
         z, x: c.x + side * (1 + rnd()), h: 0.25 + 0.2 * rnd(), vz: c.speed * (0.62 + rnd() * 0.22), vx: (rnd() - 0.5) * 0.4 + side * 0.9,
-        vh: (1 + rnd() * 1.4) * Math.min(1.5, scale), life: 0.6 + rnd() * 0.5 + 0.5 * (scale - 1), size: 0.5 * scale * (0.7 + 0.5 * rnd()), grow: 1.4 * scale * (0.85 + 0.3 * rnd()),
+        vh: (1 + rnd() * 1.4) * Math.min(1.5, scale), life: 0.6 + rnd() * 0.5 + 0.5 * (scale - 1), size: 0.62 * scale * (0.75 + 0.5 * rnd()), grow: 1.6 * scale * (0.85 + 0.3 * rnd()),
         gravity: 0.5, r, g, b,
       }, rnd));
     });
