@@ -59,7 +59,7 @@ A semente do nível de luz (`+ 0,62` na sequência de razão áurea) foi escolhi
 
 ## 5. Imagens (mesma câmera, Alta, 1280×720, harness; `docs/diag-v22/f5-predios/`, JPEG)
 
-`antes-`/`depois-` de `01` (Copacabana, dia), `05` (Sampa, noite) e `06` (Paraty, entardecer). Comandos: `PORT=<porta> node tools/capture.mjs "06::track=paraty&seg=200&hud=0&q=high&cam=high&frames=14"` (idem `copacabana&seg=300`, `sampa_noite&seg=970`); `node tools/png2jpg.mjs <dir> a.png b.png`.
+`depois-05` (noite) é da 1ª versão (antes do enxugamento do 4p; o resto da luz da fachada é o mesmo). `antes-`/`depois-` de `01` (Copacabana, dia), `05` (Sampa, noite) e `06` (Paraty, entardecer). Comandos: `PORT=<porta> node tools/capture.mjs "06::track=paraty&seg=200&hud=0&q=high&cam=high&frames=14"` (idem `copacabana&seg=300`, `sampa_noite&seg=970`); `node tools/png2jpg.mjs <dir> a.png b.png`.
 
 **Rodadas de crítica olhando a captura:**
 1. 1ª: janelas e beirais legíveis (`depois-06`: andares separados pela sombra do beiral, vidro apagado com céu, janelas de 3 intensidades), mas a parede ainda quase preta (P75 0,109, razão 0,224) → luz difusa da parede de `#342c44` para `#44385a` e janela fraca de 0,34 para 0,42 (para continuar acima da luz da parede).
