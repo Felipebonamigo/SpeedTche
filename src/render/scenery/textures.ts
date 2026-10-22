@@ -23,10 +23,58 @@ function tex(c: HTMLCanvasElement, repeat: boolean, srgb = true): THREE.CanvasTe
 const S = 256;
 const CELL = S / 4;
 
-/** Luz de uma janela acesa: quente na maioria, algumas frias (TV, escritório), algumas meio abertas. */
+/**
+ * V22/F5: as janelas acesas têm 3 NÍVEIS de luz (antes todas à mesma força, só mudava o tom): fraco (abajur, TV: luma ~0,23), médio (~0,53) e forte (luz de teto: ~0,88).
+ * O mapa de luz é sRGB (a emissiva sai ao quadrado no linear): o fraco emite ~5% do forte, e é isso que dá a variedade de uma cidade de verdade (cada apartamento
+ * numa hora). Cada janela escolhe o nível pela semente; as bandas medidas por `tests/predios-f5.test.ts` (≥ 8% da área acesa em cada uma).
+ */
+export const LIT_BANDS = [[0.22, 0.45], [0.45, 0.75], [0.75, 1]] as const;
+const LIT_COLORS: ReadonlyArray<readonly string[]> = [['#ff9a5a', '#8fb0ff', '#ffa86a'], ['#ffd79a', '#ffe8c4', '#ffcf8f'], ['#ffe0a8', '#fff0c8', '#cfe4ff']];
+const LIT_SCALE = [0.34, 0.62, 1] as const;
+function litLevel(seed: number): number {
+  // Sequência de razão áurea sobre a semente (as janelas vizinhas têm sementes seguidas): reparte os três níveis por igual até numa célula com poucas janelas acesas, onde o sorteio puro deixava um nível de fora.
+  const u = (seed * 0.6180339887 + 0.62 + hash2(seed, 93) * 0.12) % 1;
+  return u < 0.3 ? 0 : u < 0.68 ? 1 : 2;
+}
 function lightColor(seed: number): string {
-  const h = hash2(seed, 91);
-  return h < 0.62 ? '#ffd79a' : h < 0.82 ? '#ffe8c4' : '#cfe4ff';
+  const level = litLevel(seed);
+  const list = LIT_COLORS[level];
+  const hex = list[Math.floor(hash2(seed, 91) * list.length) % list.length];
+  const k = LIT_SCALE[level];
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${Math.round(((n >> 16) & 255) * k)},${Math.round(((n >> 8) & 255) * k)},${Math.round((n & 255) * k)})`;
+}
+/**
+ * Uma janela acesa: o nível de luz sorteado e, em baixo, uma faixa mais escura (a luz do teto não chega ao móvel) e, em parte delas, a cortina puxada de um lado:
+ * a janela deixa de ser um retângulo chapado.
+ */
+function litRect(l: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, seed: number): void {
+  l.fillStyle = lightColor(seed); l.fillRect(x, y, w, h);
+  if (h >= 14) { l.fillStyle = 'rgba(0,0,0,0.3)'; l.fillRect(x, y + h * 0.78, w, h * 0.22); }
+  if (w >= 12 && hash2(seed, 94) < 0.3) { l.fillStyle = 'rgba(0,0,0,0.45)'; const cw = w * 0.22; l.fillRect(hash2(seed, 95) < 0.5 ? x : x + w - cw, y, cw, h * 0.8); }
+}
+/** O mapa de luz que o vidro (`glass`) desenha por cima da luz difusa da parede; definido por `facadeTextures`. */
+let lightCtx: CanvasRenderingContext2D | null = null;
+const SKY_GLOW = '#2a2038';
+/** A luz difusa da parede: no entardecer a face à sombra do sol não fica preta, e o topo de cada andar (sob a laje) fica mais escuro (o mesmo beiral do albedo). */
+const WALL_LIGHT = '#262030';
+function wallLight(l: CanvasRenderingContext2D, ox: number, oy: number): void {
+  for (let r = 0; r < 4; r++) {
+    const y = oy + r * CELL;
+    const g = l.createLinearGradient(0, y, 0, y + CELL);
+    g.addColorStop(0, '#000000'); g.addColorStop(0.3, WALL_LIGHT); g.addColorStop(1, WALL_LIGHT);
+    l.fillStyle = g; l.fillRect(ox, y, S, CELL);
+  }
+}
+/** A sombra do beiral: o topo de cada andar (logo abaixo da laje de cima) escurece ~30% e some em 16 px (0,75 m). Roda por último na célula, sobre parede e janela. */
+const EAVE_PX = 16;
+function eaveShade(m: CanvasRenderingContext2D, ox: number, oy: number): void {
+  for (let r = 0; r < 4; r++) {
+    const y = oy + r * CELL;
+    const g = m.createLinearGradient(0, y, 0, y + EAVE_PX);
+    g.addColorStop(0, 'rgba(14,10,30,0.34)'); g.addColorStop(1, 'rgba(14,10,30,0)');
+    m.fillStyle = g; m.fillRect(ox, y, S, EAVE_PX);
+  }
 }
 
 export type FacadeStyle = 'office' | 'apartment' | 'classic' | 'house';
@@ -55,23 +103,19 @@ function drawClassicCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2
     const lit = hash2(seed, 7) < (style === 'office' ? 0.55 : 0.5);
     if (style === 'office') {
       if (r === 0 && c === 0) { m.fillStyle = '#c9d0d8'; m.fillRect(ox, oy, S, S); }
-      const g = m.createLinearGradient(0, y, 0, y + CELL);
-      g.addColorStop(0, '#46607e'); g.addColorStop(0.55, '#6a86a6'); g.addColorStop(1, '#9ab2cc');
-      m.fillStyle = g; m.fillRect(x + 3, y + 3, CELL - 6, CELL - 14);
+      glass(m, x + 3, y + 3, CELL - 6, CELL - 14, '#4a6482', '#26384c');
       m.fillStyle = '#8f9aa8'; m.fillRect(x, y + CELL - 11, CELL, 8);
       m.fillStyle = 'rgba(255,255,255,0.18)'; m.fillRect(x + 6, y + 6, 6, CELL - 22);
       if (lit) {
-        l.fillStyle = lightColor(seed);
         const part = hash2(seed, 13) < 0.25 ? 0.45 : 1;
-        l.fillRect(x + 4, y + 4 + (CELL - 16) * (1 - part), CELL - 8, (CELL - 16) * part);
+        litRect(l, x + 4, y + 4 + (CELL - 16) * (1 - part), CELL - 8, (CELL - 16) * part, seed);
       }
     } else if (style === 'apartment') {
       if (r === 0 && c === 0) { m.fillStyle = '#f2f0ea'; m.fillRect(ox, oy, S, S); }
       const wx = x + 13; const wy = y + 12; const ww = CELL - 26; const wh = CELL - 26;
       m.fillStyle = '#d8d4cc'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
-      m.fillStyle = '#2a3340'; m.fillRect(wx, wy, ww, wh);
-      m.fillStyle = '#4a5a6c'; m.fillRect(wx, wy, ww, 6);
-      if (lit) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+      glass(m, wx, wy, ww, wh, '#3e4c5e', '#222a34');
+      if (lit) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); }
       // Sacada: guarda-corpo na frente da metade de baixo, em colunas alternadas.
       if ((c + r) % 2 === 0) {
         m.fillStyle = '#6a7078';
@@ -90,9 +134,9 @@ function drawClassicCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2
       const wx = x + 18; const wy = y + 8; const ww = CELL - 36; const wh = CELL - 18;
       m.fillStyle = '#f8f2e6'; m.fillRect(wx - 4, wy - 6, ww + 8, wh + 8);
       m.fillStyle = '#d8ccb4'; m.fillRect(wx - 6, wy - 9, ww + 12, 4);
-      m.fillStyle = '#283036'; m.fillRect(wx, wy, ww, wh);
+      glass(m, wx, wy, ww, wh, '#3a4650', '#1e262c');
       m.fillStyle = '#f8f2e6'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh); m.fillRect(wx, wy + wh * 0.4, ww, 2);
-      if (lit) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+      if (lit) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
       if (r % 2 === 0) {
         m.fillStyle = '#2a2a2a'; m.fillRect(wx - 6, wy + wh - 10, ww + 12, 2);
         for (let k = 0; k < 6; k++) m.fillRect(wx - 5 + k * ((ww + 10) / 5), wy + wh - 10, 1.5, 10);
@@ -102,19 +146,35 @@ function drawClassicCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2
       if ((c + r * 3) % 4 === 3) continue; // parede cega aqui e ali
       const wx = x + 20; const wy = y + 16; const ww = CELL - 40; const wh = CELL - 30;
       m.fillStyle = '#ffffff'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
-      m.fillStyle = '#2c3440'; m.fillRect(wx, wy, ww, wh);
+      glass(m, wx, wy, ww, wh, '#3e4a5a', '#222a34');
       m.fillStyle = '#ffffff'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
       m.fillStyle = '#4a6a8a'; m.fillRect(wx - 11, wy - 2, 8, wh + 4); m.fillRect(wx + ww + 3, wy - 2, 8, wh + 4);
-      if (lit) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+      if (lit) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
     }
   }
 }
 
-/** Vidro escuro com o céu refletido em cima (o gradiente que faz a janela parecer vidro, não buraco). */
+/**
+ * Vidro com o céu refletido: o degradê escuro do vidro (`top` → `bottom`), uma camada de céu azul-claro que some em 60% da altura (o reflexo do alto, a luz que vem de cima
+ * nas janelas de dia) e um clarão diagonal fino (o brilho do sol na quina do vidro). Sem isto a janela era um buraco escuro (V22/F5: o topo ≥ 1,45× mais claro que o pé).
+ */
 function glass(m: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, top: string, bottom: string): void {
+  if (lightCtx) {
+    // No mapa de luz o vidro não herda a luz difusa da parede (janela apagada é escura); só um fiapo do céu no alto (o reflexo ao entardecer), que as janelas acesas cobrem.
+    const gl = lightCtx.createLinearGradient(0, y, 0, y + h);
+    gl.addColorStop(0, SKY_GLOW); gl.addColorStop(0.55, '#000000'); gl.addColorStop(1, '#000000');
+    lightCtx.fillStyle = gl; lightCtx.fillRect(x, y, w, h);
+  }
   const g = m.createLinearGradient(0, y, 0, y + h);
   g.addColorStop(0, top); g.addColorStop(1, bottom);
   m.fillStyle = g; m.fillRect(x, y, w, h);
+  const sky = m.createLinearGradient(0, y, 0, y + h * 0.6);
+  sky.addColorStop(0, 'rgba(176,208,240,0.62)'); sky.addColorStop(1, 'rgba(176,208,240,0)');
+  m.fillStyle = sky; m.fillRect(x, y, w, h * 0.6);
+  if (w >= 10 && h >= 14) {
+    m.fillStyle = 'rgba(255,255,255,0.12)';
+    m.beginPath(); m.moveTo(x + w * 0.12, y + h); m.lineTo(x + w * 0.5, y); m.lineTo(x + w * 0.74, y); m.lineTo(x + w * 0.36, y + h); m.fill();
+  }
 }
 
 /** Os visuais novos (células 1–3) de cada estilo. Cada célula = 4 colunas × 4 andares, como a de antes (a uv em metros não muda). */
@@ -133,7 +193,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
         for (let k = 0; k < 16; k++) {
           const x = ox + k * 16;
           m.fillStyle = '#e8e4dc'; m.fillRect(x, y + 10, 2, CELL - 32);
-          if (lit(seedBase + r * 16 + k, 0.45)) { l.fillStyle = lightColor(seedBase + r * 16 + k); l.fillRect(x + 2, y + 11, 14, CELL - 34); }
+          if (lit(seedBase + r * 16 + k, 0.45)) { litRect(l, x + 2, y + 11, 14, CELL - 34, seedBase + r * 16 + k); }
         }
         m.fillStyle = 'rgba(255,255,255,0.14)'; m.fillRect(ox, y + 12, S, 4);
       }
@@ -153,7 +213,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
           m.fillStyle = 'rgba(0,0,0,0.18)';
           for (let k = 3; k < wh * down; k += 4) m.fillRect(wx, wy + k, ww, 1);
         }
-        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + wh * down + 1, ww - 2, wh * (1 - down) - 2); }
+        if (lit(seed)) { litRect(l, wx + 1, wy + wh * down + 1, ww - 2, wh * (1 - down) - 2, seed); }
         // Guarda-corpo corrido do andar.
         m.fillStyle = '#3a3e44'; m.fillRect(x, y + CELL - 22, CELL, 3);
         for (let k = 0; k < 8; k++) m.fillRect(x + 3 + k * 8, y + CELL - 22, 2, 16);
@@ -172,7 +232,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
           glass(m, wx, wy, ww, wh, '#4a5868', '#28323e');
           const curtain = hash2(seed + wx, 31) < 0.35;
           if (curtain) { m.fillStyle = '#d8c8a4'; m.fillRect(wx, wy, ww * 0.45, wh); m.fillRect(wx + ww * 0.6, wy, ww * 0.4, wh); }
-          if (lit(seed + wx)) { l.fillStyle = lightColor(seed + wx); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+          if (lit(seed + wx)) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed + wx); }
         }
         if (hash2(seed, 41) < 0.5) {
           const ax = x + (hash2(seed, 42) < 0.5 ? 14 : 38);
@@ -193,7 +253,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
         for (let k = 0; k < 8; k++) {
           const x = ox + k * 32;
           m.fillStyle = '#c4ccce'; m.fillRect(x, y, 2, CELL);
-          if (lit(seedBase + r * 8 + k, 0.5)) { l.fillStyle = lightColor(seedBase + r * 8 + k); l.fillRect(x + 3, y + 4, 28, CELL - 14); }
+          if (lit(seedBase + r * 8 + k, 0.5)) { litRect(l, x + 3, y + 4, 28, CELL - 14, seedBase + r * 8 + k); }
         }
         m.fillStyle = 'rgba(255,255,255,0.12)'; m.fillRect(ox, y + 4, S, 6);
       }
@@ -205,7 +265,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
         m.fillStyle = '#8e8a82'; m.fillRect(x + 8, y + 8, CELL - 16, CELL - 20);
         glass(m, x + 12, y + 12, CELL - 20, CELL - 26, '#5a7088', '#2a3848');
         m.fillStyle = 'rgba(0,0,0,0.22)'; m.fillRect(x + 12, y + 12, CELL - 20, 4);
-        if (lit(seed, 0.55)) { l.fillStyle = lightColor(seed); l.fillRect(x + 13, y + 13, CELL - 22, CELL - 28); }
+        if (lit(seed, 0.55)) { litRect(l, x + 13, y + 13, CELL - 22, CELL - 28, seed); }
         m.fillStyle = 'rgba(80,70,60,0.10)'; m.fillRect(x, y + CELL - 3, CELL, 3);
       }
     } else {
@@ -217,7 +277,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
         m.fillStyle = '#c8c2b6'; m.fillRect(ox, y + CELL - 9, S, 7);
         for (let k = 0; k < 16; k++) {
           const x = ox + k * 16;
-          if (lit(seedBase + r * 16 + k, 0.5)) { l.fillStyle = lightColor(seedBase + r * 16 + k); l.fillRect(x + 7, y + 4, 9, CELL - 14); }
+          if (lit(seedBase + r * 16 + k, 0.5)) { litRect(l, x + 7, y + 4, 9, CELL - 14, seedBase + r * 16 + k); }
           m.fillStyle = '#e4e0d6'; m.fillRect(x, y, 6, CELL);
           m.fillStyle = 'rgba(0,0,0,0.12)'; m.fillRect(x + 6, y, 2, CELL);
           l.fillStyle = '#000000'; l.fillRect(x, y, 6, CELL);
@@ -234,26 +294,27 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
       if (look === 1) {
         // Janela em arco com pedra de fecho.
         m.fillStyle = '#f8f2e6'; m.beginPath(); m.arc(wx + ww / 2, wy + 2, ww / 2 + 4, Math.PI, 0); m.fill(); m.fillRect(wx - 4, wy + 2, ww + 8, wh);
-        m.fillStyle = '#283036'; m.beginPath(); m.arc(wx + ww / 2, wy + 2, ww / 2, Math.PI, 0); m.fill(); m.fillRect(wx, wy + 2, ww, wh - 4);
+        { const gg = m.createLinearGradient(0, wy - ww / 2, 0, wy + wh); gg.addColorStop(0, '#8fb0cc'); gg.addColorStop(0.35, '#3c4c5a'); gg.addColorStop(1, '#1e262c'); m.fillStyle = gg; } m.beginPath(); m.arc(wx + ww / 2, wy + 2, ww / 2, Math.PI, 0); m.fill(); m.fillRect(wx, wy + 2, ww, wh - 4);
+        l.fillStyle = '#000000'; l.beginPath(); l.arc(wx + ww / 2, wy + 2, ww / 2, Math.PI, 0); l.fill(); l.fillRect(wx, wy + 2, ww, wh - 4);
         m.fillStyle = '#d8ccb4'; m.fillRect(wx + ww / 2 - 3, wy - ww / 2 - 4, 6, 7);
         if (lit(seed)) { l.fillStyle = lightColor(seed); l.beginPath(); l.arc(wx + ww / 2, wy + 2, ww / 2 - 1, Math.PI, 0); l.fill(); l.fillRect(wx + 1, wy + 2, ww - 2, wh - 5); }
       } else if (look === 2) {
         // Venezianas verdes abertas dos dois lados e grade de ferro.
         m.fillStyle = '#f8f2e6'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
-        m.fillStyle = '#283036'; m.fillRect(wx, wy, ww, wh);
+        glass(m, wx, wy, ww, wh, '#3a4650', '#1e262c');
         m.fillStyle = '#3f6a4a'; m.fillRect(wx - 12, wy - 2, 8, wh + 4); m.fillRect(wx + ww + 4, wy - 2, 8, wh + 4);
         m.fillStyle = 'rgba(0,0,0,0.2)'; for (let k = 2; k < wh; k += 4) { m.fillRect(wx - 12, wy + k, 8, 1); m.fillRect(wx + ww + 4, wy + k, 8, 1); }
-        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+        if (lit(seed)) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); }
         m.fillStyle = '#26282c'; m.fillRect(wx - 4, wy + wh - 12, ww + 8, 2);
         for (let k = 0; k < 5; k++) m.fillRect(wx - 3 + k * ((ww + 6) / 4), wy + wh - 12, 1.5, 12);
       } else {
         // Pilastras e frontão triangular sobre a janela.
         m.fillStyle = '#d4c6aa'; m.fillRect(x, y, 7, CELL);
         m.fillStyle = '#f4ecdc'; m.fillRect(wx - 3, wy - 2, ww + 6, wh + 4);
-        m.fillStyle = '#283036'; m.fillRect(wx, wy, ww, wh);
+        glass(m, wx, wy, ww, wh, '#3a4650', '#1e262c');
         m.fillStyle = '#f4ecdc'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
         m.fillStyle = '#cdbd9e'; m.beginPath(); m.moveTo(wx - 6, wy - 3); m.lineTo(wx + ww / 2, wy - 11); m.lineTo(wx + ww + 6, wy - 3); m.fill();
-        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+        if (lit(seed)) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
       }
     }
   } else {
@@ -271,7 +332,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
         m.fillStyle = '#9aa0a6'; m.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
         glass(m, wx, wy, ww, wh, '#4c5a68', '#26303a');
         m.fillStyle = '#9aa0a6'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
-        if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); }
+        if (lit(seed)) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); }
         continue;
       }
       if ((c + r * 3) % 5 === 4) continue; // parede cega
@@ -279,7 +340,7 @@ function drawNewCell(m: CanvasRenderingContext2D, l: CanvasRenderingContext2D, s
       m.fillStyle = '#ffffff'; m.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
       glass(m, wx, wy, ww, wh, '#4a5868', '#262e38');
       m.fillStyle = '#ffffff'; m.fillRect(wx + ww / 2 - 1, wy, 2, wh);
-      if (lit(seed)) { l.fillStyle = lightColor(seed); l.fillRect(wx + 1, wy + 1, ww - 2, wh - 2); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
+      if (lit(seed)) { litRect(l, wx + 1, wy + 1, ww - 2, wh - 2, seed); l.fillStyle = '#000'; l.fillRect(wx + ww / 2 - 1, wy, 2, wh); }
       if (look === 2) {
         // Floreira com flores e o toldinho listrado.
         m.fillStyle = '#7a5a40'; m.fillRect(wx - 4, wy + wh + 3, ww + 8, 5);
@@ -294,11 +355,15 @@ export function facadeTextures(style: FacadeStyle): FacadeTextures {
   const [mc, m] = canvas2d(S * 2, S * 2);
   const [lc, l] = canvas2d(S * 2, S * 2);
   l.fillStyle = '#000000'; l.fillRect(0, 0, S * 2, S * 2);
+  lightCtx = l;
   for (let look = 0; look < FACADE_LOOKS; look++) {
     const [ox, oy] = cellOrigin(look);
+    wallLight(l, ox, oy);
     if (look === 0) drawClassicCell(m, l, style, ox, oy);
     else drawNewCell(m, l, style, look, ox, oy);
+    eaveShade(m, ox, oy);
   }
+  lightCtx = null;
   return { map: tex(mc, true), light: tex(lc, true) };
 }
 

@@ -8,6 +8,7 @@ import { hash3 } from '../noise';
 import { smoothNormals } from '../normals';
 import { bakeAO, bevelBox, box, cone, cyl, merge, mergeRound, paint, roundedBar, shadeY, tf, wavyStrip, type Geo, type Model } from './geom';
 import { collisionHalfM } from './vegetation';
+import { footShade, structureDetail } from './structures';
 
 // ───────────────────────────── Atlas de painéis ─────────────────────────────
 
@@ -51,6 +52,7 @@ export function streetLamp(): Model {
   const R = collisionHalfM('lamp');
   const metal = '#5d636b';
   // Do kit redondo: base de concreto de caixa com bisel, colar, fuste de 14 lados, braço curvo e a luminária de borda arredondada (a normal do kit fica).
+  const strut = Math.hypot(1.45, 1.72); // tirante do braço: do fuste (0,05; 8,0) até o braço (1,5; 9,72)
   const pole = mergeRound([
     paint(bevelBox(R * 2, 0.7, R * 2, 0.2), '#b9b6ae', tf(0, 0.35, 0)),
     paint(cyl(0.2, 0.26, 0.12, 16, true), '#9a978f', tf(0, 0.76, 0)),
@@ -58,7 +60,15 @@ export function streetLamp(): Model {
     paint(cyl(0.06, 0.06, 1.4, 10, true), metal, tf(0.45, 9.3, 0, 1, 1, 1, 0, 0, -0.9)),
     paint(cyl(0.06, 0.06, 1.3, 10, true), metal, tf(1.55, 9.75, 0, 1, 1, 1, 0, 0, -Math.PI / 2)),
     bar(1.0, 0.18, 0.42, 0.07, '#3c4148', tf(LAMP_HEAD_X, 9.62, 0)),
+    // V22/F5: suporte detalhado — pé alargado (o fuste nasce do concreto), portinhola de inspeção, tirante do braço e a viseira da luminária.
+    ...(structureDetail.roof ? [
+      paint(new THREE.CylinderGeometry(0.11, 0.2, 0.5, 8, 1, true), metal, tf(0, 1.0, 0)),
+      paint(box(0.22, 0.5, 0.05), '#4c525a', tf(0, 1.9, 0.12)),
+      paint(new THREE.CylinderGeometry(0.022, 0.022, strut, 5, 1, true), metal, tf(0.78, 8.86, 0, 1, 1, 1, 0, 0, -Math.atan2(1.45, 1.72))),
+      paint(box(1.08, 0.05, 0.5), '#2c3036', tf(LAMP_HEAD_X, 9.76, 0)),
+    ] : []),
   ]);
+  footShade(pole, 1.1, 0.5);
   const head = paint(box(0.86, 0.06, 0.32), '#fff2c8', tf(LAMP_HEAD_X, 9.6, 0));
   const beam = new THREE.ConeGeometry(2.8, 9.4, 14, 1, true).translate(LAMP_HEAD_X, 4.9, 0).toNonIndexed();
   return {
@@ -85,7 +95,17 @@ export function billboard(variant: number): Model {
     paint(bevelBox(2 * R, 3.7, 0.28, 0.08), '#23262b', tf(0, 6.6, -0.05)),
     bar(2 * R + 0.1, 0.16, 0.9, 0.06, '#6a6e75', tf(0, 4.6, 0.35)),
     paint(box(2 * R + 0.1, 0.5, 0.04), '#50545a', tf(0, 5.0, 0.78)),
+    // V22/F5: suporte detalhado — guarda-corpo da passarela (5 montantes e o corrimão), escada de marinheiro na perna da esquerda (2 banzos e 5 degraus) e as mãos-francesas
+    // (uma em cada perna, de baixo da passarela até a moldura do painel) que seguram o conjunto; tudo dentro da pegada, da altura e da profundidade de antes.
+    ...(structureDetail.roof ? [
+      ...[-1, -0.5, 0, 0.5, 1].map((k) => paint(box(0.05, 1.0, 0.05), '#6a6e75', tf(k * (R - 0.2), 5.1, 0.78))),
+      paint(box(2 * R - 0.3, 0.05, 0.05), '#8a8e95', tf(0, 5.6, 0.78)),
+      paint(box(0.04, 4.3, 0.04), '#8a8e95', tf(-R + 0.5, 2.5, 0.62)), paint(box(0.04, 4.3, 0.04), '#8a8e95', tf(-R + 0.85, 2.5, 0.62)),
+      ...[0, 1, 2, 3, 4].map((k) => paint(box(0.4, 0.035, 0.035), '#8a8e95', tf(-R + 0.675, 0.7 + k * 0.85, 0.62))),
+      ...[-1, 1].map((sd) => paint(cyl(0.03, 0.03, 1.5, 5, true), steel, tf(sd * (legX - 0.45), 4.5, -0.08, 1, 1, 1, 0, 0, sd * 0.62))),
+    ] : []),
   ]);
+  footShade(frame, 1.2, 0.5);
   const arms: Geo[] = [];
   const lights: Geo[] = [];
   for (let k = 0; k < 3; k++) {
@@ -113,7 +133,13 @@ export function chevronSign(dir: -1 | 1): Model {
   const posts = mergeRound([
     paint(cyl(0.06, 0.06, 1.9, 12, true), '#5a5e66', tf(-R + 0.35, 0.95, -0.08)), paint(cyl(0.06, 0.06, 1.9, 12, true), '#5a5e66', tf(R - 0.35, 0.95, -0.08)),
     paint(bevelBox(2 * R, 1.08, 0.08, 0.03), '#2b2e33', tf(0, 1.2, -0.05)),
+    // V22/F5: as sapatas de concreto dos dois postes e a travessa que prende o painel (por trás).
+    ...(structureDetail.roof ? [
+      paint(box(0.3, 0.07, 0.3), '#9a978f', tf(-R + 0.35, 0.035, -0.08)), paint(box(0.3, 0.07, 0.3), '#9a978f', tf(R - 0.35, 0.035, -0.08)),
+      paint(box(2 * R - 0.7, 0.06, 0.05), '#5a5e66', tf(0, 0.85, -0.12)),
+    ] : []),
   ]);
+  footShade(posts, 0.6, 0.45);
   const panel = atlasPlane(2 * R - 0.06, 1.0, dir < 0 ? PANEL_RECTS.chevronLeft : PANEL_RECTS.chevronRight).translate(0, 1.2, 0.0);
   return { parts: [{ geometry: posts, mat: 'flat', shadow: true }, { geometry: panel, mat: 'panel' }], blob: 0.9 };
 }
@@ -248,7 +274,12 @@ export function pitGarages(team: number): Model {
 
 /** Placa do box (não sólida). */
 export function pitSign(): Model {
-  const post = mergeRound([paint(cyl(0.07, 0.08, 2.4, 12, true), '#5a5e66', tf(0, 1.2, 0)), paint(bevelBox(1.8, 0.9, 0.06, 0.025), '#2b2e33', tf(0, 2.6, -0.04))]);
+  const post = mergeRound([
+    paint(cyl(0.07, 0.08, 2.4, 12, true), '#5a5e66', tf(0, 1.2, 0)), paint(bevelBox(1.8, 0.9, 0.06, 0.025), '#2b2e33', tf(0, 2.6, -0.04)),
+    // V22/F5: sapata de concreto e a braçadeira que prende o painel ao poste.
+    ...(structureDetail.roof ? [paint(box(0.3, 0.07, 0.3), '#9a978f', tf(0, 0.035, 0)), paint(box(0.12, 0.5, 0.06), '#3a3e44', tf(0, 2.3, -0.08)), paint(box(0.16, 0.08, 0.16), '#3a3e44', tf(0, 2.44, 0))] : []),
+  ]);
+  footShade(post, 0.6, 0.45);
   const panel = atlasPlane(1.74, 0.84, PANEL_RECTS.pit).translate(0, 2.6, 0.0);
   return { parts: [{ geometry: post, mat: 'flat', shadow: true }, { geometry: panel, mat: 'panel' }] };
 }

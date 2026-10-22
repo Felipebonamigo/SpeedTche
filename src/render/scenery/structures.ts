@@ -15,6 +15,96 @@ export const FACADE_TILE: Record<'office' | 'apartment' | 'classic' | 'house', [
 
 type FacadeStyle = keyof typeof FACADE_TILE;
 
+/** V22/F5: liga/desliga a oclusão de ambiente assada (`ao`: pé e sob os beirais) e os adereços de telhado (`roof`); só os testes e o antes × depois desligam, o jogo sempre os tem. */
+export const structureDetail = { ao: true, roof: true };
+
+/**
+ * V22/F5: oclusão de ambiente assada na COR dos vértices de um prédio (a luz que o sol e o céu não dão nos cantos): (1) o pé, de 0 a 1,4 m do chão, escurece até
+ * 50% (o contato com a calçada: sem isto o prédio "flutua" na grama); (2) as faces voltadas para baixo (a barriga das lajes, da cornija, do toldo, dos beirais de 3 m
+ * para cima) escurecem 38%. A parede logo abaixo de cada laje leva a sua sombra na textura da fachada (`eaveShade`, textures.ts). O pé pede vértices: `sliceY` corta os
+ * triângulos que cruzam 0,4 e 1,0 m (menos os de fundo, voltados para trás: a pista nunca os vê), com a uv, a cor e a normal interpoladas (~+100 △ por prédio).
+ */
+const FOOT_REACH = 1.4;
+const FOOT_STRENGTH = 0.6;
+const UNDER_STRENGTH = 0.38;
+const FOOT_PLANES = [0.4, 1.0] as const;
+
+/** O mesmo contato escuro do pé, sem cortar a malha (props pequenos: poste, placa): a cor de cada vértice a menos de `reach` m do chão escurece até `strength`. */
+export function footShade(g: Geo, reach = 1.0, strength = 0.45): Geo {
+  if (!structureDetail.ao) return g;
+  const p = g.attributes.position as THREE.BufferAttribute; const c = g.attributes.color as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    if (y < -0.01 || y >= reach) continue;
+    const f = 1 - strength * Math.pow(1 - Math.max(0, y) / reach, 1.5);
+    c.setXYZ(i, c.getX(i) * f, c.getY(i) * f, c.getZ(i) * f);
+  }
+  return g;
+}
+
+/** Corta uma malha não indexada nos planos y = `planes` (todos os atributos interpolados, normal renormalizada); o vinco de cada triângulo é mantido. */
+export function sliceY(g: Geo, planes: readonly number[], skip?: (nx: number, ny: number, nz: number) => boolean): Geo {
+  if (g.index) throw new Error('sliceY: a malha tem de ser não indexada');
+  const keys = Object.keys(g.attributes);
+  const sizes = keys.map((k) => (g.attributes[k] as THREE.BufferAttribute).itemSize);
+  const stride = sizes.reduce((a, b) => a + b, 0);
+  const posAt = keys.indexOf('position') === 0 ? 0 : -1;
+  if (posAt !== 0) throw new Error('sliceY: a posição tem de ser o primeiro atributo');
+  const normAt = keys.indexOf('normal') >= 0 ? sizes.slice(0, keys.indexOf('normal')).reduce((a, b) => a + b, 0) : -1;
+  const count = (g.attributes.position as THREE.BufferAttribute).count;
+  let verts: number[][] = [];
+  for (let i = 0; i < count; i++) {
+    const v = new Array<number>(stride); let o = 0;
+    keys.forEach((k, ki) => { const arr = (g.attributes[k] as THREE.BufferAttribute).array; for (let c = 0; c < sizes[ki]; c++) v[o++] = arr[i * sizes[ki] + c]; });
+    verts.push(v);
+  }
+  const lerp = (a: number[], b: number[], t: number): number[] => a.map((x, i) => x + (b[i] - x) * t);
+  for (const y0 of planes) {
+    const out: number[][] = [];
+    for (let t = 0; t < verts.length; t += 3) {
+      const tri = [verts[t], verts[t + 1], verts[t + 2]];
+      const d = tri.map((v) => v[1] - y0);
+      if (skip && normAt >= 0 && skip((tri[0][normAt] + tri[1][normAt] + tri[2][normAt]) / 3, (tri[0][normAt + 1] + tri[1][normAt + 1] + tri[2][normAt + 1]) / 3, (tri[0][normAt + 2] + tri[1][normAt + 2] + tri[2][normAt + 2]) / 3)) { out.push(...tri); continue; }
+      if (d.every((x) => x >= -1e-6) || d.every((x) => x <= 1e-6)) { out.push(...tri); continue; }
+      const lower: number[][] = []; const upper: number[][] = [];
+      for (let k = 0; k < 3; k++) {
+        const a = tri[k]; const b = tri[(k + 1) % 3]; const da = d[k]; const db = d[(k + 1) % 3];
+        if (da <= 1e-6) lower.push(a);
+        if (da >= -1e-6) upper.push(a);
+        if ((da > 1e-6 && db < -1e-6) || (da < -1e-6 && db > 1e-6)) { const m = lerp(a, b, da / (da - db)); lower.push(m); upper.push(m); }
+      }
+      for (const poly of [lower, upper]) for (let k = 1; k + 1 < poly.length; k++) out.push(poly[0], poly[k], poly[k + 1]);
+    }
+    verts = out;
+  }
+  const res = new THREE.BufferGeometry();
+  let off = 0;
+  keys.forEach((k, ki) => {
+    const arr = new Float32Array(verts.length * sizes[ki]);
+    verts.forEach((v, i) => { for (let c = 0; c < sizes[ki]; c++) arr[i * sizes[ki] + c] = v[off + c]; });
+    if (k === 'normal') for (let i = 0; i < verts.length; i++) { const l = Math.hypot(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2]) || 1; arr[i * 3] /= l; arr[i * 3 + 1] /= l; arr[i * 3 + 2] /= l; }
+    res.setAttribute(k, new THREE.BufferAttribute(arr, sizes[ki]));
+    off += sizes[ki];
+  });
+  Object.assign(res.userData, g.userData);
+  g.dispose();
+  return res;
+}
+
+/** A oclusão do pé e da barriga das lajes (ver acima). Devolve a malha cortada (a original é descartada). Desligada por `structureDetail.ao`. */
+export function occlude(g: Geo): Geo {
+  if (!structureDetail.ao || !g.getAttribute('color') || g.index) return g;
+  const o = sliceY(g, FOOT_PLANES, (nx) => nx < -0.5); // o fundo (voltado para trás) não leva corte
+  const p = o.attributes.position as THREE.BufferAttribute; const n = o.attributes.normal as THREE.BufferAttribute | undefined; const c = o.attributes.color as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i); let f = 1;
+    if (y >= -0.01 && y < FOOT_REACH) { const t = 1 - Math.max(0, y) / FOOT_REACH; f *= 1 - FOOT_STRENGTH * t * Math.sqrt(t); }
+    if (n && y > 2.5) { const ny = n.getY(i); if (ny < -0.4) f *= 1 - UNDER_STRENGTH * Math.min(1, (-ny - 0.4) / 0.4); }
+    if (f < 1) c.setXYZ(i, c.getX(i) * f, c.getY(i) * f, c.getZ(i) * f);
+  }
+  return o;
+}
+
 /** Caixa com UV em metros para a textura da fachada; topo e fundo apontam para um canto sem janela. */
 function facadeBox(w: number, h: number, d: number, style: FacadeStyle, color: string, m: THREE.Matrix4, vOffset = 0): Geo {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -57,8 +147,8 @@ function addFacade(p: Parts, style: MatKey, g: Geo): void {
 }
 function toModel(p: Parts, height: number, blob = 0, shadow = true): Model {
   const parts: ModelPart[] = [];
-  if (p.flat.length) parts.push({ geometry: shadeY(merge(p.flat), -1, height, 0.78, 1.06), mat: 'flat', shadow });
-  for (const [mat, list] of p.facade) parts.push({ geometry: facadeCell(merge(list), p.look), mat, shadow });
+  if (p.flat.length) parts.push({ geometry: occlude(shadeY(merge(p.flat), -1, height, 0.78, 1.06)), mat: 'flat', shadow });
+  for (const [mat, list] of p.facade) parts.push({ geometry: facadeCell(occlude(merge(list)), p.look), mat, shadow });
   if (p.glow.length) parts.push({ geometry: merge(p.glow), mat: 'glow' });
   if (p.beacon.length) parts.push({ geometry: merge(p.beacon), mat: 'beacon' });
   return { parts, blob };
@@ -84,8 +174,8 @@ function toRoundModel(p: Parts, height: number, shadow = true): Model {
   const lisas: Geo[] = [];
   if (p.flat.length) lisas.push(smoothNormals(merge(p.flat), CREASE.built, { roofTurnDeg: ROOF_TURN_DEG }));
   lisas.push(...p.round);
-  if (lisas.length) parts.push({ geometry: shadeY(mergeRound(lisas), -1, height, 0.78, 1.06), mat: 'flat', shadow });
-  for (const [mat, list] of p.facade) parts.push({ geometry: facadeCell(shadeY(mergeRound(list), 0, height, 0.82, 1.05), p.look), mat, shadow });
+  if (lisas.length) parts.push({ geometry: occlude(shadeY(mergeRound(lisas), -1, height, 0.78, 1.06)), mat: 'flat', shadow });
+  for (const [mat, list] of p.facade) parts.push({ geometry: facadeCell(occlude(shadeY(mergeRound(list), 0, height, 0.82, 1.05)), p.look), mat, shadow });
   if (p.glow.length) parts.push({ geometry: merge(p.glow), mat: 'glow' });
   if (p.beacon.length) parts.push({ geometry: merge(p.beacon), mat: 'beacon' });
   return { parts, blob: 0 };
@@ -94,6 +184,74 @@ function toRoundModel(p: Parts, height: number, shadow = true): Model {
 /** Fundação que entra 5 m no chão: prédio em terreno inclinado não flutua. */
 function foundation(p: Parts, L: number, D: number, color = '#8f8a82'): void {
   p.flat.push(paint(box(D, 5, L), color, tf(-D / 2, -2.4, 0)));
+}
+
+// ───────────────────────────── Adereços de telhado (V22/F5) ─────────────────────────────
+
+/** Onde um telhado plano pode receber adereços: a cota do piso (topo da cornija), a borda da frente (x) e o fundo, a meia largura em Z, os retângulos já ocupados e a altura máxima permitida (acima do piso). */
+interface Roof { y: number; front: number; back: number; zHalf: number; keep: ReadonlyArray<readonly [number, number, number, number]>; cap: number }
+
+const AC_COLORS = ['#d4d8dc', '#c2c8d0', '#dcd6cc'];
+const TANK_COLORS = ['#6a8aa8', '#c9c4b8', '#8a6a52', '#7a9a8a'];
+const cylN = (rt: number, rb: number, h: number, seg: number): Geo => new THREE.CylinderGeometry(rt, rb, h, seg, 1, false);
+const coneN = (r: number, h: number, seg: number): Geo => new THREE.ConeGeometry(r, h, seg);
+
+/**
+ * O topo de um prédio de cidade: um banco de condicionadores de ar junto à borda da frente (o que se vê de baixo), uma caixa-d'água de plinto, um mastro de antena com travessa
+ * e um respiro. Posição e quantidade vêm da semente (e o visual espelha em Z), a altura nunca passa de `cap` (a altura total do prédio não muda: V4 ±1 cm). ~170 △, tudo
+ * liso (`flat`), nada sólido. Não inventa nada fora da pegada: x entre `back` e `front`, z dentro de ±`zHalf`.
+ */
+function rooftop(p: Parts, seed: number, look: number, r: Roof): void {
+  if (!structureDetail.roof) return;
+  const h = (k: number): number => hash2(seed * 7 + 5, k);
+  const mir = look % 2 === 0 ? 1 : -1;
+  const hits = (x: number, z: number, hx: number, hz: number): boolean => r.keep.some(([x0, x1, z0, z1]) => x + hx > x0 - 0.2 && x - hx < x1 + 0.2 && z + hz > z0 - 0.2 && z - hz < z1 + 0.2) || Math.abs(z) + hz > r.zHalf - 0.3;
+  const taken: Array<[number, number, number, number]> = [];
+  const free = (x: number, z: number, hx: number, hz: number): boolean => !hits(x, z, hx, hz) && !taken.some(([tx, tz, thx, thz]) => Math.abs(x - tx) < hx + thx && Math.abs(z - tz) < hz + thz);
+  const put = (x: number, z: number, hx: number, hz: number): void => { taken.push([x, z, hx, hz]); };
+  // Banco de condicionadores: 3 aparelhos de 1,3 × 0,9 × 0,8 m, a ~1,3 m da borda (visíveis de baixo), em fila ao longo de Z a partir de um ponto sorteado.
+  const acX = r.front - 1.3;
+  const z0 = mir * (-r.zHalf * 0.55 + h(1) * r.zHalf * 0.6);
+  let placed = 0;
+  for (let k = 0; k < 8 && placed < 3; k++) {
+    const z = z0 + mir * k * 1.7;
+    if (!free(acX, z, 0.7, 0.55)) continue;
+    put(acX, z, 0.7, 0.55);
+    const c = AC_COLORS[(seed + placed + look) % AC_COLORS.length];
+    p.flat.push(paint(box(1.3, 0.9, 0.8), c, tf(acX, r.y + 0.45, z)));
+    p.flat.push(paint(box(1.0, 0.06, 0.55), '#4a4e56', tf(acX, r.y + 0.93, z)));
+    placed++;
+  }
+  // Caixa-d'água de plinto: base de concreto, tanque de 8 faces, tampa cônica (a cor sai da semente).
+  for (let k = 0; k < 6; k++) {
+    const z = mir * (-r.zHalf * 0.6 + ((h(2) + k * 0.37) % 1) * r.zHalf * 1.2);
+    const tx = r.front - 3.4;
+    if (!free(tx, z, 1.3, 1.3)) continue;
+    put(tx, z, 1.3, 1.3);
+    p.flat.push(paint(box(2.4, 0.4, 2.4), '#a8a49c', tf(tx, r.y + 0.2, z)));
+    p.flat.push(paint(cylN(1.05, 1.05, 1.5, 8), TANK_COLORS[(seed + look) % TANK_COLORS.length], tf(tx, r.y + 1.15, z)));
+    p.flat.push(paint(coneN(1.15, 0.35, 8), '#8a8f96', tf(tx, r.y + 2.07, z)));
+    break;
+  }
+  // Mastro de antena com travessa (TV, rádio) perto da borda; respiro baixo atrás.
+  for (let k = 0; k < 6; k++) {
+    const z = mir * ((h(3) + k * 0.41) % 1 * 2 - 1) * (r.zHalf - 1.0);
+    const mx = r.front - 0.8;
+    if (!free(mx, z, 0.5, 0.7)) continue;
+    put(mx, z, 0.5, 0.7);
+    const mh = Math.min(r.cap, 2.3);
+    p.flat.push(paint(cylN(0.04, 0.06, mh, 5), '#b8bcc2', tf(mx, r.y + mh / 2, z)));
+    p.flat.push(paint(box(0.04, 0.04, 1.2), '#b8bcc2', tf(mx, r.y + mh * 0.8, z)));
+    break;
+  }
+  const vx = r.back + 1.4;
+  for (let k = 0; k < 4; k++) {
+    const z = mir * ((h(4) + k * 0.29) % 1 * 2 - 1) * (r.zHalf - 1.0);
+    if (!free(vx, z, 0.4, 0.4)) continue;
+    put(vx, z, 0.4, 0.4);
+    p.flat.push(paint(box(0.6, 0.7, 0.6), '#9aa0a8', tf(vx, r.y + 0.35, z)));
+    break;
+  }
 }
 
 // ───────────────────────────── Prédios de cidade ─────────────────────────────
@@ -119,6 +277,7 @@ export function glassTower(seed: number, floors: number, tint: string, look = 0)
   const ant = 6 + hash2(seed, 2) * 8;
   p.flat.push(paint(cyl(0.12, 0.2, ant, 8), '#c7c9cc', tf(-D / 2, top + 0.6 + crown + ant / 2, 0)));
   p.beacon.push(paint(sphere(0.35, 10, 6), '#ff3030', tf(-D / 2, top + 0.6 + crown + ant, 0)));
+  rooftop(p, seed, look, { y: top + 0.6, front: -inset, back: -D + inset, zHalf: L / 2 - inset, keep: [[-14.2, -3.8, -5.2, 5.2]], cap: 3.4 });
   // Faixa de luz no topo (acende à noite).
   p.glow.push(paint(box(0.08, 0.35, L - inset * 2 - 1), ['#bfe4ff', '#c8fff0', '#ffe0b0', '#e0e4ff'][look], tf(-inset + 0.05, top - 0.6, 0)));
   return toRoundModel(p, top + crown);
@@ -141,6 +300,7 @@ export function apartmentBlock(seed: number, floors: number, tint: string, L = 1
   p.round.push(roundBar(D + 0.7, 0.85, L + 0.7, 0.28, '#d8d4cc', tf(-D / 2, H, 0))); // cornija
   p.round.push(paint(bevelBox(4, 2.6, 3.4, 0.4), '#b8b2a8', tf(-D / 2 - 1, H + 1.3 + 0.85, -L / 4))); // casa de máquinas
   p.flat.push(paint(cyl(1, 1, 1.8, 14), '#6a8aa8', tf(-D / 2 + 2, H + 1.7, L / 4)));
+  rooftop(p, seed, look, { y: H + 0.85, front: 0, back: -D, zHalf: L / 2, keep: [[-10.5, -6.5, -6.2, -2.8], [-6.5, -4.5, 3.5, 5.5]], cap: 2.6 });
   p.glow.push(paint(box(0.06, 0.4, 1.8), SHOP_GLOW[look], tf(0.08, 3.6, L / 2 - 2.5)));
   return toRoundModel(p, H + 3);
 }
@@ -170,6 +330,9 @@ export function beachApartment(seed: number, floors: number, tint: string, L = 2
   flat.push(paint(round(roundedBar(D + 0.6, 0.9, L + 0.6, 0.3, 1)), '#d8d4cc', tf(-D / 2, H, 0))); // cornija
   flat.push(paint(bevelBox(D - 4, 2.8, L - 6, 0.5), '#b8b2a8', tf(-D / 2 - 1, H + 0.9 + 1.4, -L / 5))); // casa de máquinas
   flat.push(paint(cyl(1.1, 1.1, 1.8, 14), '#6a8aa8', tf(-D / 2 + 2, H + 1.8, L / 4))); // caixa-d'água
+  const roof = newParts(look);
+  rooftop(roof, seed, look, { y: H + 0.9, front: 0, back: -D, zHalf: L / 2, keep: [[-13.2, -2.8, -11.2, 3.2], [-6.2, -3.8, 3.9, 6.1]], cap: 2.8 }); // adereços do topo (V22/F5)
+  flat.push(...roof.flat);
   glow.push(paint(box(0.06, 0.4, 1.8), SHOP_GLOW[look], tf(0.08, 3.6, L / 2 - 2.5)));
   const body = paint(bevelBox(D, H - 4, L, 0.7, FACADE_TILE.apartment), tint, tf(-D / 2, 4 + (H - 4) / 2, 0), true);
   const base = mergeRound(flat);
@@ -183,7 +346,7 @@ export function beachApartment(seed: number, floors: number, tint: string, L = 2
     shadeY(wall, 0, H + 3, 0.82, 1.05);
   }
   shadeY(base, -1, H + 3, 0.78, 1.06);
-  const parts: ModelPart[] = [{ geometry: base, mat: 'flat', shadow: true }, { geometry: wall, mat: 'apartment', shadow: true }, { geometry: merge(glow), mat: 'glow' }];
+  const parts: ModelPart[] = [{ geometry: occlude(base), mat: 'flat', shadow: true }, { geometry: occlude(wall), mat: 'apartment', shadow: true }, { geometry: merge(glow), mat: 'glow' }];
   return { parts, blob: 0 };
 }
 
@@ -219,7 +382,14 @@ export function classicBuilding(seed: number, floors: number, tint: string, L = 
     p.round.push(paint(bevelBox(1.2, 1.6, 1.3, 0.18), '#e6ddcc', tf(-1.4, top + 1.6, z)));
     p.flat.push(paint(gable(1.4, 0.7, 1.5), roof, tf(-1.4, top + 2.4, z, 1, 1, 1, 0, Math.PI / 2, 0)));
   }
-  for (const z of [-L / 2 + 1.5, L / 2 - 2]) p.flat.push(paint(box(0.9, 2.2, 1.4), '#b86a4a', tf(-D * 0.6, top + 4.4, z)));
+  for (const z of [-L / 2 + 1.5, L / 2 - 2]) {
+    if (!structureDetail.roof) { p.flat.push(paint(box(0.9, 2.2, 1.4), '#b86a4a', tf(-D * 0.6, top + 4.4, z))); continue; }
+    // V22/F5: a chaminé com tampa e dois tubos (a altura total é a de antes) e, numa delas, a antena de TV.
+    p.flat.push(paint(box(0.9, 1.9, 1.4), '#b86a4a', tf(-D * 0.6, top + 4.25, z)));
+    p.flat.push(paint(box(1.1, 0.1, 1.6), '#d8d2c6', tf(-D * 0.6, top + 5.25, z)));
+    for (const dz of [-0.35, 0.35]) p.flat.push(paint(cylN(0.14, 0.16, 0.2, 6), '#8a5a44', tf(-D * 0.6, top + 5.4, z + dz)));
+    if (z < 0) { p.flat.push(paint(cylN(0.03, 0.04, 0.9, 4), '#b8bcc2', tf(-D * 0.6 + 0.2, top + 5.0, z - 0.45))); p.flat.push(paint(box(0.03, 0.03, 0.7), '#b8bcc2', tf(-D * 0.6 + 0.2, top + 5.2, z - 0.45))); }
+  }
   return toRoundModel(p, top + 5);
 }
 
@@ -244,6 +414,7 @@ export function brickMidrise(seed: number, floors: number, tint: string, neon: s
   p.glow.push(paint(box(0.08, signH - 0.6, 1.8), neon, tf(1.02, H - signH / 2 - 1, sz)));
   p.flat.push(paint(box(0.3, 2.6, L * 0.7), '#1a1c20', tf(-D / 2, H + 1.9, 0)));
   p.glow.push(paint(box(0.06, 1.6, L * 0.62), neon, tf(-D / 2 + 0.18, H + 1.95, 0)));
+  rooftop(p, seed, look, { y: H + 0.75, front: 0, back: -D, zHalf: L / 2, keep: [[-7.4, -6.6, -5.8, 5.8]], cap: 2.45 });
   return toRoundModel(p, H + 4);
 }
 
