@@ -11,7 +11,7 @@ import { areaShares } from './scenery-medidas';
 const PROPS: Array<[string, number, number, number]> = [
   ['lamp', 0.5, 0.25, 320],
   ['sign:left', 0.85, 0.15, 220], ['sign:right', 0.85, 0.15, 220],
-  ['billboard:0', 0.9, 0.1, 600], ['pitsign', 0.8, 0.15, 220],
+  ['billboard:0', 0.9, 0.1, 680] /* F5: 600 → 680 de propósito: passarela com guarda-corpo, escada e mãos-francesas (+~150 △ por outdoor; poucos por pista) */, ['pitsign', 0.8, 0.15, 220],
   // Arquibancada: os degraus de concreto são planos por projeto; o que é redondo é o muro, a cobertura, os pilares e o alambrado.
   // Tetos 3.500 / 3.800 (eram 3.300 / 3.600): `cyl` de 8 a 13 lados sobe para 14 em todo o jogo (`roundSides`, a faceta da bíblia) e a arquibancada é feita de pilares e postes de alambrado cilíndricos
   // (3.422 e 3.686 medidos). O custo que importa é o do quadro (`scenery-forma`: o pior segmento segue ≤ 900); este teto só impede que a peça volte a crescer sem aviso.

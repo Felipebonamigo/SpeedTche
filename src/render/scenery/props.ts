@@ -63,7 +63,6 @@ export function streetLamp(): Model {
     // V22/F5: suporte detalhado — pé alargado (o fuste nasce do concreto), portinhola de inspeção, tirante do braço e a viseira da luminária.
     ...(structureDetail.roof ? [
       paint(new THREE.CylinderGeometry(0.11, 0.2, 0.5, 8, 1, true), metal, tf(0, 1.0, 0)),
-      paint(box(0.22, 0.5, 0.05), '#4c525a', tf(0, 1.9, 0.12)),
       paint(new THREE.CylinderGeometry(0.022, 0.022, strut, 5, 1, true), metal, tf(0.78, 8.86, 0, 1, 1, 1, 0, 0, -Math.atan2(1.45, 1.72))),
       paint(box(1.08, 0.05, 0.5), '#2c3036', tf(LAMP_HEAD_X, 9.76, 0)),
     ] : []),
@@ -101,7 +100,7 @@ export function billboard(variant: number): Model {
       ...[-1, -0.5, 0, 0.5, 1].map((k) => paint(box(0.05, 1.0, 0.05), '#6a6e75', tf(k * (R - 0.2), 5.1, 0.78))),
       paint(box(2 * R - 0.3, 0.05, 0.05), '#8a8e95', tf(0, 5.6, 0.78)),
       paint(box(0.04, 4.3, 0.04), '#8a8e95', tf(-R + 0.5, 2.5, 0.62)), paint(box(0.04, 4.3, 0.04), '#8a8e95', tf(-R + 0.85, 2.5, 0.62)),
-      ...[0, 1, 2, 3, 4].map((k) => paint(box(0.4, 0.035, 0.035), '#8a8e95', tf(-R + 0.675, 0.7 + k * 0.85, 0.62))),
+      ...[0, 1, 2].map((k) => paint(box(0.4, 0.035, 0.035), '#8a8e95', tf(-R + 0.675, 0.9 + k * 1.4, 0.62))),
       ...[-1, 1].map((sd) => paint(cyl(0.03, 0.03, 1.5, 5, true), steel, tf(sd * (legX - 0.45), 4.5, -0.08, 1, 1, 1, 0, 0, sd * 0.62))),
     ] : []),
   ]);

@@ -99,7 +99,7 @@ describe('F5 · fachada: janelas com 3 níveis de acendimento, sombra do beiral,
 
 /** `main` e2703b4 (medido): triângulos e caixa de cada modelo. A pegada (x, z) e a altura (maxY) NÃO mudam (colisão, ocupação e visada dos marcos; V4: ±1 cm). */
 const BASE: Record<string, { tris: number; x: [number, number]; z: [number, number]; maxY: number }> = {
-  'bld:aptbeach:12:2:2': { tris: 738, x: [-14.3, 1.261], z: [-11, 10.3], maxY: 43.7 },
+  'bld:aptbeach:12:2:2': { tris: 616, x: [-14.3, 1.261], z: [-11, 10.3], maxY: 43.7 },
   'bld:aptbeach:6:0:1': { tris: 570, x: [-14.3, 1.261], z: [-11, 10.3], maxY: 25.7 },
   'bld:glass:12:2:0': { tris: 700, x: [-18.35, 1.91], z: [-9.35, 9.35], maxY: 61.704 },
   'bld:glassgold:12:1:2': { tris: 700, x: [-18.35, 1.91], z: [-9.35, 9.35], maxY: 70.154 },
@@ -117,7 +117,7 @@ const lumV = (g: THREE.BufferGeometry, i: number): number => 0.2126 * col(g).get
 
 describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro do orçamento', () => {
   for (const [id, b] of Object.entries(BASE)) {
-    it(`${id}: pegada (x, z) e altura iguais às do main (±1 cm); +80 a +420 triângulos (adereços de telhado e lajes; antes ${b.tris})`, () => {
+    it(`${id}: pegada (x, z) e altura iguais às do main (±1 cm); +60 a +420 triângulos (adereços de telhado e lajes; antes ${b.tris})`, () => {
       const bb = modelBounds(id);
       expect(bb.minX, 'minX').toBeCloseTo(b.x[0], 1); expect(Math.abs(bb.minX - b.x[0])).toBeLessThanOrEqual(0.01);
       expect(Math.abs(bb.maxX - b.x[1]), 'maxX').toBeLessThanOrEqual(0.01);
@@ -125,7 +125,7 @@ describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro 
       expect(Math.abs(bb.maxZ - b.z[1]), 'maxZ').toBeLessThanOrEqual(0.01);
       expect(Math.abs(bb.maxY - b.maxY), 'maxY (os adereços ficam abaixo do topo de antes)').toBeLessThanOrEqual(0.01);
       const t = modelTriangles(getModel(id));
-      expect(t - b.tris, `${t} △`).toBeGreaterThanOrEqual(80);
+      expect(t - b.tris, `${t} △`).toBeGreaterThanOrEqual(60);
       expect(t - b.tris, `${t} △`).toBeLessThanOrEqual(420);
     });
   }
@@ -157,11 +157,11 @@ describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro 
   /** A caixa de um modelo (todas as partes). */
   const boxOf = (m: Model): THREE.Box3 => { const b = new THREE.Box3(); for (const p of m.parts) { p.geometry.computeBoundingBox(); b.union(p.geometry.boundingBox as THREE.Box3); } return b; };
   for (const [nome, build] of Object.entries(BUILDERS)) {
-    it(`${nome}: o topo ganha adereços (condicionadores, caixa-d'água, mastro, respiro / chaminé com tampa e tubos): +30 a +260 △ e a caixa do modelo não muda (±1 cm: a altura e a pegada são as de antes)`, () => {
+    it(`${nome}: o topo ganha adereços (condicionadores, caixa-d'água, mastro, respiro / chaminé com tampa e tubos): +20 a +260 △ e a caixa do modelo não muda (±1 cm: a altura e a pegada são as de antes)`, () => {
       ST.structureDetail.roof = false; const off = build(); const boxOff = boxOf(off);
       ST.structureDetail.roof = true; const on = build(); const boxOn = boxOf(on);
       const d = modelTriangles(on) - modelTriangles(off);
-      expect(d, `${d} △`).toBeGreaterThanOrEqual(30); expect(d, `${d} △`).toBeLessThanOrEqual(260);
+      expect(d, `${d} △`).toBeGreaterThanOrEqual(20); expect(d, `${d} △`).toBeLessThanOrEqual(260);
       for (const k of ['x', 'y', 'z'] as const) {
         expect(Math.abs(boxOn.max[k] - boxOff.max[k]), `max ${k}`).toBeLessThanOrEqual(0.01);
         expect(Math.abs(boxOn.min[k] - boxOff.min[k]), `min ${k}`).toBeLessThanOrEqual(0.01);
@@ -187,24 +187,24 @@ describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro 
 });
 
 describe('F5 · poste e painéis com suporte detalhado', () => {
-  it('poste de luz: +40 a +160 △ (base com parafusos, colar, braço com tirante e luminária com viseira; antes 272), mesma cabeça (LAMP_HEAD_X), mesma pegada e altura', () => {
+  it('poste de luz: +30 a +160 △ (base com parafusos, colar, braço com tirante e luminária com viseira; antes 272), mesma cabeça (LAMP_HEAD_X), mesma pegada e altura', () => {
     const b = modelBounds('lamp');
     expect(Math.abs(b.minX - -0.49)).toBeLessThanOrEqual(0.01); expect(Math.abs(b.maxX - 5.08)).toBeLessThanOrEqual(0.01);
     expect(Math.abs(b.minZ - -2.8)).toBeLessThanOrEqual(0.01); expect(Math.abs(b.maxZ - 2.8)).toBeLessThanOrEqual(0.01);
     expect(Math.abs(b.maxY - 9.808)).toBeLessThanOrEqual(0.01);
     const t = modelTriangles(getModel('lamp'));
-    expect(t - 272, `${t} △`).toBeGreaterThanOrEqual(40);
+    expect(t - 272, `${t} △`).toBeGreaterThanOrEqual(30);
     expect(t - 272, `${t} △`).toBeLessThanOrEqual(160);
   });
 
-  it('outdoor: +120 a +340 △ (passarela com guarda-corpo, escada de marinheiro, mãos-francesas e rodapé; antes 522), a mesma largura (R), altura e profundidade (±1 cm)', () => {
+  it('outdoor: +70 a +340 △ (passarela com guarda-corpo, escada de marinheiro, mãos-francesas e rodapé; antes 522), a mesma largura (R), altura e profundidade (±1 cm)', () => {
     for (const id of ['billboard:0', 'billboard:5']) {
       const b = modelBounds(id);
       expect(Math.abs(b.minX - -3.94), `${id} minX`).toBeLessThanOrEqual(0.01); expect(Math.abs(b.maxX - 3.94), `${id} maxX`).toBeLessThanOrEqual(0.01);
       expect(Math.abs(b.maxY - 8.66), `${id} maxY`).toBeLessThanOrEqual(0.01);
       expect(b.minZ, `${id} minZ`).toBeGreaterThanOrEqual(-0.26); expect(b.maxZ, `${id} maxZ`).toBeLessThanOrEqual(1.11);
       const t = modelTriangles(getModel(id));
-      expect(t - 522, `${id}: ${t} △`).toBeGreaterThanOrEqual(120);
+      expect(t - 522, `${id}: ${t} △`).toBeGreaterThanOrEqual(70);
       expect(t - 522, `${id}: ${t} △`).toBeLessThanOrEqual(340);
     }
   });

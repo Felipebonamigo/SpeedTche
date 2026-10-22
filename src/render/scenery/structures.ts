@@ -22,12 +22,12 @@ export const structureDetail = { ao: true, roof: true };
  * V22/F5: oclusão de ambiente assada na COR dos vértices de um prédio (a luz que o sol e o céu não dão nos cantos): (1) o pé, de 0 a 1,4 m do chão, escurece até
  * 50% (o contato com a calçada: sem isto o prédio "flutua" na grama); (2) as faces voltadas para baixo (a barriga das lajes, da cornija, do toldo, dos beirais de 3 m
  * para cima) escurecem 38%. A parede logo abaixo de cada laje leva a sua sombra na textura da fachada (`eaveShade`, textures.ts). O pé pede vértices: `sliceY` corta os
- * triângulos que cruzam 0,4 e 1,0 m (menos os de fundo, voltados para trás: a pista nunca os vê), com a uv, a cor e a normal interpoladas (~+100 △ por prédio).
+ * triângulos que cruzam 0,5 m (menos os de fundo, voltados para trás: a pista nunca os vê), com a uv, a cor e a normal interpoladas (~+100 △ por prédio).
  */
 const FOOT_REACH = 1.4;
 const FOOT_STRENGTH = 0.6;
 const UNDER_STRENGTH = 0.38;
-const FOOT_PLANES = [0.4, 1.0] as const;
+const FOOT_PLANES = [0.5] as const;
 
 /** O mesmo contato escuro do pé, sem cortar a malha (props pequenos: poste, placa): a cor de cada vértice a menos de `reach` m do chão escurece até `strength`. */
 export function footShade(g: Geo, reach = 1.0, strength = 0.45): Geo {
@@ -213,7 +213,7 @@ function rooftop(p: Parts, seed: number, look: number, r: Roof): void {
   const acX = r.front - 1.3;
   const z0 = mir * (-r.zHalf * 0.55 + h(1) * r.zHalf * 0.6);
   let placed = 0;
-  for (let k = 0; k < 8 && placed < 3; k++) {
+  for (let k = 0; k < 8 && placed < 2; k++) {
     const z = z0 + mir * k * 1.7;
     if (!free(acX, z, 0.7, 0.55)) continue;
     put(acX, z, 0.7, 0.55);
@@ -242,14 +242,6 @@ function rooftop(p: Parts, seed: number, look: number, r: Roof): void {
     const mh = Math.min(r.cap, 2.3);
     p.flat.push(paint(cylN(0.04, 0.06, mh, 5), '#b8bcc2', tf(mx, r.y + mh / 2, z)));
     p.flat.push(paint(box(0.04, 0.04, 1.2), '#b8bcc2', tf(mx, r.y + mh * 0.8, z)));
-    break;
-  }
-  const vx = r.back + 1.4;
-  for (let k = 0; k < 4; k++) {
-    const z = mir * ((h(4) + k * 0.29) % 1 * 2 - 1) * (r.zHalf - 1.0);
-    if (!free(vx, z, 0.4, 0.4)) continue;
-    put(vx, z, 0.4, 0.4);
-    p.flat.push(paint(box(0.6, 0.7, 0.6), '#9aa0a8', tf(vx, r.y + 0.35, z)));
     break;
   }
 }

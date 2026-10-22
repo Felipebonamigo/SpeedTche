@@ -311,7 +311,8 @@ describe('F4 · densidade por número de jogadores', () => {
       expect(objs / n, `${d.id}: objetos por segmento`).toBeLessThanOrEqual(16);
     }
     expect(worstFull, 'pior pista, layout inteiro').toBeLessThanOrEqual(1250);
-    expect(worstBase, 'pior pista, 3–4 jogadores').toBeLessThanOrEqual(781 * 1.08);
+    // F5 (V22): 1,08 → 1,18 de propósito. O teto media só o enfeite da F4 (781 de antes); a F5 põe adereços de telhado, oclusão no pé e lajes nos PRÉDIOS (+~80 △ no pior segmento de Roma, 885 contra 807), que toda lotação paga e que o teto próprio de 900 do scenery-forma continua segurando.
+    expect(worstBase, 'pior pista, 3–4 jogadores').toBeLessThanOrEqual(781 * 1.18);
   }, 120000);
 
   it('a cobertura rente à pista é contínua: ≥ 8 tufos de forração por segmento e lado (entre 9,6 e 23 m; o tapete conta 3) com 1–2 jogadores, ≥ 4 com 3–4 (sem o enfeite farto)', () => {
