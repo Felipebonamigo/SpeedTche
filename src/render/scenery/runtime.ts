@@ -15,7 +15,7 @@ import { getModel, landmarkOf, modelHeight } from './catalog';
 import { FACADE_CELL_SPAN, type MatKey, type Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
-import { blobOpacityFor, blobShape, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
+import { blobOpacityFor, blobShape, CONTACT_LAYERS, CONTACT_LAYER_SCALE, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
 import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
 import { applyWind, makeWindUniforms, windDetailOn } from './wind';
@@ -370,7 +370,7 @@ export class Scenery {
         for (const model of p.far >= 0 ? [p.model, p.far] : [p.model]) {
           const ref = refFor(model, p.sprite);
           for (const s of ref.slots) counts[s][i]++;
-          if (ref.blob > 0) { counts[blobSlot(ref.thin ? 'thin' : 'crown')][i]++; counts[blobSlot('contact')][i]++; }
+          if (ref.blob > 0) { counts[blobSlot(ref.thin ? 'thin' : 'crown')][i]++; counts[blobSlot('contact')][i] += CONTACT_LAYERS; }
         }
       }
     }
@@ -566,11 +566,14 @@ export class Scenery {
         e[12] = x; e[13] = gy; e[14] = z; e[15] = 1;
       }
       this.writeSlot(this.blobSlots[thin ? 'thin' : 'crown'], null);
-      // O contato: disco curto e escuro no pé (a oclusão de onde o objeto toca o chão).
+      // O contato: discos curtos e escuros empilhados no pé (a oclusão de onde o objeto toca o chão): a opacidade do material é ≤ 0,34, e dois discos somam ~0,5 no miolo.
       const c = contactRadius(r, thin);
-      e[0] = c; e[1] = 0; e[2] = 0; e[8] = 0; e[10] = c; e[9] = 0;
-      e[12] = x; e[14] = z; e[13] = gy + 0.005;
-      this.writeSlot(this.blobSlots.contact, null);
+      e[1] = 0; e[2] = 0; e[8] = 0; e[9] = 0; e[12] = x; e[14] = z;
+      for (let k = 0; k < CONTACT_LAYERS; k++) {
+        const ck = c * CONTACT_LAYER_SCALE[k];
+        e[0] = ck; e[10] = ck; e[13] = gy + 0.005 * (k + 1);
+        this.writeSlot(this.blobSlots.contact, null);
+      }
     }
   }
 

@@ -664,6 +664,16 @@ export const SHOULDER_REPEAT_M = 6;
 export const SHOULDER_TEX = { w: 96, h: 256 } as const;
 
 /**
+ * V22/F6: a oclusão de contato no pé de FORA da guia (onde o meio-fio assenta no cascalho): 1 fora de u 0,36–0,58 e até 0,75 no pé (u 0,47), em seno ao quadrado (sem degrau).
+ * Antes o degradê só descia da guia clara ao cascalho: a guia parecia pintada no chão, sem assento. O lado de dentro já tem a sarjeta escura (u 0–0,1).
+ */
+export function shoulderContactAo(u: number): number {
+  const t = (u - 0.36) / 0.22;
+  if (t <= 0 || t >= 1) return 1;
+  return 1 - 0.25 * Math.sin(Math.PI * t) ** 2;
+}
+
+/**
  * V11: o acostamento em pixels, do asfalto (u = 0) ao terreno (u = 1): a SARJETA escura de 0 a 0,10 (pó de pneu e sombra do meio-fio), a GUIA clara de 0,14 a
  * 0,40 (o meio-fio pintado, esmaecendo até 0,5), o miolo de cascalho/terra com pedrisco e manchas, e de 0,8 a 1 o degradê até a cor da faixa de transição do chão (`verge`:
  * é a cor da primeira coluna do terreno, então não há degrau). Pixel puro (testável no Node): era um canvas com um gradiente escuro só na borda de dentro.
@@ -692,7 +702,7 @@ export function shoulderImage(p: Palette): RoadImage {
       const base = sstep(edge - 0.07, edge + 0.07, u); const wVerge = Math.max(0, Math.min(1, base + (hash2(i, 4343) - 0.5) * 0.35 * 4 * base * (1 - base)));
       r += (verge[0] - r) * wVerge; g += (verge[1] - g) * wVerge; b += (verge[2] - b) * wVerge;
       // Pedrisco (claro e escuro) e manchas em escala de 1 m; mais fino perto da guia (concreto) que no cascalho.
-      const k = 1 + 0.16 * (hash2(i, 4242) - 0.5) + 0.07 * blot.at(u * 1.4 / 0.5, my / 1);
+      const k = (1 + 0.16 * (hash2(i, 4242) - 0.5) + 0.07 * blot.at(u * 1.4 / 0.5, my / 1)) * shoulderContactAo(u);
       data[i * 4] = Math.min(255, r * k); data[i * 4 + 1] = Math.min(255, g * k); data[i * 4 + 2] = Math.min(255, b * k); data[i * 4 + 3] = 255;
     }
   }

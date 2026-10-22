@@ -57,6 +57,10 @@ export function blobShape(sun: SunDir, radius: number, height: number, thin: boo
   return out;
 }
 
+/** Discos de contato empilhados no pé (o de cima, de 60% do raio, soma ao de baixo: o miolo fica ~0,5 de alfa com o material em 0,32) e a razão de raio de cada um. */
+export const CONTACT_LAYERS = 2;
+export const CONTACT_LAYER_SCALE: readonly number[] = [1, 0.6];
+
 /** Raio do disco de contato no pé (a oclusão curta e escura onde o objeto toca o chão). */
 export function contactRadius(radius: number, _thin: boolean): number {
   return Math.min(1.4, Math.max(0.35, 0.5 * radius));

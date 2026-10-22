@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { getTrack } from '../src/core/track';
-import { livePalette } from '../src/render/palette';
+import { livePalette, palette, SCENERIES, TIMES_OF_DAY } from '../src/render/palette';
+import * as RT from '../src/render/road-textures';
 import { shadowPlan, SHADOW_SPAN_M } from '../src/render/postfx/plan';
 import { ShadowRing } from '../src/render/postfx/shadows';
 import { buildRoadFrame } from '../src/render/roadframe';
@@ -197,10 +198,14 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
     expect(med(baixo)).toBeGreaterThan(med(alto) + 0.4);
   }, 120000);
 
-  it('cada mancha tem o seu contato escuro no pé: um disco curto (≤ 0,6 do raio) no ponto onde o objeto toca o chão, e a elipse o cobre', async () => {
+  it('cada mancha tem o seu contato escuro no pé: 2 discos curtos empilhados (o miolo e a borda, ≤ 0,6 do raio) no ponto onde o objeto toca o chão, e a elipse os cobre', async () => {
     const ms = await manchas('copacabana', 0.3, sunTo(34, -42));
     const crowns = ms.filter((b) => b.kind === 'crown'); const thins = ms.filter((b) => b.kind === 'thin'); const contacts = ms.filter((b) => b.kind === 'contact');
-    expect(contacts.length, 'um contato por objeto com mancha').toBe(crowns.length + thins.length);
+    // A opacidade do material é ≤ 0,34 (e uma mancha só de 0,3 some sobre o verde vivo): o contato é CONTACT_LAYERS discos empilhados (0,32 → ~0,5 no miolo), de raios decrescentes.
+    expect(SB.CONTACT_LAYERS).toBeGreaterThanOrEqual(2);
+    expect(contacts.length, 'CONTACT_LAYERS contatos por objeto com mancha').toBe(SB.CONTACT_LAYERS * (crowns.length + thins.length));
+    const raios = new Set(contacts.map((c) => c.b.toFixed(3)));
+    expect(raios.size, 'as camadas têm raios diferentes (um miolo mais escuro)').toBeGreaterThanOrEqual(SB.CONTACT_LAYERS);
     // cada contato cai dentro de alguma elipse (o pé está coberto) e é menor que ela
     let dentro = 0;
     for (const c of contacts) {
@@ -234,5 +239,34 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
     }
     expect(g.blobMat.version).toBe(v0);
     s.dispose();
+  });
+});
+
+describe('V22/F6 (D): oclusão de contato na pista — o pé da guia', () => {
+  type Img = { width: number; height: number; data: ArrayLike<number> };
+  const luma = (im: Img, x: number, y: number): number => (0.2126 * im.data[(y * im.width + x) * 4] + 0.7152 * im.data[(y * im.width + x) * 4 + 1] + 0.0722 * im.data[(y * im.width + x) * 4 + 2]) / 255;
+  /** Luma média da faixa u0..u1 do acostamento (todas as linhas: o pedrisco e a mancha da textura se anulam). */
+  const band = (im: Img, u0: number, u1: number): number => {
+    let s = 0; let n = 0;
+    for (let y = 0; y < im.height; y++) for (let x = Math.floor(u0 * im.width); x < Math.ceil(u1 * im.width); x++) { s += luma(im, x, y); n++; }
+    return s / n;
+  };
+
+  it('`shoulderContactAo(u)`: 1 longe do pé da guia, ≤ 0,86 no pé, suave (sem degrau) e só do lado de fora da guia', () => {
+    const f = RT.shoulderContactAo;
+    expect(f, 'shoulderContactAo não existe').toBeTypeOf('function');
+    for (const u of [0, 0.05, 0.14, 0.3, 0.62, 0.8, 1]) expect(f(u), `u ${u}`).toBeCloseTo(1, 9);
+    const pe = Math.min(...Array.from({ length: 200 }, (_, i) => f(0.3 + (i / 199) * 0.35)));
+    expect(pe).toBeLessThanOrEqual(0.86);
+    expect(pe).toBeGreaterThan(0.6);
+    for (let i = 1; i <= 400; i++) expect(Math.abs(f(i / 400) - f((i - 1) / 400)), `u ${i / 400}`).toBeLessThan(0.02);
+  });
+
+  it('o acostamento pintado tem o pé da guia mais escuro que o cascalho ao lado (antes: o degradê da guia só descia da guia clara ao cascalho), nos 6 biomas × 3 horas', () => {
+    for (const sc of SCENERIES) for (const t of TIMES_OF_DAY) {
+      const im = RT.shoulderImage(palette(sc, t)) as Img;
+      const pe = band(im, 0.44, 0.5); const miolo = band(im, 0.58, 0.68);
+      expect(pe / miolo, `${sc}/${t}: pé ${pe.toFixed(3)} ÷ miolo ${miolo.toFixed(3)}`).toBeLessThanOrEqual(0.98);
+    }
   });
 });
