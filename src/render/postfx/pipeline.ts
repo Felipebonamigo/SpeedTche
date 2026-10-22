@@ -7,7 +7,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { gradeUniforms } from '../stylize';
+import { DITHER_GLSL, gradeUniforms } from '../stylize';
 import { AoPass } from './ao';
 import type { PostPlan } from './plan';
 import { RadialBlurPass } from './radial';
@@ -26,6 +26,42 @@ const HIGH_PASS_ANCHOR = 'gl_FragColor = mix( outputColor, texel, alpha );';
 export function patchBloomHighPass(fragment: string): string {
   if (!fragment.includes(HIGH_PASS_ANCHOR)) throw new Error('pipeline: o three mudou o LuminosityHighPassShader (âncora do teto do bloom não achada)');
   return fragment.replace(HIGH_PASS_ANCHOR, () => `texel.rgb *= min( 1.0, ( luminosityThreshold * ${BLOOM_CEILING.toFixed(1)} ) / max( v, 1e-4 ) );\n\t\t\t${HIGH_PASS_ANCHOR}`);
+}
+
+// ───────────────────────────── vinheta e dither na saída (V22/F7) ─────────────────────────────
+
+/** A vinheta (escurecimento no canto, em luma de TELA: 0,11 = 11% mais escuro): o teto, e a conta que o shader repete. O diagnóstico (V22 §3.9): a bíblia prometia "vinheta leve" e não havia. */
+export const VIGNETTE_MAX = 0.11;
+/** Onde ela começa, em fração da distância do centro ao canto (0 no miolo, 1 no canto): nada até 45%. */
+export const VIGNETTE_FROM = 0.45;
+
+/** O escurecimento (0..`amount`) à fração `r` do centro ao canto: `smoothstep(FROM, 1, r)`, sem degrau. */
+export function vignetteAt(r: number, amount: number = VIGNETTE_MAX): number {
+  const t = Math.min(1, Math.max(0, (r - VIGNETTE_FROM) / (1 - VIGNETTE_FROM)));
+  return amount * t * t * (3 - 2 * t);
+}
+
+const OUTPUT_DECL_ANCHOR = 'uniform sampler2D tDiffuse;';
+const OUTPUT_COLOR_ANCHOR = '// color space';
+
+/**
+ * O fragmento do `OutputShader` do three com a vinheta e o dither entre o tone mapping e a conversão de cor (o pé de tudo: 0 passe a mais). O dither é ESTE, o único da Média em diante
+ * (o domo do céu só o dá na Baixa, que não tem este passe). Falha alto se o three mudar as âncoras.
+ */
+export function patchOutputFragment(fragment: string): string {
+  if (!fragment.includes(OUTPUT_DECL_ANCHOR) || !fragment.includes(OUTPUT_COLOR_ANCHOR)) throw new Error('pipeline: o three mudou o OutputShader (âncoras da vinheta e do dither não achadas)');
+  return fragment
+    .replace(OUTPUT_DECL_ANCHOR, () => `${OUTPUT_DECL_ANCHOR}\nuniform float uVignette;\n${DITHER_GLSL}`)
+    .replace(OUTPUT_COLOR_ANCHOR, () => `// V22/F7: vinheta (luma de tela, o quadrado leva à luz linear) e o dither de 1 LSB
+\t\t\t{
+\t\t\t\tfloat vr = length( ( vUv - 0.5 ) * 2.0 ) * 0.70710678;
+\t\t\t\tfloat vt = clamp( ( vr - ${VIGNETTE_FROM.toFixed(2)} ) / ${(1 - VIGNETTE_FROM).toFixed(2)}, 0.0, 1.0 );
+\t\t\t\tfloat vv = 1.0 - uVignette * vt * vt * ( 3.0 - 2.0 * vt );
+\t\t\t\tgl_FragColor.rgb *= vv * vv;
+\t\t\t\tgl_FragColor.rgb = stylizeDither( gl_FragColor.rgb, gl_FragCoord.xy, 1.0 );
+\t\t\t}
+
+\t\t\t${OUTPUT_COLOR_ANCHOR}`);
 }
 
 /** O bloom com a cadeia começando em `scale` × ½ do alvo: 1 = a do `UnrealBloomPass`; 0,5 = bloom em meia resolução (a Média). Com teto (`BLOOM_CEILING`). */
@@ -50,6 +86,8 @@ export interface FrameParams {
   scale: number;
   /** Força do desfoque radial, 0..1. */
   radial: number;
+  /** V22/F7: a vinheta deste viewport (`PostPlan.vignette`: o escurecimento no canto). */
+  vignette: number;
 }
 
 export class ViewportPipeline {
@@ -87,6 +125,10 @@ export class ViewportPipeline {
     // O OutputPass faz o tone mapping aqui (o desenho foi a um alvo): os uniformes da gradação (L1) entram no material dele.
     this.output = new OutputPass();
     Object.assign(this.output.uniforms, gradeUniforms);
+    // V22/F7: a vinheta e o dither entram no fragmento da saída (0 passe: o gate de passes não muda); `uVignette` é por quadro (a lotação muda o valor).
+    this.output.uniforms.uVignette = { value: plan.vignette };
+    this.output.material.fragmentShader = patchOutputFragment(this.output.material.fragmentShader);
+    this.output.material.needsUpdate = true;
     this.composer.addPass(this.output);
     this.fxaa = plan.aa === 'fxaa' ? new FXAAPass() : null;
     if (this.fxaa) this.composer.addPass(this.fxaa);
@@ -117,6 +159,7 @@ export class ViewportPipeline {
     this.stage.setRegion(this.width * p.scale, this.height * p.scale);
     if (this.ao) { this.ao.enabled = aoOn; this.ao.bind(p.camera, this.stage.depthTexture, this.stage.regionW, this.stage.regionH); }
     this.radial?.setStrength(p.radial);
+    this.output.uniforms.uVignette.value = p.vignette;
     this.composer.render();
     return this.stats();
   }

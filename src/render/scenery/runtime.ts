@@ -223,7 +223,8 @@ export class Scenery {
     this.hazeMat.onBeforeCompile = (shader) => {
       shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', `#ifdef USE_FOG
   float hazeD = fogDensity * ${HAZE_FOG_SCALE.toFixed(3)} * vFogDepth;
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(-hazeD * hazeD));
+  vec3 hazeCol = fogColor; stylizeFogTone(hazeCol, vFogRay); // V22/F7: só o TOM do lado do sol (sem a bruma extra: o lote já tem a névoa mais fina dele)
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeCol, 1.0 - exp(-hazeD * hazeD));
 #endif`);
     };
     this.hazeMat.customProgramCacheKey = () => 'scenery-haze';

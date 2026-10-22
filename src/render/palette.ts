@@ -79,6 +79,9 @@ export interface Palette {
   /** Terreno por altura e inclinação. */
   groundLow: string;
   groundHigh: string;
+  /** V22/F7: o chão com 3 tons por bioma. `groundLow` (o médio) e `groundHigh` seguem como eram; o claro QUENTE (matiz para o amarelo, mais luz) e o escuro FRIO (matiz para o azul-esmeralda, menos luz) entram onde o tom do chão passa de 0,5 e onde cai abaixo dele (terrain.ts). */
+  groundWarm: string;
+  groundCool: string;
   rock: string;
   snow: string;
   /** Areia da praia (litoral) e das dunas. */
@@ -166,6 +169,40 @@ function liftTo(hex: string, min: number): string {
   return out;
 }
 
+/** RGB 0..255 → [matiz°, saturação, valor] (HSV) e de volta: só para derivar os tons do chão. */
+function toHsv(hex: string): [number, number, number] {
+  const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
+  const mx = Math.max(r, g, b); const d = mx - Math.min(r, g, b);
+  let h = 0;
+  if (d > 0) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, mx === 0 ? 0 : d / mx, mx];
+}
+function fromHsv(h: number, s: number, v: number): string {
+  const hh = (((h % 360) + 360) % 360) / 60; const c = v * s; const x = c * (1 - Math.abs((hh % 2) - 1)); const m = v - c;
+  const [r, g, b] = hh < 1 ? [c, x, 0] : hh < 2 ? [x, c, 0] : hh < 3 ? [0, c, x] : hh < 4 ? [0, x, c] : hh < 5 ? [x, 0, c] : [c, 0, x];
+  return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+/** A cor com o matiz deslocado `hueDeg` graus, a saturação × `satMul` e o valor × `valMul` (HSV). */
+function retone(hex: string, hueDeg: number, satMul: number, valMul: number): string {
+  const [h, s, v] = toHsv(hex);
+  return fromHsv(h + hueDeg, Math.min(1, s * satMul), Math.min(1, v * valMul));
+}
+
+/**
+ * V22/F7, o chão com hierarquia de cor (V22 §3.8): o diagnóstico mediu grama a 0,90–0,93 de saturação na tela, no mesmo teto do céu (0,99) — nada guardava o máximo para o carro e a interface.
+ * `trim` desce a saturação do chão (o que passa a ~0,70–0,80 na tela depois da gradação); o tom CLARO sai do médio com o matiz para o amarelo (limão) e mais luz, o ESCURO para o azul-
+ * esmeralda e menos luz: "a grama que vai do amarelo ao azul-verde". `dir` inverte o sentido do matiz onde o chão já é amarelo-laranja (o deserto: a luz esquenta para o amarelo e a sombra
+ * vai ao vermelho-marrom). Valores a olho, calibrados nas capturas e no `nevoa-f7-gl.test.ts`.
+ */
+const GROUND_TRIO: Record<SceneryId, { trim: number; dir: 1 | -1; warm: number; cool: number }> = {
+  tropical: { trim: 0.8, dir: 1, warm: 20, cool: 18 },
+  alpine: { trim: 0.9, dir: 1, warm: 28, cool: 26 },
+  coast: { trim: 0.9, dir: 1, warm: 16, cool: 14 },
+  savanna: { trim: 0.92, dir: 1, warm: 12, cool: 14 },
+  city_night: { trim: 0.92, dir: 1, warm: 14, cool: 14 },
+  desert: { trim: 1, dir: -1, warm: 10, cool: 12 },
+};
+
 // ───────────────────────────── Bases diurnas ─────────────────────────────
 
 interface Base {
@@ -229,9 +266,9 @@ const BASES: Record<SceneryId, Base> = {
 const ROAD_TONE: Record<SceneryId, { day: string; dusk: string; night: string; alt: string; earth: number }> = {
   tropical: { day: '#82483c', dusk: '#b0644e', night: '#905a58', alt: '#f08038', earth: 0.9 }, // terra avermelhada da mata
   desert: { day: '#885a40', dusk: '#b8806c', night: '#986a70', alt: '#ffa860', earth: 1 }, // terra alaranjada
-  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#a276ae', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo (V12: mauve, não lilás-azulado)
-  alpine: { day: '#7c6672', dusk: '#947690', night: '#7c6aa0', alt: '#f0d8e0', earth: 0.3 }, // pedra rosada
-  coast: { day: '#6c6a68', dusk: '#a08078', night: '#847888', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente
+  city_night: { day: '#625e74', dusk: '#8a7a9c', night: '#b4729c', alt: '#c8c0f0', earth: 0 }, // asfalto que vira roxo (V12: mauve, não lilás-azulado); V22/F7: à noite rosa-mauve (321°), longe do violeta do chão (295°) e do índigo do prédio (237°), mesma luma
+  alpine: { day: '#7c6672', dusk: '#947690', night: '#9a6488', alt: '#f0d8e0', earth: 0.3 }, // pedra rosada; V22/F7: à noite rosa-mauve (320°; era violeta 260°, colado no chão de 267°), mesma luma
+  coast: { day: '#6c6a68', dusk: '#a08078', night: '#8c7482', alt: '#e8e0d0', earth: 0.1 }, // asfalto cinza quente; V22/F7: à noite cinza-rosado (325°; era 285°, colado no chão de 268°), mesma luma
   savanna: { day: '#80684a', dusk: '#b08064', night: '#946a58', alt: '#ffc868', earth: 0.85 }, // terra ocre
 };
 
@@ -305,7 +342,7 @@ function roxear(c: string, tone: string, amount: number): string {
 }
 
 /** A 2ª tinta da pista à noite (V12): mauve na cidade (o lilás-azulado de antes lia azul), a de sempre nos outros biomas. */
-const NIGHT_ROAD_ALT: Partial<Record<SceneryId, string>> = { city_night: '#e6bcf0', alpine: '#f0c8ec' };
+const NIGHT_ROAD_ALT: Partial<Record<SceneryId, string>> = { city_night: '#f0bcd8', alpine: '#f0c8ec' }; // V22/F7: a cidade acompanha o rosa-mauve da pista
 
 // ───────────────────────────── Gradação por hora ─────────────────────────────
 
@@ -407,14 +444,21 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
   const fogLight = mix(skyLight[2], skyLight[1], fogK); // a névoa que a luz do carro vê: a de antes do roxo (V12)
   // À noite o chão alto sobe um pouco (a mata e a montanha escuras engoliam a pista) e o asfalto leva menos azul que o resto: o carro
   // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
-  const groundLowLight = time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow);
-  const groundHighLight = time === 'night' ? liftTo(g(b.groundHigh), 0.12) : g(b.groundHigh);
+  const gt = GROUND_TRIO[scenery];
+  const trimmed = (c: string): string => retone(c, 0, gt.trim, 1); // V22/F7: a saturação do chão desce; o céu, o carro e a HUD ficam no teto
+  const groundLowLight = time === 'night' ? liftTo(g(trimmed(b.groundLow)), 0.125) : g(trimmed(b.groundLow));
+  const groundHighLight = time === 'night' ? liftTo(g(trimmed(b.groundHigh)), 0.12) : g(trimmed(b.groundHigh));
+  // O claro quente (do médio, mais luz e matiz para o amarelo) e o escuro frio (do alto, menos luz e matiz para o azul-esmeralda). O matiz dos dois vai ao roxo à noite, como o resto do chão.
+  const groundWarmLight = retone(groundLowLight, -gt.dir * gt.warm, 0.96, 1.14);
+  const groundCoolLight = retone(groundHighLight, gt.dir * gt.cool, 1.0, 0.8);
   // V12: à noite o chão e o que é de chão (beira, rocha, areia, planos do horizonte, neve) são pintados de roxo/magenta, com a luminância de antes. O que cai de luz no carro
   // (`hemiGround`, abaixo) segue saindo do chão de antes: o roxo é albedo do mundo, não luz no carro.
   const gp = NIGHT_GROUND_PURPLE[scenery];
   const purple = (c: string): string => (time === 'night' ? roxear(c, gp.tone, gp.amount) : c);
   const groundLow = purple(groundLowLight);
   const groundHigh = purple(groundHighLight);
+  const groundWarm = purple(groundWarmLight);
+  const groundCool = purple(groundCoolLight);
   // Cor-brilho: no entardecer e à noite o asfalto é neutro-quente (era o vinho e o marinho da gradação de hora: com a luz roxa, saía roxo).
   const asphalt = time === 'day' ? b.asphalt : shade(mix(b.asphalt, ASPHALT_LATE, time === 'night' ? 0.8 : 0.6), time === 'night' ? 0.72 : 0.92);
   // Os planos do horizonte puxam para o céu do período (o rosa do entardecer, o azul da noite).
@@ -440,7 +484,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     light,
     skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(groundLowLight, asphalt, 0.3), 0.55), hemiIntensity,
     envIntensity, exposure, fogDensity, bloom, cloudLit, cloudShade,
-    asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: purple(g(b.shoulder)), verge: purple(g(b.verge)), groundLow, groundHigh, rock: purple(g(b.rock)),
+    asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: purple(g(b.shoulder)), verge: purple(g(b.verge)), groundLow, groundHigh, groundWarm, groundCool, rock: purple(g(b.rock)),
     snow: time === 'day' ? '#f4f8ff' : time === 'dusk' ? '#ffe0e4' : '#c2b4ea',
     sand: purple(g(b.sand)),
     layers, layerHaze,

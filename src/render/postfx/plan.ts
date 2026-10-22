@@ -37,6 +37,8 @@ export interface PostPlan {
   dynamicResolution: boolean;
   /** Ids de `ULTRA_EFFECTS` (src/bench/ultra.ts) que este plano liga: o registro precisa dizer a verdade. */
   ultraEffects: string[];
+  /** V22/F7: o escurecimento do canto (luma de tela) que o OutputPass aplica; 0 onde não há OutputPass (Baixa). Mais leve com mais jogadores: os cantos de dentro se encontram no meio da tela. */
+  vignette: number;
 }
 
 /** AO: o GTAO da Alta (meia resolução) vale até 2 jogadores; o do Ultra (resolução cheia), até 4 (os pixels somados são os de 1). */
@@ -63,8 +65,12 @@ export function planFor(q: Quality, viewports: number): PostPlan {
     grade: true,
     dynamicResolution: post,
     ultraEffects: ultra ? ['gtao'] : [],
+    vignette: post ? VIGNETTE_BY_VIEWPORTS[n - 1] : 0,
   };
 }
+
+/** V22/F7: a vinheta por lotação (1, 2, 3, 4 jogadores): cheia sozinho, mais leve na tela dividida. */
+const VIGNETTE_BY_VIEWPORTS = [0.11, 0.08, 0.05, 0.05] as const;
 
 /** Ids dos efeitos ligados num degrau e numa lotação (cada degrau tem os do anterior). */
 export function qualityEffects(q: Quality, viewports: number): string[] {

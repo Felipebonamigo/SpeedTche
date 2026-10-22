@@ -9,6 +9,7 @@
 // mas nunca quebra. Os dois caminhos de tone mapping (material na baixa e na média; `OutputPass` na alta) usam o MESMO chunk global
 // `tonemapping_pars_fragment`, que `installToneMapping()` remenda uma vez.
 import * as THREE from 'three';
+import { atmosphereLook, installAtmosphere } from './atmosphere';
 import type { Palette } from './palette';
 
 /** Quem recebe qual rampa e qual borda. `rim` 0 = sem o código da borda (a decisão é em JS: o GLSL não faz `#if` com float). */
@@ -183,7 +184,12 @@ export function lightFor(p: Palette): LightLook {
 const vec3 = (): { value: THREE.Vector3 } => ({ value: new THREE.Vector3() });
 
 /** Só a gradação (o que o `OutputPass`, os `ShaderMaterial` e os `MeshBasic` recebem). `uGradeAdjust` = (saturação, contraste, pé sobre a luminância). */
-export const gradeUniforms = { uGradeShadows: vec3(), uGradeHighlights: vec3(), uGradeAdjust: vec3() };
+export const gradeUniforms = {
+  uGradeShadows: vec3(), uGradeHighlights: vec3(), uGradeAdjust: vec3(),
+  // V22/F7 (atmosphere.ts): a névoa com altura e lado do sol. `uFogAmt` 0 = a névoa de antes; `uFogUp` e `uFogSunH` são por viewport (`setFogView`); `uFogBase` é a cor da névoa
+  // (os anéis de horizonte, sem névoa do three, a leem); `uFogSunCol` e `uFogMix` vêm da paleta.
+  uFogAmt: { value: 0 }, uFogUp: vec3(), uFogSunH: vec3(), uFogSunCol: vec3(), uFogMix: vec3(), uFogBase: vec3(),
+};
 /**
  * Tudo o que um material com luz recebe: o mesmo objeto para todos (por referência). `uStylizeFill`: saturação da IBL difusa. O céu e o chão do período
  * (`uStylizeSky*`, `uStylizeGround`, lineares) são o reflexo do verniz dos carros (cor-brilho, cars/material.ts).
@@ -205,7 +211,8 @@ export const stylizeUniforms = {
  */
 export function worldLook(light: number): { tone: [number, number, number]; amount: number } {
   const t = clamp((0.7 - light) / 0.34, 0, 1);
-  return { tone: linear('#a83cc4'), amount: 0.6 * t * t * (3 - 2 * t) };
+  // V22/F7: o tom do prédio e do cenário vai do magenta (#a83cc4, 288°) ao índigo (#4a52d8, 246°): o chão (275–323°) e a pista (rosa-mauve, 320–352°) já ocupam o magenta; ≥ 20° de matiz entre os três.
+  return { tone: linear('#4a52d8'), amount: 0.6 * t * t * (3 - 2 * t) };
 }
 
 /** O que o verniz reflete (linear): o topo do céu, o horizonte (com um pouco do meio) e o chão escuro abaixo da linha do horizonte. */
@@ -231,7 +238,30 @@ export function setStylizePalette(p: Palette): Grading {
   stylizeUniforms.uStylizeGround.value.set(...v.ground);
   const w = worldLook(p.light);
   stylizeUniforms.uStylizeWorld.value.set(...w.tone, w.amount);
+  const a = atmosphereLook(p);
+  gradeUniforms.uFogAmt.value = a.amount;
+  gradeUniforms.uFogBase.value.set(...a.base);
+  gradeUniforms.uFogSunCol.value.set(...a.sun);
+  gradeUniforms.uFogMix.value.set(...a.mix);
   return g;
+}
+
+const _fogUp = new THREE.Vector3();
+const _fogSun = new THREE.Vector3();
+/**
+ * V22/F7: o "para cima" e o sol HORIZONTAL (unitário) no espaço de vista da câmera que vai desenhar, para a névoa (atmosphere.ts): chamar por viewport, antes de desenhar, com a câmera
+ * e a direção do sol na cena (`Sky.sunDirLocal`). Câmera de matriz de mundo em dia (o `updateMatrixWorld` é de quem chama: o renderer o faz ao posar a câmera).
+ */
+export function setFogView(camera: THREE.Camera, sunDir: THREE.Vector3): void {
+  camera.updateMatrixWorld();
+  const view = camera.matrixWorldInverse;
+  _fogUp.set(0, 1, 0).transformDirection(view);
+  _fogSun.copy(sunDir).transformDirection(view);
+  _fogSun.addScaledVector(_fogUp, -_fogSun.dot(_fogUp)); // só a parte horizontal: o azimute do sol, não a elevação
+  const len = _fogSun.length();
+  if (len > 1e-4) _fogSun.multiplyScalar(1 / len); else _fogSun.set(0, 0, 0); // sol a pino: sem lado
+  gradeUniforms.uFogUp.value.copy(_fogUp);
+  gradeUniforms.uFogSunH.value.copy(_fogSun);
 }
 
 // ───────────────────────────── Tone mapping Custom ─────────────────────────────
@@ -284,9 +314,21 @@ export function patchToneMapping(chunk: string, kind: 'neutral' | 'agx'): string
 
 /** Remenda o chunk global uma vez (idempotente). O renderer chama antes do primeiro quadro e usa `THREE.CustomToneMapping`. */
 export function installToneMapping(kind: 'neutral' | 'agx' = TONE_MAP): void {
+  installAtmosphere(); // V22/F7: a névoa com altura e lado do sol (os chunks `fog_*`): o mesmo ponto único, antes de qualquer programa compilar
   if (THREE.ShaderChunk.tonemapping_pars_fragment.includes('stylizeGrade')) return;
   THREE.ShaderChunk.tonemapping_pars_fragment = patchToneMapping(THREE.ShaderChunk.tonemapping_pars_fragment, kind);
 }
+
+/**
+ * V22/F7: o dither de 1 LSB (triangular) em UM lugar só. `c` = a cor linear, `fc` = `gl_FragCoord.xy`, `k` = a força (0 = nada). O passo é o do degrau de 8 bits da cor que SAI (a derivada
+ * da curva sRGB). Quem usa: o `OutputPass` (Média em diante, em todo pixel, junto da vinheta: postfx/pipeline.ts) e o domo do céu só na Baixa, que não tem esse passe (sky.ts, `uDither`).
+ */
+export const DITHER_GLSL = /* glsl */ `
+float stylizeH21( vec2 p ) { p = fract( p * vec2( 123.34, 456.21 ) ); p += dot( p, p + 45.32 ); return fract( p.x * p.y ); }
+vec3 stylizeDither( vec3 c, vec2 fc, float k ) {
+  vec3 step8 = pow( max( c, vec3( 0.0031308 ) ), vec3( 0.5833 ) ) * 0.00892;
+  return c + ( stylizeH21( fc ) + stylizeH21( fc + vec2( 17.0, 31.0 ) ) - 1.0 ) * step8 * k;
+}`;
 
 // ───────────────────────────── O trecho de luz ─────────────────────────────
 

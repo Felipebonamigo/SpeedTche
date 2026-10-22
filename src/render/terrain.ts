@@ -11,6 +11,7 @@ import type { Horizon } from './horizon';
 import * as THREE from 'three';
 import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
+import { ATMOS_FN } from './atmosphere';
 import { FOREST_FRAG_PARS, FOREST_VERT_BODY, FOREST_VERT_PARS, forestFragBody, ringForestAmp, ringPaint } from './horizon-rings';
 import { smoothNormals } from './normals';
 import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './palette';
@@ -233,10 +234,19 @@ export const RING_FRAG = /* glsl */ `
 uniform vec3 uSunDir; uniform float uFacet;
 varying vec3 vColor; varying vec3 vW; varying vec3 vN;
 ${FOREST_FRAG_PARS}
+uniform vec3 uFogBase;
+${ATMOS_FN}
 void main() {
   vec3 n = normalize(vN);
   float l = max(dot(n, uSunDir), 0.0);
   vec3 c = vColor * (1.0 - uFacet + uFacet * (0.62 + 0.7 * l));${forestFragBody('c')}
+  // V22/F7: a mesma bruma do mundo (altura: o pé do morro mais enevoado que o cume; tom: quente do lado do sol, frio do outro) por cima da névoa já assada na cor. Longe o plano pálido, perto o escuro.
+  {
+    vec3 fogRay = ( viewMatrix * vec4( vW - cameraPosition, 0.0 ) ).xyz;
+    float fogF = 0.0; vec3 fogC = uFogBase;
+    stylizeAtmosphere( fogF, fogC, fogRay, -fogRay.z );
+    c = mix( c, fogC, fogF );
+  }
   gl_FragColor = vec4(c, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -492,13 +502,13 @@ function meteredBox(w: number, h: number, d: number): THREE.BoxGeometry {
 
 /** Cores já convertidas (espaço linear) de uma paleta, para o laço por vértice. */
 interface GroundColors {
-  low: THREE.Color; high: THREE.Color; rock: THREE.Color; snow: THREE.Color; sand: THREE.Color; verge: THREE.Color; wetSand: THREE.Color;
+  low: THREE.Color; high: THREE.Color; warm: THREE.Color; cool: THREE.Color; rock: THREE.Color; snow: THREE.Color; sand: THREE.Color; verge: THREE.Color; wetSand: THREE.Color;
   block: [THREE.Color, THREE.Color, THREE.Color];
 }
 
 function groundColorsOf(p: Palette): GroundColors {
   return {
-    low: new THREE.Color(p.groundLow), high: new THREE.Color(p.groundHigh), rock: new THREE.Color(p.rock), snow: new THREE.Color(p.snow),
+    low: new THREE.Color(p.groundLow), high: new THREE.Color(p.groundHigh), warm: new THREE.Color(p.groundWarm), cool: new THREE.Color(p.groundCool), rock: new THREE.Color(p.rock), snow: new THREE.Color(p.snow),
     sand: new THREE.Color(p.sand), verge: new THREE.Color(p.verge), wetSand: new THREE.Color(p.sand).multiplyScalar(0.72),
     block: [new THREE.Color(p.asphalt).multiplyScalar(0.9), new THREE.Color(p.verge).multiplyScalar(0.75), new THREE.Color(p.groundHigh)],
   };
@@ -755,7 +765,8 @@ export class Terrain {
     // (antes: o `verge` misturado em 55–100% na coluna 1 e 38% na 2, o degradê de 3 m "de aerógrafo"). A cidade (calçada reta) retorna antes e não muda.
     // V11: o tom do chão por vértice (faixas claras e escuras do bioma, não um plano liso) e a transição suave da faixa de terra até o chão (coluna 2).
     const tone = groundTone(b, seg, col, side);
-    ground.lerp(tone > 0.5 ? gc.low : gc.high, Math.abs(tone - 0.5) * 1.4);
+    // V22/F7: o tom empurra o chão para o tom CLARO QUENTE (matiz para o amarelo) onde passa de 0,5 e para o ESCURO FRIO (para o azul-esmeralda) onde cai abaixo: 3 tons por bioma, não 1 + brilho.
+    ground.lerp(tone > 0.5 ? gc.warm : gc.cool, Math.abs(tone - 0.5) * 1.4);
     // Manchas de terra à mostra (a rocha vermelha no deserto e na costa/serra, a terra do `verge` na mata e na savana) onde o tom passa de 0,8.
     ground.lerp(b === 'desert' || b === 'alpine' || b === 'coast' ? gc.rock : gc.verge, 0.3 * smooth01(0.78, 1, tone));
     // Encosta íngreme: rocha (vermelha no deserto, azulada na montanha). V22/F1: na serra, com a pista alta sobre o vale, a barranca inteira (a meia descida) vira rocha (`embankmentRock`).

@@ -11,7 +11,7 @@ import { atLeast } from '../game/quality';
 import { hash2 } from './noise';
 import { buildLensFlare } from './lensflare';
 import { bodyColor, lightsAmount, mix, palette, starAlpha, type LivePalette, type Palette } from './palette';
-import { applyGrade } from './stylize';
+import { applyGrade, DITHER_GLSL } from './stylize';
 import { daylight, SKY_GRADIENT_GLSL } from './sky-paint';
 import { SHADOW_SPAN_M, shadowPlan } from './postfx/plan';
 
@@ -37,9 +37,10 @@ uniform vec3 uSunDir; uniform vec3 uSunColor;
 uniform float uSunSize; uniform float uHalo; uniform float uGlowAmt; uniform float uDisc; uniform float uMoon;
 // V22/F3: a pintura nova. uPaint liga e desliga tudo de uma vez (0 = o céu de antes, exato: é o que o env map da IBL do carro vê); uDay = a luz do dia (0..1) das paradas
 // do gradiente; uBloom = a bolha larga do lado do sol; uCirrus (0..1) e uCirrusCol = a camada alta de cirros, uCirrusQ (0 Baixa, 1 Média, 2 Alta/Ultra) = quantas oitavas, uCirrusT = o vento.
-uniform float uPaint; uniform float uDay; uniform float uBloom; uniform float uCirrus; uniform float uCirrusQ; uniform float uCirrusT; uniform vec3 uCirrusCol;
+uniform float uDither; uniform float uPaint; uniform float uDay; uniform float uBloom; uniform float uCirrus; uniform float uCirrusQ; uniform float uCirrusT; uniform vec3 uCirrusCol;
 varying vec3 vDir;
 ${SKY_GRADIENT_GLSL}
+${DITHER_GLSL}
 // Hash e ruído de valor 2D (sem textura): só os cirros e o dither leem.
 float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vn(vec2 p) {
@@ -97,9 +98,9 @@ void main() {
     discCol *= mix(1.0, 0.86 + 0.1 * smoothstep(0.2, 0.9, cr) - 0.12 * smoothstep(0.5, 1.0, length(p)), uMoon);
   }
   col = mix(col, discCol, disc);
-  // Dither de 1 LSB (triangular), no espaço linear do quadro e na escala do degrau de 8 bits da cor que sai: quebra o banding do gradiente suave. uPaint = 0 não põe nada.
-  vec3 lsb = pow(max(col, vec3(0.0031308)), vec3(0.5833)) * 0.00892;
-  col += (h21(gl_FragCoord.xy) + h21(gl_FragCoord.xy + vec2(17.0, 31.0)) - 1.0) * lsb * uPaint;
+  // Dither de 1 LSB (triangular) do degrau de 8 bits (stylize.ts: um dither só): o domo só o dá quando NÃO há OutputPass (Baixa, uDither = 1); da Média em diante o OutputPass o dá em todo pixel.
+  // uPaint = 0 (o env map do carro) não põe nada.
+  col = stylizeDither( col, gl_FragCoord.xy, uDither * uPaint );
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -545,7 +546,7 @@ export class Sky {
         uGlow: { value: new THREE.Color('#fff6d0') }, uBelow: { value: new THREE.Color('#bfe6ff') },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color('#fff3a0') },
         uSunSize: { value: 0.03 }, uHalo: { value: 9 }, uGlowAmt: { value: 0.3 }, uDisc: { value: 6 }, uMoon: { value: 0 },
-        uPaint: { value: 1 }, uDay: { value: 0 }, uBloom: { value: 0 }, uCirrus: { value: 0 }, uCirrusQ: { value: 2 }, uCirrusT: { value: 0 }, uCirrusCol: { value: new THREE.Color('#ffffff') },
+        uDither: { value: 1 }, uPaint: { value: 1 }, uDay: { value: 0 }, uBloom: { value: 0 }, uCirrus: { value: 0 }, uCirrusQ: { value: 2 }, uCirrusT: { value: 0 }, uCirrusCol: { value: new THREE.Color('#ffffff') },
       },
     });
     applyGrade(mat);
@@ -609,6 +610,7 @@ export class Sky {
       this.sun.shadow.mapSize.set(size, size);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
+    this.dome.material.uniforms.uDither.value = atLeast(q, 'medium') ? 0 : 1; // V22/F7: da Média em diante o OutputPass dá o dither (um só); a Baixa não tem o passe
     this.dome.material.uniforms.uCirrusQ.value = atLeast(q, 'high') ? 2 : atLeast(q, 'medium') ? 1 : 0; // a Baixa não paga os cirros; a Média, 2 oitavas
     this.fogBase = FOG_DENSITY[q];
     this.fog.density = this.fogBase * this.fogMul;
