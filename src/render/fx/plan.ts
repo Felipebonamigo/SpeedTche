@@ -26,6 +26,10 @@ export interface FxPlan {
   exhaustFire: number;
   /** V10 (HC2): escala da poeira da terra e da areia (tamanho, vida e quantidade de bolhas): 1 = a de antes. */
   dustScale: number;
+  /** V22 F8: nuvens de poeira por segundo por carro na trilha contínua (terra, areia, grama e a própria estrada de terra), a 100 m/s; fica em "Reduzir efeitos" (não pisca). */
+  trail: number;
+  /** V22 F8: partículas ambientes por viewport (poeira em suspensão: pontos de alfa baixo no pool de poeira, sem chamada nova); 0 em "Reduzir efeitos". */
+  ambient: number;
   /** Anel da largada e do engate do nitro. */
   shockwave: boolean;
   /** O "POW" da batida (e o leque de faíscas de quadrinho): só com "Efeitos de cartum". */
@@ -40,6 +44,9 @@ const SPEED_LINES = [14, 24, 36, 48] as const;
 const DRAFT_LINES = [0, 10, 16, 24] as const;
 const CORNER_STREAKS = [8, 12, 16, 20] as const;
 const EXHAUST_FIRE = [0.6, 0.8, 1, 1] as const;
+/** V22 F8: nuvens/s da trilha de poeira por carro (4 jogadores × taxa × vida máxima ≈ 1,6 s cabem no pool de 900 com folga) e ambientes por viewport. */
+const TRAIL = [56, 80, 100, 100] as const;
+const AMBIENT = [10, 12, 14, 16] as const;
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
@@ -59,6 +66,8 @@ export function fxPlan(q: Quality, reduceEffects: boolean, viewports = 1, cartoo
     cornerStreaks: reduceEffects ? 0 : Math.floor(CORNER_STREAKS[i] * split * (cartoon ? 1.5 : 1)),
     exhaustFire: reduceEffects ? 0 : EXHAUST_FIRE[i] * (cartoon ? 1.5 : 1),
     dustScale: reduceEffects ? 1 : cartoon ? 2.3 : 1.8,
+    trail: TRAIL[i],
+    ambient: reduceEffects ? 0 : AMBIENT[i],
     shockwave: !reduceEffects && atLeast(q, 'medium'),
     pow: !reduceEffects && cartoon,
   };

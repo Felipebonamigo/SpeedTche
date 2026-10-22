@@ -592,6 +592,14 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
           const a = panels[i].getBoundingClientRect(); const b = panels[j].getBoundingClientRect();
           if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) overlaps.push(`${panels[i].className.split(' ')[0]}×${panels[j].className.split(' ')[0]}`);
         }
+        // V22 F8: a legenda do marco não cobre a traseira do carro. A caixa do carro na câmera Alta (docs/ondas/V22-f8-efeitos.md, medida nas capturas): de 34% a 66% da
+        // largura e de 60% à base do viewport. (Em tela dividida o carro ocupa a mesma fração do viewport dele.)
+        const lmkEl = vp.querySelector(':scope > .lmk.show');
+        if (lmkEl) {
+          const v = vp.getBoundingClientRect(); const a = lmkEl.getBoundingClientRect();
+          const car = { left: v.left + v.width * 0.34, right: v.left + v.width * 0.66, top: v.top + v.height * 0.6, bottom: v.bottom };
+          if (Math.min(a.right, car.right) - Math.max(a.left, car.left) > 1 && Math.min(a.bottom, car.bottom) - Math.max(a.top, car.top) > 1) overlaps.push('lmk×carro');
+        }
         // V5 (docs/ondas/V5-hud.md): os painéis dos números principais sem caixa (fundo, borda, sombra de caixa, desfoque), e os números em
         // itálico com contorno de pelo menos 1 px efetivo pintado por baixo da tinta (paint-order), para ler sem a caixa em qualquer fundo.
         const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(/[\s,/]+/).filter(Boolean); return p.length > 3 ? Number(p[3]) : 1; };
@@ -656,8 +664,9 @@ if (!process.env.NC_LAYOUT_SKIP_HUD) {
       s.speed = 0; // o quadro desenha sem avançar a simulação: a dica posta à mão fica
     }, { hs: humans(n), hudScale });
     const tag = `Dicas ${n}P a ${w}×${h}${hudScale !== 1 ? ` (HUD ${Math.round(hudScale * 100)}%)` : ''}`;
-    // Duas passadas: sem legenda de marco na tela, e com a legenda no pior caso (o nome mais comprido, forçada ligada): ela mora na mesma
-    // faixa do pé do viewport, e o cartão tem que subir acima dela (`--lift`), nunca cobri-la.
+    // Duas passadas: sem legenda de marco na tela, e com a legenda no pior caso (o nome mais comprido, forçada ligada). V22 F8: a legenda foi para o alto
+    // do viewport e não divide mais a faixa do pé com o cartão de dica (`--lift` só sobe se a legenda estiver na metade de baixo); a conta de "sem cobrir os
+    // painéis" continua valendo com a legenda ligada.
     for (const caption of [false, true]) {
       await page.evaluate(({ caption }) => {
         for (const cap of document.querySelectorAll('#hud .vp .lmk')) {

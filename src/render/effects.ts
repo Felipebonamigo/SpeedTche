@@ -18,7 +18,8 @@ import type { RenderFrame } from '../game/contracts';
 import { createScrapeMemory, observeScrapes } from '../game/race-feel';
 import { newCueMemory, observeCues, type FxCue } from './fx/cues';
 import { fxPlan, type FxPlan } from './fx/plan';
-import { emitBrakeSmoke, emitGrassDust, emitTireSmoke, type PuffCar, type PuffSpec } from './fx/smoke';
+import { emitBrakeSmoke, emitGrassDust, emitRoadDust, emitTireSmoke, type PuffCar, type PuffSpec, type Trail } from './fx/smoke';
+import { ambientMote, puffAtlas, SPRITE_PX, type Mote } from './fx/sprite';
 import { emitBoostSparks, emitExhaustFire, emitHitSparks, emitNitroTrail, emitWheelSparks, SparkPool, type SparkCar, type SparkSpec } from './fx/sparks';
 import { Streaks } from './fx/streaks';
 import { contactPoint, emitImpact, type Contact } from './fx/impact';
@@ -32,16 +33,17 @@ import { scrapeSparks } from './scrape-sparks';
 import { locateOnFrame, type FramePoint, type RoadFrame } from './roadframe';
 
 const VERT = /* glsl */ `
-attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
-uniform float uScale; uniform float uNearFade;
-varying float vAlpha; varying vec3 vColor;
+attribute float aSize; attribute float aAlpha; attribute vec3 aColor; attribute vec2 aSpr;
+uniform float uScale; uniform float uNearFade; uniform float uSpriteK;
+varying float vAlpha; varying vec3 vColor; varying vec2 vSpr;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   // uNearFade > 0 (as bolhas): perto da câmera a partícula para de crescer (profundidade mínima de 3 m) e apaga — a fumaça que passa rente à lente não vira um disco do tamanho da tela.
   float depth = uNearFade > 0.0 ? max(3.0, -mv.z) : max(0.5, -mv.z);
-  gl_PointSize = aSize * uScale / depth;
+  // aSpr.x = quadro do sprite (0..3), −1 = lasca dura, −2 = partícula ambiente; aSpr.y = rotação (rad). A nuvem enche ~60% do quadrado do ponto: uSpriteK o compensa.
+  gl_PointSize = aSize * uScale / depth * (aSpr.x >= 0.0 ? uSpriteK : 1.0);
   gl_Position = projectionMatrix * mv;
-  vAlpha = aAlpha * (uNearFade > 0.0 ? smoothstep(uNearFade * 0.3, uNearFade, -mv.z) : 1.0); vColor = aColor;
+  vAlpha = aAlpha * (uNearFade > 0.0 ? smoothstep(uNearFade * 0.3, uNearFade, -mv.z) : 1.0); vColor = aColor; vSpr = aSpr;
 }`;
 
 const FRAG = /* glsl */ `
@@ -55,21 +57,53 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-/** Fragmento da BOLHA (M5): borda nítida, contorno escuro, brilho no canto de cima à esquerda e a metade de baixo um pouco mais escura. */
+/**
+ * Fragmento da poeira e da fumaça (V22 F8: era a BOLHA do M5, um disco com contorno escuro, brilho de lado e borda nítida). Três coisas, pelo quadro `vSpr.x`:
+ *   ≥ 0  a NUVEM: o quadro do atlas, girado por `vSpr.y`; a luz vem do alto à esquerda da TELA (a diferença do relevo, canal G, em dois pontos na direção do sol: o lado do
+ *        lóbulo que olha para a luz clareia, o oposto escurece — a luz não gira com a partícula), a base um pouco mais escura; e ela se desfaz pela BORDA (o ruído do canal R é o limiar
+ *        que sobe conforme o alfa cai: fiapos, não um disco que só esmaece). Sem contorno.
+ *   −1   a LASCA da batida: o disco duro de antes (borda nítida, contorno escuro, brilho).
+ *   −2   a partícula ambiente: um ponto macio.
+ */
 const FRAG_BUBBLE = /* glsl */ `
-// bolha
-varying float vAlpha; varying vec3 vColor;
+// bolha (nuvem de sprite)
+uniform sampler2D uSprite;
+varying float vAlpha; varying vec3 vColor; varying vec2 vSpr;
+vec4 cloudAt(vec2 c, float s, float k) {
+  vec2 p = vec2(k * c.x + s * c.y, -s * c.x + k * c.y);
+  float fi = floor(vSpr.x + 0.5);
+  vec2 f = vec2(mod(fi, 2.0), floor(fi * 0.5));
+  return texture2D(uSprite, (f + clamp(p * 0.5 + 0.5, 0.004, 0.996)) * 0.5);
+}
 void main() {
   vec2 p = (gl_PointCoord - 0.5) * 2.0;
   float d = length(p);
-  float edge = 1.0 - smoothstep(0.86, 1.0, d);
-  if (edge < 0.01) discard;
-  float rim = smoothstep(0.7, 0.93, d);
-  float shade = mix(0.7, 1.12, clamp(0.5 + 0.5 * dot(p, vec2(-0.45, 0.89)), 0.0, 1.0));
-  float glint = smoothstep(0.45, 0.0, length(p - vec2(-0.34, 0.4)));
-  vec3 col = vColor * shade;
-  col = mix(col, vColor * vec3(0.34, 0.37, 0.46), rim * 0.65) + glint * 0.2;
-  gl_FragColor = vec4(col, vAlpha * edge);
+  if (vSpr.x < -1.5) {
+    float a = (1.0 - smoothstep(0.3, 1.0, d)) * vAlpha;
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(vColor, a);
+  } else if (vSpr.x < 0.0) {
+    float edge = 1.0 - smoothstep(0.86, 1.0, d);
+    if (edge < 0.01) discard;
+    float rim = smoothstep(0.7, 0.93, d);
+    float shade = mix(0.7, 1.12, clamp(0.5 + 0.5 * dot(p, vec2(-0.45, 0.89)), 0.0, 1.0));
+    float glint = smoothstep(0.45, 0.0, length(p - vec2(-0.34, 0.4)));
+    vec3 col = vColor * shade;
+    col = mix(col, vColor * vec3(0.34, 0.37, 0.46), rim * 0.65) + glint * 0.2;
+    gl_FragColor = vec4(col, vAlpha * edge);
+  } else {
+    if (d > 1.0) discard;
+    float s = sin(vSpr.y); float k = cos(vSpr.y);
+    vec4 t = cloudAt(p, s, k);
+    float life = clamp(vAlpha / 0.88, 0.0, 1.0);
+    float thr = (1.0 - life) * 0.8;
+    float body = t.a * mix(0.62, 1.0, t.r);
+    float a = smoothstep(thr, thr + 0.3, body) * min(1.0, life * 2.2) * 0.8;
+    if (a < 0.01) discard;
+    float lit = t.g - cloudAt(p + vec2(-0.14, -0.3), s, k).g;
+    float shade = clamp(0.86 + 1.5 * lit, 0.55, 1.14) * (1.0 - 0.16 * clamp(p.y * 0.5 + 0.5, 0.0, 1.0)) * (0.94 + 0.12 * t.r);
+    gl_FragColor = vec4(vColor * shade, a);
+  }
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -81,29 +115,41 @@ class Pool {
   private readonly vz: Float32Array; private readonly vx: Float32Array; private readonly vh: Float32Array;
   private readonly life: Float32Array; private readonly maxLife: Float32Array; private readonly size: Float32Array;
   private readonly grow: Float32Array; private readonly gravity: Float32Array;
+  /** V22 F8: quadro do sprite (0..3; −1 = lasca dura), rotação inicial e giro (rad/s) de cada partícula. */
+  private readonly frame: Float32Array; private readonly rot: Float32Array; private readonly spin: Float32Array;
   private readonly r: Float32Array; private readonly g: Float32Array; private readonly b: Float32Array;
   private readonly position: THREE.BufferAttribute;
   private readonly aSize: THREE.BufferAttribute;
   private readonly aAlpha: THREE.BufferAttribute;
   private readonly aColor: THREE.BufferAttribute;
+  private readonly aSpr: THREE.BufferAttribute;
   private readonly material: THREE.ShaderMaterial;
   private next = 0;
+  private spawned = 0;
+  private readonly atlas: THREE.DataTexture;
   private readonly pt: FramePoint = { x: 0, y: 0, z: 0, heading: 0 };
 
   constructor(readonly max: number, additive: boolean, private readonly bubble = false) {
     const f = () => new Float32Array(max);
     this.z = f(); this.x = f(); this.h = f(); this.vz = f(); this.vx = f(); this.vh = f();
     this.life = f(); this.maxLife = f(); this.size = f(); this.grow = f(); this.gravity = f(); this.r = f(); this.g = f(); this.b = f();
+    this.frame = f(); this.rot = f(); this.spin = f();
     const geo = new THREE.BufferGeometry();
     this.position = new THREE.BufferAttribute(new Float32Array(max * 3), 3); this.position.setUsage(THREE.DynamicDrawUsage);
     this.aSize = new THREE.BufferAttribute(new Float32Array(max), 1); this.aSize.setUsage(THREE.DynamicDrawUsage);
     this.aAlpha = new THREE.BufferAttribute(new Float32Array(max), 1); this.aAlpha.setUsage(THREE.DynamicDrawUsage);
     this.aColor = new THREE.BufferAttribute(new Float32Array(max * 3), 3); this.aColor.setUsage(THREE.DynamicDrawUsage);
-    geo.setAttribute('position', this.position); geo.setAttribute('aSize', this.aSize); geo.setAttribute('aAlpha', this.aAlpha); geo.setAttribute('aColor', this.aColor);
+    this.aSpr = new THREE.BufferAttribute(new Float32Array(max * 2), 2); this.aSpr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', this.position); geo.setAttribute('aSize', this.aSize); geo.setAttribute('aAlpha', this.aAlpha); geo.setAttribute('aColor', this.aColor); geo.setAttribute('aSpr', this.aSpr);
     geo.setDrawRange(0, 0);
+    // O atlas do sprite (256 × 256 RGBA, pintado uma vez na carga; só o pool de poeira o usa).
+    const atlas = new THREE.DataTexture(puffAtlas(), SPRITE_PX, SPRITE_PX, THREE.RGBAFormat, THREE.UnsignedByteType);
+    atlas.minFilter = THREE.LinearFilter; atlas.magFilter = THREE.LinearFilter; atlas.generateMipmaps = false; atlas.needsUpdate = true;
+    this.atlas = atlas;
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: bubble ? FRAG_BUBBLE : FRAG, transparent: true, depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, uniforms: { uScale: { value: 400 }, uNearFade: { value: bubble ? 5 : 0 } },
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      uniforms: { uScale: { value: 400 }, uNearFade: { value: bubble ? 5 : 0 }, uSprite: { value: atlas }, uSpriteK: { value: 1.9 } },
     });
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
@@ -111,15 +157,19 @@ class Pool {
     if (bubble) this.points.name = 'fx-dust';
   }
 
-  emit(z: number, x: number, h: number, vz: number, vx: number, vh: number, life: number, size: number, grow: number, gravity: number, r: number, g: number, b: number): void {
+  emit(z: number, x: number, h: number, vz: number, vx: number, vh: number, life: number, size: number, grow: number, gravity: number, r: number, g: number, b: number, frame = -3, rot = 0, spin = 0): void {
     const i = this.next; this.next = (this.next + 1) % this.max;
+    // Quem não diz o quadro e a rotação (emissor de antes) ganha os seus por hash do contador: nunca duas iguais em fila.
+    this.spawned++;
+    this.frame[i] = frame === -3 ? Math.floor(hash2(this.spawned, 91) * 4) : frame;
+    this.rot[i] = rot !== 0 ? rot : 0.1 + hash2(this.spawned, 92) * 6; this.spin[i] = spin !== 0 ? spin : (hash2(this.spawned, 93) - 0.5) * 2.4;
     this.z[i] = z; this.x[i] = x; this.h[i] = h; this.vz[i] = vz; this.vx[i] = vx; this.vh[i] = vh;
     this.life[i] = life; this.maxLife[i] = life; this.size[i] = size; this.grow[i] = grow; this.gravity[i] = gravity;
     this.r[i] = r; this.g[i] = g; this.b[i] = b;
   }
 
   emitSpec(s: PuffSpec): void {
-    this.emit(s.z, s.x, s.h, s.vz, s.vx, s.vh, s.life, s.size, s.grow, s.gravity, s.r, s.g, s.b);
+    this.emit(s.z, s.x, s.h, s.vz, s.vx, s.vh, s.life, s.size, s.grow, s.gravity, s.r, s.g, s.b, s.frame, s.rot, s.spin);
   }
 
   /** Quantas partículas estão vivas. */
@@ -139,8 +189,11 @@ class Pool {
 
   clear(): void { this.life.fill(0); this.points.geometry.setDrawRange(0, 0); }
 
-  /** Escreve os buffers no referencial do viewport; `scale` = altura em px / (2·tan(fov/2)). */
-  pose(rf: RoadFrame, track: Track, scale: number, _viewport = 0): void {
+  /**
+   * Escreve os buffers no referencial do viewport; `scale` = altura em px / (2·tan(fov/2)). `ambient` (V22 F8): as partículas ambientes deste viewport, escritas nas vagas
+   * que sobram depois das vivas (o pool nunca passa do seu teto): quem as pede diz quantas, onde está o carro e a cor.
+   */
+  pose(rf: RoadFrame, track: Track, scale: number, ambient?: AmbientPose): void {
     let n = 0;
     for (let i = 0; i < this.max; i++) {
       if (this.life[i] <= 0) continue;
@@ -150,16 +203,33 @@ class Pool {
       this.aSize.setX(n, this.size[i] + this.grow[i] * (1 - t));
       this.aAlpha.setX(n, this.bubble ? Math.min(1, t * 3) * 0.88 : Math.min(1, t * 2.5) * (0.25 + 0.55 * t));
       this.aColor.setXYZ(n, this.r[i], this.g[i], this.b[i]);
+      this.aSpr.setXY(n, this.frame[i], this.rot[i] + this.spin[i] * (this.maxLife[i] - this.life[i]));
       n++;
+    }
+    if (ambient && this.bubble) {
+      for (let k = 0; k < ambient.count && n < this.max; k++) {
+        ambientMote(k, ambient.time, ambient.z, ambient.x, MOTE);
+        if (MOTE.alpha < 0.004 || !locateOnFrame(rf, track, MOTE.z, MOTE.x, this.pt)) continue;
+        this.position.setXYZ(n, this.pt.x, this.pt.y + MOTE.h, this.pt.z);
+        this.aSize.setX(n, MOTE.size);
+        this.aAlpha.setX(n, MOTE.alpha);
+        this.aColor.setXYZ(n, ambient.r, ambient.g, ambient.b);
+        this.aSpr.setXY(n, -2, 0);
+        n++;
+      }
     }
     this.points.geometry.setDrawRange(0, n);
     this.points.visible = n > 0;
-    if (n > 0) { this.position.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true; this.aColor.needsUpdate = true; }
+    if (n > 0) { this.position.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true; this.aColor.needsUpdate = true; this.aSpr.needsUpdate = true; }
     this.material.uniforms.uScale.value = scale;
   }
 
-  dispose(): void { this.points.geometry.dispose(); this.material.dispose(); }
+  dispose(): void { this.points.geometry.dispose(); this.material.dispose(); this.atlas.dispose(); }
 }
+
+/** As partículas ambientes de um viewport (V22 F8): quantas, o carro (z em unidades, x em meias larguras), o relógio (s) e a cor. */
+interface AmbientPose { count: number; z: number; x: number; time: number; r: number; g: number; b: number }
+const MOTE: Mote = { z: 0, x: 0, h: 0, size: 0, alpha: 0 };
 
 /** Teto de pontos do anel das marcas de pneu (o do Ultra, `fxPlan`); o degrau escolhe quantos usa. */
 const MARKS_MAX = 2048;
@@ -209,6 +279,13 @@ export class Effects {
   private contactsN = 0;
   private readonly puffCar: PuffCar = { z: 0, x: 0, speed: 0, driftDir: 0, driftTicks: 0, driftCharge: 0, skidTicks: 0 };
   private readonly dustRgb: [number, number, number] = [0.54, 0.48, 0.35];
+  /** V22 F8: a poeira da própria estrada de terra (cor da pista, mais clara), o quanto a pista é terra (`roadEarth`), a taxa da trilha deste quadro e a cor das partículas ambientes. */
+  private readonly roadRgb: [number, number, number] = [0.5, 0.36, 0.26];
+  private readonly roadColor = new THREE.Color('#a07050');
+  private roadEarth = 0;
+  private readonly trail: Trail = { dt: 1 / 60, rate: 100 };
+  private readonly moteRgb: [number, number, number] = [1, 0.96, 0.85];
+  private readonly ambientPose = { count: 0, z: 0, x: 0, time: 0, r: 1, g: 1, b: 1 };
   private readonly prevSpeed = new Float32Array(20);
   private readonly shakeAmp = new Float32Array(4);
   private readonly dustColor = new THREE.Color('#8a7a5a');
@@ -221,6 +298,12 @@ export class Effects {
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
     this.dustColor.set(p.verge).lerp(new THREE.Color(p.shoulder), 0.4).multiplyScalar(p.light < 0.5 ? 0.7 : 0.92);
+    // V22 F8: a poeira da estrada de terra leva a cor da pista, um pouco puxada para o acostamento e mais clara (poeira no ar pega luz; sem branco: virava fumaça cinza sobre a terra vermelha na 1ª captura); as partículas
+    // ambientes, um branco quente de dia que escurece e esfria com a luz do período (à noite, normal sobre o escuro, não vira estrela).
+    this.roadColor.set(p.roadBase).lerp(new THREE.Color('#e2b88a'), 0.5).multiplyScalar(p.light < 0.5 ? 0.62 : 1);
+    this.roadEarth = p.roadEarth;
+    const lt = Math.min(1, Math.max(0, (p.light - 0.3) / 0.6));
+    this.moteRgb[0] = (0.34 + 0.66 * lt) * (1 - 0.1 * (1 - lt)); this.moteRgb[1] = (0.34 + 0.66 * lt) * (0.96 - 0.06 * (1 - lt)); this.moteRgb[2] = (0.4 + 0.6 * lt) * (0.85 + 0.15 * (1 - lt));
     // Cor-brilho: as linhas brancas (velocidade e túnel do vácuo) são aditivas; com o mesmo brilho sobre a cena da noite, 10× mais escura, viravam
     // barras de farol ao lado dos carros (Sampa). Caem com a luz do período. V8: 1 de dia e 0,33 no entardecer e à noite (eram ~0,76 e 0,45: no
     // entardecer, o de limiar de bloom mais baixo, 1,6, elas brilhavam); contínuo entre os dois (a corrida que muda chama isto com a luz ao vivo).
@@ -275,12 +358,20 @@ export class Effects {
     this.marks.buffer.setCapacity(plan.marks);
     this.markClock += dt;
     this.dustRgb[0] = this.dustColor.r; this.dustRgb[1] = this.dustColor.g; this.dustRgb[2] = this.dustColor.b;
+    this.roadRgb[0] = this.roadColor.r; this.roadRgb[1] = this.roadColor.g; this.roadRgb[2] = this.roadColor.b;
+    this.trail.dt = dt;
     const rnd = () => this.rnd();
     for (let i = 0; i < state.cars.length && i < 20; i++) {
       const c = state.cars[i];
       // Poeira na grama, fumaça da freada forte e fumaça do pneu na derrapagem: bolhas.
       const pc = this.puffCarOf(c);
-      emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff, plan.dustScale);
+      // V22 F8: poeira em TRILHA (uma nuvem por metro andado, taxa do degrau): a do chão fora do asfalto e a da própria estrada de terra. Só de quem está a menos de
+      // 160 m de algum viewport (rival lá longe levantaria poeira que ninguém vê e tomaria vagas do pool); rival perto solta metade.
+      if (this.nearViewer(frame, c.z)) {
+        this.trail.rate = plan.trail * (c.seat >= 0 ? 1 : 0.5);
+        emitGrassDust(pc, this.dustRgb, plan.smoke, rnd, this.emitPuff, plan.dustScale, this.trail);
+        emitRoadDust(pc, this.roadRgb, this.roadEarth, plan.smoke, rnd, this.emitPuff, plan.dustScale, this.trail);
+      }
       const acceleration = (c.speed - this.prevSpeed[i]) / dt; // unidades/s²: a aceleração deste quadro (o `prevSpeed` é trocado mais abaixo)
       emitBrakeSmoke(pc, (this.prevSpeed[i] - c.speed) / dt, c.stats.brake, c.collisionCooldown, plan.smoke, rnd, this.emitPuff);
       if (state.phase !== 'countdown') emitTireSmoke(pc, dt, plan.smoke, rnd, this.emitPuff);
@@ -375,7 +466,11 @@ export class Effects {
 
   /** `viewport` = o índice do viewport desta pose (as linhas de velocidade e o túnel são de quem corre nele). */
   pose(rf: RoadFrame, track: Track, scale: number, viewport = 0): void {
-    this.dust.pose(rf, track, scale);
+    const v = this.views[viewport];
+    const amb = this.ambientPose;
+    amb.count = v && v.time > 0 ? this.plan.ambient : 0;
+    if (amb.count > 0) { amb.z = v.z; amb.x = v.x; amb.time = v.time; amb.r = this.moteRgb[0]; amb.g = this.moteRgb[1]; amb.b = this.moteRgb[2]; }
+    this.dust.pose(rf, track, scale, amb.count > 0 ? amb : undefined);
     const st = this.streaks;
     st.begin();
     this.sparks.pose(rf, track, st);

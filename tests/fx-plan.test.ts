@@ -5,7 +5,8 @@ import type { Quality } from '../src/game/contracts';
 import { fxPlan, type FxPlan } from '../src/render/fx/plan';
 
 const LEVELS: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
-const NUMBERS = ['sparks', 'smoke', 'marks', 'speedLines', 'draftLines', 'cornerStreaks', 'exhaustFire', 'dustScale'] as const;
+// V22 F8: + `trail` (nuvens/s da trilha de poeira) e `ambient` (partículas ambientes): campos novos do plano, e as duas crescem do Baixa ao Ultra como os outros números (o motivo de estarem aqui).
+const NUMBERS = ['sparks', 'smoke', 'marks', 'speedLines', 'draftLines', 'cornerStreaks', 'exhaustFire', 'dustScale', 'trail', 'ambient'] as const;
 const FLAGS = ['wheelSparks', 'shockwave', 'pow'] as const;
 
 describe('plano de efeitos (M5)', () => {
