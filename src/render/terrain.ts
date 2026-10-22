@@ -16,6 +16,8 @@ import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './p
 import { applyGrade, applyStylize } from './stylize';
 import type { RoadFrame } from './roadframe';
 import { clearingsOf, inClearing } from './scenery/clearings';
+import type { Quality } from '../game/contracts';
+import { applyBiomeDetail, applyDetailQuality, detailTiling, embankmentRock, installTerrainDetail, silenceDetail, type DetailUniforms } from './terrain-detail';
 import { windowTextures } from './textures';
 import { HEADING_PER_CURVE, SEGMENT_M, turnPerCurve, Y_SCALE } from './units';
 
@@ -372,12 +374,16 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-/** Faixa com `lanes` vértices por ponto, com cor e normal por vértice. */
+/**
+ * Faixa com `lanes` vértices por ponto, com cor, normal e `aDet` por vértice. V22/F1: `aDet` = (lateral em m com o sinal do lado, distância ABSOLUTA ao longo da pista em m): é
+ * o que o shader do chão usa para o detalhe (terrain-detail.ts) — nunca a posição de mundo, que muda a cada quadro e faria o detalhe "nadar".
+ */
 class Strip {
   readonly geometry = new THREE.BufferGeometry();
   readonly position: THREE.BufferAttribute;
   readonly color: THREE.BufferAttribute;
   readonly normal: THREE.BufferAttribute;
+  readonly det: THREE.BufferAttribute;
   readonly mesh: THREE.Mesh;
   constructor(readonly capacity: number, readonly lanes: number, material: THREE.Material) {
     const verts = capacity * lanes;
@@ -390,6 +396,9 @@ class Strip {
     this.normal = new THREE.BufferAttribute(new Float32Array(verts * 3), 3);
     this.normal.setUsage(THREE.DynamicDrawUsage);
     this.geometry.setAttribute('normal', this.normal);
+    this.det = new THREE.BufferAttribute(new Float32Array(verts * 2), 2);
+    this.det.setUsage(THREE.DynamicDrawUsage);
+    this.geometry.setAttribute('aDet', this.det);
     const index = new Uint32Array((capacity - 1) * (lanes - 1) * 6);
     let k = 0;
     for (let j = 0; j < capacity - 1; j++) for (let l = 0; l < lanes - 1; l++) {
@@ -402,15 +411,16 @@ class Strip {
     this.mesh.frustumCulled = false;
     this.mesh.receiveShadow = true;
   }
-  set(point: number, lane: number, x: number, y: number, z: number, r: number, g: number, b: number, nx: number, ny: number, nz: number): void {
+  set(point: number, lane: number, x: number, y: number, z: number, r: number, g: number, b: number, nx: number, ny: number, nz: number, lat: number, along: number): void {
     const i = point * this.lanes + lane;
     this.position.setXYZ(i, x, y, z);
     this.color.setXYZ(i, r, g, b);
     this.normal.setXYZ(i, nx, ny, nz);
+    this.det.setXY(i, lat, along);
   }
   finish(points: number): void {
     this.geometry.setDrawRange(0, Math.max(0, points - 1) * (this.lanes - 1) * 6);
-    this.position.needsUpdate = true; this.color.needsUpdate = true; this.normal.needsUpdate = true;
+    this.position.needsUpdate = true; this.color.needsUpdate = true; this.normal.needsUpdate = true; this.det.needsUpdate = true;
   }
   dispose(): void { this.geometry.dispose(); }
 }
@@ -505,6 +515,8 @@ export class Terrain {
   private readonly left: Strip;
   private readonly right: Strip;
   private readonly material: THREE.MeshStandardMaterial;
+  /** V22/F1: os uniformes do detalhe do chão (terrain-detail.ts); por pista, bioma, qualidade e período só eles mudam. */
+  private readonly detail: DetailUniforms;
   private readonly ground: THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>;
   private readonly sea: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private readonly foam: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -536,6 +548,9 @@ export class Terrain {
   constructor(capacity: number) {
     this.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6 });
     applyStylize(this.material, 'ground');
+    this.detail = installTerrainDetail(this.material); // DEPOIS do estilizador: compõe com ele
+    // Só para os testes de imagem (tools/render-harness.lab.ts, `groundDetail`): liga e desliga o detalhe SEM recompilar, para isolar o campo do detalhe (a razão entre o quadro com e sem).
+    this.material.userData.terrainDetail = { off: () => silenceDetail(this.detail), on: () => applyBiomeDetail(this.detail, this.biome) };
     this.left = new Strip(capacity, NC, this.material);
     this.right = new Strip(capacity, NC, this.material);
     this.group.add(this.left.mesh, this.right.mesh);
@@ -613,6 +628,9 @@ export class Terrain {
     this.group.add(this.farGroup);
   }
 
+  /** V22/F1: o detalhe do chão por degrau (Baixa 1 oitava, Média a fina, Alta o grão); só uniformes, nada recompila. */
+  setQuality(q: Quality): void { applyDetailQuality(this.detail, q); }
+
   /** `pTo`: a paleta do período seguinte, se a corrida o alcança (M6, `racePeriodPlan`); `setLive` mistura as duas. */
   setTrack(track: Track, p: Palette, key: string, pTo?: Palette): void {
     if (key === this.trackKey) return;
@@ -624,6 +642,9 @@ export class Terrain {
     for (let si = 0; si < 2; si++) for (let c = 0; c < NC; c++) this.dropW[si * NC + c] = columnDrop(this.biome, si === 0 ? -1 : 1, c);
     this.buildTables(track, groundColorsOf(p));
     this.colorTableB = null; this.blend = 0;
+    applyBiomeDetail(this.detail, this.biome);
+    this.detail.A.value.x = detailTiling(track.segments.length * SEGMENT_M).invPeriod; // o ladrilho de ruído fecha na volta da pista
+    this.detail.verge.value.set(p.verge);
     if (pTo) {
       const a = this.colorTable.slice();
       this.buildTables(track, groundColorsOf(pTo));
@@ -720,15 +741,15 @@ export class Terrain {
     const ground = out.copy(gc.low).lerp(gc.high, Math.min(1, smooth01(4, 45, h) * 0.85 + (patch - 0.5) * 0.7));
     if (b === 'savanna') ground.lerp(gc.verge, smooth01(0.62, 0.8, patch) * 0.55); // capim seco
     if (b === 'desert') ground.copy(gc.low).lerp(gc.high, patch * 0.6 + smooth01(0, 30, h) * 0.3);
-    if (col === 1) return ground.lerp(gc.verge, 0.55 + 0.45 * smooth01(0.4, 0.7, patch));
+    // V22/F1: a borda acostamento → chão é irregular e vem do shader (terrain-detail.ts: o `verge` pintado até uma borda de ruído); aqui as colunas 1 e 2 levam o chão PURO
+    // (antes: o `verge` misturado em 55–100% na coluna 1 e 38% na 2, o degradê de 3 m "de aerógrafo"). A cidade (calçada reta) retorna antes e não muda.
     // V11: o tom do chão por vértice (faixas claras e escuras do bioma, não um plano liso) e a transição suave da faixa de terra até o chão (coluna 2).
     const tone = groundTone(b, seg, col, side);
     ground.lerp(tone > 0.5 ? gc.low : gc.high, Math.abs(tone - 0.5) * 1.4);
     // Manchas de terra à mostra (a rocha vermelha no deserto e na costa/serra, a terra do `verge` na mata e na savana) onde o tom passa de 0,8.
     ground.lerp(b === 'desert' || b === 'alpine' || b === 'coast' ? gc.rock : gc.verge, 0.3 * smooth01(0.78, 1, tone));
-    if (col === 2) ground.lerp(gc.verge, 0.38 * (1 - smooth01(0.3, 0.8, patch)));
-    // Encosta íngreme: rocha (vermelha no deserto, azulada na montanha).
-    ground.lerp(gc.rock, smooth01(0.42, 0.95, slope) * (b === 'tropical' ? 0.55 : 0.9));
+    // Encosta íngreme: rocha (vermelha no deserto, azulada na montanha). V22/F1: na serra, com a pista alta sobre o vale, a barranca inteira (a meia descida) vira rocha (`embankmentRock`).
+    ground.lerp(gc.rock, Math.max(smooth01(0.42, 0.95, slope) * (b === 'tropical' ? 0.55 : 0.9), col >= 5 ? embankmentRock(b, roadH, columnDrop(b, side, col)) : 0));
     // Neve acima da linha (com ruído na borda), nunca colada na pista.
     if (col >= 3 && Number.isFinite(RELIEF[b].snowLine)) {
       const line = RELIEF[b].snowLine + (patch - 0.5) * 16;
@@ -819,6 +840,7 @@ export class Terrain {
       const cx = Math.cos(h); const sz = Math.sin(h);
       const px = frame.px[j]; const py = frame.py[j]; const pz = frame.pz[j];
       const delta = s.curve * turn;
+      const along = (frame.segIndex[0] + j) * SEGMENT_M;
       // Do lado de dentro da curva, colunas longe demais dobrariam para trás: prende a distância.
       const clampD = 0.9 * SEGMENT_M / (Math.abs(delta) + 1e-6);
       for (let sIdx = 0; sIdx < 2; sIdx++) {
@@ -841,7 +863,8 @@ export class Terrain {
           let nx = -gA * side * cx - gL * sz; let nz = -gA * side * sz + gL * cx;
           const inv = 1 / Math.sqrt(nx * nx + 1 + nz * nz);
           nx *= inv; nz *= inv;
-          strip.set(j, lane, px + side * dist * cx, y, pz + side * dist * sz, ct[k] + (cb[k] - ct[k]) * bl, ct[k + 1] + (cb[k + 1] - ct[k + 1]) * bl, ct[k + 2] + (cb[k + 2] - ct[k + 2]) * bl, nx, inv, nz);
+          // `along` desenrolado (4 m por ponto, mesmo através do fim da volta): o ladrilho de ruído repete um número inteiro de vezes no comprimento da pista.
+          strip.set(j, lane, px + side * dist * cx, y, pz + side * dist * sz, ct[k] + (cb[k] - ct[k]) * bl, ct[k + 1] + (cb[k + 1] - ct[k + 1]) * bl, ct[k + 2] + (cb[k + 2] - ct[k + 2]) * bl, nx, inv, nz, side * dist, along);
         }
         if (seaSide) {
           // Linha d'água: onde o chão cruza o nível do mar (entre a coluna 3 e a 4).
@@ -899,6 +922,7 @@ export class Terrain {
     this.ringMaterial.uniforms.uFacet.value = this.baseFacet * (1 - 0.6 * night);
     this.horizon?.setBlend(this.blend);
     this.ground.material.color.set(p.groundHigh).lerp(this.tmp.set(p.fog), 0.25);
+    this.detail.verge.value.set(p.verge);
     const su = this.sea.material.uniforms;
     (su.uDeep.value as THREE.Color).set(p.waterDeep);
     (su.uShallow.value as THREE.Color).set(p.waterShallow);

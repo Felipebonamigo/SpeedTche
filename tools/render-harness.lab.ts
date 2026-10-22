@@ -357,6 +357,34 @@ function regions(quality: Quality, frames: number, boxes: Array<[number, number,
   });
 }
 
+/**
+ * V22/F1: a luma (0..255, inteiro) de uma caixa em px do quadro — `box` = [x, y, largura, altura], y de cima para baixo — depois de `frames` quadros sem andar a corrida.
+ * O teste do chão (tests/terreno-detalhe-gl.test.ts) faz a conta (resíduo 5×5, correlação entre dois quadros) no Node.
+ */
+function lumaBox(quality: Quality, frames: number, box: [number, number, number, number]): number[] {
+  if (!current) throw new Error('lab.setup primeiro');
+  for (let i = 0; i < frames; i++) { if (!holdClock) tick++; renderer.render(frameFor(quality)); }
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  const [x0, y0, w, h] = box;
+  const out: number[] = [];
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+    const i = ((H - 1 - y) * W + x) * 4;
+    out.push(Math.round(0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2]));
+  }
+  return out;
+}
+
+/** V22/F1: liga ou desliga o detalhe do chão (uniformes; nada recompila): a razão entre o quadro com e sem isola o campo do detalhe, sem a luz e a geometria. */
+function groundDetail(on: boolean): void {
+  scene.traverse((o) => {
+    const hook = ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData?.terrainDetail as { on(): void; off(): void } | undefined;
+    if (hook) { if (on) hook.on(); else hook.off(); }
+  });
+}
+
 /** O jogador no quadro parado (V10): `speed` = fração da velocidade máxima, `nitro` liga o nitro, `skid` põe as rodas fora do asfalto (poeira). */
 function drive(o: { speed?: number; nitro?: boolean; skid?: boolean }): void {
   if (!current) throw new Error('lab.setup primeiro');
@@ -715,7 +743,7 @@ function stylizeUniformGet(name: string): number[] {
 const lab = {
   hullInfo, stylizeUniformGet, carUniformsDump, stylizeUniform, grabView, grab, glassPoints, lamps, carUniform, carIds: (): string[] => CARS.map((c) => c.id),
   hold: (on: boolean): void => { holdClock = on; },
-  freeze, headlights, shoot, regions, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
+  freeze, headlights, shoot, regions, lumaBox, groundDetail, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
   setReduce: (on: boolean): void => { reduceFx = on; },
   setCartoon: (on: boolean): void => { cartoonFx = on; },
