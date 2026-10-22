@@ -180,7 +180,7 @@ function ringMesh(name: string, layer: number, points: number, p: Palette, mater
   const amp = ringForestAmp('coast', layer);
   const B = -70; const ro = 1.02; const ri = 0.975;
   // `aForest` (horizon-rings.ts) = (mancha, contorno, 1 na crista) × a parte de mata (1 − granito): a pedra nua fica lisa.
-  const push = (x: number, y: number, z: number, k: THREE.Color, f = 1, keep = 1, crest = 0): void => { pos.push(x, y, z); col.push(k.r * f, k.g * f, k.b * f); forest.push(amp.speckle * keep, amp.fringe * keep, crest); };
+  const push = (x: number, y: number, z: number, k: THREE.Color, f = 1, keep = 1, crest = 0): void => { pos.push(x, y, z); col.push(k.r * f, k.g * f, k.b * f); forest.push(amp.speckle * keep, amp.fringe * keep, crest, 0); };
   const hAt = (i: number): number => ridgeHeight(layer, ((i % points) / points) * Math.PI * 2, only);
   for (let i = 0; i < points; i++) {
     const a0 = (i / points) * Math.PI * 2; const a1 = ((i + 1) / points) * Math.PI * 2;
@@ -206,7 +206,7 @@ function ringMesh(name: string, layer: number, points: number, p: Palette, mater
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 3));
+  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 4));
   const mesh = new THREE.Mesh(g, material);
   mesh.name = name; mesh.frustumCulled = false; mesh.renderOrder = -5 + (2 - layer);
   return mesh;

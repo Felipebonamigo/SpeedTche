@@ -334,12 +334,12 @@ describe('F3 · anéis de horizonte: arvoredo fino e contorno de copas por fragm
   const mk = (b: (typeof SCENERIES)[number], layer: number, snow: THREE.Color | null = null): THREE.BufferGeometry =>
     buildRing(b, layer, [470, 660, 920][layer], [62, 120, 205][layer], new THREE.Color(pal.layers[layer]), new THREE.Color(pal.fog), pal.layerHaze[layer], snow);
 
-  it('o anel leva `aForest` (mancha, contorno, 1 só na crista), um por vértice, e a crista são exatamente os vértices do topo (2 de 6 por quadrilátero de cima)', () => {
+  it('o anel leva `aForest` (mancha, contorno, 1 só na crista, ravina de neve), um por vértice, e a crista são exatamente os vértices do topo (2 de 6 por quadrilátero de cima)', () => {
     const g = mk('tropical', 1); const f = g.getAttribute('aForest');
     expect(f, 'atributo aForest').toBeDefined();
-    expect(f.count).toBe(g.getAttribute('position').count); expect(f.itemSize).toBe(3);
+    expect(f.count).toBe(g.getAttribute('position').count); expect(f.itemSize).toBe(4);
     let crest = 0;
-    for (let i = 0; i < f.count; i++) { const z = f.getZ(i); expect([0, 1]).toContain(z); crest += z; expect(f.getX(i)).toBeLessThanOrEqual(0.2); expect(f.getY(i)).toBeLessThanOrEqual(1); }
+    for (let i = 0; i < f.count; i++) { const z = f.getZ(i); expect([0, 1]).toContain(z); crest += z; expect(f.getX(i)).toBeLessThanOrEqual(0.2); expect(f.getY(i)).toBeLessThanOrEqual(1); expect(f.getW(i)).toBeLessThanOrEqual(1); }
     expect(crest).toBe(300 * 3); // 3 vértices do topo por coluna (o 3º do triângulo de cima e os 2 do segundo)
   });
 
@@ -357,6 +357,22 @@ describe('F3 · anéis de horizonte: arvoredo fino e contorno de copas por fragm
       if (r > 0.85) { peakCrest++; expect(f.getY(i), `pico a ${r.toFixed(2)}`).toBeCloseTo(0, 6); }
     }
     expect(lowCrest, 'há crista baixa (mata)').toBeGreaterThan(0); expect(peakCrest, 'há pico de neve').toBeGreaterThan(0);
+  });
+
+  it('a neve leva ravinas (w): o pico do anel alpino tem w ≥ 0,6 e a mata (sem neve) tem w = 0; o shader sombreia as ravinas em azul, esticadas na vertical', () => {
+    const g = mk('alpine', 1, new THREE.Color('#ffffff')); const f = g.getAttribute('aForest'); const pos = g.getAttribute('position');
+    let peak = 0; let peakMin = Infinity; let low = 0;
+    for (let i = 0; i < f.count; i++) {
+      if (f.getZ(i) !== 1) continue; // as cristas (as encostas de baixo de um pico nevado são nevadas também)
+      const r = pos.getY(i) / 120;
+      if (r > 0.9) { peak++; peakMin = Math.min(peakMin, f.getW(i)); }
+      if (r < 0.45) low = Math.max(low, f.getW(i));
+    }
+    expect(peak).toBeGreaterThan(0); expect(peakMin, 'ravina no pico').toBeGreaterThanOrEqual(0.6); expect(low, 'sem ravina na mata').toBeCloseTo(0, 6);
+    const tropical = mk('tropical', 1).getAttribute('aForest');
+    for (let i = 0; i < tropical.count; i++) expect(tropical.getW(i)).toBe(0);
+    expect(forestFragBody('c')).toMatch(/vForest\.w/);
+    expect(forestFragBody('c')).toMatch(/vec3\(0\.8\d?, 0\.9\d?, 1\.0\)/);
   });
 
   it('o shader: descarta o contorno e mancha a cor, no espaço do OBJETO (vLocal) — nunca em posição de mundo ou de câmera, que faria o arvoredo "nadar"', () => {

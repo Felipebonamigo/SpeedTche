@@ -441,8 +441,8 @@ export function buildRing(biome: SceneryId, layer: number, radius: number, heigh
   const cBase = top.clone().lerp(fog, Math.min(1, haze + 0.55));
   const cSnow = snow ? snow.clone().lerp(fog, haze * 0.8) : null;
   const tmp = new THREE.Color();
-  // `aForest` = (mancha, contorno, 1 na crista): a neve e a pedra do pico não levam o arvoredo (`keep`: 1 = mata, 0 = neve).
-  const push = (x: number, y: number, z: number, c: THREE.Color, keep = 1, crest = 0) => { pos.push(x, y, z); col.push(c.r, c.g, c.b); forest.push(amp.speckle * keep, amp.fringe * keep, crest); };
+  // `aForest` = (mancha, contorno, 1 na crista, ravina): a neve e a pedra do pico não levam o arvoredo (`keep`: 1 = mata, 0 = neve) e levam, no lugar dele, as ravinas.
+  const push = (x: number, y: number, z: number, c: THREE.Color, keep = 1, crest = 0) => { pos.push(x, y, z); col.push(c.r, c.g, c.b); forest.push(amp.speckle * keep, amp.fringe * keep, crest, cSnow ? 0.9 * (1 - keep) : 0); };
   const heightAt = (i: number): number => height * ringProfile(biome, layer, (i % N) / N);
   const keepAt = (h: number): number => (cSnow ? 1 - smooth01(0.5, 0.85, h / height) : 1);
   // Neve pela altura do próprio vértice, numa faixa larga: decidida por coluna (pico acima de 66–78%), a coluna
@@ -474,7 +474,7 @@ export function buildRing(biome: SceneryId, layer: number, radius: number, heigh
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 3));
+  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 4));
   return smoothNormals(g, RING_CREASE);
 }
 

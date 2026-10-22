@@ -85,15 +85,15 @@ export function ringPaint(biome: SceneryId, layer: number, n: number, top: THREE
 /**
  * O arvoredo FINO e o contorno de copas: por fragmento, em ruído 3D do espaço do OBJETO (o anel é rígido e gira com o grupo do horizonte: a posição local fica no mesmo ponto
  * do morro, como um desenho no morro — nunca a posição de mundo, que mudaria a cada quadro e faria o arvoredo "nadar", a regra da F1). `aForest` por vértice =
- * (força da mancha, fundo do contorno, 1 na crista e 0 no resto): a mata pega as duas; a neve, a pedra e o deserto, pouco ou nada.
+ * (força da mancha, fundo do contorno, 1 na crista e 0 no resto, ravina de neve): a mata pega as duas; a neve, a pedra e o deserto, pouco ou nada.
  * Duas escalas de mancha (18 m e 8 m a 700 m: acima de ~8 px, para o ruído não cintilar) e o contorno come até 8% da altura do quadrilátero da crista com `discard`.
  */
 export const FOREST_VERT_PARS = /* glsl */ `
-attribute vec3 aForest; varying vec3 vForest; varying vec3 vLocal;`;
+attribute vec4 aForest; varying vec4 vForest; varying vec3 vLocal;`;
 export const FOREST_VERT_BODY = /* glsl */ `
   vForest = aForest; vLocal = position;`;
 export const FOREST_FRAG_PARS = /* glsl */ `
-varying vec3 vForest; varying vec3 vLocal;
+varying vec4 vForest; varying vec3 vLocal;
 float forestH(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 float forestN(vec3 x) {
   vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -111,6 +111,9 @@ export function forestFragBody(c: string): string {
     float fr = smoothstep(0.35, 0.75, forestN(lp / vec3(10.0, 4.0, 10.0)) * 0.65 + forestN(lp / vec3(4.5, 2.2, 4.5)) * 0.35);
     if (vForest.z > 1.0 - 0.08 * vForest.y * fr) discard;
     ${c} *= 1.0 + vForest.x * (fo - 0.5) * 1.6;
+    // Ravinas da neve: faixas verticais (o ruído esticado em y) sombreadas em azul, só onde há neve (w): a encosta branca deixa de ser uma bolha lisa.
+    float gu = smoothstep(0.42, 0.78, forestN(lp / vec3(11.0, 48.0, 11.0)) * 0.7 + forestN(lp / vec3(4.0, 20.0, 4.0)) * 0.3);
+    ${c} *= mix(vec3(1.0), vec3(0.86, 0.92, 1.0), vForest.w * gu);
   }`;
 }
 
