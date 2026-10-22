@@ -83,14 +83,14 @@ describe('F5 · fachada: janelas com 3 níveis de acendimento, sombra do beiral,
   }
 
   for (const style of STYLES) {
-    it(`${style}: a parede tem uma luz difusa própria no mapa de luz (mediana 0,04–0,16), para não ficar preta quando a face está à sombra do sol (entardecer); antes: 0`, () => {
+    it(`${style}: a parede tem uma luz difusa própria no mapa de luz (mediana 0,04–0,2), para não ficar preta quando a face está à sombra do sol (entardecer); antes: 0`, () => {
       const l = tex.get(style)?.light; if (!l) throw new Error('sem textura');
       const vals: number[] = [];
       for (let y = 0; y < S * 2; y += 3) for (let x = 0; x < S * 2; x += 3) vals.push(lumaAt(l.raster, x, y));
       vals.sort((a, b) => a - b);
       const med = vals[Math.floor(vals.length / 2)];
       expect(med).toBeGreaterThanOrEqual(0.04);
-      expect(med).toBeLessThanOrEqual(0.16);
+      expect(med).toBeLessThanOrEqual(0.2);
     });
   }
 });

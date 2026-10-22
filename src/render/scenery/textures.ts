@@ -57,7 +57,7 @@ function litRect(l: CanvasRenderingContext2D, x: number, y: number, w: number, h
 let lightCtx: CanvasRenderingContext2D | null = null;
 const SKY_GLOW = '#2a2038';
 /** A luz difusa da parede: no entardecer a face à sombra do sol não fica preta, e o topo de cada andar (sob a laje) fica mais escuro (o mesmo beiral do albedo). */
-const WALL_LIGHT = '#262030';
+const WALL_LIGHT = '#342c44';
 function wallLight(l: CanvasRenderingContext2D, ox: number, oy: number): void {
   for (let r = 0; r < 4; r++) {
     const y = oy + r * CELL;
