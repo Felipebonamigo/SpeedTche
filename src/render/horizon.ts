@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Quality } from '../game/contracts';
 import { atLeast } from '../game/quality';
+import { ringFoliage } from './horizon-rings';
 import { valueNoise } from './noise';
 import type { Palette } from './palette';
 import { applyGrade } from './stylize';
@@ -184,7 +185,10 @@ function ringMesh(name: string, layer: number, points: number, p: Palette, mater
     const arc = (R * Math.PI * 2) / points;
     const f = 1 + 0.14 * Math.max(-1, Math.min(1, -(h1 - h0) / (arc * 1.2)));
     const g0 = graniteAt(layer, a0, only); const g1 = graniteAt(layer, a1, only);
-    const t0 = top.clone().lerp(GRANITE, g0 * 0.75); const t1 = top.clone().lerp(GRANITE, g1 * 0.75);
+    // V22/F3: o arvoredo e o cume (horizon-rings.ts) só onde há mata: a pedra nua (granito) fica lisa. Mesmo índice nas cores A e B (a corrida que muda).
+    const f0 = ringFoliage('coast', layer, i, points); const f1 = ringFoliage('coast', layer, i + 1, points);
+    const k0 = 1 + (f0.shade * f0.crest - 1) * (1 - g0); const k1 = 1 + (f1.shade * f1.crest - 1) * (1 - g1);
+    const t0 = top.clone().lerp(GRANITE, g0 * 0.75).multiplyScalar(k0); const t1 = top.clone().lerp(GRANITE, g1 * 0.75).multiplyScalar(k1);
     const mc = mid.clone().lerp(top, 0.35);
     push(x0 * ro, B, z0 * ro, base); push(x1 * ro, B, z1 * ro, base); push(x0 * ro, m0, z0 * ro, mid, f);
     push(x1 * ro, B, z1 * ro, base); push(x1 * ro, m1, z1 * ro, mid, f); push(x0 * ro, m0, z0 * ro, mid, f);

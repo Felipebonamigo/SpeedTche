@@ -11,6 +11,7 @@ import type { Horizon } from './horizon';
 import * as THREE from 'three';
 import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
+import { ringPaint } from './horizon-rings';
 import { smoothNormals } from './normals';
 import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
@@ -432,8 +433,8 @@ const RING_CREASE = 120;
 export function buildRing(biome: SceneryId, layer: number, radius: number, height: number, top: THREE.Color, fog: THREE.Color, haze: number, snow: THREE.Color | null): THREE.BufferGeometry {
   const N = 300; // pontos por volta: com 150 o contorno da serra saía em degraus
   const pos: number[] = []; const col: number[] = [];
-  const cTop = top.clone().lerp(fog, haze);
-  const cMid = top.clone().lerp(fog, Math.min(1, haze + 0.22));
+  // V22/F3: a cor do topo, da encosta alta e do meio por coluna, com o ruído de arvoredo e o cume iluminado (horizon-rings.ts): antes, uma cor só por fileira.
+  const paint = ringPaint(biome, layer, N, top, fog, haze);
   const cBase = top.clone().lerp(fog, Math.min(1, haze + 0.55));
   const cSnow = snow ? snow.clone().lerp(fog, haze * 0.8) : null;
   const tmp = new THREE.Color();
@@ -441,7 +442,8 @@ export function buildRing(biome: SceneryId, layer: number, radius: number, heigh
   const heightAt = (i: number): number => height * ringProfile(biome, layer, (i % N) / N);
   // Neve pela altura do próprio vértice, numa faixa larga: decidida por coluna (pico acima de 66–78%), a coluna
   // vizinha saía cinza e a encosta inteira virava faixa vertical — com a serra lisa isso aparecia.
-  const topColor = (h: number): THREE.Color => {
+  const topColor = (h: number, i: number): THREE.Color => {
+    const cTop = paint.top[i];
     if (!cSnow) return cTop;
     const s = smooth01(0.5, 0.85, h / height);
     return tmp.copy(cTop).lerp(cSnow, s);
@@ -455,10 +457,11 @@ export function buildRing(biome: SceneryId, layer: number, radius: number, heigh
     // O meio fica para fora e o topo para dentro: a encosta tem inclinação (o sol a faceta).
     const m0 = h0 * 0.45; const m1 = h1 * 0.45;
     const ro = 1.02; const ri = 0.975;
-    push(x0 * ro, B, z0 * ro, cBase); push(x1 * ro, B, z1 * ro, cBase); push(x0 * ro, m0, z0 * ro, cMid);
-    push(x1 * ro, B, z1 * ro, cBase); push(x1 * ro, m1, z1 * ro, cMid); push(x0 * ro, m0, z0 * ro, cMid);
-    const t0 = topColor(h0).clone(); const t1 = topColor(h1).clone();
-    const mc0 = cMid.clone().lerp(cTop, 0.35); const mc1 = cMid.clone().lerp(cTop, 0.35);
+    const cMid0 = paint.mid[i]; const cMid1 = paint.mid[i + 1];
+    push(x0 * ro, B, z0 * ro, cBase); push(x1 * ro, B, z1 * ro, cBase); push(x0 * ro, m0, z0 * ro, cMid0);
+    push(x1 * ro, B, z1 * ro, cBase); push(x1 * ro, m1, z1 * ro, cMid1); push(x0 * ro, m0, z0 * ro, cMid0);
+    const t0 = topColor(h0, i).clone(); const t1 = topColor(h1, i + 1).clone();
+    const mc0 = paint.slope[i]; const mc1 = paint.slope[i + 1];
     push(x0 * ro, m0, z0 * ro, mc0); push(x1 * ro, m1, z1 * ro, mc1); push(x0 * ri, h0, z0 * ri, t0);
     push(x1 * ro, m1, z1 * ro, mc1); push(x1 * ri, h1, z1 * ri, t1); push(x0 * ri, h0, z0 * ri, t0);
   }
