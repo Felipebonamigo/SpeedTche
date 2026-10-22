@@ -16,14 +16,14 @@ import type { Palette } from './palette';
 export const ATMOS_ONSET = 90;
 /** Onde ela chega ao teto (m). */
 export const ATMOS_REACH = 380;
-/** O teto da bruma extra (fração de cor) na câmera: com o FogExp2 da Alta (0,0019) dá 28% → ~52% a 300 m (~47% no entardecer, que é menos denso) (era 28%; o plano pede ≥ 40%). */
-export const ATMOS_AMOUNT = 0.42;
+/** O teto da bruma extra (fração de cor) na câmera: com o FogExp2 da Alta (0,0019) dá 28% → ~50% a 300 m (~47% no entardecer, que é menos denso) (era 28%; o plano pede ≥ 40%). */
+export const ATMOS_AMOUNT = 0.38;
 /** Altura: a bruma extra vale `1 − hy·ATMOS_HEIGHT_K` (hy = metros acima da câmera), presa a [MIN, MAX]: 30 m abaixo da câmera = 1,36×; 30 m acima = 0,64×. */
 export const ATMOS_HEIGHT_K = 0.012;
 export const ATMOS_HEIGHT_MIN = 0.6;
 export const ATMOS_HEIGHT_MAX = 1.8;
 /** O lado oposto ao sol esfria (a mesma tinta do domo, `SKY_FRAG`). */
-export const ATMOS_COOL: readonly [number, number, number] = [0.95, 0.985, 1.04];
+export const ATMOS_COOL: readonly [number, number, number] = [0.97, 0.99, 1.03];
 
 const smooth = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -60,8 +60,8 @@ export function atmosphereLook(p: Palette): AtmosphereLook {
     amount: ATMOS_AMOUNT,
     base: lin(p.fog),
     sun: lin(p.skyGlow),
-    // 0,35 de dia e à noite, 0,8 no entardecer (o `glow` de `sunLook` em sky.ts); a faixa larga e o frio são da pintura de dia (V22/F3).
-    mix: [0.35 + 0.45 * duskOf(p.light), 0.18 * day, 0.8 * day],
+    // 0,25 de dia e à noite (o domo usa 0,35: a névoa leva menos, porque o creme sobre a névoa ciano da costa vira verde-acinzentado — visto no Pão de Açúcar), 0,8 no entardecer (o `glow` de `sunLook` em sky.ts); a faixa larga e o frio são da pintura de dia (V22/F3).
+    mix: [0.25 + 0.55 * duskOf(p.light), 0.1 * day, 0.5 * day],
   };
 }
 

@@ -439,13 +439,14 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     cloudLit = null; cloudShade = sky[1];
   }
   // Névoa: o horizonte com um pouco do meio do céu — tem cor, nunca cinza.
-  const fogK = time === 'day' ? 0.28 : time === 'dusk' ? 0.32 : 0.2;
+  // V22/F7: no deserto de dia o meio do céu (azul) cinzava a névoa do horizonte laranja (35°, sat 0,21): o mesa distante virava marrom-acinzentado. Menos azul na mistura: névoa de poeira quente.
+  const fogK = time === 'day' ? (scenery === 'desert' ? 0.1 : 0.28) : time === 'dusk' ? 0.32 : 0.2;
   const fog = mix(sky[2], sky[1], fogK);
-  const fogLight = mix(skyLight[2], skyLight[1], fogK); // a névoa que a luz do carro vê: a de antes do roxo (V12)
+  const fogLight = mix(skyLight[2], skyLight[1], time === 'day' ? 0.28 : fogK); // a névoa que a luz do carro vê: a de antes do roxo (V12); V22/F7: o deserto de dia não muda a luz do carro (só o que se vê)
   // À noite o chão alto sobe um pouco (a mata e a montanha escuras engoliam a pista) e o asfalto leva menos azul que o resto: o carro
   // escuro continua se lendo contra ele (tests/paleta-m2.test.ts: contraste estrada × chão e carro × asfalto).
   const gt = GROUND_TRIO[scenery];
-  const trimmed = (c: string): string => retone(c, 0, gt.trim, 1); // V22/F7: a saturação do chão desce; o céu, o carro e a HUD ficam no teto
+  const trimmed = (c: string): string => (time === 'night' ? c : retone(c, 0, gt.trim, 1)); // à noite o chão já é roxo (`purple`): sem a trava (a luma média da cena não sobe) // V22/F7: a saturação do chão desce; o céu, o carro e a HUD ficam no teto
   const groundLowLight = time === 'night' ? liftTo(g(trimmed(b.groundLow)), 0.125) : g(trimmed(b.groundLow));
   const groundHighLight = time === 'night' ? liftTo(g(trimmed(b.groundHigh)), 0.12) : g(trimmed(b.groundHigh));
   // O claro quente (do médio, mais luz e matiz para o amarelo) e o escuro frio (do alto, menos luz e matiz para o azul-esmeralda). O matiz dos dois vai ao roxo à noite, como o resto do chão.
@@ -482,7 +483,7 @@ function build(scenery: SceneryId, time: TimeOfDay): Palette {
     far: layers[2], near: layers[0],
     pit: shade(asphalt, 1.22), pitLine,
     light,
-    skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(groundLowLight, asphalt, 0.3), 0.55), hemiIntensity,
+    skyGlow: glow, sunLight, sunIntensity, hemiSky, hemiGround: shade(mix(time === 'night' ? liftTo(g(b.groundLow), 0.125) : g(b.groundLow), asphalt, 0.3), 0.55), hemiIntensity, // V22/F7: o rebatimento (hemiGround) sai do chão de ANTES da trava de saturação: a luz do carro não muda
     envIntensity, exposure, fogDensity, bloom, cloudLit, cloudShade,
     asphalt, roadBase, roadAlt, roadEarth: rt.earth, shoulder: purple(g(b.shoulder)), verge: purple(g(b.verge)), groundLow, groundHigh, groundWarm, groundCool, rock: purple(g(b.rock)),
     snow: time === 'day' ? '#f4f8ff' : time === 'dusk' ? '#ffe0e4' : '#c2b4ea',

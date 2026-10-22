@@ -81,7 +81,12 @@ describe('o que NÃO muda: a luz que cai no carro, o asfalto, a exposição, o d
     const bad: string[] = [];
     for (const s of SCENERIES) for (const t of ['day', 'dusk'] as const) {
       const p = palette(s, t) as Palette & { skyLight?: unknown };
-      for (const [k, v] of Object.entries(base(s, t))) if (JSON.stringify(p[k as keyof Palette]) !== JSON.stringify(v)) bad.push(`${s}:${t}.${k}`);
+      for (const [k, v] of Object.entries(base(s, t))) {
+        // V22/F7 mudou DE PROPÓSITO, só no que se VÊ (não na luz do carro: hemiGround e fogLight seguem os de antes): a saturação do chão desce (`GROUND_TRIO.trim`: o diagnóstico mediu a grama a 0,90–0,93,
+        // no teto do céu, sem hierarquia) — `groundLow`, `groundHigh` e as cópias `grassLight`/`grassDark`, de dia e no entardecer — e a névoa do deserto de dia perde o azul do meio do céu (`fog`, 35°, sat 0,21 → mais quente).
+        if (['groundLow', 'groundHigh', 'grassLight', 'grassDark'].includes(k) || (s === 'desert' && t === 'day' && k === 'fog')) continue;
+        if (JSON.stringify(p[k as keyof Palette]) !== JSON.stringify(v)) bad.push(`${s}:${t}.${k}`);
+      }
       if (JSON.stringify(p.skyLight) !== JSON.stringify(p.sky)) bad.push(`${s}:${t}.skyLight ≠ sky`);
     }
     expect(bad).toEqual([]);
@@ -188,10 +193,10 @@ describe('o roxo do cenário à noite (uniforme `uStylizeWorld`)', () => {
     for (let l = 0.7; l >= 0.32 - 1e-9; l -= 0.01) { const a = worldLook(l).amount; expect(a, `luz ${l.toFixed(2)}`).toBeGreaterThanOrEqual(prev - 1e-9); expect(a - prev, `salto em ${l.toFixed(2)}`).toBeLessThan(0.06); prev = a; }
   });
 
-  it('o tom é roxo/magenta (matiz 270–330° em sRGB)', () => {
+  it('o tom é violeta-azulado (matiz 230–280° em sRGB; V22/F7: era roxo/magenta 270–330°, o magenta é do chão e da pista e o prédio precisa de ≥ 20° de diferença: `tests/nevoa-f7.test.ts`)', () => {
     const [r, g, b] = worldLook(0.32).tone.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)));
     const h = hsv(`#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`).h;
-    expect(h).toBeGreaterThanOrEqual(270); expect(h).toBeLessThanOrEqual(330);
+    expect(h).toBeGreaterThanOrEqual(230); expect(h).toBeLessThanOrEqual(280);
   });
 
   it('setStylizePalette grava o uniforme: 0 de dia e no entardecer, > 0 à noite', () => {

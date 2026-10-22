@@ -68,9 +68,11 @@ describe('V11 · a cor da estrada (paleta por bioma e período)', () => {
     expect(sat(alpine), 'serra: pedra rosada').toBeGreaterThanOrEqual(0.04); expect(sat(alpine)).toBeLessThanOrEqual(0.2);
   });
 
-  it('a cidade à noite tem asfalto roxo-azulado (matiz 245°–290°, saturação ≥ 0,25: lilás, não néon) e nenhum bioma tem azul-marinho (matiz 200°–245° com saturação > 0,4) em período nenhum', () => {
+  it('a cidade à noite tem asfalto rosa-mauve (matiz 290°–335°, saturação ≥ 0,25: mauve, não néon) e nenhum bioma tem azul-marinho (matiz 200°–245° com saturação > 0,4) em período nenhum', () => {
+    // V22/F7 (e) moveu o matiz de 245°–290° (lilás-azulado, #a276ae a 287°) para 290°–335° (#b4729c a 321°, mesma luma): o chão da noite é violeta (295°) e o prédio índigo (237°); a pista precisa de
+    // ≥ 20° de cada um para a noite separar por matiz, não só por valor (o HC2 pinta a pista rosa). Medido: 321° no albedo. Saturação e a ausência de azul-marinho seguem travadas.
     const c = rgb(RB(palette('city_night', 'night')));
-    expect(hueDeg(c), 'matiz').toBeGreaterThanOrEqual(245); expect(hueDeg(c)).toBeLessThanOrEqual(290);
+    expect(hueDeg(c), 'matiz').toBeGreaterThanOrEqual(290); expect(hueDeg(c)).toBeLessThanOrEqual(335);
     expect(sat(c), 'saturação').toBeGreaterThanOrEqual(0.25);
     const navy = COMBOS.filter(([s, t]) => { const x = rgb(RB(palette(s, t))); return hueDeg(x) >= 200 && hueDeg(x) < 245 && sat(x) > 0.4; }).map((k) => k.join(':'));
     expect(navy).toEqual([]);

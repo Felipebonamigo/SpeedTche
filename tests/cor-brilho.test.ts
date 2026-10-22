@@ -353,7 +353,7 @@ describe('2c. a estrada tem tom (V11): terra e pedra com cor, sem azul-marinho',
     expect(bad).toEqual([]);
   });
 
-  it('o matiz renderizado é o do bioma: deserto 10°–38°, mata 2°–28°, savana 26°–50°; praia quente (R ≥ B); a cidade à noite é roxo-azulada (matiz 245°–300°, B − R entre 8 e 60)', () => {
+  it('o matiz renderizado é o do bioma: deserto 10°–38°, mata 2°–28°, savana 26°–50°; praia quente (R ≥ B); a cidade à noite é rosa-mauve (matiz 290°–335°, B − R entre −60 e +15; V22/F7: era roxo-azulado 245°–300° e B − R 8–60)', () => {
     const hueOf = (s: SceneryId, t: TimeOfDay, sun: boolean): number => hueDeg(road(s, t, palette(s, t), sun));
     for (const sun of [false, true]) {
       const tag = sun ? 'ao sol' : 'à sombra';
@@ -363,8 +363,10 @@ describe('2c. a estrada tem tom (V11): terra e pedra com cor, sem azul-marinho',
       const coast = road('coast', 'day', palette('coast', 'day'), sun);
       expect(coast[0], `praia ${tag}: R ≥ B`).toBeGreaterThanOrEqual(coast[2]);
       const c = road('city_night', 'night', palette('city_night', 'night'), sun);
-      expect(hueDeg(c), `cidade à noite ${tag} rgb(${c.join(',')})`).toBeGreaterThanOrEqual(245); expect(hueDeg(c)).toBeLessThanOrEqual(300);
-      expect(c[2] - c[0], `cidade à noite ${tag}: B − R`).toBeGreaterThanOrEqual(8); expect(c[2] - c[0]).toBeLessThanOrEqual(60);
+      // V22/F7 (e): a pista da cidade à noite foi do lilás-azulado (matiz 245°–300°, B − R 8–60) ao rosa-mauve, para o matiz da pista ficar ≥ 20° do chão (violeta, 295°) e do prédio (índigo,
+      // 237°): valor novo medido no mesmo modelo = 308°–322° renderizado; faixa 290°–335° e B − R entre −60 e +15. O V12 GL (`noite-roxa-gl`) já pedia chão 275–335° e B − R ≤ +0,06.
+      expect(hueDeg(c), `cidade à noite ${tag} rgb(${c.join(',')})`).toBeGreaterThanOrEqual(290); expect(hueDeg(c)).toBeLessThanOrEqual(335);
+      expect(c[2] - c[0], `cidade à noite ${tag}: B − R`).toBeGreaterThanOrEqual(-60); expect(c[2] - c[0]).toBeLessThanOrEqual(15);
     }
   });
 

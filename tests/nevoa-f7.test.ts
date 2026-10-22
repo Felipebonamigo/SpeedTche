@@ -106,7 +106,7 @@ describe('F7 · o tom da névoa por lado do sol e os uniformes', () => {
     }
     const day = atmosphereLook(palette('coast', 'day')); const dusk = atmosphereLook(palette('coast', 'dusk')); const night = atmosphereLook(palette('coast', 'night'));
     expect(dusk.mix[0]).toBeGreaterThan(day.mix[0] + 0.3); expect(dusk.mix[1]).toBe(0); expect(night.mix[1]).toBe(0); expect(night.mix[2]).toBe(0);
-    expect(day.mix[1]).toBeGreaterThan(0.1); expect(day.mix[2]).toBeGreaterThan(0.5);
+    expect(day.mix[1]).toBeGreaterThan(0.05); expect(day.mix[2]).toBeGreaterThanOrEqual(0.4); // valores da calibração visual (rodada 4: mais forte virava verde-acinzentado na costa)
   });
 
   it('setStylizePalette entrega os uniformes e o setFogView põe o "para cima" e o sol horizontal no espaço de vista da câmera', () => {
