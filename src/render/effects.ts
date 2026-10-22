@@ -298,9 +298,9 @@ export class Effects {
   /** Poeira da cor do chão que o carro levanta: a faixa de terra/areia/cascalho da beira. */
   setPalette(p: Palette): void {
     this.dustColor.set(p.verge).lerp(new THREE.Color(p.shoulder), 0.4).multiplyScalar(p.light < 0.5 ? 0.7 : 0.92);
-    // V22 F8: a poeira da estrada de terra leva a cor da pista, puxada para o acostamento e um pouco para o claro (poeira no ar é mais pálida que o chão); as partículas
+    // V22 F8: a poeira da estrada de terra leva a cor da pista, um pouco puxada para o acostamento e mais clara (poeira no ar pega luz; sem branco: virava fumaça cinza sobre a terra vermelha na 1ª captura); as partículas
     // ambientes, um branco quente de dia que escurece e esfria com a luz do período (à noite, normal sobre o escuro, não vira estrela).
-    this.roadColor.set(p.roadBase).lerp(new THREE.Color(p.shoulder), 0.3).lerp(new THREE.Color('#ffffff'), 0.14).multiplyScalar(p.light < 0.5 ? 0.7 : 1);
+    this.roadColor.set(p.roadBase).lerp(new THREE.Color('#e2b88a'), 0.5).multiplyScalar(p.light < 0.5 ? 0.62 : 1);
     this.roadEarth = p.roadEarth;
     const lt = Math.min(1, Math.max(0, (p.light - 0.3) / 0.6));
     this.moteRgb[0] = (0.34 + 0.66 * lt) * (1 - 0.1 * (1 - lt)); this.moteRgb[1] = (0.34 + 0.66 * lt) * (0.96 - 0.06 * (1 - lt)); this.moteRgb[2] = (0.4 + 0.6 * lt) * (0.85 + 0.15 * (1 - lt));

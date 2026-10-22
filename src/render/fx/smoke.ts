@@ -120,7 +120,7 @@ export function emitRoadDust(c: PuffCar, color: readonly [number, number, number
     const [r, g, b] = toned(color, rnd, 0.1);
     out(puff({
       z, x: c.x + side * (WHEEL_X + 0.03 * rnd()), h: 0.12 + 0.12 * rnd(), vz: c.speed * (0.68 + rnd() * 0.2), vx: side * (0.12 + 0.3 * rnd()) + (rnd() - 0.5) * 0.1,
-      vh: 0.5 + 0.9 * rnd(), life: 0.55 + rnd() * 0.45 + 0.4 * (scale - 1), size: 0.4 * scale * (0.75 + 0.5 * rnd()), grow: 1.1 * scale * (0.85 + 0.3 * rnd()),
+      vh: 0.5 + 0.9 * rnd(), life: 0.55 + rnd() * 0.45 + 0.4 * (scale - 1), size: 0.55 * scale * (0.75 + 0.5 * rnd()), grow: 1.5 * scale * (0.85 + 0.3 * rnd()),
       gravity: 0.4, r, g, b,
     }, rnd));
   });
