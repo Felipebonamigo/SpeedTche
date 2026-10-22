@@ -1,4 +1,4 @@
-SPEED TCHÊ — versão de teste para amigos (0.1.19, build de 31/10/2026)
+SPEED TCHÊ — versão de teste para amigos (0.1.20, build de 01/11/2026)
 
 Corrida arcade em 3D com co-op local de até 4 jogadores em tela dividida. Esta é uma versão de TESTE:
 pode ter bugs, e o nome, a arte e o equilíbrio ainda vão mudar. Obrigado por testar!
@@ -26,6 +26,14 @@ CONTROLES (dá para trocar em Opções › Controles)
   Segurar a buzina abre a roda de 8 frases de brincadeira (escolha com a marcha ▲▼ e solte para falar).
 
 O QUE TESTAR
+- NOVIDADES DA 0.1.20 (sobre a 0.1.19) — CÉU E SOMBRAS:
+  * CÉU: 8 formas de cúmulo e 2 de faixa (eram 3 e 1), nuvens que derivam em alturas diferentes, cirros finos, gradiente com mais tons, e um brilho
+    largo do lado do sol de dia (o sol em si não mudou de lugar nem a luz do jogo). Anéis de morro no horizonte com mancha de mata, contorno de copas
+    e ravinas na neve.
+  * SOMBRAS: a sombra falsa das árvores, postes e placas é uma elipse esticada para longe do sol (mesma direção da sombra real), com contato escuro
+    no pé; antes ficava enterrada no relevo e o Cânion não tinha nenhuma. Na qualidade Alta ou Ultra, em 1 ou 2 jogadores, as árvores próximas
+    (até 60 m) projetam sombra real do sol. Custa cerca de 11 mil triângulos por tela nessa condição. Em 3 ou 4 jogadores e em Baixa/Média o efeito é discreto.
+  * Penumbra da sombra um pouco mais macia na Alta.
 - NOVIDADES DA 0.1.19 (sobre a 0.1.18) — MAIS ACABAMENTO GRÁFICO:
   * PRÉDIOS E PLACAS: o pé do prédio e a barriga das lajes escurecem (sombra de contato), sombra de beiral na fachada, janelas com três
     níveis de acendimento e reflexo de céu, adereços de telhado (condicionadores, caixa-d'água, chaminé, antena), poste e outdoor com suporte.
