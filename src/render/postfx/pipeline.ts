@@ -32,8 +32,8 @@ export function patchBloomHighPass(fragment: string): string {
 
 /** A vinheta (escurecimento no canto, em luma de TELA: 0,11 = 11% mais escuro): o teto, e a conta que o shader repete. O diagnóstico (V22 §3.9): a bíblia prometia "vinheta leve" e não havia. */
 export const VIGNETTE_MAX = 0.11;
-/** Onde ela começa, em fração da distância do centro ao canto (0 no miolo, 1 no canto): nada até 45%. */
-export const VIGNETTE_FROM = 0.45;
+/** Onde ela começa, em fração da distância do centro ao canto (0 no miolo, 1 no canto): nada até 55% (com 45% o para-choque do carro, a 70% da altura, já escurecia 2,5% e o piso de luma do V2 caiu de 0,1228 a 0,1196: o carro é o herói do quadro, a vinheta não o toca). */
+export const VIGNETTE_FROM = 0.55;
 
 /** O escurecimento (0..`amount`) à fração `r` do centro ao canto: `smoothstep(FROM, 1, r)`, sem degrau. */
 export function vignetteAt(r: number, amount: number = VIGNETTE_MAX): number {

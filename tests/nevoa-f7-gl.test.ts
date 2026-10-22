@@ -118,7 +118,7 @@ describe.skipIf(!available)('V22 · F7 · a névoa, o chão e a noite na imagem 
     console.log(`[F7] saída: centro ${com.centro.toFixed(4)} canto ${com.canto.toFixed(4)} razão ${com.razao.toFixed(4)} | sem vinheta razão ${sem.razao.toFixed(4)} | resíduo ${com.residuoFino.toFixed(5)}`);
     expect(com.razao).toBeLessThan(0.97); expect(com.razao).toBeGreaterThanOrEqual(0.88);
     expect(Math.abs(com.centro / sem.centro - 1), 'o miolo não escurece').toBeLessThan(0.003);
-    expect(Math.abs(com.borda / sem.borda - 1), 'a 45% do raio ainda não há vinheta').toBeLessThan(0.004);
+    expect(Math.abs(com.borda / sem.borda - 1), 'a 28% do raio ainda não há vinheta').toBeLessThan(0.004);
     expect(sem.razao, 'sem vinheta o fundo liso é igual no canto e no centro').toBeGreaterThan(0.99);
     expect(com.residuoFino).toBeGreaterThanOrEqual(0.0012); expect(com.residuoFino).toBeLessThan(0.006);
     expect(await saida.evaluate(() => (window as unknown as { saida: Saida }).saida.shaderErrors())).toEqual([]);

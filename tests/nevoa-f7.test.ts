@@ -152,10 +152,10 @@ describe('F7 · vinheta e dither no OutputPass (0 passe; um dither só)', () => 
     expect(() => patchOutputFragment('nada')).toThrow(/OutputShader/);
   });
 
-  it('a vinheta é 0 no miolo (até 45% do raio), cresce sem degrau e vale ≤ 12% no canto', () => {
+  it('a vinheta é 0 no miolo (até 55% do raio), cresce sem degrau e vale ≤ 12% no canto', () => {
     expect(VIGNETTE_MAX).toBeLessThanOrEqual(0.12);
     expect(vignetteAt(0)).toBe(0);
-    expect(vignetteAt(0.45)).toBe(0);
+    expect(vignetteAt(0.55)).toBe(0);
     expect(vignetteAt(1)).toBeCloseTo(VIGNETTE_MAX, 9);
     let prev = 0;
     for (let r = 0; r <= 1.0001; r += 0.01) { const v = vignetteAt(r); expect(v).toBeGreaterThanOrEqual(prev - 1e-12); expect(v - prev).toBeLessThan(0.01); prev = v; }
