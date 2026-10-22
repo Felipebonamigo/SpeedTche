@@ -1,0 +1,237 @@
+// V22/F6 (docs/ondas/V22-f6-sombras.md): UMA lógica de sombra na cena. Antes, o poste e o prédio projetavam sombra direcional do sol, e a árvore, o cacto e a placa tinham uma mancha
+// REDONDA centrada embaixo (`blob`, runtime.ts), sem seguir o sol; o pé de cada objeto flutuava na grama; a borda do mapa de sombra era granulada (PCF de 5 pontos, raio 2).
+// Aqui: (A) a forma pura da sombra falsa (elipse esticada pelo sol), (B) o plano do PCF (raio e bias por mapa), (C) o `Scenery` de verdade, em Node: o ângulo e o comprimento
+// de cada mancha, o contato escuro no pé, a opacidade e a tinta, (D) o AO da pista.
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import { getTrack } from '../src/core/track';
+import { livePalette } from '../src/render/palette';
+import { shadowPlan, SHADOW_SPAN_M } from '../src/render/postfx/plan';
+import { ShadowRing } from '../src/render/postfx/shadows';
+import { buildRoadFrame } from '../src/render/roadframe';
+import * as SB from '../src/render/scenery/sombra-falsa';
+import { fakeCanvasDocument } from './canvas-fake';
+
+const DEG = Math.PI / 180;
+/** Vetor (da cena) PARA o sol, a partir de azimute e elevação em graus (a convenção de `sky.ts`: x direita, y cima, −z frente). */
+function sunTo(elDeg: number, azDeg: number): { x: number; y: number; z: number } {
+  const el = elDeg * DEG; const az = azDeg * DEG;
+  return { x: Math.sin(az) * Math.cos(el), y: Math.sin(el), z: -Math.cos(az) * Math.cos(el) };
+}
+/** Diferença de ângulo (graus, 0..180) entre dois rumos no plano. */
+function angDiff(a: number, b: number): number {
+  let d = Math.abs(a - b) % (2 * Math.PI);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d / DEG;
+}
+
+describe('V22/F6 (A): a forma pura da sombra falsa (sombra-falsa.ts)', () => {
+  it('o eixo maior aponta para longe do sol, em qualquer azimute', () => {
+    for (let az = -180; az < 180; az += 15) {
+      const s = SB.blobShape(sunTo(34, az), 2.4, 6, false);
+      const want = Math.atan2(-sunTo(34, az).z, -sunTo(34, az).x);
+      expect(angDiff(Math.atan2(s.dirZ, s.dirX), want), `azimute ${az}`).toBeLessThan(0.01);
+      expect(Math.hypot(s.dirX, s.dirZ)).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('o semieixo maior = altura ÷ tan(elevação), preso a [1,2 ; 3,0] × o raio', () => {
+    const r = 2.4;
+    // sol baixo (10°): 6 ÷ tan 10° = 34 m → preso em 3,0 r
+    expect(SB.blobShape(sunTo(10, 0), r, 6, false).along).toBeCloseTo(3.0 * r, 9);
+    // sol a 45°: 6 ÷ 1 = 6 m (entre 1,2 r = 2,88 e 3 r = 7,2): vale a conta
+    expect(SB.blobShape(sunTo(45, 0), r, 6, false).along).toBeCloseTo(6, 9);
+    // sol a pino (85°): 6 ÷ tan 85° = 0,52 m → preso em 1,2 r (nunca encolhe abaixo disso: o contato continua coberto)
+    expect(SB.blobShape(sunTo(85, 0), r, 6, false).along).toBeCloseTo(1.2 * r, 9);
+    // a largura é o raio de antes (a mancha só se estica, não engorda)
+    expect(SB.blobShape(sunTo(34, 0), r, 6, false).across).toBeCloseTo(r, 9);
+  });
+
+  it('o ponto de contato fica dentro da mancha: a borda de trás da elipse é o raio de antes (o que já cobria o pé)', () => {
+    for (const el of [9, 20, 34, 60, 85]) {
+      const r = 1.8; const s = SB.blobShape(sunTo(el, 20), r, 7, false);
+      expect(s.shift - s.along, `el ${el}`).toBeCloseTo(-r, 9);
+    }
+  });
+
+  it('mastro (poste, placa alta, cipreste): só a faixa estreita; o comprimento passa do teto da copa, mas é preso em THIN_LEN_MAX_M', () => {
+    // O raio de um poste é 0,7 m: preso em 3 r daria uma sombra de 2 m para um mastro de 10 m. O mastro tem teto próprio.
+    expect(SB.isThin(0.7, 9.8)).toBe(true); // poste
+    expect(SB.isThin(0.4, 9.6)).toBe(true); // poste de cerca
+    expect(SB.isThin(1.2, 8.7)).toBe(true); // outdoor
+    expect(SB.isThin(2.4, 5.8)).toBe(false); // árvore
+    expect(SB.isThin(2.46, 2.3)).toBe(false); // pedra
+    const s = SB.blobShape(sunTo(50, 0), 0.7, 9.8, true); // 9,8 ÷ tan 50° = 8,2 m: abaixo do teto, vale a conta
+    expect(s.along).toBeCloseTo(9.8 / Math.tan(50 * DEG), 6);
+    expect(s.along).toBeGreaterThan(3 * 0.7 * 3); // bem além dos 3 r (2,1 m) que a regra da copa daria a um poste
+    expect(s.along).toBeLessThanOrEqual(SB.THIN_LEN_MAX_M);
+    expect(SB.blobShape(sunTo(5, 0), 0.7, 9.8, true).along).toBeCloseTo(SB.THIN_LEN_MAX_M, 9);
+  });
+
+  it('o sol a pino (ou sem direção) não gera NaN: a mancha cai no redondo de antes', () => {
+    for (const sun of [{ x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 1e-12, y: 1, z: 0 }]) {
+      const s = SB.blobShape(sun, 2.4, 6, false);
+      for (const v of [s.dirX, s.dirZ, s.along, s.across, s.shift]) expect(Number.isFinite(v)).toBe(true);
+      expect(s.along).toBeGreaterThanOrEqual(1.2 * 2.4 - 1e-9);
+    }
+  });
+
+  it('o raio do contato é uma fração curta do raio da copa (o escuro "curto" do pé)', () => {
+    for (const [r, thin] of [[2.4, false], [1.1, false], [0.7, true], [1.2, true]] as const) {
+      const c = SB.contactRadius(r, thin);
+      expect(c).toBeGreaterThan(0.2);
+      expect(c).toBeLessThanOrEqual(0.6 * r + 1e-9 + (thin ? 0.4 : 0));
+      expect(c).toBeLessThanOrEqual(1.4);
+    }
+  });
+
+  it('opacidade ≤ 0,34 e a tinta é de sombra (azul-lilás: o azul não cai abaixo do vermelho)', () => {
+    expect(SB.BLOB_OPACITY_SCALE).toBeLessThan(1);
+    for (const op of [0.32, 0.4]) expect(op * SB.BLOB_OPACITY_SCALE).toBeLessThanOrEqual(0.34 + 1e-9);
+  });
+});
+
+describe('V22/F6 (B): o plano do PCF (raio e bias) e o `ShadowRing`', () => {
+  it('a penumbra em metros fica em 0,22 – 0,5 m nos dois tamanhos de mapa (raio 2 nos 2048 dava 0,16 m: granulado)', () => {
+    for (const [q, n] of [['medium', 1], ['high', 1], ['high', 2], ['ultra', 2], ['medium', 4], ['high', 4]] as const) {
+      const p = shadowPlan(q, n);
+      const texel = SHADOW_SPAN_M / p.mapSize;
+      const pen = p.radius * texel;
+      expect(pen, `${q}/${n}: ${pen.toFixed(3)} m`).toBeGreaterThanOrEqual(0.22);
+      expect(pen, `${q}/${n}: ${pen.toFixed(3)} m`).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  it('o normalBias acompanha o texel (≥ 0,7 texel: senão o raio maior faz acne) e o bias é o de antes', () => {
+    for (const [q, n] of [['medium', 1], ['high', 1], ['medium', 4]] as const) {
+      const p = shadowPlan(q, n);
+      const texel = SHADOW_SPAN_M / p.mapSize;
+      expect(p.normalBias, `${q}/${n}`).toBeGreaterThanOrEqual(0.7 * texel);
+      expect(p.normalBias).toBeLessThanOrEqual(2 * texel); // e não solta a sombra do pé (peter-panning)
+      expect(p.bias).toBeCloseTo(-0.00025, 9);
+    }
+  });
+
+  it('a Baixa continua sem sombra do sol (nada de mapa)', () => {
+    expect(shadowPlan('low', 1)).toMatchObject({ enabled: false, mapSize: 0 });
+  });
+
+  it('`ShadowRing.beginFrame` grava raio, bias e normalBias do plano na luz (a cada quadro, também ao trocar de 2 para 3 jogadores)', () => {
+    const light = new THREE.DirectionalLight();
+    const ring = new ShadowRing(light.shadow);
+    for (const [q, n] of [['high', 1], ['high', 4], ['medium', 1]] as const) {
+      const p = shadowPlan(q, n);
+      ring.beginFrame(p);
+      expect(light.shadow.radius, `${q}/${n} radius`).toBe(p.radius);
+      expect(light.shadow.bias, `${q}/${n} bias`).toBe(p.bias);
+      expect(light.shadow.normalBias, `${q}/${n} normalBias`).toBe(p.normalBias);
+    }
+    ring.dispose();
+  });
+});
+
+describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contato e opacidade', () => {
+  let restore = (): void => {};
+  beforeEach(() => { restore = fakeCanvasDocument(); });
+  afterEach(() => restore());
+
+  interface Blob { kind: 'crown' | 'thin' | 'contact'; ex: number; ez: number; fx: number; fz: number; x: number; y: number; z: number; a: number; b: number }
+
+  /** As manchas visíveis (instância a instância) depois de um `update`, com o eixo X (maior), o eixo Z (menor) e o centro. */
+  async function manchas(trackId: string, zFrac: number, sun: { x: number; y: number; z: number } | undefined, mapa?: (s: unknown) => void): Promise<Blob[]> {
+    const { Scenery } = await import('../src/render/scenery/runtime');
+    const track = getTrack(trackId);
+    const s = new Scenery();
+    const frame = buildRoadFrame(track, track.length * zFrac, 30, 200);
+    (s.update as (...a: unknown[]) => void).call(s, frame, track, 1, 1, true, sun);
+    mapa?.(s);
+    const g = s as unknown as { batches: Array<{ key: string; mesh: THREE.BatchedMesh }>; slots: Array<{ batch: number; start: number; used: number }>; blobSlots: { crown: number; thin: number; contact: number } };
+    const bi = g.batches.findIndex((b) => b.key === 'blob');
+    expect(bi, 'sem lote de manchas').toBeGreaterThanOrEqual(0);
+    const mesh = g.batches[bi].mesh;
+    const out: Blob[] = [];
+    const m = new THREE.Matrix4();
+    for (const kind of ['crown', 'thin', 'contact'] as const) {
+      const si = g.blobSlots[kind];
+      if (si === undefined || si < 0) continue;
+      const sl = g.slots[si];
+      for (let k = 0; k < sl.used; k++) {
+        mesh.getMatrixAt(sl.start + k, m);
+        const e = m.elements;
+        out.push({ kind, ex: e[0], ez: e[2], fx: e[8], fz: e[10], x: e[12], y: e[13], z: e[14], a: Math.hypot(e[0], e[2]), b: Math.hypot(e[8], e[10]) });
+      }
+    }
+    s.dispose();
+    return out;
+  }
+
+  it('todas as manchas de copa e de mastro apontam para longe do sol (≤ 10° do azimute), em qualquer trecho (rumo da pista) — a árvore e o poste na MESMA direção', async () => {
+    const sun = sunTo(34, -42); // o dia da paleta (palette.ts SUN.day)
+    const want = Math.atan2(-sun.z, -sun.x);
+    for (const zf of [0.05, 0.3, 0.55]) {
+      const ms = (await manchas('copacabana', zf, sun)).filter((b) => b.kind !== 'contact');
+      const crowns = ms.filter((b) => b.kind === 'crown'); const thins = ms.filter((b) => b.kind === 'thin');
+      expect(crowns.length, `copas em ${zf}`).toBeGreaterThanOrEqual(8);
+      expect(thins.length, `mastros em ${zf}`).toBeGreaterThanOrEqual(2);
+      for (const b of ms) expect(angDiff(Math.atan2(b.ez, b.ex), want), `${b.kind} em ${zf}`).toBeLessThanOrEqual(10);
+    }
+  }, 120000);
+
+  it('a copa é uma ELIPSE esticada (semieixo maior ÷ menor entre 1,2 e 3,0), o mastro é mais fino e mais comprido que a copa', async () => {
+    const ms = await manchas('copacabana', 0.3, sunTo(34, -42));
+    const crowns = ms.filter((b) => b.kind === 'crown'); const thins = ms.filter((b) => b.kind === 'thin');
+    expect(crowns.length).toBeGreaterThanOrEqual(8);
+    for (const b of crowns) {
+      expect(b.a / b.b).toBeGreaterThanOrEqual(1.2 - 1e-6);
+      expect(b.a / b.b).toBeLessThanOrEqual(3.0 + 1e-6);
+    }
+    expect(Math.max(...crowns.map((b) => b.a / b.b)), 'alguma copa tem de esticar de verdade (> 1,5)').toBeGreaterThan(1.5);
+    for (const b of thins) expect(b.a / b.b, 'mastro').toBeGreaterThan(3);
+  }, 120000);
+
+  it('o sol baixo (entardecer, 9°) estica mais que o sol alto (34°): o comprimento acompanha a elevação', async () => {
+    const alto = (await manchas('copacabana', 0.3, sunTo(60, -42))).filter((b) => b.kind === 'crown');
+    const baixo = (await manchas('copacabana', 0.3, sunTo(9, -42))).filter((b) => b.kind === 'crown');
+    const med = (v: Blob[]): number => v.map((b) => b.a / b.b).reduce((s, x) => s + x, 0) / v.length;
+    expect(med(baixo)).toBeGreaterThan(med(alto) + 0.4);
+  }, 120000);
+
+  it('cada mancha tem o seu contato escuro no pé: um disco curto (≤ 0,6 do raio) no ponto onde o objeto toca o chão, e a elipse o cobre', async () => {
+    const ms = await manchas('copacabana', 0.3, sunTo(34, -42));
+    const crowns = ms.filter((b) => b.kind === 'crown'); const thins = ms.filter((b) => b.kind === 'thin'); const contacts = ms.filter((b) => b.kind === 'contact');
+    expect(contacts.length, 'um contato por objeto com mancha').toBe(crowns.length + thins.length);
+    // cada contato cai dentro de alguma elipse (o pé está coberto) e é menor que ela
+    let dentro = 0;
+    for (const c of contacts) {
+      expect(c.a, 'contato redondo').toBeCloseTo(c.b, 6);
+      const host = [...crowns, ...thins].find((e) => {
+        const dx = c.x - e.x; const dz = c.z - e.z;
+        const u = (dx * e.ex + dz * e.ez) / (e.a * e.a); const v = (dx * e.fx + dz * e.fz) / (e.b * e.b);
+        return u * u + v * v <= 1.0001 && c.b < e.b + 1e-6 && Math.abs(c.y - e.y) < 0.2;
+      });
+      if (host) dentro++;
+    }
+    expect(dentro / contacts.length, 'contatos dentro da própria elipse').toBeGreaterThanOrEqual(0.95);
+  }, 120000);
+
+  it('sem sol informado a mancha fica redonda como antes (ninguém quebra: estúdio, garagem, testes antigos)', async () => {
+    const ms = (await manchas('copacabana', 0.3, undefined)).filter((b) => b.kind === 'crown' || b.kind === 'thin');
+    expect(ms.length).toBeGreaterThanOrEqual(8);
+    for (const b of ms) expect(Number.isFinite(b.a) && Number.isFinite(b.b)).toBe(true);
+  }, 120000);
+
+  it('opacidade ≤ 0,34 nos três períodos (setLive) e a cor da mancha é de sombra (B ≥ R), sem programa novo (version)', async () => {
+    const { Scenery } = await import('../src/render/scenery/runtime');
+    const s = new Scenery();
+    const g = s as unknown as { blobMat: THREE.MeshBasicMaterial };
+    const v0 = g.blobMat.version;
+    for (const [bioma, time] of [['tropical', 'day'], ['tropical', 'dusk'], ['city_night', 'night']] as const) {
+      s.setLive(livePalette(bioma, time, 3, 0).p);
+      expect(g.blobMat.opacity, `${bioma}/${time}`).toBeLessThanOrEqual(0.34 + 1e-9);
+      expect(g.blobMat.opacity, `${bioma}/${time}`).toBeGreaterThanOrEqual(0.2);
+      expect(g.blobMat.color.b, `${bioma}/${time} B`).toBeGreaterThanOrEqual(g.blobMat.color.r);
+    }
+    expect(g.blobMat.version).toBe(v0);
+    s.dispose();
+  });
+});

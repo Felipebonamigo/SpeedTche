@@ -13,6 +13,7 @@ import { buildLensFlare } from './lensflare';
 import { bodyColor, lightsAmount, mix, palette, starAlpha, type LivePalette, type Palette } from './palette';
 import { applyGrade } from './stylize';
 import { daylight, SKY_GRADIENT_GLSL } from './sky-paint';
+import { SHADOW_SPAN_M, shadowPlan } from './postfx/plan';
 
 export { FLARE_ELEMENTS, flareFade, lensFlareLayout } from './lensflare';
 
@@ -581,11 +582,14 @@ export class Sky {
     this.sun = new THREE.DirectionalLight('#ffffff', 3);
     this.sun.castShadow = true;
     const cam = this.sun.shadow.camera;
-    cam.left = -80; cam.right = 80; cam.top = 80; cam.bottom = -80; cam.near = 1; cam.far = 600;
+    const half = SHADOW_SPAN_M / 2;
+    cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half; cam.near = 1; cam.far = 600;
     cam.updateProjectionMatrix(); // o three não recalcula sozinho depois de mudar os limites
-    this.sun.shadow.bias = -0.00025;
-    this.sun.shadow.normalBias = 0.12;
-    this.sun.shadow.radius = 2;
+    // V22/F6: raio do PCF, bias e normalBias são do plano (postfx/plan.ts `shadowPlan`; o `ShadowRing` os regrava a cada quadro). Aqui o ponto de partida: o da Alta.
+    const pcf = shadowPlan('high', 1);
+    this.sun.shadow.bias = pcf.bias;
+    this.sun.shadow.normalBias = pcf.normalBias;
+    this.sun.shadow.radius = pcf.radius;
     this.target.position.set(0, 0, -30);
     scene.add(this.target);
     this.sun.target = this.target;

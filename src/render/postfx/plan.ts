@@ -101,16 +101,33 @@ export interface ShadowPlan {
   mapSize: number;
   /** A cada quantos quadros cada viewport re-desenha o mapa dele (1 = todo quadro). */
   every: 1 | 2;
+  /** PCF (V22/F6): raio do filtro em texels, e o bias e o normalBias da luz (m). */
+  radius: number;
+  bias: number;
+  normalBias: number;
 }
+
+/** O lado do quadrado que o mapa de sombra cobre (m): a câmera da luz vai de −80 a +80 (sky.ts). */
+export const SHADOW_SPAN_M = 160;
+/** O bias de profundidade, igual em todos os mapas (era `sun.shadow.bias` em sky.ts). */
+const SHADOW_BIAS = -0.00025;
+
+/**
+ * V22/F6: o PCF do three r186 tem 5 pontos (disco de Vogel girado por ruído por pixel): a borda é granulada se a penumbra (raio × texel) for estreita. Com o mapa de 2048 (texel 7,8 cm)
+ * o raio 2 dava 0,16 m de penumbra; o raio 3 dá 0,23 m. O mapa de 1024 (texel 15,6 cm) já tinha 0,31 m (raio 2). O `normalBias` acompanha o texel (um raio maior com bias fixo
+ * faz o chão se auto-sombrear em rampa): ~1,3 texel nos 2048 (0,10 m), ~1 texel nos 1024 (0,16 m; era 0,12, abaixo do texel).
+ */
+const PCF_2048 = { radius: 3, bias: SHADOW_BIAS, normalBias: 0.1 };
+const PCF_1024 = { radius: 2, bias: SHADOW_BIAS, normalBias: 0.16 };
 
 /**
  * Sombra do sol por qualidade e lotação. Com 3 e 4 jogadores cada viewport tem o seu mapa de 1024², refeito a cada 2 quadros (e o
  * deslocamento do mundo entre eles é compensado: `shadowShiftMeters`): os texels por quadro caem a ⅛ do que 4 mapas de 2048² custavam.
  */
 export function shadowPlan(q: Quality, viewports: number): ShadowPlan {
-  if (!atLeast(q, 'medium')) return { enabled: false, mapSize: 0, every: 1 };
-  if (viewports >= 3) return { enabled: true, mapSize: 1024, every: 2 };
-  return { enabled: true, mapSize: atLeast(q, 'high') ? 2048 : 1024, every: 1 };
+  if (!atLeast(q, 'medium')) return { enabled: false, mapSize: 0, every: 1, radius: 0, bias: 0, normalBias: 0 };
+  if (viewports >= 3) return { enabled: true, mapSize: 1024, every: 2, ...PCF_1024 };
+  return atLeast(q, 'high') ? { enabled: true, mapSize: 2048, every: 1, ...PCF_2048 } : { enabled: true, mapSize: 1024, every: 1, ...PCF_1024 };
 }
 
 /** O viewport `i` re-desenha o mapa dele neste quadro? Mapa ainda vazio sempre re-desenha (primeiro uso, tamanho trocado). */

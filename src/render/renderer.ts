@@ -289,7 +289,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     sky.update(absH, time);
     road.update(rf, track);
     terrain.update(rf, track, time, sky.sunDirLocal, absH);
-    scenery.update(rf, track, time, screenLodScale(viewports), lushScenery(viewports));
+    scenery.update(rf, track, time, screenLodScale(viewports), lushScenery(viewports), sky.sunDirLocal);
   }
 
   /** A cena da legenda da pista atual (null antes do cenário montar o layout dela). */

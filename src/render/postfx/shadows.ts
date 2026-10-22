@@ -30,6 +30,8 @@ export class ShadowRing {
       this.disposeMaps();
     }
     this.size = plan.mapSize;
+    // V22/F6: o filtro (PCF) e os bias acompanham o tamanho do mapa; trocar de 2 para 3 jogadores muda o texel, então vale a cada quadro (três atribuições).
+    if (plan.mapSize > 0) { sh.radius = plan.radius; sh.bias = plan.bias; sh.normalBias = plan.normalBias; }
     if (plan.every !== this.mode) {
       this.disposeMaps();
       this.mode = plan.every;

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { getTrack } from '../src/core/track';
 import { livePalette, mix, palette, sceneryLook } from '../src/render/palette';
 import { buildRoadFrame } from '../src/render/roadframe';
+import { BLOB_OPACITY_SCALE } from '../src/render/scenery/sombra-falsa';
 import { fakeCanvasDocument } from './canvas-fake';
 
 describe('M6 (b): o cenário ao vivo', () => {
@@ -47,7 +48,7 @@ describe('M6 (b): o cenário ao vivo', () => {
     expect(g.facadeMats[0].emissiveIntensity).toBeCloseTo(1.25, 12);
     expect(g.panelMat.emissiveIntensity).toBeCloseTo(0.6, 12);
     expect(g.glowMat.color.r).toBeCloseTo(2.0, 12);
-    expect(g.blobMat.opacity).toBeCloseTo(0.4, 12);
+    expect(g.blobMat.opacity).toBeCloseTo(0.4 * BLOB_OPACITY_SCALE, 12); // V22/F6: a mancha esticada cobre mais chão que o disco redondo: 0,40 → 0,34 (a escala de runtime; palette.ts não mudou)
     expect(g.flatMat.color.getHexString()).toBe(new THREE.Color(sceneryLook(0.32).tint).getHexString());
     expect(g.materials.cone.opacity).toBeCloseTo(0.035, 12);
     s.setLive(livePalette('city_night', 'dusk', 3, 0).p);

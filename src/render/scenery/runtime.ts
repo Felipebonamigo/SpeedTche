@@ -7,13 +7,15 @@
 // decoração distante usa mancha no chão (barata e funciona também na qualidade baixa).
 import * as THREE from 'three';
 import type { Track } from '../../core/types';
+import { hash2 } from '../noise';
 import { sceneryLook, type Palette } from '../palette';
 import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
-import { getModel, landmarkOf } from './catalog';
+import { getModel, landmarkOf, modelHeight } from './catalog';
 import { FACADE_CELL_SPAN, type MatKey, type Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
+import { BLOB_OPACITY_SCALE, blobShape, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
 import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
 import { applyWind, makeWindUniforms, windDetailOn } from './wind';
@@ -59,7 +61,8 @@ function batchKeyFor(mat: MatKey, sprite: boolean, haze = false): BatchKey {
 }
 
 interface Slot { batch: number; geom: number; start: number; cap: number; used: number; prev: number }
-interface Ref { slots: number[]; blob: number }
+/** `height` (m, escala 1) e `thin` (mastro) vêm do modelo: a sombra falsa (sombra-falsa.ts) estica pela altura. */
+interface Ref { slots: number[]; blob: number; height: number; thin: boolean }
 interface Batch {
   key: BatchKey;
   mesh: THREE.BatchedMesh;
@@ -101,25 +104,67 @@ export function applyFacadeAtlas(m: THREE.Material): void {
   m.customProgramCacheKey = () => `${prevKey.call(m)}|${FACADE_ATLAS_KEY}`;
 }
 
-/** Mancha de sombra: disco horizontal de raio 1. */
-function blobGeometry(): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
-  const out = g.toNonIndexed();
-  g.dispose();
-  return out;
+/**
+ * Atlas das manchas de sombra (V22/F6), 128 × 128 em 3 células de 64: copa (arredondada e irregular, com buracos de sol), mastro (faixa fina com a ponta mais larga: a luminária, o painel,
+ * a copa fina) e contato (o disco escuro curto no pé). Todas com a borda da célula transparente (o mip não costura uma na outra). Só alfa (branco): a cor é a do material.
+ */
+const BLOB_ATLAS = 128;
+const BLOB_CELL = 64;
+type BlobKind = 'crown' | 'thin' | 'contact';
+const BLOB_ORIGIN: Record<BlobKind, [number, number]> = { crown: [0, 0], thin: [BLOB_CELL, 0], contact: [0, BLOB_CELL] };
+
+function softDisc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, a: number): void {
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.62, `rgba(255,255,255,${a * 0.8})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
 }
 
 function blobTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 64;
+  c.width = BLOB_ATLAS; c.height = BLOB_ATLAS;
   const ctx = c.getContext('2d');
   if (!ctx) throw new Error('sem canvas 2D');
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+  const [cx0, cy0] = BLOB_ORIGIN.crown; const m = BLOB_CELL / 2;
+  // Copa: um miolo cheio e 9 bolhas em volta (o contorno vira folhagem, não elipse lisa) e 7 buracos por onde o sol passa (alfa menor no miolo).
+  softDisc(ctx, cx0 + m, cy0 + m, 19, 0.92);
+  for (let i = 0; i < 9; i++) {
+    const a = i * 2.399 + 0.6; const rad = (0.3 + 0.32 * hash2(i, 3)) * 28;
+    softDisc(ctx, cx0 + m + Math.cos(a) * rad, cy0 + m + Math.sin(a) * rad, 9 + 6 * hash2(i, 5), 0.86);
+  }
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.9 + 1.1; const rad = (0.15 + 0.5 * hash2(i, 7)) * 22;
+    softDisc(ctx, cx0 + m + Math.cos(a) * rad, cy0 + m + Math.sin(a) * rad, 3 + 2.5 * hash2(i, 9), 0.42);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // Mastro: linha de ~9 px de espessura do pé (esquerda) à ponta (direita), que termina numa bolha (a cabeça do poste, o painel, a copa fina).
+  const [tx0, ty0] = BLOB_ORIGIN.thin;
+  for (let row = -5; row <= 5; row++) {
+    const a = 0.78 * Math.max(0, 1 - (Math.abs(row) / 5.5) ** 2);
+    const g = ctx.createLinearGradient(tx0, 0, tx0 + BLOB_CELL, 0);
+    g.addColorStop(0, `rgba(255,255,255,${a * 0.2})`); g.addColorStop(0.1, `rgba(255,255,255,${a})`); g.addColorStop(0.72, `rgba(255,255,255,${a * 0.9})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(tx0, ty0 + m + row, BLOB_CELL, 1);
+  }
+  softDisc(ctx, tx0 + 0.8 * BLOB_CELL, ty0 + m, 11, 0.8);
+  // Contato: disco escuro e curto (a oclusão do pé).
+  const [kx0, ky0] = BLOB_ORIGIN.contact;
+  softDisc(ctx, kx0 + m, ky0 + m, 29, 1);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+/** Quadrado de lado 2 no chão (normal para cima) com a uv da célula do atlas: o eixo x do quadrado é o eixo maior da sombra. */
+function blobGeometry(kind: BlobKind): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+  const out = g.toNonIndexed();
+  g.dispose();
+  const [ox, oy] = BLOB_ORIGIN[kind];
+  const uv = out.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (ox + uv.getX(i) * BLOB_CELL) / BLOB_ATLAS, 1 - (oy + (1 - uv.getY(i)) * BLOB_CELL) / BLOB_ATLAS);
+  }
+  return out;
 }
 
 /**
@@ -150,7 +195,11 @@ export class Scenery {
   private slots: Slot[] = [];
   /** Ref por (modelo, é sprite): índice = modelo * 2 + (sprite ? 1 : 0). */
   private refs: Array<Ref | undefined> = [];
-  private blobSlot = -1;
+  /** Os três encaixes do lote de manchas (V22/F6): copa, mastro e contato; −1 = a pista não tem. */
+  private blobSlots: Record<BlobKind, number> = { crown: -1, thin: -1, contact: -1 };
+  /** O sol no referencial da cena (`Sky.sunDirLocal`), ou null: a mancha fica redonda (estúdio, testes). */
+  private sun: SunDir | null = null;
+  private readonly shape: BlobShape = { dirX: 1, dirZ: 0, along: 1, across: 1, shift: 0 };
   private night = false;
   /** Vento (wind.ts): tempo e amplitude compartilhados por todas as telas; desliga na janela curta (qualidade Baixa). */
   private readonly windU = makeWindUniforms();
@@ -237,7 +286,7 @@ export class Scenery {
     this.hazeMat.color.copy(this.flatMat.color);
     this.cutoutMat.color.copy(this.flatMat.color);
     this.blobMat.color.set(look.blob);
-    this.blobMat.opacity = look.blobOpacity;
+    this.blobMat.opacity = look.blobOpacity * BLOB_OPACITY_SCALE;
     this.panelMat.emissiveIntensity = look.panel;
     this.glowMat.color.setScalar(look.glow);
     const cone = this.materials.cone as THREE.MeshBasicMaterial;
@@ -273,7 +322,7 @@ export class Scenery {
     this.hazeMat.color.copy(this.flatMat.color);
     this.cutoutMat.color.copy(this.flatMat.color);
     this.blobMat.color.set(look.blob);
-    this.blobMat.opacity = time === 'night' ? 0.4 : 0.32;
+    this.blobMat.opacity = (time === 'night' ? 0.4 : 0.32) * BLOB_OPACITY_SCALE;
 
     // Geometrias por lote e contagem por segmento de cada uma (para a capacidade por janela).
     const batchGeoms = new Map<BatchKey, THREE.BufferGeometry[]>();
@@ -304,27 +353,27 @@ export class Scenery {
       const id = layout.models[model];
       const mdl: Model = getModel(id);
       const haze = landmarkOf(id)?.place === 'skyline';
-      const ref: Ref = { slots: mdl.parts.map((p, pi) => { const key = batchKeyFor(p.mat, sprite, haze); return addGeom(key, p.geometry, `${id}#${pi}#${key}`); }), blob: mdl.blob ?? 0 };
+      const blobR = mdl.blob ?? 0;
+      const height = blobR > 0 ? modelHeight(id) : 0;
+      const ref: Ref = { slots: mdl.parts.map((p, pi) => { const key = batchKeyFor(p.mat, sprite, haze); return addGeom(key, p.geometry, `${id}#${pi}#${key}`); }), blob: blobR, height, thin: isThin(blobR, height) };
       refs[k] = ref;
       return ref;
     };
-    const blobGeo = blobGeometry();
-    let blobSlot = -1;
+    const blobGeos: Record<BlobKind, THREE.BufferGeometry> = { crown: blobGeometry('crown'), thin: blobGeometry('thin'), contact: blobGeometry('contact') };
+    const blobSlots: Record<BlobKind, number> = { crown: -1, thin: -1, contact: -1 };
+    const blobSlot = (kind: BlobKind): number => (blobSlots[kind] < 0 ? (blobSlots[kind] = addGeom('blob', blobGeos[kind], `blob:${kind}`)) : blobSlots[kind]);
     for (let i = 0; i < n; i++) {
       for (const p of layout.bySeg[i]) {
         for (const model of p.far >= 0 ? [p.model, p.far] : [p.model]) {
           const ref = refFor(model, p.sprite);
           for (const s of ref.slots) counts[s][i]++;
-          if (ref.blob > 0) {
-            if (blobSlot < 0) blobSlot = addGeom('blob', blobGeo, 'blob');
-            counts[blobSlot][i]++;
-          }
+          if (ref.blob > 0) { counts[blobSlot(ref.thin ? 'thin' : 'crown')][i]++; counts[blobSlot('contact')][i]++; }
         }
       }
     }
-    blobGeo.dispose();
+    for (const g of Object.values(blobGeos)) g.dispose();
     this.refs = refs;
-    this.blobSlot = blobSlot;
+    this.blobSlots = blobSlots;
     // Capacidade = maior soma numa janela de WINDOW segmentos (com volta).
     for (let s = 0; s < slots.length; s++) {
       const c = counts[s];
@@ -390,7 +439,9 @@ export class Scenery {
 
   /** `lodScale` (cars/lod.ts `screenLodScale`): 0,5 na tela dividida, onde o viewport tem a metade da altura — a decoração pequena some e o modelo de longe entra na metade da distância (mesmos pixels). */
   /** `lush` (layout.ts `lushScenery`): com 1–2 jogadores entra também o enfeite farto (F4: mais árvores e tapete rente à pista); com 3–4 a densidade é a de antes. */
-  update(frame: RoadFrame, track: Track, time: number, lodScale = 1, lush = true): void {
+  /** `sun` (V22/F6): a direção PARA o sol no referencial da cena (`Sky.sunDirLocal`, já atualizada para este viewport): a sombra falsa das árvores, postes e placas aponta para longe dele. Sem ele, a mancha fica redonda. */
+  update(frame: RoadFrame, track: Track, time: number, lodScale = 1, lush = true, sun?: SunDir): void {
+    this.sun = sun ?? null;
     const key = `${track.def.id}:${track.segments.length}`;
     if (key !== this.trackKey || !this.layout) { this.trackKey = key; this.setTrack(track); }
     const layout = this.layout;
@@ -493,14 +544,30 @@ export class Scenery {
       this.compose(p.spinY === 0 ? Math.atan2(sy, cy) : yaw, pitch, spin, p.sx, p.sy, p.sz, x, y, z);
     }
     this.write(ref, p, true, this.windOn && model === p.model ? p.wind : 0);
-    if (blob && ref.blob > 0 && this.blobSlot >= 0) {
-      // Mancha: disco no chão alinhado ao rumo da pista (giro −h: cos = cH, sen = −sH).
+    if (blob && ref.blob > 0 && this.blobSlots.contact >= 0) {
       const r = ref.blob * Math.max(p.sx, p.sz);
-      e[0] = cH * r; e[1] = 0; e[2] = sH * r; e[3] = 0;
-      e[4] = 0; e[5] = 1; e[6] = 0; e[7] = 0;
-      e[8] = -sH * r; e[9] = 0; e[10] = cH * r; e[11] = 0;
-      e[12] = x; e[13] = y + 0.07; e[14] = z; e[15] = 1;
-      this.writeSlot(this.blobSlot, null);
+      const thin = ref.thin;
+      const gy = y + 0.07;
+      if (this.sun) {
+        // V22/F6: elipse esticada para longe do sol (eixo X da mancha = a direção da sombra; Z = X × Y, a mesma mão da mancha de antes) com a ponta de trás no raio de antes.
+        const sh = blobShape(this.sun, r, ref.height * p.sy, thin, this.shape);
+        e[0] = sh.dirX * sh.along; e[1] = 0; e[2] = sh.dirZ * sh.along; e[3] = 0;
+        e[4] = 0; e[5] = 1; e[6] = 0; e[7] = 0;
+        e[8] = -sh.dirZ * sh.across; e[9] = 0; e[10] = sh.dirX * sh.across; e[11] = 0;
+        e[12] = x + sh.dirX * sh.shift; e[13] = gy; e[14] = z + sh.dirZ * sh.shift; e[15] = 1;
+      } else {
+        // Sem sol: o disco alinhado ao rumo da pista, como antes (giro −h: cos = cH, sen = −sH).
+        e[0] = cH * r; e[1] = 0; e[2] = sH * r; e[3] = 0;
+        e[4] = 0; e[5] = 1; e[6] = 0; e[7] = 0;
+        e[8] = -sH * r; e[9] = 0; e[10] = cH * r; e[11] = 0;
+        e[12] = x; e[13] = gy; e[14] = z; e[15] = 1;
+      }
+      this.writeSlot(this.blobSlots[thin ? 'thin' : 'crown'], null);
+      // O contato: disco curto e escuro no pé (a oclusão de onde o objeto toca o chão).
+      const c = contactRadius(r, thin);
+      e[0] = c; e[1] = 0; e[2] = 0; e[8] = 0; e[10] = c; e[9] = 0;
+      e[12] = x; e[14] = z; e[13] = gy + 0.005;
+      this.writeSlot(this.blobSlots.contact, null);
     }
   }
 
