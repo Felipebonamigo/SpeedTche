@@ -105,7 +105,12 @@ export interface ShadowPlan {
   radius: number;
   bias: number;
   normalBias: number;
+  /** V22/F6: até que distância (m, ao longo da pista) a decoração com copa projeta sombra de verdade no mapa (0 = nenhuma). Só Alta e Ultra com 1–2 jogadores: cada viewport paga os triângulos dela no passe de sombra. */
+  crowns: number;
 }
+
+/** Alcance das copas próximas no mapa do sol (m): dentro dos ±80 m do mapa (`SHADOW_SPAN_M`). */
+export const CROWN_SHADOW_M = 60;
 
 /** O lado do quadrado que o mapa de sombra cobre (m): a câmera da luz vai de −80 a +80 (sky.ts). */
 export const SHADOW_SPAN_M = 160;
@@ -125,9 +130,9 @@ const PCF_1024 = { radius: 2, bias: SHADOW_BIAS, normalBias: 0.16 };
  * deslocamento do mundo entre eles é compensado: `shadowShiftMeters`): os texels por quadro caem a ⅛ do que 4 mapas de 2048² custavam.
  */
 export function shadowPlan(q: Quality, viewports: number): ShadowPlan {
-  if (!atLeast(q, 'medium')) return { enabled: false, mapSize: 0, every: 1, radius: 0, bias: 0, normalBias: 0 };
-  if (viewports >= 3) return { enabled: true, mapSize: 1024, every: 2, ...PCF_1024 };
-  return atLeast(q, 'high') ? { enabled: true, mapSize: 2048, every: 1, ...PCF_2048 } : { enabled: true, mapSize: 1024, every: 1, ...PCF_1024 };
+  if (!atLeast(q, 'medium')) return { enabled: false, mapSize: 0, every: 1, radius: 0, bias: 0, normalBias: 0, crowns: 0 };
+  if (viewports >= 3) return { enabled: true, mapSize: 1024, every: 2, ...PCF_1024, crowns: 0 };
+  return atLeast(q, 'high') ? { enabled: true, mapSize: 2048, every: 1, ...PCF_2048, crowns: CROWN_SHADOW_M } : { enabled: true, mapSize: 1024, every: 1, ...PCF_1024, crowns: 0 };
 }
 
 /** O viewport `i` re-desenha o mapa dele neste quadro? Mapa ainda vazio sempre re-desenha (primeiro uso, tamanho trocado). */

@@ -286,10 +286,11 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
 
   function poseWorld(rf: RoadFrame, track: Track, z: number, time: number, viewports = 1): void {
     const absH = absoluteHeading(track, z);
+    const crownsM = quality ? shadowPlan(quality, viewports).crowns : 0; // V22/F6: as copas próximas projetam no mapa do sol (Alta/Ultra, 1–2 jogadores)
     sky.update(absH, time);
     road.update(rf, track);
     terrain.update(rf, track, time, sky.sunDirLocal, absH);
-    scenery.update(rf, track, time, screenLodScale(viewports), lushScenery(viewports), sky.sunDirLocal);
+    scenery.update(rf, track, time, screenLodScale(viewports), lushScenery(viewports), sky.sunDirLocal, crownsM);
   }
 
   /** A cena da legenda da pista atual (null antes do cenário montar o layout dela). */

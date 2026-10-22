@@ -203,7 +203,11 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
     const crowns = ms.filter((b) => b.kind === 'crown'); const thins = ms.filter((b) => b.kind === 'thin'); const contacts = ms.filter((b) => b.kind === 'contact');
     // A opacidade do material é ≤ 0,34 (e uma mancha só de 0,3 some sobre o verde vivo): o contato é CONTACT_LAYERS discos empilhados (0,32 → ~0,5 no miolo), de raios decrescentes.
     expect(SB.CONTACT_LAYERS).toBeGreaterThanOrEqual(2);
-    expect(contacts.length, 'CONTACT_LAYERS contatos por objeto com mancha').toBe(SB.CONTACT_LAYERS * (crowns.length + thins.length));
+    // O contato é só de objeto que tem pé de verdade (≥ CONTACT_MIN_HEIGHT_M: poste, árvore, placa, pedra); arbusto e flor não (2 △ a mais por objeto contam no gate, e o pé deles já é a própria mancha).
+    expect(SB.contactWanted(0.9)).toBe(false); expect(SB.contactWanted(2.3)).toBe(true); expect(SB.contactWanted(9.8)).toBe(true);
+    expect(contacts.length % SB.CONTACT_LAYERS, 'camadas inteiras por objeto').toBe(0);
+    expect(contacts.length / SB.CONTACT_LAYERS, 'a maioria dos objetos com mancha tem pé (árvores e postes)').toBeGreaterThanOrEqual(0.5 * (crowns.length + thins.length));
+    expect(contacts.length / SB.CONTACT_LAYERS, 'mas nem todos: os arbustos ficam sem').toBeLessThan(crowns.length + thins.length);
     const raios = new Set(contacts.map((c) => c.b.toFixed(3)));
     expect(raios.size, 'as camadas têm raios diferentes (um miolo mais escuro)').toBeGreaterThanOrEqual(SB.CONTACT_LAYERS);
     // cada contato cai dentro de alguma elipse (o pé está coberto) e é menor que ela
@@ -240,6 +244,53 @@ describe('V22/F6 (C): o `Scenery` de verdade — sombra falsa direcional, contat
     expect(g.blobMat.version).toBe(v0);
     s.dispose();
   });
+});
+
+describe('V22/F6 (E): copas próximas no mapa do sol (só Alta e Ultra, 1–2 jogadores)', () => {
+  it('shadowPlan.crowns: 60 m na Alta e no Ultra com 1–2 jogadores; 0 na Baixa, na Média e com 3–4 (cada viewport paga a própria conta)', () => {
+    for (const q of ['high', 'ultra'] as const) for (const n of [1, 2]) expect(shadowPlan(q, n).crowns, `${q}/${n}`).toBe(60);
+    for (const q of ['high', 'ultra'] as const) for (const n of [3, 4]) expect(shadowPlan(q, n).crowns, `${q}/${n}`).toBe(0);
+    for (const n of [1, 2, 3, 4]) { expect(shadowPlan('medium', n).crowns, `medium/${n}`).toBe(0); expect(shadowPlan('low', n).crowns, `low/${n}`).toBe(0); }
+  });
+});
+
+describe('V22/F6 (E): o `Scenery` — a copa a menos de 60 m passa para o lote que projeta sombra', () => {
+  let restore = (): void => {};
+  beforeEach(() => { restore = fakeCanvasDocument(); });
+  afterEach(() => restore());
+
+  /** Instâncias usadas por lote (`flat` = projeta sombra; `dress` = decoração sem sombra) depois de um update na Foz (mata farta). */
+  async function usados(crowns: number | undefined): Promise<{ flat: number; dress: number; castFlat: boolean; castDress: boolean }> {
+    const { Scenery } = await import('../src/render/scenery/runtime');
+    const track = getTrack('foz_do_iguacu');
+    const s = new Scenery();
+    const frame = buildRoadFrame(track, track.length * 0.25, 30, 260);
+    (s.update as (...a: unknown[]) => void).call(s, frame, track, 1, 1, true, sunTo(34, -42), crowns);
+    const g = s as unknown as { batches: Array<{ key: string; mesh: THREE.BatchedMesh; slots: number[] }>; slots: Array<{ used: number }> };
+    const tot = (key: string): number => g.batches.filter((b) => b.key === key).reduce((a, b) => a + b.slots.reduce((x, si) => x + g.slots[si].used, 0), 0);
+    const cast = (key: string): boolean => g.batches.some((b) => b.key === key && b.mesh.castShadow);
+    const out = { flat: tot('flat'), dress: tot('dress'), castFlat: cast('flat'), castDress: cast('dress') };
+    s.dispose();
+    return out;
+  }
+
+  it('com `crowns` = 60 o lote que projeta ganha as árvores próximas e o `dress` perde as mesmas (a soma não muda: nada some, nada dobra); sem ele, tudo como antes', async () => {
+    const base = await usados(undefined);
+    const zero = await usados(0);
+    const com = await usados(60);
+    expect(zero).toEqual(base);
+    expect(com.flat, 'árvores próximas entram no lote que projeta').toBeGreaterThanOrEqual(base.flat + 4);
+    expect(com.flat + com.dress, 'a soma é a mesma: a instância troca de lote, não se repete').toBe(base.flat + base.dress);
+    expect(com.dress).toBeLessThan(base.dress);
+    expect(com.castFlat).toBe(true);
+    expect(com.castDress, 'o dress continua sem projetar (só as copas próximas projetam)').toBe(false);
+  }, 120000);
+
+  it('o raio de 60 m manda: com 20 m entram menos árvores que com 60 m; com 120 m, mais', async () => {
+    const a = (await usados(20)).flat; const b = (await usados(60)).flat; const c = (await usados(120)).flat;
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(c);
+  }, 180000);
 });
 
 describe('V22/F6 (D): oclusão de contato na pista — o pé da guia', () => {

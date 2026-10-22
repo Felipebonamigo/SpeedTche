@@ -11,11 +11,12 @@ import { hash2 } from '../noise';
 import { sceneryLook, type Palette } from '../palette';
 import { applyGrade, applyStylize } from '../stylize';
 import type { RoadFrame } from '../roadframe';
+import { SEGMENT_M } from '../units';
 import { getModel, landmarkOf, modelHeight } from './catalog';
 import { FACADE_CELL_SPAN, type MatKey, type Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
-import { blobOpacityFor, blobShape, CONTACT_LAYERS, CONTACT_LAYER_SCALE, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
+import { blobOpacityFor, blobShape, CONTACT_LAYERS, CONTACT_LAYER_SCALE, contactRadius, contactWanted, isThin, type BlobShape, type SunDir } from './sombra-falsa';
 import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
 import { applyWind, makeWindUniforms, windDetailOn } from './wind';
@@ -349,18 +350,26 @@ export class Scenery {
       return si;
     };
     const refs: Array<Ref | undefined> = [];
-    const refFor = (model: number, sprite: boolean): Ref => {
-      const k = model * 2 + (sprite ? 1 : 0);
+    /** `variant`: 0 = decoração (sem sombra), 1 = sprite sólido (projeta), 2 = decoração PERTO (V22/F6: as partes que projetam vão para o lote que projeta; só Alta/Ultra com 1–2 jogadores). */
+    const refFor = (model: number, variant: number): Ref => {
+      const k = model * 3 + variant;
       const r = refs[k];
       if (r) return r;
+      const sprite = variant === 1;
       const id = layout.models[model];
       const mdl: Model = getModel(id);
       const haze = landmarkOf(id)?.place === 'skyline';
       const blobR = mdl.blob ?? 0;
       const height = blobR > 0 ? modelHeight(id) : 0;
-      const ref: Ref = { slots: mdl.parts.map((p, pi) => { const key = batchKeyFor(p.mat, sprite, haze); return addGeom(key, p.geometry, `${id}#${pi}#${key}`); }), blob: blobR, height, thin: isThin(blobR, height) };
+      const ref: Ref = { slots: mdl.parts.map((p, pi) => { const key = variant === 2 && p.shadow && p.mat === 'flat' ? 'flat' : batchKeyFor(p.mat, sprite, haze); return addGeom(key, p.geometry, `${id}#${pi}#${key}`); }), blob: blobR, height, thin: isThin(blobR, height) };
       refs[k] = ref;
       return ref;
+    };
+    const nearOk = new Map<number, boolean>();
+    const castsNear = (model: number): boolean => {
+      let v = nearOk.get(model);
+      if (v === undefined) { const id = layout.models[model]; v = landmarkOf(id)?.place !== 'skyline' && getModel(id).parts.some((q) => q.shadow === true && q.mat === 'flat'); nearOk.set(model, v); }
+      return v;
     };
     const blobGeos: Record<BlobKind, THREE.BufferGeometry> = { crown: blobGeometry('crown'), thin: blobGeometry('thin'), contact: blobGeometry('contact') };
     const blobSlots: Record<BlobKind, number> = { crown: -1, thin: -1, contact: -1 };
@@ -368,9 +377,11 @@ export class Scenery {
     for (let i = 0; i < n; i++) {
       for (const p of layout.bySeg[i]) {
         for (const model of p.far >= 0 ? [p.model, p.far] : [p.model]) {
-          const ref = refFor(model, p.sprite);
+          const ref = refFor(model, p.sprite ? 1 : 0);
           for (const s of ref.slots) counts[s][i]++;
-          if (ref.blob > 0) { counts[blobSlot(ref.thin ? 'thin' : 'crown')][i]++; counts[blobSlot('contact')][i] += CONTACT_LAYERS; }
+          // A cópia "perto" (variante 2) das árvores de decoração: o encaixe das partes que projetam é o do lote `flat` (mesmo nome que o do sprite, se o modelo também for sprite).
+          if (!p.sprite && model === p.model && p.linkSeg === 0 && castsNear(model)) for (const s of refFor(model, 2).slots) counts[s][i]++;
+          if (ref.blob > 0) { counts[blobSlot(ref.thin ? 'thin' : 'crown')][i]++; if (contactWanted(ref.height)) counts[blobSlot('contact')][i] += CONTACT_LAYERS; }
         }
       }
     }
@@ -442,9 +453,11 @@ export class Scenery {
 
   /** `lodScale` (cars/lod.ts `screenLodScale`): 0,5 na tela dividida, onde o viewport tem a metade da altura — a decoração pequena some e o modelo de longe entra na metade da distância (mesmos pixels). */
   /** `lush` (layout.ts `lushScenery`): com 1–2 jogadores entra também o enfeite farto (F4: mais árvores e tapete rente à pista); com 3–4 a densidade é a de antes. */
-  /** `sun` (V22/F6): a direção PARA o sol no referencial da cena (`Sky.sunDirLocal`, já atualizada para este viewport): a sombra falsa das árvores, postes e placas aponta para longe dele. Sem ele, a mancha fica redonda. */
-  update(frame: RoadFrame, track: Track, time: number, lodScale = 1, lush = true, sun?: SunDir): void {
+  /** `crownsM` (V22/F6, `shadowPlan().crowns`): a decoração com copa a menos de tantos metros (ao longo da pista) projeta sombra de verdade no mapa do sol; 0 = nenhuma (Baixa, Média, 3–4 jogadores).
+   *  `sun` (V22/F6): a direção PARA o sol no referencial da cena (`Sky.sunDirLocal`, já atualizada para este viewport): a sombra falsa das árvores, postes e placas aponta para longe dele. Sem ele, a mancha fica redonda. */
+  update(frame: RoadFrame, track: Track, time: number, lodScale = 1, lush = true, sun?: SunDir, crownsM = 0): void {
     this.sun = sun ?? null;
+    const crownSegs = crownsM / SEGMENT_M;
     const key = `${track.def.id}:${track.segments.length}`;
     if (key !== this.trackKey || !this.layout) { this.trackKey = key; this.setTrack(track); }
     const layout = this.layout;
@@ -474,7 +487,7 @@ export class Scenery {
         const p = list[k];
         if (ahead > p.maxAhead * lodScale || p.rank > detail || (p.lush !== 0 && !lush)) continue;
         const useFar = p.far >= 0 && ahead >= p.farFrom * lodScale;
-        this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD);
+        this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD, !useFar && ahead < crownSegs);
       }
     }
     // Visibilidade: só as pontas que mudaram.
@@ -496,8 +509,8 @@ export class Scenery {
     this.beaconMat.color.setScalar(blink);
   }
 
-  private place(p: Placement, model: number, frame: RoadFrame, j: number, time: number, blob: boolean): void {
-    const ref = this.refs[model * 2 + (p.sprite ? 1 : 0)];
+  private place(p: Placement, model: number, frame: RoadFrame, j: number, time: number, blob: boolean, crown: boolean): void {
+    const ref = (crown && !p.sprite ? this.refs[model * 3 + 2] : undefined) ?? this.refs[model * 3 + (p.sprite ? 1 : 0)];
     if (!ref) return;
     const f = p.f;
     const c0 = this.cosH[j]; const s0 = this.sinH[j]; const c1 = this.cosH[j + 1]; const s1 = this.sinH[j + 1];
@@ -547,9 +560,9 @@ export class Scenery {
       this.compose(p.spinY === 0 ? Math.atan2(sy, cy) : yaw, pitch, spin, p.sx, p.sy, p.sz, x, y, z);
     }
     this.write(ref, p, true, this.windOn && model === p.model ? p.wind : 0);
-    if (blob && ref.blob > 0 && this.blobSlots.contact >= 0) {
+    const thin = ref.thin;
+    if (blob && ref.blob > 0 && this.blobSlots[thin ? 'thin' : 'crown'] >= 0) {
       const r = ref.blob * Math.max(p.sx, p.sz);
-      const thin = ref.thin;
       const gy = y + 0.07;
       if (this.sun) {
         // V22/F6: elipse esticada para longe do sol (eixo X da mancha = a direção da sombra; Z = X × Y, a mesma mão da mancha de antes) com a ponta de trás no raio de antes.
@@ -566,6 +579,7 @@ export class Scenery {
         e[12] = x; e[13] = gy; e[14] = z; e[15] = 1;
       }
       this.writeSlot(this.blobSlots[thin ? 'thin' : 'crown'], null);
+      if (!contactWanted(ref.height)) return;
       // O contato: discos curtos e escuros empilhados no pé (a oclusão de onde o objeto toca o chão): a opacidade do material é ≤ 0,34, e dois discos somam ~0,5 no miolo.
       const c = contactRadius(r, thin);
       e[1] = 0; e[2] = 0; e[8] = 0; e[9] = 0; e[12] = x; e[14] = z;

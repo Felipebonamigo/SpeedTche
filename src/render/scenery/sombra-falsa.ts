@@ -60,6 +60,9 @@ export function blobShape(sun: SunDir, radius: number, height: number, thin: boo
 /** Discos de contato empilhados no pé (o de cima, de 60% do raio, soma ao de baixo: o miolo fica ~0,5 de alfa com o material em 0,32) e a razão de raio de cada um. */
 export const CONTACT_LAYERS = 2;
 export const CONTACT_LAYER_SCALE: readonly number[] = [1, 0.6];
+/** Só objeto com pé de verdade (≥ 1,5 m: poste, árvore, placa, pedra, cacto alto) leva o contato: o arbusto e a flor ficam só com a própria mancha (cada camada custa 2 △ por objeto no gate). */
+export const CONTACT_MIN_HEIGHT_M = 1.5;
+export function contactWanted(height: number): boolean { return height >= CONTACT_MIN_HEIGHT_M; }
 
 /** Raio do disco de contato no pé (a oclusão curta e escura onde o objeto toca o chão). */
 export function contactRadius(radius: number, _thin: boolean): number {
