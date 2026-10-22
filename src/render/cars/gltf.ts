@@ -195,12 +195,8 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
 
   const b = new MeshBuilder();
   for (const part of shellParts) emit(b, part);
-  let lod1: CarModel['lod1'];
-  if (lod1Parts.length) {
-    const b1 = new MeshBuilder();
-    for (const part of lod1Parts) emit(b1, part);
-    lod1 = { shell: b1.build(), triangles: b1.triangles };
-  }
+  const b1 = new MeshBuilder();
+  for (const part of lod1Parts) emit(b1, part);
 
   // Rodas (eixo em x): centro e largura pela caixa; o raio é o do vértice mais longe do eixo — a caixa
   // de um pneu de 12 lados mede cos 15° do raio, e o carro afundaria no chão.
@@ -223,6 +219,8 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
   };
   const front = axle('wheel_fl', 'wheel_fr');
   const rear = axle('wheel_rl', 'wheel_rr');
+  // V21: o casco simples e o casco levam a oclusão assada com as rodas de proxy (os eixos só se sabem agora).
+  const lod1: CarModel['lod1'] = lod1Parts.length ? { shell: b1.build(undefined, { axles: [front, rear] }), triangles: b1.triangles } : undefined;
 
   // A roda do arquivo (a da frente à direita) em escala unitária — raio 1, largura 1, centro na origem, face de fora em
   // +x —, que é o formato que `wheels.ts` e as instâncias de roda usam (`scale(axle.w, axle.r, axle.r)`).
@@ -256,7 +254,7 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
       decals.set(part.decal, d);
     }
   }
-  const shell = b.build();
+  const shell = b.build(undefined, { axles: [front, rear] });
   const contract: CarContract = {
     seats: seats.map((o): P3 => { const p = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld).applyMatrix4(TO_GAME); return [p.x, p.y, p.z]; }),
     kits: [...kits].map(([name, triangles]) => ({ name, triangles })),
@@ -282,7 +280,7 @@ export function carModelFromGltf(body: CarBody, root: THREE.Object3D, carId?: st
     // do jogador); o arquivo só dá posição e tamanho. Sem a marca, vale a roda do arquivo (o caso do Kenney e dos carros de arte própria de roda).
     ...((nodes.get('wheel_fr')?.userData as { project_wheel?: unknown } | undefined)?.project_wheel ? {} : {
       wheelModel: {
-        design: style.wheel, geometry: wb.build(CREASE.wheel), triangles: wb.triangles,
+        design: style.wheel, geometry: wb.build(CREASE.wheel, false), triangles: wb.triangles,
         symmetry: (Math.PI * 2) / (Number.isFinite(spokes) && spokes > 0 ? spokes : DEFAULT_SPOKES),
       },
     }),

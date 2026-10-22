@@ -36,8 +36,8 @@ describe('shader dos carros: acabamentos', () => {
     // v3 (nc/cameras): o corte do próprio carro nas câmeras de Capô e Frente; v4 (cor-brilho): a lente com miolo (aLens) e o verniz estilizado;
     // v5 (V2): o sol com rugosidade mínima na luz direta (o ponto branco com halo no teto do GT).
     // v6 (V2, realismo): a pintura guarda o matiz (`carPaintHold`). v7 (V2, realismo 2): o céu refletido no vidro (`uGlassSky`). v8 (V6c): a escada do furgão se mexe no vértice (`aPaint.w` 0,5 + bits da instância).
-    expect(key).toContain('speed-tche-car-v9'); // V14: o brilho alongado da tinta, a lanterna em tira com halo e o vidro em faixa (era v8)
-    expect(key).not.toContain('speed-tche-car-v1');
+    expect(key).toContain('speed-tche-car-v10'); // V21: a oclusão assada, o horizonte refletido e o metal neutro (era v9: V14, o brilho alongado, a lanterna em tira com halo e o vidro em faixa)
+    expect(key).not.toMatch(/speed-tche-car-v1(?!\d)/); // a chave velha v1 (o 'v10' contém 'v1': o teste olha o fim do número)
   });
 
   it('cada gancho foi aplicado uma vez: uma rugosidade, um metal, nenhuma declaração repetida', () => {

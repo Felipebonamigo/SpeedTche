@@ -48,7 +48,37 @@ export interface CarUniforms {
   uLampE: { value: THREE.Vector4[] };
   /** V14: a faixa de altura do vidro do casco do lote (y mínimo, y máximo): o reflexo do céu fica na parte de cima. */
   uGlassY: { value: THREE.Vector2 };
+  /** V21: a força da oclusão ambiente assada (atributo `aOcc`, cars/occlusion.ts): 0 = sem. */
+  uOcc: { value: number };
+  /** V21: a curvatura vertical de mentira da lataria vertical (por metro de altura): o horizonte refletido cruza a porta (ver `BODY_CURVE`). */
+  uCurve: { value: number };
+  /** V21: quanto da cor do céu some do reflexo do metal (cromo, aro, escapamento): 0 = o céu todo, 1 = reflexo neutro. */
+  uMetalNeutral: { value: number };
+  /** V21: o degradê de altura da lataria vertical (porta, para-lama): (quanto escurece embaixo, quanto clareia em cima). */
+  uBodyGrad: { value: THREE.Vector2 };
+  /** V21: a linha do horizonte refletida na lataria: (quanto escurece abaixo dela, quanto clareia acima). */
+  uHorizon: { value: THREE.Vector2 };
 }
+
+/**
+ * Força da oclusão assada (V21, docs/ondas/V21-acabamento.md): o fator de luz da lataria é `1 − uOcc × aOcc` (aOcc 0 = aberto, 1 = fechado), tudo o que não é lanterna.
+ * Vale em todos os degraus (é de graça: um atributo e uma multiplicação) e em "Reduzir efeitos" (não pisca nem acende nada). Provisório: medido no GL (tests/acabamento-gl.test.ts).
+ */
+export const OCC_STRENGTH = 0.8;
+/** A oclusão até aqui (0 a 1) não escurece: o teto e o capô abertos recebem 5 a 15% de oclusão da cabine e não podem perder luz (V14: a faixa de luz da tampa, o branco que lê branco). Provisório. */
+export const OCC_DEADZONE = 0.08;
+/** A oclusão que já escurece por inteiro (acima dela, o máximo de `OCC_STRENGTH`): a saia do carro mede ~0,25–0,35 contra ~0,6 de um vão fechado. */
+export const OCC_FULL = 0.5;
+/** Quanto da oclusão sobra numa superfície que olha reto para cima (0 = nenhuma): o teto, o capô e a tampa recebem a luz do céu inteira. Provisório: medido no GL (tests/tinta-gl.test.ts, o brilho da tampa). */
+export const OCC_UP_KEEP = 0.2;
+/** V21: a curvatura vertical de mentira (por metro): `r.y += BODY_CURVE × (1 − |n.y|) × (y − 0,55 m)`. Provisório: medido no GL. */
+export const BODY_CURVE = 1.4;
+/** V21: o degradê de altura da lataria vertical: escurece `[0]` na saia (y ≤ 0,2 m) e clareia `[1]` acima de 0,85 m. Provisório. */
+export const BODY_GRAD = [0.15, 0.04] as const;
+/** V21: o horizonte refletido: escurece `[0]` a lataria que reflete o chão e clareia `[1]` a que reflete o céu, com a linha nítida entre elas. Provisório. */
+export const HORIZON = [0.15, 0.07] as const;
+/** V21: o reflexo do metal perde esta fração da croma do céu (o cromo azul-ciano era "brinquedo"). Provisório. */
+export const METAL_NEUTRAL = 0.85;
 
 /**
  * O realce do sol tem teto (V2, docs/ondas/V2-gt.md §10). O sol é uma luz de ponto: no verniz (rugosidade 0,06), no vidro (0,05) e no cromo o realce
@@ -187,6 +217,8 @@ attribute vec4 aPaint;
 attribute vec4 aMat;
 attribute float aLens;
 varying float vLens;
+attribute float aOcc;
+varying float vOcc;
 attribute vec4 instExtra;
 uniform float uPopup;
 varying vec4 vMat;
@@ -214,6 +246,7 @@ vColor = vec4( 1.0 );
   vBrake = ( flags & 1 ) != 0 ? 1.0 : 0.0;
   vMat = aMat;
   vLens = aLens;
+  vOcc = aOcc;
   vPaintW = max( aPaint.x, liv );
   // Acabamento: só a carroceria pintada (não o acento nem a face que virou faixa) e só em quem tem o bit na instância.
   vFin = aPaint.x * ( 1.0 - aPaint.y ) * ( 1.0 - liv );
@@ -235,7 +268,7 @@ vColor = vec4( 1.0 );
 const FRAG_SHEEN = /* glsl */ `
 // Brilho alongado da tinta (SHEEN_FULL em material.ts): o lobo do sol esticado ao longo do carro (Ward anisotrópico: estreito na largura, largo no comprimento) e a faixa
 // clara logo acima do horizonte refletido. \`k\` = (lobo, faixa, halo) × o peso da lataria pintada. Só a luz direcional da cena (o sol do período: some à noite com a luz dele).
-vec3 carSheen( vec3 col, vec3 paint, vec3 n, vec3 viewPos, vec3 fwd, vec3 k ) {
+vec3 carSheen( vec3 col, vec3 paint, vec3 n, vec3 viewPos, vec3 fwd, vec3 k, float ly ) {
   const vec3 W = vec3( 0.2126, 0.7152, 0.0722 );
   vec3 v = normalize( viewPos );
   float ndv = clamp( dot( n, v ), 0.0, 1.0 );
@@ -253,6 +286,11 @@ vec3 carSheen( vec3 col, vec3 paint, vec3 n, vec3 viewPos, vec3 fwd, vec3 k ) {
     s += k.x * sunK * exp( - ( ht * ht / ${SHEEN_LOBE_ALONG.toFixed(3)} + hb * hb / ${SHEEN_LOBE_ACROSS.toFixed(4)} ) );
   #endif
   vec3 r = inverseTransformDirection( reflect( -v, n ), viewMatrix );
+  // V21: a curvatura vertical de mentira só vale para a linha do horizonte (ry): a faixa do horizonte de V14 (abaixo) fica com o r.y verdadeiro, senão ela anda para fora do meio da tampa.
+  float ry = r.y + uCurve * ( 1.0 - abs( inverseTransformDirection( n, viewMatrix ).y ) ) * clamp( ly - 0.55, -0.6, 0.9 );
+  // V21: a linha do horizonte refletida: o que reflete o chão escurece, o que reflete o céu clareia, e a borda é nítida (é ela que dá o ar de verniz à porta).
+  // (o que clareia some na tinta muito escura: ela já está num platô logo abaixo do estouro, como o brilho do sol abaixo; ver SHEEN_DARK)
+  col *= mix( 1.0 - uHorizon.x, 1.0 + uHorizon.y * smoothstep( ${SHEEN_DARK[0].toFixed(3)}, ${SHEEN_DARK[1].toFixed(3)}, dot( paint, W ) ), smoothstep( -0.03, 0.03, ry ) );
   float strip = smoothstep( -0.02, 0.05, r.y ) * ( 1.0 - smoothstep( 0.08, 0.45, r.y ) );
   s += k.y * strip * ( 0.35 + 0.65 * pow( 1.0 - ndv, 2.0 ) );
   vec3 tint = paint / max( max( paint.r, max( paint.g, paint.b ) ), 1.0e-3 );
@@ -298,6 +336,12 @@ uniform float uGlassSky;
 uniform vec3 uSheen;
 uniform vec4 uGlassBand;
 uniform vec2 uGlassY;
+uniform float uOcc;
+uniform float uCurve;
+uniform float uMetalNeutral;
+uniform vec2 uBodyGrad;
+uniform vec2 uHorizon;
+varying float vOcc;
 uniform vec4 uLampC[ ${MAX_LAMPS} ];
 uniform vec4 uLampE[ ${MAX_LAMPS} ];
 uniform vec3 uStylizeSkyTop;
@@ -311,10 +355,11 @@ vec3 carLamp( vec3 lens, float w, float wRed, float glow ) {
 }
 // Verniz estilizado (cor-brilho): a lataria reflete o céu do período (topo → horizonte) e, abaixo da linha do horizonte, o chão escuro, por um Fresnel de
 // cartum (expoente 3). Analítico: nenhuma amostra de textura, nenhuma chamada; as cores vêm de setStylizePalette (uniformes compartilhados).
-vec3 carVarnish( vec3 col, vec3 n, vec3 viewPos, float k ) {
+vec3 carVarnish( vec3 col, vec3 n, vec3 viewPos, float k, float ly ) {
   vec3 v = normalize( viewPos );
   float ndv = clamp( dot( n, v ), 0.0, 1.0 );
   vec3 r = inverseTransformDirection( reflect( -v, n ), viewMatrix );
+  r.y += uCurve * ( 1.0 - abs( inverseTransformDirection( n, viewMatrix ).y ) ) * clamp( ly - 0.55, -0.6, 0.9 );
   vec3 sky = mix( uStylizeSkyHorizon, uStylizeSkyTop, smoothstep( 0.03, 0.65, r.y ) );
   vec3 refl = mix( uStylizeGround, sky, smoothstep( -0.025, 0.025, r.y ) );
   float f = 0.05 + 0.95 * pow( 1.0 - ndv, 3.0 );
@@ -444,6 +489,7 @@ export function createCarMaterial(): { material: THREE.MeshPhysicalMaterial; uni
     uSelfLight: { value: 0.2 }, uHeadGlow: { value: 0.4 }, uTailGlow: { value: 0.9 }, uBrakeGlow: { value: 3.2 },
     uPopup: { value: 0 }, uEnvBoost: { value: 1.6 }, uVarnish: { value: varnishFor('high') }, uSunCap: { value: SUN_SPEC_CAP }, uPaintHold: { value: PAINT_HOLD }, uGlassSky: { value: GLASS_SKY },
     uSheen: { value: new THREE.Vector3(SHEEN_FULL.lobe, SHEEN_FULL.band, SHEEN_FULL.halo) },
+    uOcc: { value: OCC_STRENGTH }, uCurve: { value: BODY_CURVE }, uMetalNeutral: { value: METAL_NEUTRAL }, uBodyGrad: { value: new THREE.Vector2(...BODY_GRAD) }, uHorizon: { value: new THREE.Vector2(...HORIZON) },
     uGlassBand: { value: new THREE.Vector4(...GLASS_BAND) },
     uGlassY: { value: new THREE.Vector2(0, 1) },
     uLampC: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4()) },
@@ -497,6 +543,7 @@ ${VERT_MOVE}`);
         #if defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
           // Peças metálicas (cromo, aro) e vidro refletem mais o céu; a pintura, pouco (a cor manda).
           radiance *= uEnvBoost * ( 0.35 + fMetal );
+          radiance = mix( radiance, vec3( dot( radiance, vec3( 0.2126, 0.7152, 0.0722 ) ) ), uMetalNeutral * clamp( fMetal, 0.0, 1.0 ) * ( 1.0 - wGlass ) );
           radiance *= mix( 1.0, 0.15, wGlass );
           #ifdef USE_CLEARCOAT
             clearcoatRadiance *= uEnvBoost * 0.55;
@@ -507,9 +554,19 @@ ${VERT_MOVE}`);
           #endif
         #endif`)
       // Verniz: só a lataria pintada (pintura e faixas), menos no fosco e no cromado (que já é espelho), depois de toda a luz e antes da saída.
-      .replace('#include <opaque_fragment>', `outgoingLight = carVarnish( outgoingLight, normal, vViewPosition, uVarnish * vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ) );
+      .replace('#include <opaque_fragment>', `// V21: a oclusão ambiente assada escurece tudo o que não acende (a lanterna e o farol ficam de fora: occLamp).
+        float occLamp = 1.0 - step( 0.01, vMat.z + vMat.w );
+        // O que olha para cima (o capô, o teto, a tampa) recebe a luz do céu inteira: a oclusão pesa ${(1 - OCC_UP_KEEP).toFixed(2)} menos nele (V14: a faixa de luz da tampa e o branco que lê branco).
+        float carAO = 1.0 - uOcc * clamp( ( vOcc - ${OCC_DEADZONE.toFixed(2)} ) / ${(OCC_FULL - OCC_DEADZONE).toFixed(2)}, 0.0, 1.0 ) * occLamp * mix( 1.0, ${OCC_UP_KEEP.toFixed(2)}, clamp( inverseTransformDirection( normal, viewMatrix ).y, 0.0, 1.0 ) );
+        outgoingLight *= carAO;
+        {
+          // V21: degradê de altura da lataria vertical (a porta, o para-lama): escura na saia, mais clara no ombro, como o chão e o céu que ela reflete.
+          float sideW = 1.0 - abs( inverseTransformDirection( normal, viewMatrix ).y );
+          outgoingLight *= mix( 1.0, mix( 1.0 - uBodyGrad.x, 1.0 + uBodyGrad.y, smoothstep( 0.2, 0.85, vLocal.y ) ), sideW * vPaintW );
+        }
+        outgoingLight = carVarnish( outgoingLight, normal, vViewPosition, uVarnish * vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ), vLocal.y );
         // V14: o brilho alongado da tinta (lobo do sol + faixa do horizonte), só na lataria pintada, antes de ela voltar ao matiz.
-        outgoingLight = carSheen( outgoingLight, diffuseColor.rgb, normal, vViewPosition, vFwd, uSheen * ( vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ) ) );
+        outgoingLight = carSheen( outgoingLight, diffuseColor.rgb, normal, vViewPosition, vFwd, uSheen * ( vPaintW * ( 1.0 - wMatte ) * ( 1.0 - wChrome ) * carAO ), vLocal.y );
         // O vidro reflete o céu pelo Fresnel (GLASS_SKY): o reflexo do env map dele caiu acima, a base é preta.
         outgoingLight = carGlassSky( outgoingLight, normal, vViewPosition, uGlassSky * wGlass, clamp( ( vLocal.y - uGlassY.x ) / max( uGlassY.y - uGlassY.x, 0.05 ), 0.0, 1.0 ) );
         // A pintura guarda o matiz (PAINT_HOLD): só a lataria pintada, menos o cromado (espelho) e o camaleão e o perolado (que mudam de cor de propósito).
@@ -517,8 +574,8 @@ ${VERT_MOVE}`);
         #include <opaque_fragment>`);
   };
   // Um programa para todos os carros: a chave não muda por instância. v2 (N3): os acabamentos. (Era 'nitro-car-v1': o jogo mudou de nome.)
-  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`). v6 (V2, realismo): a pintura guarda o matiz. v7 (V2, realismo 2): o céu refletido no vidro. v9 (V14): o brilho alongado, a lanterna em tira com halo e o vidro em faixa.
-  material.customProgramCacheKey = () => 'speed-tche-car-v9';
+  // v4 (cor-brilho): a lanterna com miolo e o verniz estilizado. v5 (V2): o teto no realce do sol (`SUN_SPEC_CAP`). v6 (V2, realismo): a pintura guarda o matiz. v7 (V2, realismo 2): o céu refletido no vidro. v9 (V14): o brilho alongado, a lanterna em tira com halo e o vidro em faixa. v10 (V21): a oclusão assada (`aOcc`).
+  material.customProgramCacheKey = () => 'speed-tche-car-v10';
   // Luz estilizada (rampa, terminador, luz de borda) DEPOIS do callback e da chave acima: o stylize compõe com os dois.
   applyStylize(material, 'car');
   return { material, uniforms };

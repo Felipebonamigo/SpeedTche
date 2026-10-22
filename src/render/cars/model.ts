@@ -87,7 +87,7 @@ export interface ModelParts {
 
 /** Fecha o modelo: mede a altura, conta triângulos, monta a geometria. */
 export function finish(body: CarBody, b: MeshBuilder, parts: ModelParts): CarModel {
-  const shell = b.build();
+  const shell = b.build(undefined, { axles: parts.axles }); // V21: as rodas de proxy fecham o vão do para-lama (cars/occlusion.ts)
   const bb = shell.boundingBox ?? new THREE.Box3();
   return { body, shell, ...parts, height: bb.max.y, triangles: b.triangles };
 }
