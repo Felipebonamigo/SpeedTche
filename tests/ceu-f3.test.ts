@@ -201,11 +201,11 @@ describe('F3 · brilho do lado do sol de dia (opção A do dono): pinta o céu, 
       .toEqual({ sun: '#fff0d6', i: 3.3, hemi: '#87bef4', hi: 1.3, env: 0.45, exp: 0.98 });
   });
 
-  it('o disco e o halo de dia são os de antes (tamanho 0,038, halo 7, brilho do horizonte 0,35, disco 4), e a bolha larga existe: dia ≥ 0,3, entardecer > 0, lua 0', () => {
+  it('o disco e o halo de dia são os de antes (tamanho 0,038, halo 7, brilho do horizonte 0,35, disco 4), e a bolha larga existe só de dia (0,12–0,3); o entardecer (a cena que o diagnóstico elogia) e a lua não a levam', () => {
     const d = sunSetup('day', 'coast');
     expect([d.size, d.halo, d.glow, d.disc]).toEqual([0.038, 7, 0.35, 4]);
-    expect(d.bloom).toBeGreaterThanOrEqual(0.3); expect(d.bloom).toBeLessThanOrEqual(0.7);
-    expect(sunSetup('dusk', 'coast').bloom).toBeGreaterThan(0);
+    expect(d.bloom).toBeGreaterThanOrEqual(0.12); expect(d.bloom).toBeLessThanOrEqual(0.3);
+    expect(sunSetup('dusk', 'coast').bloom).toBe(0);
     expect(sunSetup('night', 'coast').bloom).toBe(0);
   });
 
@@ -236,7 +236,7 @@ describe('F3 · o céu que o carro reflete (IBL) e a luz não mudam; só uniform
     for (const v of seen) expect(v).toBe(0);
     const dome = (sky as unknown as { dome: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> }).dome;
     expect(dome.material.uniforms.uPaint.value).toBe(1);
-    expect(dome.material.uniforms.uBloom.value).toBeGreaterThan(0.3);
+    expect(dome.material.uniforms.uBloom.value).toBeGreaterThan(0.12);
   });
 
   it('a luz do sol e a hemisférica que o Sky aplica de dia são as da paleta (a opção A não mexe em sunLight nem em exposição)', () => {

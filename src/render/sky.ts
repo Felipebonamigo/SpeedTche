@@ -58,13 +58,13 @@ void main() {
   float az = dot(dh, sh) * 0.5 + 0.5;
   float band = exp(-hp * 6.0);
   col = mix(col, uGlow, band * az * az * az * uGlowAmt);
-  // Dois tons por lado do sol (só pintura): o lado do sol esquenta numa faixa mais larga, o lado de lá esfria e puxa para o azul.
+  // Dois tons por lado do sol (só de dia): o lado do sol esquenta numa faixa mais larga, o lado de lá esfria e puxa para o azul. O entardecer e a noite ficam como eram.
   float wide = exp(-hp * 3.2);
-  col = mix(col, uGlow, wide * az * az * 0.2 * uPaint);
+  col = mix(col, uGlow, wide * az * az * 0.16 * day);
   col *= mix(vec3(1.0), vec3(0.94, 0.985, 1.04), wide * (1.0 - az) * day);
   // A bolha larga do sol (sem disco): lava o céu em volta dele, de dia o sol fica fora do quadro e é isto que dá "lado" ao céu.
   float cs = clamp(dot(d, uSunDir), -1.0, 1.0);
-  float bl = smoothstep(0.3, 1.0, cs); bl *= bl;
+  float bl = smoothstep(0.5, 1.0, cs); bl *= bl;
   col = mix(col, uGlow, bl * uBloom * uPaint);
   // Cirros: uma camada fina e alta, por ruído numa placa em perspectiva (esticada ao longo do vento), mais forte em cima do que rente ao horizonte.
   if (uCirrusQ > 0.5 && uCirrus * uPaint > 0.01 && hp > 0.05) {
@@ -157,8 +157,8 @@ interface SunSetup { dir: THREE.Vector3; size: number; halo: number; glow: numbe
 
 /** O disco e o halo do período (o tamanho cresce no pôr do sol); a direção vem da paleta (`sunAz`, `sunEl`). */
 function sunLook(time: TimeOfDay): Omit<SunSetup, 'dir'> {
-  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false, bloom: 0.45 }; // sol a 34°: sombras longas, halo no alto da tela; V22/F3: a bolha larga pinta o lado do sol (a luz não muda)
-  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false, bloom: 0.25 }; // sol grande e baixo, à frente, horizonte em brasa
+  if (time === 'day') return { size: 0.038, halo: 7, glow: 0.35, disc: 4, moon: false, bloom: 0.17 }; // sol a 34°: sombras longas, halo no alto da tela; V22/F3: a bolha larga pinta o lado do sol (a luz não muda)
+  if (time === 'dusk') return { size: 0.07, halo: 4.2, glow: 0.8, disc: 1.5, moon: false, bloom: 0 }; // o entardecer (a cena que funciona, §3.4) fica como era: a bolha larga lavava o rosa do céu // sol grande e baixo, à frente, horizonte em brasa
   return { size: 0.05, halo: 9, glow: 0.35, disc: 1.35, moon: true, bloom: 0 }; // lua grande a 20°, para aparecer nas retas que apontam para ela
 }
 
@@ -684,7 +684,7 @@ export class Sky {
     // Somem com a noite pela luz (as luzes da cidade acendendo), sem piscar; à noite fechada, `visible` desliga a chamada.
     cu.uFade.value = 1 - lightsAmountNight(p.light);
     // Cirros: a mesma luz e o mesmo sumiço das nuvens (a noite dissolve os dois).
-    u.uCirrus.value = cu.uFade.value; (u.uCirrusCol.value as THREE.Color).copy(cu.uLit.value as THREE.Color);
+    u.uCirrus.value = cu.uFade.value * (0.55 + 0.45 * daylight(p.light)); // no entardecer, mais fraco (o céu rosa já funciona) (u.uCirrusCol.value as THREE.Color).copy(cu.uLit.value as THREE.Color);
     this.sun.color.set(p.sunLight);
     this.sun.intensity = p.sunIntensity;
     // Sombra um pouco aberta: a hemisférica (céu) pinta o que o sol não alcança (mais aberta à noite).
