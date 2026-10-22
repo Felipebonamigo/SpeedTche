@@ -24,6 +24,9 @@ function measure(pick: (id: string) => boolean): { median: number; mean: number 
     for (const p of m.parts) { const a = p.geometry.attributes.position; for (let i = 0; i < a.count; i++) { ymin = Math.min(ymin, a.getY(i)); ymax = Math.max(ymax, a.getY(i)); } }
     let lo = 0; let nl = 0; let hi = 0; let nh = 0;
     for (const p of m.parts) {
+      // F4 (V22): só as partes `flat` têm o volume pintado (`volumeLook`). O capim de recorte do contorno da saia (`cutout`, cartões de pé escuro e ponta clara) não tem gradiente
+      // de altura nem entra nesta conta: contado, os ~80 vértices claros dele subiam a luminância do terço de baixo e escondiam o contrato da V10 nas árvores de antes.
+      if (p.mat !== 'flat') continue;
       const a = p.geometry.attributes.position; const c = p.geometry.attributes.color;
       if (!c) continue;
       for (let i = 0; i < a.count; i++) {

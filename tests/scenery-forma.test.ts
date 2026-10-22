@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { getTrack, TRACKS } from '../src/core/track';
 import { getModel } from '../src/render/scenery/catalog';
-import { sceneryLayout, type Layout } from '../src/render/scenery/layout';
+import { baseLayout, sceneryLayout, type Layout } from '../src/render/scenery/layout';
 import { sceneryShading } from '../src/render/scenery/smooth';
 import { modelTriangles } from '../src/render/scenery/vegetation';
 import { frameCost } from './scenery-medidas';
@@ -172,7 +172,9 @@ describe('cenário redondo: orçamento', () => {
   it('custo de quadro do cenário ≤ 900 triângulos por segmento de janela em toda pista (o modelo de perto só até o farFrom; sem marcos)', () => {
     const bad: string[] = []; let worst = 0; let worstId = '';
     for (const { id, segs, layout } of layouts) {
-      const c = frameCost(layout, segs, trisOf);
+      // F4 (V22): o teto de 900 △ por segmento mede o que TODA lotação paga (`baseLayout`: sem o enfeite farto de 1–2 jogadores, que tem teto próprio em
+      // tests/vegetacao-f4.test.ts). Medindo o layout inteiro, o farto (árvores a mais de 25 a 65 m, só com viewport grande) estourava a conta estática em 15 pistas (máx. 1018).
+      const c = frameCost(baseLayout(layout), segs, trisOf);
       if (c > worst) { worst = c; worstId = id; }
       if (c > 900) bad.push(`${id}: ${c.toFixed(0)}`);
     }

@@ -3,7 +3,7 @@
 // Puro (sem DOM): o layout e os testes usam; scenery.ts só instancia.
 import type { SceneryId, SpriteKind, TrackDef } from '../../core/types';
 import { hash2 } from '../noise';
-import { bandPoints, volumeLook, type Model } from './geom';
+import { bandPoints, volumeLook, type Model, type VolumeLookOptions } from './geom';
 import { LANDMARKS } from './landmarks';
 import { onLandmarkPartsChange } from './landmarks/parts';
 import type { LandmarkDef } from './landmarks/types';
@@ -30,6 +30,7 @@ export function regionOf(def: TrackDef): Region {
 
 // ───────────────────────────── Registro de modelos ─────────────────────────────
 
+const TREE_R = V.collisionHalfM('tree');
 const G = { trop: ['#1f7a3a', '#2c8f40', '#3aa345'], mango: ['#2a8a3a', '#3a9a40', '#2f7f38'], oak: ['#3a7a32', '#4a8a38', '#356f30'], dark: ['#23643a', '#2d7442', '#1f5a34'] };
 const SK = { lush: ['#3a8a36', '#4a9a3c'], dry: ['#8a8a3c', '#9a9245'], alp: ['#4f7a3a', '#5a8a40'], coast: ['#4a9a44', '#d6368f'] };
 
@@ -37,6 +38,20 @@ const SK = { lush: ['#3a8a36', '#4a9a3c'], dry: ['#8a8a3c', '#9a9245'], alp: ['#
 const BUILDERS: Record<string, () => Model> = {
   // Árvores (R de `tree`).
   'tree:giant:0': () => V.tropicalGiant(1), 'tree:giant:1': () => V.tropicalGiant(2, G.dark),
+  // F4 (V22): variantes de FORMA das espécies dominantes (a silhueta muda, a pegada de colisão não): copa de sombrinha e emergente esguia; mangueira larga e alta; acácia em dois andares e tombada.
+  'tree:giant:2': () => V.tropicalGiant(201, G.trop, 'umbrella'), 'tree:giant:3': () => V.tropicalGiant(202, G.dark, 'slender'),
+  'tree:mango:2': () => V.roundTree(203, G.mango, SK.lush, '#5a3e28', 1, TREE_R, 'wide'), 'tree:mango:3': () => V.roundTree(204, ['#3a9a3a', '#4aa842', '#2f8a36'], SK.lush, '#5a3e28', 1.1, TREE_R, 'tall'),
+  'tree:acacia:2': () => V.acacia(205, 'tier'), 'tree:acacia:3': () => V.acacia(206, 'lean'),
+  'tree:oak:2': () => V.roundTree(211, G.oak, SK.lush, '#5a4430', 1.05, TREE_R, 'wide'), 'tree:oak:3': () => V.roundTree(212, G.oak, SK.lush, '#5a4430', 1.05, TREE_R, 'tall'),
+  'tree:linden:2': () => V.roundTree(213, ['#4a9a3a', '#5aa842', '#3f8a36'], SK.lush, '#6b4a2b', 1, TREE_R, 'tiered'), 'tree:linden:3': () => V.roundTree(214, ['#4a9a3a', '#5aa842', '#3f8a36'], SK.lush, '#6b4a2b', 1, TREE_R, 'dome'),
+  'tree:linden:4': () => V.roundTree(224, ['#4a9a3a', '#5aa842', '#3f8a36'], SK.lush, '#6b4a2b', 1, TREE_R, 'twin'),
+  'tree:marula:2': () => V.roundTree(215, ['#6a8a36', '#7a9a3c', '#5f8030'], SK.dry, '#5a4430', 0.9, TREE_R, 'tiered'), 'tree:marula:3': () => V.roundTree(216, ['#6a8a36', '#7a9a3c', '#5f8030'], SK.dry, '#5a4430', 0.9, TREE_R, 'dome'),
+  'tree:ipe-pink:2': () => V.roundTree(217, ['#e85aa8', '#f07ab8', '#d8489a'], SK.lush, '#5a3e28', 1, TREE_R, 'wide'),
+  'tree:ipe-yellow:3': () => V.roundTree(218, ['#f5c518', '#ffd84a', '#e8b010'], SK.lush, '#5a3e28', 1, TREE_R, 'tall'),
+  'tree:maple-red:2': () => V.roundTree(219, ['#d4442a', '#e05a32', '#c0382a'], SK.alp, '#4a3428', 0.95, TREE_R, 'wide'),
+  'tree:maple-orange:3': () => V.roundTree(220, ['#e8822a', '#f09a3a', '#d8702a'], SK.alp, '#4a3428', 0.95, TREE_R, 'tall'),
+  'tree:beech-autumn:2': () => V.roundTree(221, ['#c8962a', '#d9a83a', '#b8862a'], SK.alp, '#5a4a3a', 1, TREE_R, 'tiered'),
+  'tree:aspen-gold:2': () => V.aspen(222, ['#e8b52a', '#f2c94c', '#d9a020'], TREE_R, 'clump'), 'tree:aspen-green:2': () => V.aspen(223, ['#6aa84f', '#7ab85a', '#5a9a45'], TREE_R, 'clump'),
   'tree:mango:0': () => V.roundTree(3, G.mango, SK.lush), 'tree:mango:1': () => V.roundTree(4, ['#3a9a3a', '#4aa842', '#2f8a36'], SK.lush, '#5a3e28', 1.1),
   'tree:banana': () => V.banana(5), 'tree:fern': () => V.treeFern(6),
   'tree:acacia:0': () => V.acacia(7), 'tree:acacia:1': () => V.acacia(8), 'tree:baobab': () => V.baobab(9),
@@ -56,6 +71,8 @@ const BUILDERS: Record<string, () => Model> = {
   'pine:spruce': () => V.conifer(31, '#2a6b42', 5, 1), 'pine:fir': () => V.conifer(32, '#347a66', 6, 0.95),
   'pine:snow': () => V.conifer(33, '#2c6e46', 5, 1, true), 'pine:slim': () => V.conifer(34, '#33784c', 6, 1.25),
   'pine:cedar': () => V.conifer(35, '#285f40', 7, 1.2, false, 1.4), 'pine:larch': () => V.conifer(36, '#d9a83a', 5, 1.1),
+  // F4: o pinheiro alto e esguio (7 camadas) e o baixo e largo (4); mesma pegada.
+  'pine:tall': () => V.conifer(37, '#2b6a4a', 7, 1.55, false, 0.8), 'pine:squat': () => V.conifer(38, '#357f3a', 4, 0.7, false, 0.3),
   // Palmeiras (R de `palm`) e o que as substitui fora dos trópicos (mesma pegada).
   'palm:coco-lean': () => V.coconutPalm(41, 1.6), 'palm:coco': () => V.coconutPalm(42, 0.6), 'palm:royal': () => V.royalPalm(43),
   'palm:date': () => V.datePalm(44), 'palm:fan': () => V.fanPalm(45),
@@ -96,6 +113,15 @@ const BUILDERS: Record<string, () => Model> = {
   ...Object.fromEntries([0, 1].map((k) => [`tuft:sage:${k}`, () => V.grassTuft(120 + k, ['#9aa67a', '#8a9a68'][k], 0.45)])),
   // Capim de cartão com recorte alfa (L4): o pé escuro e a ponta clara; o lote `cutout` do runtime.
   ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:cut:${k}`, () => V.cutoutTuft(150 + k, ['#2f7f34', '#3a8a38', '#4a9a3a'][k], ['#7fd05a', '#92d85c', '#a8e062'][k], 0.62 + 0.08 * k)])),
+  // F4: o capim de recorte nas outras paisagens (seco da savana, serra, sálvia do deserto): o tapete contínuo rente à pista (`carpet`).
+  // O tapete (F4): 3 tufos de recorte por objeto, nas cores de cada paisagem.
+  ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:patch:${k}`, () => V.cutoutPatch(190 + k, ['#2f7f34', '#3a8a38', '#4a9a3a'][k], ['#7fd05a', '#92d85c', '#a8e062'][k], 0.6 + 0.08 * k, 1.0)])),
+  ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:patchdry:${k}`, () => V.cutoutPatch(195 + k, ['#8a7a34', '#9a8a3c', '#7a7030'][k], ['#e0cf7a', '#d8c468', '#ecdc8c'][k], 0.58 + 0.1 * k, 1.1)])),
+  ...Object.fromEntries([0, 1].map((k) => [`tuft:patchalp:${k}`, () => V.cutoutPatch(200 + k, ['#3a6a38', '#456f3a'][k], ['#8cbf6a', '#a2cc7a'][k], 0.5 + 0.08 * k, 1.0)])),
+  ...Object.fromEntries([0, 1].map((k) => [`tuft:patchsage:${k}`, () => V.cutoutPatch(205 + k, ['#7c8a62', '#6f7d58'][k], ['#b8c498', '#a8b488'][k], 0.4 + 0.06 * k, 0.9)])),
+  ...Object.fromEntries([0, 1, 2].map((k) => [`tuft:cutdry:${k}`, () => V.cutoutTuft(160 + k, ['#8a7a34', '#9a8a3c', '#7a7030'][k], ['#e0cf7a', '#d8c468', '#ecdc8c'][k], 0.6 + 0.1 * k, 1.1)])),
+  ...Object.fromEntries([0, 1].map((k) => [`tuft:cutalp:${k}`, () => V.cutoutTuft(170 + k, ['#3a6a38', '#456f3a'][k], ['#8cbf6a', '#a2cc7a'][k], 0.5 + 0.08 * k, 1.0)])),
+  ...Object.fromEntries([0, 1].map((k) => [`tuft:cutsage:${k}`, () => V.cutoutTuft(180 + k, ['#7c8a62', '#6f7d58'][k], ['#b8c498', '#a8b488'][k], 0.4 + 0.06 * k, 0.9)])),
   'flowers:meadow': () => V.flowerPatch(130, '#4f9a3a', ['#ffffff', '#ffd23f', '#e8502a']),
   'flowers:alpine': () => V.flowerPatch(131, '#4f8a3a', ['#b86ac8', '#ffffff', '#6a8aff']),
   'flowers:tropical': () => V.flowerPatch(132, '#2f8a38', ['#e8402a', '#ffb000', '#ff5fb0']),
@@ -156,10 +182,17 @@ export function landmarkOf(modelId: string): LandmarkDef | undefined {
  * levam o mais forte (chapadas, eram as mais lisas), arbustos quase o mesmo, árvores e cactos menos (a copa já tinha `shadeY` de 0,84 a 1,1). O resto (prédios,
  * cerca, objetos de pista, capim de cartão, as sebes) fica como estava.
  */
-const VOLUME: Array<{ pick: RegExp; base: number; top: number }> = [
+/**
+ * V22/F4: `look` = o aro claro da saia e a barriga fria da copa (`geom.VolumeLookOptions`), só nas árvores, coníferas e palmeiras. O aro tira o anel escuro de contorno duro que
+ * o gradiente vertical da V10 punha no pé da saia (o "chapéu"); a barriga escurece e esfria o que a copa tem de voltado para baixo (a luz que chega por baixo é a do céu e do chão).
+ */
+const VOLUME: Array<{ pick: RegExp; base: number; top: number; look?: VolumeLookOptions }> = [
   { pick: /^(rock:|mesa:|stack:|searock:|far:(rock|boulder))/, base: 0.62, top: 1.26 },
   { pick: /^bush:(?!hedge)/, base: 0.66, top: 1.24 },
-  { pick: /^(tree:|pine:|palm:|cactus:|far:(round|cone|palm|poplar|flat|saguaro|mandacaru))/, base: 0.7, top: 1.22 },
+  { pick: /^tree:/, base: 0.7, top: 1.3, look: { rim: { reach: V.collisionHalfM('tree'), height: 0.9, lift: 2.1 }, under: { minY: 2.0, strength: 0.55, cool: 0.3 } } },
+  { pick: /^pine:/, base: 0.7, top: 1.22 },
+  { pick: /^palm:/, base: 0.7, top: 1.22, look: { rim: { reach: V.collisionHalfM('palm'), height: 0.9, lift: 2.1 }, under: { minY: 2.6, strength: 0.26, cool: 0.18 } } },
+  { pick: /^(cactus:|far:(round|cone|palm|poplar|flat|saguaro|mandacaru))/, base: 0.7, top: 1.22 },
 ];
 
 function volumeModel(id: string, model: Model): Model {
@@ -167,7 +200,7 @@ function volumeModel(id: string, model: Model): Model {
   if (!v) return model;
   let ymin = Infinity; let ymax = -Infinity;
   for (const p of model.parts) { const a = p.geometry.attributes.position; for (let i = 0; i < a.count; i++) { ymin = Math.min(ymin, a.getY(i)); ymax = Math.max(ymax, a.getY(i)); } }
-  for (const p of model.parts) if (p.mat === 'flat') volumeLook(p.geometry, ymin, ymax, v.base, v.top);
+  for (const p of model.parts) if (p.mat === 'flat') volumeLook(p.geometry, ymin, ymax, v.base, v.top, v.look);
   return model;
 }
 
@@ -347,7 +380,9 @@ export function farModelFor(id: string): string | null {
       'tree:ipe-pink': 'far:round-pink', 'tree:ipe-yellow': 'far:round-gold', 'tree:aspen-gold': 'far:round-gold', 'tree:beech-autumn': 'far:round-gold',
       'tree:maple-red': 'far:round-red', 'tree:maple-orange': 'far:round-red', 'tree:acacia:0': 'far:flat-acacia', 'tree:acacia:1': 'far:flat-acacia',
       'tree:baobab': 'far:round-dry', 'tree:marula': 'far:round-dry', 'tree:carnauba': 'far:palm-dry', 'tree:umbuzeiro': 'far:round-umbu', 'tree:juazeiro': 'far:round-dark', 'tree:olive': 'far:round-olive', 'tree:eucalyptus': 'far:round-olive',
-      'tree:cypress': 'far:cone-cypress', 'tree:poplar': 'far:poplar', 'tree:giant:0': 'far:round-dark', 'tree:giant:1': 'far:round-dark',
+      'tree:cypress': 'far:cone-cypress', 'tree:poplar': 'far:poplar', 'tree:giant:0': 'far:round-dark', 'tree:giant:1': 'far:round-dark', 'tree:giant:2': 'far:round-dark', 'tree:giant:3': 'far:round-dark',
+      'tree:acacia:2': 'far:flat-acacia', 'tree:acacia:3': 'far:flat-acacia', 'tree:marula:2': 'far:round-dry', 'tree:marula:3': 'far:round-dry', 'tree:ipe-pink:2': 'far:round-pink', 'tree:ipe-yellow:3': 'far:round-gold',
+      'tree:maple-red:2': 'far:round-red', 'tree:maple-orange:3': 'far:round-red', 'tree:beech-autumn:2': 'far:round-gold', 'tree:aspen-gold:2': 'far:round-gold',
     };
     return map[id] ?? 'far:round-green';
   }
@@ -378,11 +413,31 @@ function pickV<T>(list: readonly T[], variant: number): T {
   return list[((variant % list.length) + list.length) % list.length];
 }
 
+/**
+ * Árvore sólida por bioma/país. F4: a lista cresceu de 4 para 8 entradas — as quatro primeiras são as de antes (o núcleo sorteia a variante em 0–3 e os testes
+ * a fixam); as quatro últimas são as variantes de forma, que o layout alcança sorteando `variant + 4` por hash do sprite (`placeSprites`). Mesma pegada de colisão.
+ */
 const TREES: Record<SceneryId, Partial<Record<Region, string[]>> & { _: string[] }> = {
-  tropical: { _: ['tree:giant:0', 'tree:mango:0', 'tree:banana', 'tree:fern'], jp: ['tree:giant:1', 'tree:mango:1', 'tree:fern', 'tree:banana'], au: ['tree:giant:0', 'tree:fern', 'tree:giant:1', 'tree:banana'] },
-  savanna: { _: ['tree:acacia:0', 'tree:baobab', 'tree:acacia:1', 'tree:marula'], eu: ['tree:oak', 'tree:poplar', 'tree:linden', 'tree:poplar'], br: ['tree:ipe-pink', 'tree:mango:0', 'tree:ipe-yellow', 'tree:marula'] },
-  alpine: { _: ['tree:aspen-gold', 'tree:aspen-green', 'tree:oak', 'tree:aspen-gold'], jp: ['tree:maple-red', 'tree:oak', 'tree:maple-orange', 'tree:maple-red'], eu: ['tree:beech-autumn', 'tree:aspen-green', 'tree:oak', 'tree:beech-autumn'], no: ['tree:aspen-green', 'tree:aspen-gold', 'tree:aspen-green', 'tree:beech-autumn'] },
-  coast: { _: ['tree:mango:0', 'tree:linden', 'tree:mango:1', 'tree:oak'], med: ['tree:olive', 'tree:cypress', 'tree:olive', 'tree:cypress'], au: ['tree:eucalyptus', 'tree:mango:0', 'tree:eucalyptus', 'tree:oak'] },
+  tropical: {
+    _: ['tree:giant:0', 'tree:mango:0', 'tree:banana', 'tree:fern', 'tree:giant:2', 'tree:mango:2', 'tree:giant:3', 'tree:mango:3'],
+    jp: ['tree:giant:1', 'tree:mango:1', 'tree:fern', 'tree:banana', 'tree:giant:3', 'tree:mango:3', 'tree:giant:2', 'tree:mango:2'],
+    au: ['tree:giant:0', 'tree:fern', 'tree:giant:1', 'tree:banana', 'tree:giant:2', 'tree:fern', 'tree:giant:3', 'tree:banana'],
+  },
+  savanna: {
+    _: ['tree:acacia:0', 'tree:baobab', 'tree:acacia:1', 'tree:marula', 'tree:acacia:2', 'tree:marula:2', 'tree:acacia:3', 'tree:marula:3'],
+    eu: ['tree:oak', 'tree:poplar', 'tree:linden', 'tree:poplar', 'tree:oak:2', 'tree:linden:2', 'tree:oak:3', 'tree:linden:4'],
+    br: ['tree:ipe-pink', 'tree:mango:0', 'tree:ipe-yellow', 'tree:marula', 'tree:ipe-pink:2', 'tree:mango:2', 'tree:ipe-yellow:3', 'tree:mango:3'],
+  },
+  alpine: {
+    _: ['tree:aspen-gold', 'tree:aspen-green', 'tree:oak', 'tree:aspen-gold', 'tree:aspen-gold:2', 'tree:aspen-green:2', 'tree:oak:2', 'tree:oak:3'],
+    jp: ['tree:maple-red', 'tree:oak', 'tree:maple-orange', 'tree:maple-red', 'tree:maple-red:2', 'tree:oak:2', 'tree:maple-orange:3', 'tree:oak:3'],
+    eu: ['tree:beech-autumn', 'tree:aspen-green', 'tree:oak', 'tree:beech-autumn', 'tree:beech-autumn:2', 'tree:aspen-green:2', 'tree:oak:2', 'tree:oak:3'],
+    no: ['tree:aspen-green', 'tree:aspen-gold', 'tree:aspen-green', 'tree:beech-autumn', 'tree:aspen-green:2', 'tree:aspen-gold:2', 'tree:beech-autumn:2', 'tree:beech-autumn'],
+  },
+  coast: {
+    _: ['tree:mango:0', 'tree:linden', 'tree:mango:1', 'tree:oak', 'tree:mango:2', 'tree:linden:2', 'tree:mango:3', 'tree:oak:2'],
+    med: ['tree:olive', 'tree:cypress', 'tree:olive', 'tree:cypress'], au: ['tree:eucalyptus', 'tree:mango:0', 'tree:eucalyptus', 'tree:oak'],
+  },
   desert: { _: ['tree:marula', 'tree:acacia:0', 'tree:marula', 'tree:acacia:1'], br: ['tree:umbuzeiro', 'tree:juazeiro', 'tree:carnauba', 'tree:juazeiro'], au: ['tree:eucalyptus', 'tree:eucalyptus', 'tree:acacia:0', 'tree:eucalyptus'], med: ['tree:olive', 'tree:olive', 'tree:cypress', 'tree:olive'] },
   city_night: { _: ['tree:street', 'tree:street', 'tree:linden', 'tree:street'] },
 };
@@ -391,8 +446,9 @@ const TREES: Record<SceneryId, Partial<Record<Region, string[]>> & { _: string[]
 const CARTOON_PALMS = ['palm:cartoon:0', 'palm:cartoon:1', 'palm:cartoon:2', 'palm:cartoon:3'];
 
 const PINES: Partial<Record<Region, string[]>> & { _: string[] } = {
-  _: ['pine:spruce', 'pine:fir', 'pine:snow', 'pine:slim'], jp: ['pine:cedar', 'pine:spruce', 'pine:cedar', 'pine:snow'], no: ['pine:snow', 'pine:spruce', 'pine:larch', 'pine:snow'],
-  za: ['pine:spruce', 'pine:fir', 'pine:slim', 'pine:fir'], eu: ['pine:spruce', 'pine:fir', 'pine:snow', 'pine:larch'],
+  _: ['pine:spruce', 'pine:fir', 'pine:snow', 'pine:slim', 'pine:tall', 'pine:squat', 'pine:fir', 'pine:spruce'], jp: ['pine:cedar', 'pine:spruce', 'pine:cedar', 'pine:snow', 'pine:tall', 'pine:squat', 'pine:cedar', 'pine:spruce'],
+  no: ['pine:snow', 'pine:spruce', 'pine:larch', 'pine:snow', 'pine:tall', 'pine:squat', 'pine:larch', 'pine:snow'],
+  za: ['pine:spruce', 'pine:fir', 'pine:slim', 'pine:fir', 'pine:tall', 'pine:squat', 'pine:slim', 'pine:spruce'], eu: ['pine:spruce', 'pine:fir', 'pine:snow', 'pine:larch', 'pine:tall', 'pine:squat', 'pine:larch', 'pine:fir'],
 };
 
 const PALMS: Partial<Record<Region, string[]>> & { _: string[] } = {
@@ -553,6 +609,11 @@ export interface DressingRecipe {
   /** Forração da faixa onde o carro anda (baixa, atravessável). */
   cover: Array<[string, number]>;
   coverDensity: number;
+  /**
+   * F4: o tapete rente à pista (capim de recorte e flores, de 8 a 13 △ a peça): as peças a mais entre 9,6 e 23 m do centro, da divisa da pista até o alcance do carro —
+   * `COVER_EXTRA` por segmento e lado em todo número de jogadores (a partir da Média) e `COVER_LUSH` só com 1–2 (`lushScenery`). Vazio = sem tapete (a cidade).
+   */
+  carpet: Array<[string, number]>;
   /** Árvores além da divisa: espécies (perto) + silhueta (longe). */
   groves: Grove[];
   /** Árvores por lado por segmento num trecho de mata. */
@@ -578,27 +639,27 @@ const ORLA_COM_CALCADAO: ReadonlySet<string> = new Set(['copacabana']);
 
 const green3 = ['tuft:green:0', 'tuft:green:1', 'tuft:green:2'];
 
-export function dressingRecipe(def: TrackDef): DressingRecipe {
+function recipeOf(def: TrackDef): DressingRecipe {
   const region = regionOf(def);
   const base: DressingRecipe = {
-    fence: null, poles: false, cover: green3.map((id) => [id, 1] as [string, number]), coverDensity: 2.2, groves: [], groveDensity: 0.8, clearing: 0.35,
+    fence: null, poles: false, cover: green3.map((id) => [id, 1] as [string, number]), carpet: [], coverDensity: 2.2, groves: [], groveDensity: 0.8, clearing: 0.35,
     scatter: [], scatterDensity: 0.15, landmarks: [], landmarkEvery: 160, boats: [], umbrellas: false, boardwalk: false, kiosks: [],
   };
   switch (def.scenery) {
     case 'tropical':
       return { ...base, fence: region === 'jp' ? 'hedge' : null, cover: [['tuft:green:0', 2], ['tuft:green:1', 2], ['flowers:tropical', 1], ['bush:fern', 1]], coverDensity: 2.6,
-        groves: [{ near: ['tree:giant:0', 'tree:giant:1'], far: 'far:round-dark', weight: 3 }, { near: ['tree:mango:0', 'tree:mango:1'], far: 'far:round-green', weight: 2 }, { near: ['palm:coco', 'palm:royal'], far: 'far:palm', weight: 2 }, { near: ['tree:fern', 'tree:banana'], far: 'far:round-green', weight: 2 }],
+        groves: [{ near: ['tree:giant:0', 'tree:giant:1', 'tree:giant:2', 'tree:giant:3'], far: 'far:round-dark', weight: 3 }, { near: ['tree:mango:0', 'tree:mango:1', 'tree:mango:2', 'tree:mango:3'], far: 'far:round-green', weight: 2 }, { near: ['palm:coco', 'palm:royal'], far: 'far:palm', weight: 2 }, { near: ['tree:fern', 'tree:banana'], far: 'far:round-green', weight: 2 }],
         groveDensity: 1.25, clearing: 0.2, scatter: [['bush:heliconia', 2], ['bush:fern', 2], ['rock:mossy', 1]], scatterDensity: 0.3,
         landmarks: region === 'jp' ? [['torii', 1, 30, 45]] : region === 'br' ? [['chapel:white', 1, 40, 90], ['house:farm', 2, 30, 70]] : [['house:farm', 1, 35, 80]], landmarkEvery: 220 };
     case 'savanna':
       if (region === 'eu') return { ...base, fence: 'rail', poles: true, cover: [['tuft:green:0', 2], ['tuft:green:1', 1], ['flowers:meadow', 1]], coverDensity: 2.2,
-        groves: [{ near: ['tree:oak', 'tree:linden'], far: 'far:round-green', weight: 3 }, { near: ['tree:poplar'], far: 'far:poplar', weight: 2 }], groveDensity: 0.7, clearing: 0.55,
+        groves: [{ near: ['tree:oak', 'tree:oak:2', 'tree:oak:3', 'tree:linden:2', 'tree:linden:3', 'tree:linden:4'], far: 'far:round-green', weight: 3 }, { near: ['tree:poplar'], far: 'far:poplar', weight: 2 }], groveDensity: 0.7, clearing: 0.55,
         scatter: [['bush:green', 1]], scatterDensity: 0.1, landmarks: [['turbine', 5, 70, 220], ['house:farm', 2, 40, 110], ['chapel:white', 1, 60, 140]], landmarkEvery: 45 };
       if (region === 'br') return { ...base, fence: 'ranch', poles: true, cover: [['tuft:dry:0', 2], ['tuft:green:1', 2], ['flowers:meadow', 1]], coverDensity: 2.4,
-        groves: [{ near: ['tree:ipe-pink', 'tree:ipe-yellow'], far: 'far:round-pink', weight: 1 }, { near: ['tree:mango:0', 'tree:marula'], far: 'far:round-green', weight: 2 }, { near: ['palm:coco', 'palm:fan'], far: 'far:palm-dry', weight: 2 }],
+        groves: [{ near: ['tree:ipe-pink', 'tree:ipe-pink:2', 'tree:ipe-yellow', 'tree:ipe-yellow:3'], far: 'far:round-pink', weight: 1 }, { near: ['tree:mango:0', 'tree:mango:3', 'tree:marula', 'tree:marula:2'], far: 'far:round-green', weight: 2 }, { near: ['palm:coco', 'palm:fan'], far: 'far:palm-dry', weight: 2 }],
         groveDensity: 0.55, clearing: 0.5, scatter: [['bush:dry', 1], ['termite', 1]], scatterDensity: 0.15, landmarks: [['house:farm', 2, 40, 110], ['chapel:white', 1, 60, 150]], landmarkEvery: 200 };
       return { ...base, fence: 'ranch', cover: [['tuft:dry:0', 3], ['tuft:dry:1', 2], ['tuft:dry:2', 2], ['bush:dry', 1]], coverDensity: 2.8,
-        groves: [{ near: ['tree:acacia:0', 'tree:acacia:1'], far: 'far:flat-acacia', weight: 4 }, { near: ['tree:baobab'], far: 'far:round-dry', weight: 1 }, { near: ['tree:marula'], far: 'far:round-dry', weight: 1 }],
+        groves: [{ near: ['tree:acacia:0', 'tree:acacia:1', 'tree:acacia:2', 'tree:acacia:3'], far: 'far:flat-acacia', weight: 4 }, { near: ['tree:baobab'], far: 'far:round-dry', weight: 1 }, { near: ['tree:marula', 'tree:marula:2', 'tree:marula:3'], far: 'far:round-dry', weight: 1 }],
         groveDensity: 0.35, clearing: 0.5, scatter: [['rock:kopje', 1], ['bush:dry', 2], ['termite', 1]], scatterDensity: 0.25,
         landmarks: [['house:rondavel', 1, 50, 120], ['far:rock-ochre', 2, 60, 160]], landmarkEvery: 180 };
     case 'desert': {
@@ -613,8 +674,9 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
         landmarks: [...mesas, [rocksFar, 3, 50, 140], ...extra], landmarkEvery: 60 };
     }
     case 'alpine': {
-      const pines = region === 'jp' ? ['pine:cedar', 'pine:spruce'] : region === 'no' ? ['pine:snow', 'pine:spruce', 'pine:larch'] : region === 'za' ? ['pine:fir', 'pine:slim'] : ['pine:spruce', 'pine:fir', 'pine:snow'];
-      const broad = region === 'jp' ? ['tree:maple-red', 'tree:maple-orange'] : region === 'us' ? ['tree:aspen-gold', 'tree:aspen-green'] : region === 'no' ? ['tree:aspen-green', 'tree:aspen-gold'] : ['tree:beech-autumn', 'tree:aspen-green'];
+      // F4: o pinheiro alto e o baixo entram em toda região alpina (as formas distintas por receita: tests/vegetacao-f4.test.ts).
+      const pines = [...(region === 'jp' ? ['pine:cedar', 'pine:spruce'] : region === 'no' ? ['pine:snow', 'pine:spruce', 'pine:larch'] : region === 'za' ? ['pine:fir', 'pine:slim'] : ['pine:spruce', 'pine:fir', 'pine:snow']), 'pine:tall', 'pine:squat'];
+      const broad = region === 'jp' ? ['tree:maple-red', 'tree:maple-red:2', 'tree:maple-orange', 'tree:maple-orange:3'] : region === 'us' ? ['tree:aspen-gold', 'tree:aspen-green', 'tree:aspen-gold:2', 'tree:aspen-green:2'] : region === 'no' ? ['tree:aspen-green', 'tree:aspen-gold', 'tree:aspen-green:2', 'tree:beech-autumn:2'] : ['tree:beech-autumn', 'tree:beech-autumn:2', 'tree:aspen-green', 'tree:aspen-green:2'];
       const lm: Array<[string, number, number, number]> = region === 'jp' ? [['pagoda', 1, 50, 110], ['house:japan', 2, 35, 90], ['torii', 1, 30, 40]] : region === 'za' ? [['house:rondavel', 2, 40, 100]] : region === 'no' ? [['house:red', 2, 35, 90], ['chapel:red', 1, 50, 120]] : region === 'us' ? [['house:chalet', 1, 40, 100]] : [['house:chalet', 3, 35, 100], ['chapel:white', 1, 50, 130]];
       return { ...base, fence: 'armco', cover: [['tuft:green:0', 2], ['tuft:green:2', 1], ['flowers:alpine', 1], ['pebbles:grey', 1]], coverDensity: 2.2,
         groves: [{ near: pines, far: region === 'no' ? 'far:cone-snow' : 'far:cone-dark', weight: 5 }, { near: broad, far: region === 'jp' ? 'far:round-red' : 'far:round-gold', weight: 1 }],
@@ -626,7 +688,7 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
         : region === 'no' ? [{ near: ['pine:spruce', 'pine:snow'], far: 'far:cone-dark', weight: 3 }, { near: ['tree:aspen-green'], far: 'far:round-green', weight: 1 }]
           : region === 'au' ? [{ near: ['tree:eucalyptus'], far: 'far:round-olive', weight: 2 }, { near: ['bush:green'], far: 'far:round-green', weight: 1 }]
             : region === 'jp' ? [{ near: ['palm:blackpine'], far: 'far:round-dark', weight: 2 }]
-              : region === 'br' ? [{ near: ['palm:cartoon:0', 'palm:cartoon:1', 'palm:cartoon:2'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0'], far: 'far:round-green', weight: 1 }]
+              : region === 'br' ? [{ near: ['palm:cartoon:0', 'palm:cartoon:1', 'palm:cartoon:2', 'palm:cartoon:3'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0', 'tree:mango:2', 'tree:mango:3'], far: 'far:round-green', weight: 1 }]
                 : [{ near: ['palm:coco', 'palm:coco-lean'], far: 'far:palm', weight: 3 }, { near: ['tree:mango:0'], far: 'far:round-green', weight: 1 }];
       const lm: Array<[string, number, number, number]> = region === 'med' ? [['house:cubes-white', 3, 32, 70], ['house:cubes-pastel', 3, 32, 80], ['windmill', 1, 40, 90]]
         : region === 'no' ? [['house:red', 3, 30, 70], ['house:yellow', 2, 30, 70]] : region === 'au' ? [['house:white', 1, 35, 80]] : region === 'jp' ? [['torii', 1, 30, 40], ['house:japan', 1, 35, 70]] : region === 'za' ? [['house:white', 2, 35, 80]] : [['house:white', 1, 35, 80]];
@@ -639,4 +701,22 @@ export function dressingRecipe(def: TrackDef): DressingRecipe {
       return { ...base, fence: 'railing', cover: [], coverDensity: 0, groves: [{ near: ['tree:street'], far: 'far:round-green', weight: 1 }], groveDensity: 0.25, clearing: 0.5,
         scatter: [['bush:hedge', 1]], scatterDensity: 0.1, landmarks: [], landmarkEvery: 400 };
   }
+}
+
+/** O tapete de cada paisagem (F4): capim de recorte na cor da forração dela, com flor de vez em quando. A cidade não tem. */
+function carpetOf(def: TrackDef): Array<[string, number]> {
+  const region = regionOf(def);
+  switch (def.scenery) {
+    case 'tropical': return [['tuft:patch:0', 3], ['tuft:patch:1', 3], ['tuft:patch:2', 2], ['flowers:tropical', 1]];
+    case 'savanna': return region === 'eu' ? [['tuft:patch:0', 3], ['tuft:patch:2', 2], ['tuft:patchdry:1', 1], ['flowers:meadow', 1]]
+      : [['tuft:patchdry:0', 3], ['tuft:patchdry:1', 3], ['tuft:patchdry:2', 2], ['flowers:meadow', 1]];
+    case 'alpine': return [['tuft:patchalp:0', 3], ['tuft:patchalp:1', 3], ['tuft:patch:2', 1], ['flowers:alpine', 1]];
+    case 'coast': return [['tuft:patch:0', 3], ['tuft:patch:1', 3], ['tuft:patch:2', 1], ['flowers:meadow', 1]];
+    case 'desert': return [['tuft:patchsage:0', 3], ['tuft:patchsage:1', 3], ['tuft:patchdry:1', 1], ['flowers:desert', 1]];
+    case 'city_night': return [];
+  }
+}
+
+export function dressingRecipe(def: TrackDef): DressingRecipe {
+  return { ...recipeOf(def), carpet: carpetOf(def) };
 }

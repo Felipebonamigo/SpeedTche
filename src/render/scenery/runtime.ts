@@ -389,7 +389,8 @@ export class Scenery {
   // ───────────────────────────── Por quadro, por viewport ─────────────────────────────
 
   /** `lodScale` (cars/lod.ts `screenLodScale`): 0,5 na tela dividida, onde o viewport tem a metade da altura — a decoração pequena some e o modelo de longe entra na metade da distância (mesmos pixels). */
-  update(frame: RoadFrame, track: Track, time: number, lodScale = 1): void {
+  /** `lush` (layout.ts `lushScenery`): com 1–2 jogadores entra também o enfeite farto (F4: mais árvores e tapete rente à pista); com 3–4 a densidade é a de antes. */
+  update(frame: RoadFrame, track: Track, time: number, lodScale = 1, lush = true): void {
     const key = `${track.def.id}:${track.segments.length}`;
     if (key !== this.trackKey || !this.layout) { this.trackKey = key; this.setTrack(track); }
     const layout = this.layout;
@@ -417,7 +418,7 @@ export class Scenery {
       if (ahead > fogSegs) break;
       for (let k = 0; k < list.length; k++) {
         const p = list[k];
-        if (ahead > p.maxAhead * lodScale || p.rank > detail) continue;
+        if (ahead > p.maxAhead * lodScale || p.rank > detail || (p.lush !== 0 && !lush)) continue;
         const useFar = p.far >= 0 && ahead >= p.farFrom * lodScale;
         this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD);
       }
