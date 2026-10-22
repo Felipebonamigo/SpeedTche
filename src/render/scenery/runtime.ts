@@ -223,7 +223,7 @@ export class Scenery {
     this.hazeMat.onBeforeCompile = (shader) => {
       shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', `#ifdef USE_FOG
   float hazeD = fogDensity * ${HAZE_FOG_SCALE.toFixed(3)} * vFogDepth;
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(-hazeD * hazeD));
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(-hazeD * hazeD)); // V22/F7: os marcos do horizonte NÃO levam o tom do lado do sol (o Pão de Açúcar virava verde-acinzentado: creme sobre a névoa ciano)
 #endif`);
     };
     this.hazeMat.customProgramCacheKey = () => 'scenery-haze';

@@ -261,6 +261,40 @@ export interface ProbeStat { x0: number; y0: number; x1: number; y1: number; mea
  * Corrida parada no quadro: o mundo não anda (os carros ficam onde a corrida os deixou); `x` põe o jogador numa faixa, `parked` o para; `seg` o leva ao
  * início do segmento (o `seg=` do render-harness.html: a folha do GT e a galeria) e tira os outros da frente; `look` é o visual do jogador (N3).
  */
+/**
+ * V22/F7: o matiz do chão na imagem. Por caixa: a saturação média (HSV), o matiz médio (circular, °) dos pixels MAIS ESCUROS (30% de baixo da luma) e dos MAIS CLAROS (30% de cima) entre os
+ * que têm croma (sat > 0,25) e a diferença entre os dois (°, com sinal: claro − escuro, no menor arco). É o "o matiz do chão varia entre a sombra e a luz" do plano.
+ */
+function hueSpread(quality: Quality, frames: number, boxes: Array<[number, number, number, number]>): Array<{ sat: number; dark: number; light: number; spread: number; n: number }> {
+  if (!current) throw new Error('lab.setup primeiro');
+  for (let i = 0; i < frames; i++) { tick++; renderer.render(frameFor(quality)); }
+  const ctx = gl.getContext();
+  const W = ctx.drawingBufferWidth; const H = ctx.drawingBufferHeight;
+  const buf = new Uint8Array(W * H * 4);
+  ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
+  return boxes.map(([fx0, fy0, fx1, fy1]) => {
+    const x0 = Math.max(0, Math.floor(fx0 * W)); const x1 = Math.min(W, Math.ceil(fx1 * W));
+    const y0 = Math.max(0, Math.floor(fy0 * H)); const y1 = Math.min(H, Math.ceil(fy1 * H));
+    const px: Array<{ l: number; hx: number; hy: number }> = [];
+    let satSum = 0; let n = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = ((H - 1 - y) * W + x) * 4;
+      const r = buf[i]; const g = buf[i + 1]; const b = buf[i + 2];
+      const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const d = mx - mn;
+      const sat = mx === 0 ? 0 : d / mx; satSum += sat; n++;
+      if (sat <= 0.25) continue;
+      const h = (mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * (Math.PI / 3);
+      px.push({ l: 0.2126 * r + 0.7152 * g + 0.0722 * b, hx: Math.cos(h), hy: Math.sin(h) });
+    }
+    px.sort((a, b) => a.l - b.l);
+    const k = Math.floor(px.length * 0.3);
+    const mean = (list: typeof px): number => { let sx = 0; let sy = 0; for (const p of list) { sx += p.hx; sy += p.hy; } return ((Math.atan2(sy, sx) * 180) / Math.PI + 360) % 360; };
+    const dark = k > 0 ? mean(px.slice(0, k)) : 0; const light = k > 0 ? mean(px.slice(px.length - k)) : 0;
+    let spread = light - dark; if (spread > 180) spread -= 360; if (spread < -180) spread += 360;
+    return { sat: satSum / Math.max(1, n), dark, light, spread, n: px.length };
+  });
+}
+
 function freeze(trackId: string, ticks: number, opts: { x?: number; parked?: boolean; tod?: 'day' | 'dusk' | 'night'; seg?: number; look?: CarLook; car?: string } = {}): void {
   setup(trackId, 1, ticks, opts.tod, opts.look ? [opts.look] : undefined, opts.car ? [opts.car] : undefined);
   if (!current) throw new Error('lab.setup primeiro');
@@ -743,7 +777,7 @@ function stylizeUniformGet(name: string): number[] {
 const lab = {
   hullInfo, stylizeUniformGet, carUniformsDump, stylizeUniform, grabView, grab, glassPoints, lamps, carUniform, carIds: (): string[] => CARS.map((c) => c.id),
   hold: (on: boolean): void => { holdClock = on; },
-  freeze, headlights, shoot, regions, lumaBox, groundDetail, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
+  freeze, headlights, shoot, regions, hueSpread, lumaBox, groundDetail, drive, snapshot, diffFromSnapshot, bloomHalo, nitro, flameDiff,
   /** "Reduzir efeitos" e "Efeitos de cartum" nos quadros seguintes (V10). */
   setReduce: (on: boolean): void => { reduceFx = on; },
   setCartoon: (on: boolean): void => { cartoonFx = on; },

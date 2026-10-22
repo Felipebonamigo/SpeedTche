@@ -420,7 +420,7 @@ export class Stage {
     const c0 = gl.info.render.calls; const t0 = gl.info.render.triangles;
     const st = this.stats[i];
     if (plan.post) {
-      const ps = this.pipelineFor(i, vp.w * size.dpr, vp.h * size.dpr, cam).render({ camera: cam, scale: 1, radial: 0 }, plan.ao !== null);
+      const ps = this.pipelineFor(i, vp.w * size.dpr, vp.h * size.dpr, cam).render({ camera: cam, scale: 1, radial: 0, vignette: 0 }, plan.ao !== null);
       st.targetW = ps.targetW; st.targetH = ps.targetH; st.samples = ps.samples; st.passes = ps.passes; st.postPx = ps.postPx;
     } else {
       gl.render(this.scene, cam);

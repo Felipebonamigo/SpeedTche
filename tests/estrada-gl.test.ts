@@ -86,13 +86,14 @@ describe.skipIf(!available)('V11 · a estrada na imagem (swiftshader)', { timeou
     expect(errors).toEqual([]);
   });
 
-  it('Sampa (cidade, noite): a estrada é roxo-azulada, não preta nem marinho — matiz 245°–300°, B − R entre 5 e 90 (era 15 até a V12), saturação ≥ 0,3 e luma ≥ 0,1 (antes: rgb 60,37,46, matiz 337°, o rosa-vinho da luz roxa sobre o asfalto neutro)', async () => {
+  it('Sampa (cidade, noite): a estrada é rosa-mauve, não preta nem marinho — matiz 290°–335°, B − R entre −60 e +15 (V22/F7; era 245°–300° e 5–90), saturação ≥ 0,3 e luma ≥ 0,1 (antes: rgb 60,37,46, matiz 337°, o rosa-vinho da luz roxa sobre o asfalto neutro)', async () => {
     const { near } = await estrada(CENAS.sampa);
     const luma = (0.2126 * near[0] + 0.7152 * near[1] + 0.0722 * near[2]) / 255;
     registrar(`[V11] sampa: perto rgb(${near}) matiz ${hueDeg(near).toFixed(0)}° sat ${satOf(near).toFixed(2)} luma ${luma.toFixed(3)}`);
-    expect(hueDeg(near), `matiz (rgb ${near})`).toBeGreaterThanOrEqual(245); expect(hueDeg(near)).toBeLessThanOrEqual(300);
-    // V12: o piso do B − R foi de 15 para 5: a pista da cidade à noite é mauve (matiz ~285°, mais perto do 322° do HC2) em vez de lilás-azulado; matiz, saturação e luma seguem travados.
-    expect(near[2] - near[0], 'B − R').toBeGreaterThanOrEqual(5); expect(near[2] - near[0]).toBeLessThanOrEqual(90);
+    // V22/F7 (e): matiz 245°–300° → 290°–335° e B − R 5–90 → −60…+15. A pista da cidade à noite passou do mauve-lilás (287° no albedo) ao rosa-mauve (#b4729c, 321°, mesma luma) para ficar ≥ 20° do chão
+    // (violeta, 295°) e do prédio (índigo, 237°): a noite separa por matiz, não só por valor. Medido na imagem: 315° (antes 285°); saturação e luma seguem travadas.
+    expect(hueDeg(near), `matiz (rgb ${near})`).toBeGreaterThanOrEqual(290); expect(hueDeg(near)).toBeLessThanOrEqual(335);
+    expect(near[2] - near[0], 'B − R').toBeGreaterThanOrEqual(-60); expect(near[2] - near[0]).toBeLessThanOrEqual(15);
     expect(satOf(near), 'saturação').toBeGreaterThanOrEqual(0.3);
     expect(luma, 'luma').toBeGreaterThanOrEqual(0.1);
     expect(errors).toEqual([]);

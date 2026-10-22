@@ -40,7 +40,7 @@ import { lushScenery, type Layout } from './scenery/layout';
 import { Sky } from './sky';
 import { Stage, STAGE_IDLE_RELEASE } from './stage';
 import { stageBus } from './stage-bus';
-import { installToneMapping, setStylizePalette } from './stylize';
+import { installToneMapping, setFogView, setStylizePalette } from './stylize';
 import { Terrain } from './terrain';
 import { buildHorizon } from './horizon';
 
@@ -264,10 +264,11 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
   function drawViewport(i: number, rect: Rect, camera: THREE.PerspectiveCamera, q: Quality, plan: PostPlan, blur: number): void {
     const c0 = renderer.info.render.calls; const tri0 = renderer.info.render.triangles;
     const v = vps[vpCount];
+    setFogView(camera, sky.sunDirLocal); // V22/F7: a névoa com altura e lado do sol precisa do "para cima" e do sol no espaço de vista DESTA câmera
     if (plan.post) {
       const pipe = pipelineFor(i, rect, camera, q);
       lastScale = currentScale();
-      const st = pipe.render({ camera, scale: lastScale, radial: plan.radialBlur ? blur : 0 }, plan.ao !== null);
+      const st = pipe.render({ camera, scale: lastScale, radial: plan.radialBlur ? blur : 0, vignette: plan.vignette }, plan.ao !== null);
       v.targetW = st.targetW; v.targetH = st.targetH; v.samples = st.samples; v.passes = st.passes; v.postPx = st.postPx;
     } else {
       renderer.render(scene, camera);

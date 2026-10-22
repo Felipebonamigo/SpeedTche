@@ -64,7 +64,9 @@ describe.skipIf(!available)('V22 · F3 · o céu na imagem (swiftshader)', { tim
   });
 
   it('dither: o céu liso (sem cirros e sem bolha) tem resíduo fino ≥ 0,0012 (antes 0,0007) e < 0,006: grão de 1 LSB, continua céu limpo', async () => {
-    const liso = await medir({ facing: 180, cirrus: 0, bloom: 0 });
+    // V22/F7 (um dither só): este ensaio desenha o domo DIRETO no canvas, o caminho da Baixa (sem OutputPass), então é a Baixa que o mede. Da Média em diante o dither é do OutputPass (em todo pixel,
+    // `nevoa-f7-gl.test.ts`) e o domo não leva o dele (`uDither` = 0: senão o céu teria ~1,4 LSB). Valor e limites iguais aos da F3; só o degrau mudou, de 'high' para 'low'.
+    const liso = await medir({ facing: 180, cirrus: 0, bloom: 0, quality: 'low' });
     expect(liso.residuoFino).toBeGreaterThanOrEqual(0.0012); expect(liso.residuoFino).toBeLessThan(0.006);
     const antes = await medir({ facing: 180, paint: 0 });
     expect(antes.residuoFino, 'com a pintura desligada o céu é o de antes: sem grão').toBeLessThan(0.0009);
