@@ -11,7 +11,7 @@ import type { Horizon } from './horizon';
 import * as THREE from 'three';
 import type { SceneryId, Track } from '../core/types';
 import { fbm, hash2, hash3, valueNoise } from './noise';
-import { ringPaint } from './horizon-rings';
+import { FOREST_FRAG_PARS, FOREST_VERT_BODY, FOREST_VERT_PARS, forestFragBody, ringForestAmp, ringPaint } from './horizon-rings';
 import { smoothNormals } from './normals';
 import { lightsAmount, mix as mixHex, type LivePalette, type Palette } from './palette';
 import { applyGrade, applyStylize } from './stylize';
@@ -218,8 +218,9 @@ const RING_VERT = /* glsl */ `
 // colorB / uBlend (M6): a cor do período seguinte por vértice e quanto dela vale (0 = a da pista); sem período seguinte colorB é a própria cor.
 attribute vec3 colorB; uniform float uBlend;
 varying vec3 vColor; varying vec3 vW; varying vec3 vN;
+${FOREST_VERT_PARS}
 void main() {
-  vColor = mix(color, colorB, uBlend);
+  vColor = mix(color, colorB, uBlend);${FOREST_VERT_BODY}
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vW = wp.xyz;
   vN = normalize(mat3(modelMatrix) * normal);
@@ -231,10 +232,11 @@ void main() {
 export const RING_FRAG = /* glsl */ `
 uniform vec3 uSunDir; uniform float uFacet;
 varying vec3 vColor; varying vec3 vW; varying vec3 vN;
+${FOREST_FRAG_PARS}
 void main() {
   vec3 n = normalize(vN);
   float l = max(dot(n, uSunDir), 0.0);
-  vec3 c = vColor * (1.0 - uFacet + uFacet * (0.62 + 0.7 * l));
+  vec3 c = vColor * (1.0 - uFacet + uFacet * (0.62 + 0.7 * l));${forestFragBody('c')}
   gl_FragColor = vec4(c, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -432,14 +434,17 @@ const RING_CREASE = 120;
 
 export function buildRing(biome: SceneryId, layer: number, radius: number, height: number, top: THREE.Color, fog: THREE.Color, haze: number, snow: THREE.Color | null): THREE.BufferGeometry {
   const N = 300; // pontos por volta: com 150 o contorno da serra saía em degraus
-  const pos: number[] = []; const col: number[] = [];
+  const pos: number[] = []; const col: number[] = []; const forest: number[] = [];
+  const amp = ringForestAmp(biome, layer);
   // V22/F3: a cor do topo, da encosta alta e do meio por coluna, com o ruído de arvoredo e o cume iluminado (horizon-rings.ts): antes, uma cor só por fileira.
   const paint = ringPaint(biome, layer, N, top, fog, haze);
   const cBase = top.clone().lerp(fog, Math.min(1, haze + 0.55));
   const cSnow = snow ? snow.clone().lerp(fog, haze * 0.8) : null;
   const tmp = new THREE.Color();
-  const push = (x: number, y: number, z: number, c: THREE.Color) => { pos.push(x, y, z); col.push(c.r, c.g, c.b); };
+  // `aForest` = (mancha, contorno, 1 na crista): a neve e a pedra do pico não levam o arvoredo (`keep`: 1 = mata, 0 = neve).
+  const push = (x: number, y: number, z: number, c: THREE.Color, keep = 1, crest = 0) => { pos.push(x, y, z); col.push(c.r, c.g, c.b); forest.push(amp.speckle * keep, amp.fringe * keep, crest); };
   const heightAt = (i: number): number => height * ringProfile(biome, layer, (i % N) / N);
+  const keepAt = (h: number): number => (cSnow ? 1 - smooth01(0.5, 0.85, h / height) : 1);
   // Neve pela altura do próprio vértice, numa faixa larga: decidida por coluna (pico acima de 66–78%), a coluna
   // vizinha saía cinza e a encosta inteira virava faixa vertical — com a serra lisa isso aparecia.
   const topColor = (h: number, i: number): THREE.Color => {
@@ -462,12 +467,14 @@ export function buildRing(biome: SceneryId, layer: number, radius: number, heigh
     push(x1 * ro, B, z1 * ro, cBase); push(x1 * ro, m1, z1 * ro, cMid1); push(x0 * ro, m0, z0 * ro, cMid0);
     const t0 = topColor(h0, i).clone(); const t1 = topColor(h1, i + 1).clone();
     const mc0 = paint.slope[i]; const mc1 = paint.slope[i + 1];
-    push(x0 * ro, m0, z0 * ro, mc0); push(x1 * ro, m1, z1 * ro, mc1); push(x0 * ri, h0, z0 * ri, t0);
-    push(x1 * ro, m1, z1 * ro, mc1); push(x1 * ri, h1, z1 * ri, t1); push(x0 * ri, h0, z0 * ri, t0);
+    const k0 = keepAt(h0); const k1 = keepAt(h1);
+    push(x0 * ro, m0, z0 * ro, mc0, k0); push(x1 * ro, m1, z1 * ro, mc1, k1); push(x0 * ri, h0, z0 * ri, t0, k0, 1);
+    push(x1 * ro, m1, z1 * ro, mc1, k1); push(x1 * ri, h1, z1 * ri, t1, k1, 1); push(x0 * ri, h0, z0 * ri, t0, k0, 1);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('aForest', new THREE.Float32BufferAttribute(forest, 3));
   return smoothNormals(g, RING_CREASE);
 }
 

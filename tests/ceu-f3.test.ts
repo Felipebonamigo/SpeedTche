@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { palette, SCENERIES, TIMES_OF_DAY, blendPalette, type Palette } from '../src/render/palette';
 import { buildHorizon, ridgeHeight } from '../src/render/horizon';
-import { buildRing } from '../src/render/terrain';
-import { ringFoliage } from '../src/render/horizon-rings';
+import { buildRing, RING_FRAG } from '../src/render/terrain';
+import { FOREST_FRAG_PARS, forestFragBody, ringFoliage, ringForestAmp } from '../src/render/horizon-rings';
 import { SKY_STOP_HP, daylight, skyGradient } from '../src/render/sky-paint';
 import { buildClouds, cloudAtlasImage, cloudLayout, CLOUD_ATLAS, CLOUD_FRAG, CLOUD_VERT, SKY_FRAG, Sky, sunSetup } from '../src/render/sky';
 
@@ -325,6 +325,71 @@ describe('F3 · anéis de horizonte: ruído de arvoredo e de cume', () => {
     expect(cols.length).toBeGreaterThan(20);
     expect(std(cols)).toBeGreaterThan(0.01);
     expect(ridgeHeight(2, 1.0)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+
+describe('F3 · anéis de horizonte: arvoredo fino e contorno de copas por fragmento (estável: só espaço do objeto)', () => {
+  const pal = palette('tropical', 'day');
+  const mk = (b: (typeof SCENERIES)[number], layer: number, snow: THREE.Color | null = null): THREE.BufferGeometry =>
+    buildRing(b, layer, [470, 660, 920][layer], [62, 120, 205][layer], new THREE.Color(pal.layers[layer]), new THREE.Color(pal.fog), pal.layerHaze[layer], snow);
+
+  it('o anel leva `aForest` (mancha, contorno, 1 só na crista), um por vértice, e a crista são exatamente os vértices do topo (2 de 6 por quadrilátero de cima)', () => {
+    const g = mk('tropical', 1); const f = g.getAttribute('aForest');
+    expect(f, 'atributo aForest').toBeDefined();
+    expect(f.count).toBe(g.getAttribute('position').count); expect(f.itemSize).toBe(3);
+    let crest = 0;
+    for (let i = 0; i < f.count; i++) { const z = f.getZ(i); expect([0, 1]).toContain(z); crest += z; expect(f.getX(i)).toBeLessThanOrEqual(0.2); expect(f.getY(i)).toBeLessThanOrEqual(1); }
+    expect(crest).toBe(300 * 3); // 3 vértices do topo por coluna (o 3º do triângulo de cima e os 2 do segundo)
+  });
+
+  it('a mata leva as duas forças; a camada longe, menos (a névoa e a distância); o deserto leva mancha mas NENHUM contorno; a neve do pico não leva nada', () => {
+    const t = [0, 1, 2].map((l) => ringForestAmp('tropical', l));
+    expect(t[0].fringe).toBeGreaterThan(t[1].fringe); expect(t[1].fringe).toBeGreaterThan(t[2].fringe);
+    expect(t[0].speckle).toBeGreaterThan(t[2].speckle); expect(t[2].fringe).toBeGreaterThan(0);
+    expect(ringForestAmp('desert', 0).fringe).toBe(0); expect(ringForestAmp('desert', 0).speckle).toBeGreaterThan(0);
+    const g = mk('alpine', 1, new THREE.Color('#ffffff')); const f = g.getAttribute('aForest'); const pos = g.getAttribute('position');
+    const full = ringForestAmp('alpine', 1).fringe;
+    let lowCrest = 0; let peakCrest = 0;
+    for (let i = 0; i < f.count; i++) if (f.getZ(i) === 1) {
+      const r = pos.getY(i) / 120; // (a altura do anel 1 em `mk`) a neve vai de 50% a 85% da altura (smoothstep)
+      if (r < 0.5) { lowCrest++; expect(f.getY(i), `crista a ${r.toFixed(2)} da altura`).toBeCloseTo(full, 6); }
+      if (r > 0.85) { peakCrest++; expect(f.getY(i), `pico a ${r.toFixed(2)}`).toBeCloseTo(0, 6); }
+    }
+    expect(lowCrest, 'há crista baixa (mata)').toBeGreaterThan(0); expect(peakCrest, 'há pico de neve').toBeGreaterThan(0);
+  });
+
+  it('o shader: descarta o contorno e mancha a cor, no espaço do OBJETO (vLocal) — nunca em posição de mundo ou de câmera, que faria o arvoredo "nadar"', () => {
+    const body = forestFragBody('c');
+    expect(body).toMatch(/discard/); expect(body).toMatch(/vLocal/); expect(body).toMatch(/vForest/);
+    for (const bad of ['vW', 'cameraPosition', 'gl_FragCoord', 'uTime']) { expect(body, bad).not.toContain(bad); expect(FOREST_FRAG_PARS, bad).not.toContain(bad); }
+    expect(RING_FRAG).toContain('forestN'); expect(RING_FRAG).toMatch(/discard/);
+  });
+
+  it('o horizonte do Rio leva o mesmo arvoredo: a crista de morro tem aForest, a cúpula do Pão de Açúcar não (o atributo faltando vale 0: nada muda nela)', () => {
+    const h = buildHorizon('copacabana', palette('coast', 'day'), 'high');
+    const ring = h!.children.find((c) => c.name === 'horizon:layer-1') as THREE.Mesh;
+    const f = ring.geometry.getAttribute('aForest');
+    expect(f).toBeDefined(); expect(f.count).toBe(ring.geometry.getAttribute('position').count);
+    let crest = 0; let withFringe = 0;
+    for (let i = 0; i < f.count; i++) { crest += f.getZ(i); if (f.getY(i) > 0) withFringe++; }
+    expect(crest).toBeGreaterThan(0); expect(withFringe).toBeGreaterThan(0);
+    const pao = h!.children.find((c) => c.name === 'horizon:pao-de-acucar') as THREE.Mesh;
+    expect(pao.geometry.getAttribute('aForest')).toBeUndefined();
+    // o granito (pedra nua) fica liso: a força é multiplicada por (1 − granito)
+    let maxSpeckle = 0;
+    for (let i = 0; i < f.count; i++) maxSpeckle = Math.max(maxSpeckle, f.getX(i));
+    expect(maxSpeckle).toBeLessThanOrEqual(ringForestAmp('coast', 1).speckle + 1e-9);
+  });
+
+  it('o material do Rio remenda o three por âncora (color_fragment) e a chave de programa muda: um programa só, como antes', () => {
+    const h = buildHorizon('copacabana', palette('coast', 'day'), 'high')!;
+    const m = (h.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial;
+    const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: '#include <common>\n#include <color_vertex>', fragmentShader: '#include <common>\n#include <color_fragment>' };
+    m.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+    expect(shader.fragmentShader).toContain('forestN'); expect(shader.fragmentShader).toContain('discard');
+    expect(shader.vertexShader).toContain('aForest');
+    expect(m.customProgramCacheKey()).toContain('forest');
   });
 });
 

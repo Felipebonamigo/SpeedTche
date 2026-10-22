@@ -68,14 +68,14 @@ void main() {
   col = mix(col, uGlow, bl * uBloom * uPaint);
   // Cirros: uma camada fina e alta, por ruído numa placa em perspectiva (esticada ao longo do vento), mais forte em cima do que rente ao horizonte.
   if (uCirrusQ > 0.5 && uCirrus * uPaint > 0.01 && hp > 0.05) {
-    vec2 q = d.xz / (hp + 0.18) * 1.7;
+    vec2 q = d.xz / (hp + 0.18) * 2.6;
     q.x += uCirrusT;
     vec2 s = vec2(q.x * 0.55, q.y * 2.4);
     s.x += vn(s * 0.8 + 7.0) * 1.6;
     float n = vn(s) * 0.55 + vn(s * 2.1 + 3.0) * 0.3;
     n = uCirrusQ > 1.5 ? n + vn(s * 4.3 + 9.0) * 0.15 : n / 0.85;
-    float cir = smoothstep(0.48, 0.78, n) * smoothstep(0.05, 0.22, hp) * (1.0 - 0.5 * smoothstep(0.6, 1.0, hp));
-    col = mix(col, mix(uCirrusCol, uGlow, bl * 0.5), cir * uCirrus * 0.6 * uPaint);
+    float cir = smoothstep(0.54, 0.86, n) * smoothstep(0.05, 0.22, hp) * (1.0 - 0.5 * smoothstep(0.6, 1.0, hp));
+    col = mix(col, mix(uCirrusCol, uGlow, bl * 0.5), cir * uCirrus * 0.42 * uPaint);
   }
   // Abaixo do horizonte: a cor da névoa, para o chão distante sumir sem emenda.
   col = mix(col, uBelow, smoothstep(0.0, -0.06, h));

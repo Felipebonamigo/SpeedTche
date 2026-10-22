@@ -81,3 +81,42 @@ export function ringPaint(biome: SceneryId, layer: number, n: number, top: THREE
   }
   return out;
 }
+
+/**
+ * O arvoredo FINO e o contorno de copas: por fragmento, em ruído 3D do espaço do OBJETO (o anel é rígido e gira com o grupo do horizonte: a posição local fica no mesmo ponto
+ * do morro, como um desenho no morro — nunca a posição de mundo, que mudaria a cada quadro e faria o arvoredo "nadar", a regra da F1). `aForest` por vértice =
+ * (força da mancha, fundo do contorno, 1 na crista e 0 no resto): a mata pega as duas; a neve, a pedra e o deserto, pouco ou nada.
+ * Duas escalas de mancha (18 m e 8 m a 700 m: acima de ~8 px, para o ruído não cintilar) e o contorno come até 8% da altura do quadrilátero da crista com `discard`.
+ */
+export const FOREST_VERT_PARS = /* glsl */ `
+attribute vec3 aForest; varying vec3 vForest; varying vec3 vLocal;`;
+export const FOREST_VERT_BODY = /* glsl */ `
+  vForest = aForest; vLocal = position;`;
+export const FOREST_FRAG_PARS = /* glsl */ `
+varying vec3 vForest; varying vec3 vLocal;
+float forestH(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+float forestN(vec3 x) {
+  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(forestH(i), forestH(i + vec3(1.0, 0.0, 0.0)), f.x), mix(forestH(i + vec3(0.0, 1.0, 0.0)), forestH(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+             mix(mix(forestH(i + vec3(0.0, 0.0, 1.0)), forestH(i + vec3(1.0, 0.0, 1.0)), f.x), mix(forestH(i + vec3(0.0, 1.0, 1.0)), forestH(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+}`;
+/** O corpo no fragmento: descarta o contorno (copas) e mancha a cor `c` (vec3). */
+export function forestFragBody(c: string): string {
+  // `lp` = a posição local reescalada para que o tamanho ANGULAR das manchas seja o mesmo nos três anéis (470, 660 e 920 m): em metros a 700 m de distância.
+  return /* glsl */ `
+  {
+    vec3 lp = vLocal * (700.0 / max(length(vLocal.xz), 100.0));
+    float fo = forestN(lp / vec3(18.0, 9.0, 18.0)) * 0.55 + forestN(lp / vec3(8.0, 4.5, 8.0)) * 0.45;
+    fo = mix(fo, smoothstep(0.36, 0.64, fo), 0.65);
+    float fr = smoothstep(0.35, 0.75, forestN(lp / vec3(10.0, 4.0, 10.0)) * 0.65 + forestN(lp / vec3(4.5, 2.2, 4.5)) * 0.35);
+    if (vForest.z > 1.0 - 0.08 * vForest.y * fr) discard;
+    ${c} *= 1.0 + vForest.x * (fo - 0.5) * 1.6;
+  }`;
+}
+
+/** A força da mancha e a do contorno de cada bioma e camada (0..1): a mata inteira, a savana esparsa, a serra só abaixo da neve, o deserto (mesa de pedra) sem contorno. */
+export function ringForestAmp(biome: SceneryId, layer: number): { speckle: number; fringe: number } {
+  const k = LAYER_AMP[layer] ?? 0.7;
+  const b: Record<SceneryId, [number, number]> = { tropical: [1, 1], coast: [0.9, 0.9], savanna: [0.8, 0.7], alpine: [0.8, 0.35], desert: [0.5, 0], city_night: [0.5, 0.4] };
+  return { speckle: b[biome][0] * 0.2 * k, fringe: b[biome][1] * k };
+}
