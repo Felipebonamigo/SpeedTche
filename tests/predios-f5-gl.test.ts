@@ -51,12 +51,12 @@ describe.skipIf(!available)('V22/F5 · a parede do prédio na imagem (swiftshade
     } finally { await page.close().catch(() => undefined); }
   }
 
-  // A torre de Paraty (06): a fachada de x 250–510, y 10–170 (sem a copa da palmeira, que só entra mais abaixo). A parede é o que não é janela acesa: a metade mais escura dos pixels.
-  it('Paraty ao entardecer: a parede da torre (a metade escura dos pixels da fachada) tem luma mediana ≥ 0,2 e ≥ 0,25 do brilho das janelas (P95) — antes: parede quase preta, ~0,09 e ~0,10', async () => {
+  // A torre de Paraty (06): a fachada de x 250–510, y 10–170 (sem a copa da palmeira, que só entra mais abaixo). A parede é tudo o que não é janela acesa (pixels abaixo de metade do P95).
+  it('Paraty ao entardecer: a parede da torre (o que não é janela acesa) tem luma mediana ≥ 0,2 e ≥ 0,25 do brilho das janelas (P95) — antes: parede quase preta, ~0,09 e ~0,10', async () => {
     const v = await lumas('track=paraty&seg=200', [250, 10, 260, 160]);
-    const wall = v.slice(0, Math.floor(v.length / 2));
-    const medWall = wall[Math.floor(wall.length / 2)];
     const p95 = v[Math.floor(v.length * 0.95)];
+    const wall = v.filter((x) => x < 0.5 * p95); // tudo o que não é janela acesa: parede, montante e vidro apagado
+    const medWall = wall[Math.floor(wall.length / 2)];
     registrar(`[V22/F5] paraty (06): parede mediana ${medWall.toFixed(3)} · janelas P95 ${p95.toFixed(3)} · razão ${(medWall / p95).toFixed(3)}`);
     expect(medWall, `luma da parede ${medWall.toFixed(3)}`).toBeGreaterThanOrEqual(0.2);
     expect(medWall / p95, `razão parede ÷ janela ${(medWall / p95).toFixed(3)}`).toBeGreaterThanOrEqual(0.25);
