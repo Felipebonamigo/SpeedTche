@@ -286,6 +286,28 @@ describe('V22/F6 (E): o `Scenery` — a copa a menos de 60 m passa para o lote q
     expect(com.castDress, 'o dress continua sem projetar (só as copas próximas projetam)').toBe(false);
   }, 120000);
 
+  it('a copa projeta só a menos de `crowns` m à frente: com `crowns` = 0 NUNCA (o `ahead` negativo, dos objetos atrás do carro, passava em `ahead < 0` e as árvores de trás entravam no mapa do sol)', async () => {
+    const { Scenery } = await import('../src/render/scenery/runtime');
+    const track = getTrack('foz_do_iguacu');
+    for (const crowns of [0, 60, 120]) {
+      const s = new Scenery();
+      const frame = buildRoadFrame(track, track.length * 0.25, 30, 260);
+      const calls: Array<{ ahead: number; crown: boolean }> = [];
+      const g = s as unknown as { place: (...a: unknown[]) => void };
+      const orig = g.place.bind(s);
+      g.place = (...a: unknown[]): void => { calls.push({ ahead: (a[3] as number) - frame.behind, crown: a[6] as boolean }); orig(...a); };
+      (s.update as (...a: unknown[]) => void).call(s, frame, track, 1, 1, true, sunTo(34, -42), crowns);
+      expect(calls.length, `crowns ${crowns}`).toBeGreaterThan(100);
+      expect(calls.filter((c) => c.ahead < 0).length, 'a janela tem objetos atrás do carro').toBeGreaterThan(0);
+      for (const c of calls) {
+        if (crowns === 0) expect(c.crown, `crowns 0: ahead ${c.ahead}`).toBe(false);
+        else if (c.crown) expect(c.ahead * 4, `crowns ${crowns}`).toBeLessThan(crowns);
+      }
+      expect(calls.filter((c) => c.crown).length === 0, `crowns ${crowns}`).toBe(crowns === 0);
+      s.dispose();
+    }
+  }, 180000);
+
   it('o raio de 60 m manda: com 20 m entram menos árvores que com 60 m; com 120 m, mais', async () => {
     const a = (await usados(20)).flat; const b = (await usados(60)).flat; const c = (await usados(120)).flat;
     expect(a).toBeLessThan(b);

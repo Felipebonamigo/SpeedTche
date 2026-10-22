@@ -487,7 +487,7 @@ export class Scenery {
         const p = list[k];
         if (ahead > p.maxAhead * lodScale || p.rank > detail || (p.lush !== 0 && !lush)) continue;
         const useFar = p.far >= 0 && ahead >= p.farFrom * lodScale;
-        this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD, !useFar && ahead < crownSegs);
+        this.place(p, useFar ? p.far : p.model, frame, j, time, ahead < BLOB_AHEAD, !useFar && crownSegs > 0 && ahead < crownSegs);
       }
     }
     // Visibilidade: só as pontas que mudaram.
