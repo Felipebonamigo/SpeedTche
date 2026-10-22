@@ -219,10 +219,11 @@ export function createTipsHud(root: HTMLElement): TipsHud | null {
         setStyle(n.vp, '--s', `calc(${uiScale(rect).toFixed(3)} * var(--hud-scale, 1))`); setStyle(n.vp, '--seat', vp.color);
         const tip = vp.tip;
         setClass(n.card, 'show', tip !== null);
-        // A legenda dos marcos (caption.ts) mora na mesma faixa: com ela na tela, o cartão sobe para ficar acima dela.
+        // A legenda dos marcos (caption.ts) já morou nesta faixa: se estiver na metade de baixo, o cartão sobe para ficar acima dela.
         const hudVp = hud[i];
         const lmk = tip && hudVp ? hudVp.querySelector<HTMLElement>(':scope > .lmk.show') : null;
-        const lift = hudVp && lmk ? Math.max(0, Math.round(hudVp.getBoundingClientRect().bottom - lmk.getBoundingClientRect().top)) : 0;
+        // V22 F8: a legenda foi para o ALTO do viewport; só a que ainda estiver na metade de baixo empurra o cartão.
+        const lift = hudVp && lmk && lmk.getBoundingClientRect().top > hudVp.getBoundingClientRect().top + hudVp.getBoundingClientRect().height / 2 ? Math.max(0, Math.round(hudVp.getBoundingClientRect().bottom - lmk.getBoundingClientRect().top)) : 0;
         setStyle(n.vp, '--lift', `${lift}px`);
         if (!tip) return;
         n.card.dataset.tip = tip.id;
