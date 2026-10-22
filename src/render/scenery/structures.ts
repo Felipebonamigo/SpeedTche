@@ -22,7 +22,7 @@ export const structureDetail = { ao: true, roof: true };
  * V22/F5: oclusão de ambiente assada na COR dos vértices de um prédio (a luz que o sol e o céu não dão nos cantos): (1) o pé, de 0 a 1,4 m do chão, escurece até
  * 50% (o contato com a calçada: sem isto o prédio "flutua" na grama); (2) as faces voltadas para baixo (a barriga das lajes, da cornija, do toldo, dos beirais de 3 m
  * para cima) escurecem 38%. A parede logo abaixo de cada laje leva a sua sombra na textura da fachada (`eaveShade`, textures.ts). O pé pede vértices: `sliceY` corta os
- * triângulos que cruzam 0,5 m (menos os de fundo, voltados para trás: a pista nunca os vê), com a uv, a cor e a normal interpoladas (~+100 △ por prédio).
+ * triângulos que cruzam 0,5 m (só os da face da frente: os lados e o fundo quase nunca aparecem), com a uv, a cor e a normal interpoladas (~+100 △ por prédio).
  */
 const FOOT_REACH = 1.4;
 const FOOT_STRENGTH = 0.6;
@@ -94,7 +94,7 @@ export function sliceY(g: Geo, planes: readonly number[], skip?: (nx: number, ny
 /** A oclusão do pé e da barriga das lajes (ver acima). Devolve a malha cortada (a original é descartada). Desligada por `structureDetail.ao`. */
 export function occlude(g: Geo): Geo {
   if (!structureDetail.ao || !g.getAttribute('color') || g.index) return g;
-  const o = sliceY(g, FOOT_PLANES, (nx) => nx < -0.5); // o fundo (voltado para trás) não leva corte
+  const o = sliceY(g, FOOT_PLANES, (nx) => nx < 0.5); // só a face da frente leva corte (os lados e o fundo, quase nunca vistos, não)
   const p = o.attributes.position as THREE.BufferAttribute; const n = o.attributes.normal as THREE.BufferAttribute | undefined; const c = o.attributes.color as THREE.BufferAttribute;
   for (let i = 0; i < p.count; i++) {
     const y = p.getY(i); let f = 1;
@@ -219,7 +219,6 @@ function rooftop(p: Parts, seed: number, look: number, r: Roof): void {
     put(acX, z, 0.7, 0.55);
     const c = AC_COLORS[(seed + placed + look) % AC_COLORS.length];
     p.flat.push(paint(box(1.3, 0.9, 0.8), c, tf(acX, r.y + 0.45, z)));
-    p.flat.push(paint(box(1.0, 0.06, 0.55), '#4a4e56', tf(acX, r.y + 0.93, z)));
     placed++;
   }
   // Caixa-d'água de plinto: base de concreto, tanque de 8 faces, tampa cônica (a cor sai da semente).
@@ -231,17 +230,6 @@ function rooftop(p: Parts, seed: number, look: number, r: Roof): void {
     p.flat.push(paint(box(2.4, 0.4, 2.4), '#a8a49c', tf(tx, r.y + 0.2, z)));
     p.flat.push(paint(cylN(1.05, 1.05, 1.5, 8), TANK_COLORS[(seed + look) % TANK_COLORS.length], tf(tx, r.y + 1.15, z)));
     p.flat.push(paint(coneN(1.15, 0.35, 8), '#8a8f96', tf(tx, r.y + 2.07, z)));
-    break;
-  }
-  // Mastro de antena com travessa (TV, rádio) perto da borda; respiro baixo atrás.
-  for (let k = 0; k < 6; k++) {
-    const z = mir * ((h(3) + k * 0.41) % 1 * 2 - 1) * (r.zHalf - 1.0);
-    const mx = r.front - 0.8;
-    if (!free(mx, z, 0.5, 0.7)) continue;
-    put(mx, z, 0.5, 0.7);
-    const mh = Math.min(r.cap, 2.3);
-    p.flat.push(paint(cylN(0.04, 0.06, mh, 5), '#b8bcc2', tf(mx, r.y + mh / 2, z)));
-    p.flat.push(paint(box(0.04, 0.04, 1.2), '#b8bcc2', tf(mx, r.y + mh * 0.8, z)));
     break;
   }
 }
@@ -269,7 +257,7 @@ export function glassTower(seed: number, floors: number, tint: string, look = 0)
   const ant = 6 + hash2(seed, 2) * 8;
   p.flat.push(paint(cyl(0.12, 0.2, ant, 8), '#c7c9cc', tf(-D / 2, top + 0.6 + crown + ant / 2, 0)));
   p.beacon.push(paint(sphere(0.35, 10, 6), '#ff3030', tf(-D / 2, top + 0.6 + crown + ant, 0)));
-  rooftop(p, seed, look, { y: top + 0.6, front: -inset, back: -D + inset, zHalf: L / 2 - inset, keep: [[-14.2, -3.8, -5.2, 5.2]], cap: 3.4 });
+  rooftop(p, seed, look, { y: top + 0.6, front: -inset, back: -D + inset, zHalf: L / 2 - inset, keep: [[-14.2, -4.3, -5.2, 5.2]], cap: 3.4 });
   // Faixa de luz no topo (acende à noite).
   p.glow.push(paint(box(0.08, 0.35, L - inset * 2 - 1), ['#bfe4ff', '#c8fff0', '#ffe0b0', '#e0e4ff'][look], tf(-inset + 0.05, top - 0.6, 0)));
   return toRoundModel(p, top + crown);

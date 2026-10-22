@@ -117,7 +117,7 @@ const lumV = (g: THREE.BufferGeometry, i: number): number => 0.2126 * col(g).get
 
 describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro do orçamento', () => {
   for (const [id, b] of Object.entries(BASE)) {
-    it(`${id}: pegada (x, z) e altura iguais às do main (±1 cm); +60 a +420 triângulos (adereços de telhado e lajes; antes ${b.tris})`, () => {
+    it(`${id}: pegada (x, z) e altura iguais às do main (±1 cm); +30 a +420 triângulos (adereços de telhado e lajes; antes ${b.tris})`, () => {
       const bb = modelBounds(id);
       expect(bb.minX, 'minX').toBeCloseTo(b.x[0], 1); expect(Math.abs(bb.minX - b.x[0])).toBeLessThanOrEqual(0.01);
       expect(Math.abs(bb.maxX - b.x[1]), 'maxX').toBeLessThanOrEqual(0.01);
@@ -125,7 +125,7 @@ describe('F5 · prédios: pegada e altura intactas, adereços de telhado dentro 
       expect(Math.abs(bb.maxZ - b.z[1]), 'maxZ').toBeLessThanOrEqual(0.01);
       expect(Math.abs(bb.maxY - b.maxY), 'maxY (os adereços ficam abaixo do topo de antes)').toBeLessThanOrEqual(0.01);
       const t = modelTriangles(getModel(id));
-      expect(t - b.tris, `${t} △`).toBeGreaterThanOrEqual(60);
+      expect(t - b.tris, `${t} △`).toBeGreaterThanOrEqual(30);
       expect(t - b.tris, `${t} △`).toBeLessThanOrEqual(420);
     });
   }
