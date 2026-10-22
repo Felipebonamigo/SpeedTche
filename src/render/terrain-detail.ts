@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import type { SceneryId } from '../core/types';
 import type { Quality } from '../game/contracts';
+import { atLeast } from '../game/quality';
 import { hash3 } from './noise';
 
 /** Célula do ruído grosso (m), células do ladrilho (por lado), e as razões das outras duas escalas: fina = 12 / 5 = 2,4 m; grão = 12 / 96 = 0,125 m. */
@@ -241,7 +242,7 @@ export function applyBiomeDetail(u: DetailUniforms, biome: SceneryId): void {
 /** O que a qualidade liga: Baixa 1 oitava (só a grossa), Média a fina também, Alta e Ultra o grão. Só uniformes: nenhum programa recompila. */
 export function applyDetailQuality(u: DetailUniforms, q: Quality): void {
   u.Q.value.x = q === 'low' ? 0 : 1;
-  u.Q.value.y = q === 'high' || q === 'ultra' ? 1 : 0;
+  u.Q.value.y = atLeast(q, 'high') ? 1 : 0;
 }
 
 /** Zera tudo o que o detalhe pinta (amplitudes, ceifa, ondulado, borda irregular): o chão volta a ser só a cor por vértice. Só para medir o campo do detalhe (o inverso de `applyBiomeDetail`). */
