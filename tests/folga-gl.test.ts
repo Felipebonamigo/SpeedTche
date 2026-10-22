@@ -25,8 +25,12 @@ interface LabApi {
   scene: { traverse(f: (o: { name: string; perObjectFrustumCulled?: boolean }) => void): void };
 }
 
-/** Triângulos do cenário (cena + sombra) de Copacabana 1p Média, medidos antes do corte (tools/folga-perfil.mjs): 1 jogador não muda. */
-const CENARIO_COPA_1P = 101_126;
+/**
+ * Triângulos do cenário (cena + sombra) de Copacabana 1p Média, medidos antes do corte (tools/folga-perfil.mjs): 1 jogador não muda.
+ * V22/F4: 101.126 → 101.964 (+838 △, a mesma diferença do gate copa-1p Média, 236.278 → 237.116). O que o teste prova (o corte de LOD da tela dividida não toca 1 jogador) continua;
+ * o valor só andou porque o CONTEÚDO do cenário andou: o capim de recorte da saia das árvores, o tapete rente à pista e as árvores a mais com 1–2 jogadores (docs/ondas/V22-f4-vegetacao.md).
+ */
+const CENARIO_COPA_1P = 101_964;
 
 /** Cascos completos (lod0) de Copacabana 1p Média, medidos antes do corte do LOD (tools/folga-perfil.mjs): a distância de 1 jogador é a de sempre. */
 const CARROS_1P_LOD0 = 8;
