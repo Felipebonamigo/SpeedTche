@@ -12,7 +12,7 @@ import { SPRITE_HALF_WIDTH } from '../../core/track/sprites';
 import { hash2, valueNoise3 } from '../noise';
 import { ROAD_HALF_WIDTH_M } from '../units';
 import { smoothNormals, CREASE } from '../normals';
-import { bakeAO, box, cone, cullInside, cutoutCards, cyl, frond, ico, jitter, lean, lumpy, merge, mergeRound, mottle, paint, roundedBar, shadeY, sphere, sphericalNormals, tf, tintUpSoft, tris, tuft, type Ellipsoid, type Geo, type Model } from './geom';
+import { bakeAO, box, cone, cullInside, cutoutCards, cutoutRing, cyl, frond, ico, jitter, lean, lumpy, merge, mergeRound, mottle, paint, roundedBar, shadeY, sphere, sphericalNormals, tf, tintUpSoft, tris, tuft, type Ellipsoid, type Geo, type Model } from './geom';
 
 /** Meia largura de colisão (m, escala 1) de um sprite: o modelo sólido tem de chegar até ela na altura do carro. */
 export function collisionHalfM(kind: SpriteKind): number {
@@ -95,7 +95,8 @@ function mound(reach: number, h: number, colors: string[], seed: number): Geo[] 
     bump[i] = n;
     // Para cima e um pouco para fora; a borda (y = 0) fica no alcance e os anéis de cima nunca passam dela
     // (cos 30° × 1,06 < 1).
-    if (y > 1e-6) p.setXYZ(i, x * (1 + 0.06 * n), y * (1 + 0.7 * n), z * (1 + 0.06 * n));
+    // F4: o relevo para baixo para em −0,4 (a saia ganha ≥ 72% da altura em qualquer azimute) e o de raio é de ±3,5%: a saia agora é mais baixa e, onde o ruído a afundava a menos de 5 cm, a pegada de colisão encolhia até 0,35 m.
+    if (y > 1e-6) p.setXYZ(i, x * (1 + 0.035 * n), y * (1 + 0.7 * Math.max(n, -0.4)), z * (1 + 0.035 * n));
   }
   dome.setAttribute('bump', new THREE.BufferAttribute(bump, 1));
   const g = paint(dome, colors[0], tf(0, 0, 0, reach, h * 0.85, reach));
@@ -110,6 +111,27 @@ function mound(reach: number, h: number, colors: string[], seed: number): Geo[] 
   }
   g.deleteAttribute('bump');
   return [mottle(g, 0.14, seed)];
+}
+
+/**
+ * V22/F4: a saia da árvore. A moita do pé era um domo de 0,6–0,85 m, de cor chapada e a mais escura da cena contra o chão claro: lia como chapéu. Agora é mais baixa
+ * (`SKIRT_LOW` × a altura de antes; a faixa do carro continua a vê-la até 0,92 da pegada) e o contorno ganha tufos de capim de recorte (`treeModel`).
+ */
+const SKIRT_LOW = 0.62;
+function skirt(reach: number, h: number, colors: string[], seed: number): Geo[] {
+  // Piso de 0,52: o ponto mais baixo do domo na faixa do carro (anel a 0,92 da pegada, com o relevo sorteado a 30%) tem de ficar acima de 5 cm, ou a pegada de colisão encolhe naquele azimute.
+  return mound(reach, Math.max(0.52, h * SKIRT_LOW), colors, seed);
+}
+
+/**
+ * Modelo de árvore: a parte sólida (lote `flat`/`dress`, projeta sombra se for sprite) mais o contorno irregular da saia: 8 tufos de capim de recorte alfa
+ * (`cutoutRing`, 32 △, lote `cutout` que já existe: nenhuma chamada nova por viewport onde o litoral do Brasil já o usava) nas cores da própria saia,
+ * dentro da pegada (o recorte não entra na conta da colisão: só as partes `flat` entram).
+ */
+function treeModel(solid: Geo, blob: number, R: number, skirtColors: string[], seed: number, tufts = 8): Model {
+  const foot = new THREE.Color(skirtColors[0]).multiplyScalar(0.85).getStyle();
+  const head = new THREE.Color(skirtColors[skirtColors.length - 1]).lerp(new THREE.Color('#d8f08a'), 0.22).getStyle();
+  return { parts: [{ geometry: solid, mat: 'flat', shadow: true }, { geometry: cutoutRing(tufts, R * 0.8, 1.3, 0.72, seed, foot, head, 2), mat: 'cutout' }], blob };
 }
 
 /**
@@ -220,9 +242,14 @@ export function tube(path: ReadonlyArray<readonly [number, number, number]>, rad
 
 // ───────────────────────────── Árvores (sprite `tree`) ─────────────────────────────
 
-/** Gigante da mata atlântica/tropical: raízes tabulares (a pegada), tronco alto, copa em camadas. */
-export function tropicalGiant(seed: number, greens = ['#1f7a3a', '#2c8f40', '#3aa345']): Model {
-  const parts: Geo[] = [trunk(0.34, 0.5, 7.2, '#6d553d', 9)];
+export type GiantShape = 'layered' | 'umbrella' | 'slender';
+
+/**
+ * Gigante da mata atlântica/tropical: raízes tabulares (a pegada), tronco alto, copa em camadas. F4: `umbrella` (copa larga e chata no alto, de sombrinha) e `slender`
+ * (emergente, copa estreita e alta) — mesma pegada e mesmas raízes; só a copa muda.
+ */
+export function tropicalGiant(seed: number, greens = ['#1f7a3a', '#2c8f40', '#3aa345'], shape: GiantShape = 'layered'): Model {
+  const parts: Geo[] = [trunk(0.34, 0.5, shape === 'slender' ? 8.6 : 7.2, '#6d553d', 9)];
   // Raízes tabulares: aletas triangulares do tronco até a borda da pegada.
   for (let k = 0; k < 5; k++) {
     const a = (k / 5) * Math.PI * 2 + hash2(seed, k) * 0.4;
@@ -230,55 +257,158 @@ export function tropicalGiant(seed: number, greens = ['#1f7a3a', '#2c8f40', '#3a
     const r0 = 0.42; const h = 1.5 + hash2(seed, k + 9) * 0.6;
     parts.push(paint(tris([c * r0, h, s * r0, c * r0, 0, s * r0, c * TREE_R, 0, s * TREE_R]), '#5e4833'));
   }
-  const hTop = 8.4 + hash2(seed, 20) * 1.4;
-  parts.push(...puffs([
-    { r: 3.1, x: 0, y: hTop - 1.1, z: 0, color: greens[0], seed, sy: 0.5, amount: 0.16 },
-    { r: 2.2, x: 1.5, y: hTop - 1.9, z: 0.6, color: greens[1], seed: seed + 1, sy: 0.55 },
-    { r: 2.0, x: -1.3, y: hTop - 1.6, z: -0.9, color: greens[1], seed: seed + 2, sy: 0.55 },
-    { r: 1.9, x: 0.2, y: hTop, z: -0.3, color: greens[2], seed: seed + 3, sy: 0.6 },
-  ]));
-  parts.push(...mound(TREE_R, 0.75, ['#2f7f36', '#3f9a3c', '#2a7032'], seed));
+  let hTop = 8.4 + hash2(seed, 20) * 1.4;
+  if (shape === 'layered') {
+    parts.push(...puffs([
+      { r: 3.1, x: 0, y: hTop - 1.1, z: 0, color: greens[0], seed, sy: 0.5, amount: 0.16 },
+      { r: 2.2, x: 1.5, y: hTop - 1.9, z: 0.6, color: greens[1], seed: seed + 1, sy: 0.55 },
+      { r: 2.0, x: -1.3, y: hTop - 1.6, z: -0.9, color: greens[1], seed: seed + 2, sy: 0.55 },
+      { r: 1.9, x: 0.2, y: hTop, z: -0.3, color: greens[2], seed: seed + 3, sy: 0.6 },
+    ]));
+  } else if (shape === 'umbrella') {
+    hTop += 0.6;
+    parts.push(...puffs([
+      { r: 4.3, x: 0, y: hTop - 0.9, z: 0, color: greens[0], seed, sy: 0.3, amount: 0.14 },
+      { r: 2.7, x: 2.9, y: hTop - 1.3, z: 0.9, color: greens[1], seed: seed + 1, sy: 0.38 },
+      { r: 2.5, x: -2.5, y: hTop - 1.1, z: -1.4, color: greens[2], seed: seed + 2, sy: 0.38 },
+      { r: 2.1, x: 0.4, y: hTop - 0.2, z: -0.4, color: greens[1], seed: seed + 3, sy: 0.4 },
+    ]));
+  } else {
+    hTop += 2.0;
+    parts.push(...puffs([
+      { r: 2.1, x: 0, y: hTop - 2.6, z: 0, color: greens[0], seed, sy: 0.95, amount: 0.14 },
+      { r: 1.9, x: 0.5, y: hTop - 0.9, z: 0.3, color: greens[1], seed: seed + 1, sy: 0.95 },
+      { r: 1.6, x: -0.4, y: hTop + 0.6, z: -0.3, color: greens[2], seed: seed + 2, sy: 0.9 },
+      { r: 1.2, x: 0.2, y: hTop + 1.7, z: 0.1, color: greens[1], seed: seed + 3, sy: 0.9 },
+    ]));
+  }
+  const SKIRT_COLS = ['#2f7f36', '#3f9a3c', '#2a7032'];
+  parts.push(...skirt(TREE_R, 0.75, SKIRT_COLS, seed));
   parts.push(...fernRing(5, TREE_R * 1.0, 0.5, ['#3f9a3c', '#2f8a38'], seed, 0.95, 0.9));
-  return flat(finish(merge(parts), hTop + 1.5, 0.6, 1.15, 0.06, seed), 2.6);
+  return treeModel(finish(merge(parts), hTop + 1.5, 0.6, 1.15, 0.06, seed), 2.6, TREE_R, SKIRT_COLS, seed);
 }
 
-/** Árvore de copa redonda (mangueira, carvalho, ipê): saia de arbustos no pé e copa de 5 bolhas. */
-export function roundTree(seed: number, canopy: string[], skirtColors: string[], trunkColor = '#6b4a2b', height = 1, R = TREE_R): Model {
+export type CrownShape = 'round' | 'wide' | 'tall' | 'tiered' | 'twin' | 'dome';
+
+/**
+ * Árvore de copa redonda (mangueira, carvalho, ipê): saia de arbustos no pé e copa de 5 bolhas. F4: `shape` muda a SILHUETA, não a semente — `wide` (copa baixa e larga),
+ * `tall` (oval alta), `tiered` (três pratos no alto de um tronco comprido), `dome` (copa compacta) e `twin` (dois troncos, duas copas). A copa fica acima de 2,3 m e a saia é a mesma: a pegada de colisão não muda.
+ */
+export function roundTree(seed: number, canopy: string[], skirtColors: string[], trunkColor = '#6b4a2b', height = 1, R = TREE_R, shape: CrownShape = 'round'): Model {
   const H = height;
-  const parts: Geo[] = [trunk(0.2, 0.32, 2.6 * H, trunkColor)];
-  parts.push(branch(0.14, 0.08, 1.8, trunkColor, tf(0.55, 2.6 * H, 0.1, 1, 1, 1, 0, 0, -0.7)));
-  parts.push(branch(0.13, 0.08, 1.6, trunkColor, tf(-0.45, 2.7 * H, -0.3, 1, 1, 1, 0.3, 0, 0.6)));
-  const cy = 4.1 * H;
-  const crown: Puff[] = [{ r: 2.2, x: 0, y: cy, z: 0, color: canopy[0], seed, sy: 0.78 }];
-  for (let k = 0; k < 4; k++) {
-    const a = (k / 4) * Math.PI * 2 + hash2(seed, k) * 0.7;
-    // O icosaedro subdividido desce mais que o de 20 faces (tem ponto no polo): a bolha sobe 0,2 m e achata um pouco,
-    // e o fundo dela fica onde ficava — fora da faixa do carro, que mede a pegada pela moita do pé.
-    crown.push({ r: 1.35, x: Math.cos(a) * 1.5, y: cy - 0.7 + hash2(seed, k + 5) * 0.5, z: Math.sin(a) * 1.5, color: canopy[(k + 1) % canopy.length], seed: seed + k + 1, sy: 0.74 });
+  const c = (k: number): string => canopy[k % canopy.length];
+  const parts: Geo[] = [];
+  let crown: Puff[]; let top: number;
+  if (shape === 'round') {
+    parts.push(trunk(0.2, 0.32, 2.6 * H, trunkColor));
+    parts.push(branch(0.14, 0.08, 1.8, trunkColor, tf(0.55, 2.6 * H, 0.1, 1, 1, 1, 0, 0, -0.7)));
+    parts.push(branch(0.13, 0.08, 1.6, trunkColor, tf(-0.45, 2.7 * H, -0.3, 1, 1, 1, 0.3, 0, 0.6)));
+    const cy = 4.1 * H;
+    crown = [{ r: 2.2, x: 0, y: cy, z: 0, color: canopy[0], seed, sy: 0.78 }];
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2 + hash2(seed, k) * 0.7;
+      // O icosaedro subdividido desce mais que o de 20 faces (tem ponto no polo): a bolha sobe 0,2 m e achata um pouco,
+      // e o fundo dela fica onde ficava — fora da faixa do carro, que mede a pegada pela moita do pé.
+      crown.push({ r: 1.35, x: Math.cos(a) * 1.5, y: cy - 0.7 + hash2(seed, k + 5) * 0.5, z: Math.sin(a) * 1.5, color: canopy[(k + 1) % canopy.length], seed: seed + k + 1, sy: 0.74 });
+    }
+    top = cy + 2;
+  } else if (shape === 'wide') {
+    parts.push(trunk(0.22, 0.36, 2.3 * H, trunkColor));
+    for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.8; parts.push(branch(0.14, 0.08, 1.9, trunkColor, lean(Math.cos(a) * 0.5, 2.3 * H, Math.sin(a) * 0.5, a, 0.75))); }
+    const cy = 3.8 * H;
+    crown = [{ r: 2.5, x: 0, y: cy, z: 0, color: c(0), seed, sy: 0.5 }];
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.7;
+      crown.push({ r: 1.75, x: Math.cos(a) * 2.5, y: cy - 0.3 + hash2(seed, k + 5) * 0.4, z: Math.sin(a) * 2.5, color: c(k + 1), seed: seed + k + 1, sy: 0.6 });
+    }
+    top = cy + 1.5;
+  } else if (shape === 'tall') {
+    parts.push(trunk(0.18, 0.3, 3.2 * H, trunkColor));
+    parts.push(branch(0.1, 0.06, 1.3, trunkColor, tf(0.4, 3.0 * H, 0.1, 1, 1, 1, 0, 0, -0.55)));
+    const cy = 4.6 * H;
+    crown = [
+      { r: 2.4, x: 0, y: cy, z: 0, color: c(0), seed, sy: 1.0 },
+      { r: 1.8, x: 0.6, y: cy + 1.9, z: 0.2, color: c(1), seed: seed + 1, sy: 0.95 },
+      { r: 1.7, x: -0.9, y: cy + 0.1, z: 0.6, color: c(2), seed: seed + 2, sy: 0.95 },
+      { r: 1.25, x: 0.2, y: cy + 3.4, z: -0.1, color: c(0), seed: seed + 3, sy: 0.9 },
+    ];
+    top = cy + 4.4;
+  } else if (shape === 'tiered') {
+    // Copa de pratos no alto de um tronco comprido (sombrinha): o chão debaixo dela fica livre.
+    parts.push(trunk(0.2, 0.3, 3.8 * H, trunkColor));
+    parts.push(branch(0.13, 0.08, 1.5, trunkColor, tf(0.5, 3.7 * H, 0, 1, 1, 1, 0, 0, -0.8)));
+    const cy = 4.9 * H;
+    crown = [
+      { r: 2.7, x: 0, y: cy, z: 0, color: c(0), seed, sy: 0.32, amount: 0.1 },
+      { r: 2.0, x: 0.3, y: cy + 0.9, z: -0.2, color: c(1), seed: seed + 1, sy: 0.34, amount: 0.1 },
+      { r: 1.3, x: -0.2, y: cy + 1.7, z: 0.1, color: c(2), seed: seed + 2, sy: 0.4 },
+    ];
+    top = cy + 2.3;
+  } else if (shape === 'dome') {
+    // Copa compacta e redonda, de uma bolha grande e três pequenas coladas: a árvore de quintal.
+    parts.push(trunk(0.2, 0.3, 2.4 * H, trunkColor));
+    parts.push(branch(0.12, 0.07, 1.4, trunkColor, tf(-0.4, 2.4 * H, 0.2, 1, 1, 1, 0, 0, 0.7)));
+    const cy = 3.95 * H;
+    crown = [{ r: 2.0, x: 0, y: cy, z: 0, color: c(0), seed, sy: 0.88 }];
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.9;
+      crown.push({ r: 1.15, x: Math.cos(a) * 1.25, y: cy - 0.15 + hash2(seed, k + 5) * 0.5, z: Math.sin(a) * 1.25, color: c(k + 1), seed: seed + k + 1, sy: 0.85 });
+    }
+    top = cy + 1.9;
+  } else {
+    // twin: dois troncos que se abrem e uma copa em cada ponta, com uma bolha de ponte no alto.
+    parts.push(trunk(0.16, 0.27, 3.0 * H, trunkColor, 12, 0.3, 0.4));
+    parts.push(trunk(0.15, 0.25, 2.8 * H, trunkColor, 12, 0.34, 0.4 + Math.PI));
+    const cy = 4.0 * H;
+    const dx = Math.cos(0.4) * 1.8; const dz = Math.sin(0.4) * 1.8;
+    crown = [
+      { r: 1.75, x: dx, y: cy, z: dz, color: c(0), seed, sy: 0.82 },
+      { r: 1.65, x: -dx, y: cy - 0.2, z: -dz, color: c(1), seed: seed + 1, sy: 0.82 },
+      { r: 1.2, x: 0, y: cy + 0.9, z: 0, color: c(2), seed: seed + 2, sy: 0.8 },
+    ];
+    top = cy + 2.2;
   }
   parts.push(...puffs(crown));
-  parts.push(...mound(R, 0.85, skirtColors, seed));
-  return flat(finish(merge(parts), cy + 2, 0.66, 1.14, 0.05, seed), 2.4);
+  const SKIRT_COLS = skirtColors;
+  parts.push(...skirt(R, 0.85, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), top, 0.66, 1.14, 0.05, seed), 2.4, R, SKIRT_COLS, seed);
 }
 
-/** Acácia-guarda-chuva: troncos abertos, copa chata e larga, moita espinhosa no pé. */
-export function acacia(seed: number): Model {
+export type AcaciaShape = 'flat' | 'tier' | 'lean';
+
+/**
+ * Acácia-guarda-chuva: troncos abertos, copa chata e larga, moita espinhosa no pé. F4: `tier` (duas copas chatas empilhadas, a de cima menor) e `lean` (tronco que tomba e
+ * copa deslocada para um lado, a silhueta de vento da savana).
+ */
+export function acacia(seed: number, shape: AcaciaShape = 'flat'): Model {
   const parts: Geo[] = [];
   const bark = '#5f4a36';
-  parts.push(trunk(0.16, 0.26, 2.2, bark));
+  const g = ['#6f8f35', '#7f9a3a', '#5f8030'];
+  const off = shape === 'lean' ? 1.7 : 0; // deslocamento da copa para +X local (o giro é livre)
+  if (shape === 'lean') parts.push(trunk(0.16, 0.26, 2.4, bark, 12, 0.5, 0));
+  else parts.push(trunk(0.16, 0.26, 2.2, bark));
   for (let k = 0; k < 3; k++) {
     const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.8;
-    parts.push(branch(0.14, 0.08, 3.0, bark, lean(Math.cos(a) * 0.55, 3.35, Math.sin(a) * 0.55, a, 0.42)));
+    parts.push(branch(0.14, 0.08, 3.0, bark, lean(off * 0.6 + Math.cos(a) * 0.55, 3.35, Math.sin(a) * 0.55, a, 0.42)));
   }
-  const g = ['#6f8f35', '#7f9a3a', '#5f8030'];
-  parts.push(...puffs([
-    { r: 3.4, x: 0, y: 4.9, z: 0, color: g[0], seed, sy: 0.24, amount: 0.1 },
-    { r: 2.2, x: 1.6, y: 4.6, z: 0.8, color: g[1], seed: seed + 1, sy: 0.3 },
-    { r: 2.0, x: -1.7, y: 4.7, z: -0.6, color: g[2], seed: seed + 2, sy: 0.3 },
-  ]));
-  parts.push(...mound(TREE_R, 0.7, ['#8a8a3c', '#7a7a38', '#9a9245'], seed + 3));
+  if (shape === 'tier') {
+    parts.push(...puffs([
+      { r: 3.1, x: 0, y: 4.5, z: 0, color: g[0], seed, sy: 0.22, amount: 0.1 },
+      { r: 1.9, x: 1.5, y: 4.3, z: 0.6, color: g[1], seed: seed + 1, sy: 0.26 },
+      { r: 2.2, x: 0.5, y: 5.7, z: -0.3, color: g[2], seed: seed + 2, sy: 0.26 },
+      { r: 1.4, x: -0.6, y: 6.2, z: 0.4, color: g[1], seed: seed + 3, sy: 0.3 },
+    ]));
+  } else {
+    parts.push(...puffs([
+      { r: 3.4, x: off, y: 4.9, z: 0, color: g[0], seed, sy: 0.24, amount: 0.1 },
+      { r: 2.2, x: off + 1.6, y: 4.6, z: 0.8, color: g[1], seed: seed + 1, sy: 0.3 },
+      { r: 2.0, x: off - 1.7, y: 4.7, z: -0.6, color: g[2], seed: seed + 2, sy: 0.3 },
+    ]));
+  }
+  const SKIRT_COLS = ['#8a8a3c', '#7a7a38', '#9a9245'];
+  parts.push(...skirt(TREE_R, 0.7, SKIRT_COLS, seed + 3));
   parts.push(paint(tuft(7, 1.0, 0.5, seed), '#c9b25a', tf(0.3, 0, -0.4)));
-  return flat(finish(merge(parts), 5.6, 0.7, 1.1, 0.05, seed), 3.2);
+  return treeModel(finish(merge(parts), shape === 'tier' ? 6.8 : 5.6, 0.7, 1.1, 0.05, seed), 3.2, TREE_R, SKIRT_COLS, seed);
 }
 
 /** Baobá: o tronco é a pegada (raio de colisão no chão), galhos grossos e tufos esparsos. */
@@ -304,23 +434,27 @@ export function poplar(seed: number, R = TREE_R): Model {
   // Coluna esticada 3,4×: esfera de 10 × 8 (o icosaedro esticado mostrava faces compridas).
   parts.push(paint(lumpy(sphere(1.25, 14, 12), 0.08, seed), '#3f8a3a', tf(0, 5.6, 0, 1, 3.4, 1)));
   parts.push(blob(0.9, 0.25, 8.8, 0.1, '#4f9a40', seed + 1, 1.6, 0.1));
-  parts.push(...mound(R, 0.8, ['#3b7a35', '#4a8a3a'], seed));
-  return flat(finish(merge(parts), 10.5, 0.66, 1.12, 0.05, seed), 1.6);
+  const SKIRT_COLS = ['#3b7a35', '#4a8a3a'];
+  parts.push(...skirt(R, 0.8, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), 10.5, 0.66, 1.12, 0.05, seed), 1.6, R, SKIRT_COLS, seed);
 }
 
-/** Bétula/álamo (montanha): três troncos claros, copas estreitas — verde ou dourada de outono. */
-export function aspen(seed: number, leaves: string[], R = TREE_R): Model {
+/** Bétula/álamo (montanha): três troncos claros, copas estreitas — verde ou dourada de outono. F4: `clump` = cinco troncos abertos numa moita larga e baixa. */
+export function aspen(seed: number, leaves: string[], R = TREE_R, shape: 'trio' | 'clump' = 'trio'): Model {
   const parts: Geo[] = [];
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2 + hash2(seed, k) * 0.8;
-    const x = Math.cos(a) * 0.45; const z = Math.sin(a) * 0.45;
-    const h = 5.2 + hash2(seed, k + 3) * 1.8;
+  const n = 3; // três troncos nos dois formatos (o teto de 900 △ por modelo): a moita é o mesmo trio aberto, mais baixo e largo
+  const spread = shape === 'clump' ? 1.25 : 0.45;
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2 + hash2(seed, k) * 0.8;
+    const x = Math.cos(a) * spread; const z = Math.sin(a) * spread;
+    const h = (shape === 'clump' ? 4.4 : 5.2) + hash2(seed, k + 3) * (shape === 'clump' ? 1.5 : 1.8);
     parts.push(paint(cyl(0.08, 0.13, h, 12, true), '#e9e5da', tf(x, h / 2, z, 1, 1, 1, Math.sin(a) * 0.06, 0, -Math.cos(a) * 0.06)));
-    parts.push(paint(box(0.2, 0.1, 0.2), '#3a3a3a', tf(x, 1.3 + k * 0.5, z)));
-    parts.push(blob(1.15, x * 1.4, h - 0.6, z * 1.4, leaves[k % leaves.length], seed + k, 1.5));
+    parts.push(paint(box(0.2, 0.1, 0.2), '#3a3a3a', tf(x, 1.3 + k * 0.4, z)));
+    parts.push(blob(shape === 'clump' ? 1.3 : 1.15, x * 1.4, h - 0.6, z * 1.4, leaves[k % leaves.length], seed + k, shape === 'clump' ? 1.15 : 1.5));
   }
-  parts.push(...mound(R, 0.7, ['#4f7a3a', '#5a8a40'], seed + 7));
-  return flat(finish(merge(parts), 7.5, 0.7, 1.12, 0.05, seed), 1.8);
+  const SKIRT_COLS = ['#4f7a3a', '#5a8a40'];
+  parts.push(...skirt(R, 0.7, SKIRT_COLS, seed + 7));
+  return treeModel(finish(merge(parts), shape === 'clump' ? 6.8 : 7.5, 0.7, 1.12, 0.05, seed), 1.8, R, SKIRT_COLS, seed);
 }
 
 /** Eucalipto (Austrália): tronco claro e alto, copa rala caindo em tufos. */
@@ -334,8 +468,9 @@ export function eucalyptus(seed: number, R = TREE_R): Model {
     crown.push({ r: 1.2, x: Math.cos(a) * 1.3, y: 6.6 + hash2(seed, k + 3) * 1.4, z: Math.sin(a) * 1.3, color: g[k % 3], seed: seed + k, sy: 0.75 });
   }
   parts.push(...puffs(crown));
-  parts.push(...mound(R, 0.6, ['#9a8a5a', '#8a8a55'], seed + 9));
-  return flat(finish(merge(parts), 8.5, 0.72, 1.1, 0.05, seed), 2.2);
+  const SKIRT_COLS = ['#9a8a5a', '#8a8a55'];
+  parts.push(...skirt(R, 0.6, SKIRT_COLS, seed + 9));
+  return treeModel(finish(merge(parts), 8.5, 0.72, 1.1, 0.05, seed), 2.2, R, SKIRT_COLS, seed);
 }
 
 /** Oliveira: tronco torto e grosso, copa baixa prateada que desce até a altura do carro. */
@@ -350,8 +485,9 @@ export function olive(seed: number, R = TREE_R): Model {
     crown.push({ r: 0.72, x: Math.cos(a) * (R - 0.95), y: 1.75 + hash2(seed, k + 2) * 0.3, z: Math.sin(a) * (R - 0.95), color: g[k % 3], seed: seed + k + 1, sy: 0.7 });
   }
   parts.push(...puffs(crown));
-  parts.push(...mound(R, 0.65, ['#7f9860', '#8ea56a'], seed + 5));
-  return flat(finish(merge(parts), 4, 0.72, 1.12, 0.05, seed), 2.2);
+  const SKIRT_COLS = ['#7f9860', '#8ea56a'];
+  parts.push(...skirt(R, 0.65, SKIRT_COLS, seed + 5));
+  return treeModel(finish(merge(parts), 4, 0.72, 1.12, 0.05, seed), 2.2, R, SKIRT_COLS, seed, 3); // 3 tufos: a oliveira já tem 886 △ e o teto por modelo é 900
 }
 
 /** Cipreste (Mediterrâneo): chama verde-escura, estreita e alta. */
@@ -360,8 +496,9 @@ export function cypress(seed: number, R = TREE_R): Model {
   // Chama esticada 4×: esfera de 10 × 8 (o icosaedro esticado mostrava faces compridas).
   parts.push(paint(lumpy(sphere(1.0, 14, 12), 0.06, seed), '#2f5a36', tf(0, 4.3, 0, 1, 4.0, 1)));
   parts.push(paint(cone(0.55, 1.6, 14), '#2a5232', tf(0, 8.1, 0)));
-  parts.push(...mound(R, 0.6, ['#4a6a3a', '#5a7a40'], seed));
-  return flat(finish(merge(parts), 9, 0.68, 1.12, 0.04, seed), 1.3);
+  const SKIRT_COLS = ['#4a6a3a', '#5a7a40'];
+  parts.push(...skirt(R, 0.6, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), 9, 0.68, 1.12, 0.04, seed), 1.3, R, SKIRT_COLS, seed);
 }
 
 // ───────────────────────────── Sertão do Brasil (árvores): carnaúba, juazeiro, umbuzeiro ─────────────────────────────
@@ -397,8 +534,9 @@ export function juazeiro(seed: number, R = TREE_R): Model {
     crown.push({ r: 1.7, x: Math.cos(a) * 1.8, y: 3.4 + hash2(seed, k + 5) * 0.4, z: Math.sin(a) * 1.8, color: g[(k + 1) % 3], seed: seed + k + 1, sy: 0.74, amount: 0.1 });
   }
   parts.push(...puffs(crown));
-  parts.push(...mound(R, 0.7, ['#6a8a3a', '#7a9a44'], seed));
-  return flat(finish(merge(parts), 6.4, 0.66, 1.14, 0.05, seed), 2.6);
+  const SKIRT_COLS = ['#6a8a3a', '#7a9a44'];
+  parts.push(...skirt(R, 0.7, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), 6.4, 0.66, 1.14, 0.05, seed), 2.6, R, SKIRT_COLS, seed);
 }
 
 /** Umbuzeiro: tronco grosso e baixo (a caixa-d'água do sertão) e a copa em guarda-chuva, larga e achatada, verde-oliva. */
@@ -411,8 +549,9 @@ export function umbuzeiro(seed: number, R = TREE_R): Model {
     crown.push({ r: 2.1, x: Math.cos(a) * 2.5, y: 3.15 + k * 0.2, z: Math.sin(a) * 2.5, color: g[k + 1], seed: seed + k + 1, sy: 0.42, amount: 0.08 });
   }
   parts.push(...puffs(crown));
-  parts.push(...mound(R, 0.6, ['#8a8a50', '#9a9a58'], seed));
-  return flat(finish(merge(parts), 5, 0.72, 1.1, 0.05, seed), 2.8);
+  const SKIRT_COLS = ['#8a8a50', '#9a9a58'];
+  parts.push(...skirt(R, 0.6, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), 5, 0.72, 1.1, 0.05, seed), 2.8, R, SKIRT_COLS, seed);
 }
 
 // ───────────────────────────── Coníferas (sprite `pine`) ─────────────────────────────
@@ -448,7 +587,7 @@ export function conifer(seed: number, color: string, tiers = 5, slim = 1, snow =
 // ───────────────────────────── Palmeiras (sprite `palm`) ─────────────────────────────
 
 function palmBase(seed: number, colors: string[]): Geo[] {
-  return [...mound(PALM_R, 0.6, colors, seed + 100), ...fernRing(5, PALM_R, 0.42, colors, seed + 100, 0.8, 0.75)];
+  return [...skirt(PALM_R, 0.6, colors, seed + 100), ...fernRing(5, PALM_R, 0.42, colors, seed + 100, 0.8, 0.75)];
 }
 
 /** Coqueiro: tronco curvo anelado, folhas caídas, cocos; plantas no pé até a pegada. */
@@ -478,7 +617,7 @@ export function coconutPalm(seed: number, lean: number, baseColors = ['#3f9a3c',
   for (let k = 0; k < 3; k++) parts.push(paint(frond(1.6, 0.5, k * 2.1, 1.3, 0.6, 2), '#6cc050', tf(topX, H, topZ)));
   for (let k = 0; k < 3; k++) parts.push(paint(ico(0.2, 0), '#6b4a22', tf(topX + Math.cos(k * 2.1) * 0.26, H - 0.35, topZ + Math.sin(k * 2.1) * 0.26)));
   parts.push(...palmBase(seed, baseColors));
-  return flat(finish(merge(parts), H + 1, 0.75, 1.12, 0.04, seed), 2.4);
+  return treeModel(finish(merge(parts), H + 1, 0.75, 1.12, 0.04, seed), 2.4, PALM_R, baseColors, seed);
 }
 
 /** As 4 palmeiras de cartum: altura, quanto o tronco tomba, cor do tronco (pé, topo), folhas e se há palmito verde. */
@@ -486,7 +625,7 @@ const CARTOON_PALMS = [
   { H: 7.4, tilt: 1.6, r0: 0.3, r1: 0.19, trunk: ['#8a6a3f', '#a67f4a'], fronds: 10, len: 3.4, droop: 2.5, shaft: false },
   { H: 8.6, tilt: 0.5, r0: 0.3, r1: 0.2, trunk: ['#85683f', '#a07a48'], fronds: 10, len: 3.5, droop: 2.5, shaft: false },
   { H: 10.4, tilt: 0.15, r0: 0.38, r1: 0.26, trunk: ['#b6ada0', '#d2cabc'], fronds: 10, len: 3.7, droop: 2.4, shaft: true },
-  { H: 3.6, tilt: 0.4, r0: 0.42, r1: 0.32, trunk: ['#8a6e48', '#a2825a'], fronds: 12, len: 3.0, droop: 1.2, shaft: false },
+  { H: 3.6, tilt: 0.4, r0: 0.42, r1: 0.32, trunk: ['#8a6e48', '#a2825a'], fronds: 11, len: 3.0, droop: 1.2, shaft: false },
 ] as const;
 
 /**
@@ -553,7 +692,7 @@ export function cartoonPalm(seed: number, kind: 0 | 1 | 2 | 3): Model {
   const base = smoothNormals(merge(palmBase(seed, ['#3f9a3c', '#58ad44'])), CREASE.plant);
   const g = mergeRound([trunkGeo, crown, ...bits, base]);
   bakeAO(g, { reach: 1.8, strength: 0.5, rays: 10, smoothDeg: 180 }); // planta: sem quina viva, o mesmo ponto tem a mesma oclusão
-  return flat(finish(g, H + 1, 0.78, 1.12, 0.04, seed), 2.4);
+  return treeModel(finish(g, H + 1, 0.78, 1.12, 0.04, seed), 2.4, PALM_R, ['#3f9a3c', '#58ad44'], seed, 5); // 5 tufos e a baixa com 11 folhas (eram 12): a palmeira de cartum tem teto de 700 △ (tests/scenery-copacabana)
 }
 
 /** Palmeira-imperial: tronco reto cinza, palmito verde, folhas em arco. */
@@ -566,7 +705,7 @@ export function royalPalm(seed: number, baseColors = ['#3f9a3c', '#58ad44']): Mo
     parts.push(paint(frond(3.4, 0.8, a, 1.6, 2.4, 4), k % 2 ? '#3a8f38' : '#48a040', tf(0, H + 1.5, 0)));
   }
   parts.push(...palmBase(seed, baseColors));
-  return flat(finish(merge(parts), H + 3, 0.78, 1.1, 0.04, seed), 2.2);
+  return treeModel(finish(merge(parts), H + 3, 0.78, 1.1, 0.04, seed), 2.2, PALM_R, baseColors, seed);
 }
 
 /** Tamareira baixa e cheia: as folhas de baixo caem até a altura do carro, na pegada. */
@@ -581,7 +720,7 @@ export function datePalm(seed: number): Model {
     parts.push(paint(frond(len, 0.7, a, low ? 0.3 : 1.4, low ? 0.9 : 1.9, 3), low ? '#3f8f3a' : '#56a846', tf(0, H + (low ? -0.1 : 0.1), 0)));
   }
   parts.push(...palmBase(seed, ['#4a9a3c', '#3a8a36']));
-  return flat(finish(merge(parts), H + 2, 0.75, 1.12, 0.04, seed), 2.4);
+  return treeModel(finish(merge(parts), H + 2, 0.75, 1.12, 0.04, seed), 2.4, PALM_R, ['#4a9a3c', '#3a8a36'], seed);
 }
 
 /** Palmeira-de-leque (washingtonia): tronco fino e alto, saia de folhas secas, copa de leques. */
@@ -594,7 +733,7 @@ export function fanPalm(seed: number, baseColors = ['#6a9a3c', '#8aa84a']): Mode
     parts.push(paint(cone(0.85, 0.12, 10), '#4f9a44', lean(Math.cos(a) * 0.9, H + 0.35 + hash2(seed, k) * 0.3, Math.sin(a) * 0.9, a, 0.5, 1.6, 1, 1)));
   }
   parts.push(...palmBase(seed, baseColors));
-  return flat(finish(merge(parts), H + 1, 0.78, 1.1, 0.04, seed), 1.6);
+  return treeModel(finish(merge(parts), H + 1, 0.78, 1.1, 0.04, seed), 1.6, PALM_R, baseColors, seed);
 }
 
 /** Bananeira: folhas largas saindo do chão — a pegada é a própria folhagem. */
@@ -604,8 +743,9 @@ export function banana(seed: number, R = TREE_R): Model {
     const a = (k / 7) * Math.PI * 2 + hash2(seed, k) * 0.5;
     parts.push(paint(frond(2.2, 0.9, a, 1.6, 1.3, 3), k % 2 ? '#5cb04a' : '#4a9e40', tf(0, 2.2 + hash2(seed, k + 3) * 0.6, 0)));
   }
-  parts.push(...mound(R, 0.7, ['#3f9a3c', '#58ad44'], seed));
-  return flat(finish(merge(parts), 4, 0.75, 1.12, 0.05, seed), 1.8);
+  const SKIRT_COLS = ['#3f9a3c', '#58ad44'];
+  parts.push(...skirt(R, 0.7, SKIRT_COLS, seed));
+  return treeModel(finish(merge(parts), 4, 0.75, 1.12, 0.05, seed), 1.8, R, SKIRT_COLS, seed);
 }
 
 /** Samambaiaçu (samambaia arbórea): tronco fino e roseta de frondes no alto. */
@@ -613,8 +753,9 @@ export function treeFern(seed: number, R = TREE_R): Model {
   const H = 3.2 + hash2(seed, 1) * 1.6;
   const parts: Geo[] = [trunk(0.2, 0.15, H, '#4a3a2a')];
   for (let k = 0; k < 9; k++) parts.push(paint(frond(2.2, 0.55, (k / 9) * Math.PI * 2 + seed, 0.7, 1.4, 3), k % 2 ? '#3a9a44' : '#2f8a3c', tf(0, H, 0)));
-  parts.push(...mound(R, 0.6, ['#2f8a38', '#3f9a3c'], seed), ...fernRing(5, R, 0.45, ['#3f9a3c', '#2f8a38'], seed, 0.8, 0.75));
-  return flat(finish(merge(parts), H + 1, 0.72, 1.12, 0.04, seed), 1.6);
+  const SKIRT_COLS = ['#2f8a38', '#3f9a3c'];
+  parts.push(...skirt(R, 0.6, SKIRT_COLS, seed), ...fernRing(5, R, 0.45, ['#3f9a3c', '#2f8a38'], seed, 0.8, 0.75));
+  return treeModel(finish(merge(parts), H + 1, 0.72, 1.12, 0.04, seed), 1.6, R, SKIRT_COLS, seed);
 }
 
 // ───────────────────────────── Deserto (sprite `cactus`) ─────────────────────────────
@@ -910,6 +1051,14 @@ export function grassTuft(seed: number, color: string, h = 0.55, n = 7): Model {
 /** Tufo de capim de recorte alfa (cartões cruzados + a lâmina de `cutout.ts`): 4 cartões, 8 triângulos; `foot` e `head` são as cores do pé e da ponta. */
 export function cutoutTuft(seed: number, foot: string, head: string, h = 0.62, w = 1.0): Model {
   return { parts: [{ geometry: cutoutCards(4, w, h, seed, foot, head), mat: 'cutout' }] };
+}
+
+/**
+ * Tapete de capim de recorte (F4): 3 tufos (6 cartões, 12 △) num objeto só, a 0,7 m uns dos outros — o mesmo capim em 1/3 das instâncias (o runtime paga CPU por instância, e o
+ * tapete rente à pista tem dezenas por segmento).
+ */
+export function cutoutPatch(seed: number, foot: string, head: string, h = 0.6, w = 1.0): Model {
+  return { parts: [{ geometry: cutoutRing(3, 0.7, w, h, seed, foot, head, 2, 0.35), mat: 'cutout' }] };
 }
 
 /** Canteiro de flores do campo: tufo com pontos coloridos. */

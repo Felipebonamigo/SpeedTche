@@ -36,7 +36,7 @@ import { ShadowRing } from './postfx/shadows';
 import { Road } from './road';
 import { absoluteHeading, buildRoadFrame, FRAME_AHEAD, FRAME_BEHIND, type RoadFrame } from './roadframe';
 import { Scenery } from './scenery';
-import type { Layout } from './scenery/layout';
+import { lushScenery, type Layout } from './scenery/layout';
 import { Sky } from './sky';
 import { Stage, STAGE_IDLE_RELEASE } from './stage';
 import { stageBus } from './stage-bus';
@@ -289,7 +289,7 @@ export function createRenderer(canvas: HTMLCanvasElement, hudRoot: HTMLElement):
     sky.update(absH, time);
     road.update(rf, track);
     terrain.update(rf, track, time, sky.sunDirLocal, absH);
-    scenery.update(rf, track, time, screenLodScale(viewports));
+    scenery.update(rf, track, time, screenLodScale(viewports), lushScenery(viewports));
   }
 
   /** A cena da legenda da pista atual (null antes do cenário montar o layout dela). */

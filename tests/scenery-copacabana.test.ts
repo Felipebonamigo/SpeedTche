@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { getTrack } from '../src/core/track';
 import { bladeFill } from '../src/render/scenery/cutout';
 import { dressingRecipe, getModel, modelBandRadius, modelBounds, modelFrontX, spriteVisual } from '../src/render/scenery/catalog';
-import { CAR_REACH_M, FENCE_M, sceneryLayout } from '../src/render/scenery/layout';
+import { baseLayout, CAR_REACH_M, FENCE_M, sceneryLayout } from '../src/render/scenery/layout';
 import { collisionHalfM, modelTriangles } from '../src/render/scenery/vegetation';
 
 const pos = (g: THREE.BufferGeometry): THREE.BufferAttribute => g.getAttribute('position') as THREE.BufferAttribute;
@@ -200,7 +200,8 @@ describe('Copacabana: no layout', () => {
   it('orçamento: ≤ 900 triângulos e ≤ 16 objetos por segmento (medido: ver a saída)', () => {
     let sum = 0; let objs = 0;
     const tris = new Map<string, number>();
-    for (const list of layout.bySeg) for (const p of list) {
+    // F4 (V22): o teto estático mede o que TODA lotação paga (`baseLayout`, sem o enfeite farto de 1–2 jogadores; o inteiro tem teto próprio em tests/vegetacao-f4.test.ts: 916 △ por segmento aqui).
+    for (const list of baseLayout(layout).bySeg) for (const p of list) {
       const id = idOf(p);
       objs++;
       if (id.startsWith('lm:')) continue;

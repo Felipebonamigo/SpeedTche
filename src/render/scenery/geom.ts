@@ -219,20 +219,61 @@ export function tintUp(geo: Geo, color: THREE.ColorRepresentation, threshold: nu
   return geo;
 }
 
+/** Opções extras do volume pintado das árvores (V22/F4): o aro claro da saia e a barriga fria da copa. */
+export interface VolumeLookOptions {
+  /**
+   * Aro da saia: o gradiente vertical da V10 escurecia o pé de TODO o modelo, e o pé da saia é onde a copa toca o chão claro — um anel escuro
+   * de contorno duro, que lia como chapéu. Os vértices abaixo de `height` e longe do tronco ganham
+   * até `lift` ×: o escuro fica junto do tronco (a oclusão de verdade), o aro acompanha o chão. Só a faixa de fora (de 0,74 a 0,97 × `reach`) e os primeiros `height` metros
+   * (a rampa vai de 0,35 a 1 × `height`): a V10 (`tests/hc2-cenario.test.ts`) quer o terço de baixo do modelo bem mais escuro que o de cima.
+   */
+  rim?: { reach: number; height: number; lift: number };
+  /**
+   * Barriga da copa: o vértice acima de `minY` e abaixo do centro da copa (a média das alturas dos vértices acima de `minY`) escurece até `strength` e vira para o azul
+   * (`cool`: o vermelho cai e o azul sobe) — a luz do céu que chega por baixo é mais fria que a do sol. SÓ pela posição (a normal suave de dois vértices coincidentes na
+   * aresta lisa difere perto do vinco, e a cor tem de correr contínua entre as faces: `tests/scenery-forma.test.ts`); o raio até o eixo reforça o miolo, mais tapado.
+   */
+  under?: { minY: number; strength: number; cool: number };
+}
+
 /**
  * V10 (HC2): o volume pintado — gradiente vertical, por vértice. A cor de cada vértice é multiplicada por `base` no pé do modelo e `top` no alto (curva
  * suave pela altura do modelo inteiro). Só a POSIÇÃO decide (a normal não: dois vértices no mesmo ponto de faces vizinhas, na aresta lisa, têm de ficar da mesma
  * cor — `tests/scenery-forma.test.ts`); a luz de borda no contorno é do shader (`stylize.ts`, família `scenery`). Sem geometria, textura nem material novos. Uma vez por modelo.
+ * F4: `o.rim` e `o.under` (acima) — a barriga usa a normal, mas a normal suave é a mesma em dois vértices coincidentes da aresta lisa, então a regra continua valendo.
  */
-export function volumeLook(geo: Geo, ymin: number, ymax: number, base: number, top: number): Geo {
+export function volumeLook(geo: Geo, ymin: number, ymax: number, base: number, top: number, o: VolumeLookOptions = {}): Geo {
   const p = geo.attributes.position as THREE.BufferAttribute;
   const c = geo.attributes.color as THREE.BufferAttribute | undefined;
   if (!c) return geo;
   const span = Math.max(1e-6, ymax - ymin);
+  const smooth = (a: number, b: number, v: number): number => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // Centro e piso da copa (os vértices acima de `under.minY`): a barriga é o que fica entre eles.
+  let crownY = 0; let crownLow = Infinity; let crownN = 0; let crownR = 1e-6;
+  if (o.under) {
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i);
+      if (y <= o.under.minY || Math.hypot(p.getX(i), p.getZ(i)) < 0.8) continue; // o tronco (raio < 0,8 m) não conta para o centro da copa
+      crownY += y; crownN++; crownLow = Math.min(crownLow, y); crownR = Math.max(crownR, Math.hypot(p.getX(i), p.getZ(i)));
+    }
+    crownY = crownN ? crownY / crownN : 0;
+  }
   for (let i = 0; i < p.count; i++) {
     const t = Math.max(0, Math.min(1, (p.getY(i) - ymin) / span));
-    const k = base + (top - base) * (t * t * (3 - 2 * t));
-    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k);
+    let k = base + (top - base) * (t * t * (3 - 2 * t));
+    let kr = k; let kb = k;
+    if (o.rim) {
+      const y = p.getY(i); const r = Math.hypot(p.getX(i), p.getZ(i));
+      const w = smooth(0.74 * o.rim.reach, 0.97 * o.rim.reach, r) * (1 - smooth(o.rim.height * 0.35, o.rim.height, y));
+      k *= 1 + (o.rim.lift - 1) * w; kr = k; kb = k;
+    }
+    if (o.under && crownN > 0 && p.getY(i) > o.under.minY && crownY > crownLow) {
+      const below = smooth(0, 1, (crownY - p.getY(i)) / (crownY - crownLow)); // 1 no piso da copa, 0 do centro para cima
+      const core = 0.65 + 0.35 * (1 - smooth(0.2, 1, Math.hypot(p.getX(i), p.getZ(i)) / crownR)); // o miolo é mais tapado que a ponta
+      const u = below * core;
+      if (u > 0) { k *= 1 - o.under.strength * u; kr = k * (1 - o.under.cool * u * 0.7); kb = k * (1 + o.under.cool * u); }
+    }
+    c.setXYZ(i, c.getX(i) * kr, c.getY(i) * k, c.getZ(i) * kb);
   }
   c.needsUpdate = true;
   return geo;
@@ -784,6 +825,28 @@ export function cutoutCards(n: number, w: number, h: number, seed: number, foot 
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  return g;
+}
+
+/**
+ * Moitas de capim de recorte em anel (V22/F4): `n` tufos de `cards` cartões (`cutoutCards`) postos em volta da origem, a `radius` do centro (com ±`jitter` de raio e
+ * giro livre), numa só geometria com os atributos do lote `cutout` (position, normal, color, uv). É o contorno irregular da saia da árvore: a silhueta de
+ * capim rompe o anel liso da moita sem custar mais que 2 △ por cartão.
+ */
+export function cutoutRing(n: number, radius: number, w: number, h: number, seed: number, foot: string, head: string, cards = 2, jitterR = 0.12): Geo {
+  const parts: Geo[] = [];
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * Math.PI * 2 + (hash2(seed, k + 200) - 0.5) * 0.7;
+    const r = radius * (1 - jitterR + hash2(seed, k + 300) * jitterR * 1.2);
+    const hh = h * (0.75 + hash2(seed, k + 400) * 0.5);
+    const g = cutoutCards(cards, w, hh, seed * 13 + k, foot, head);
+    g.applyMatrix4(tf(Math.cos(a) * r, 0, Math.sin(a) * r, 1, 1, 1, 0, hash2(seed, k + 500) * 6.28, 0));
+    parts.push(g);
+  }
+  const g = mergeGeometries(parts, false);
+  if (!g) throw new Error('cutoutRing: fusão falhou');
+  for (const p of parts) p.dispose();
+  g.userData.keepNormals = true; // a normal é a do cartão (para cima: o capim acende como o chão), não a que o vinco da planta daria
   return g;
 }
 

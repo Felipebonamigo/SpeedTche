@@ -65,7 +65,24 @@ export interface Placement {
    * qualidades baixa e média o runtime desenha só os de nota ≤ a fração da janela (menos vista, menos enfeite).
    */
   rank: number;
+  /**
+   * V22/F4: enfeite "farto" (0 = sempre; 1 = só com 1–2 jogadores, `lushScenery`): a densidade a mais da vegetação não entra na tela dividida de 3–4,
+   * onde cada viewport paga a própria conta de triângulos (docs/ondas/V22-f4-vegetacao.md). Nunca é sprite sólido.
+   */
+  lush: number;
 }
+
+/** V22/F4: o cenário farto (mais árvores e cobertura) vale com 1–2 jogadores; com 3–4 a densidade é a de antes (o gate de 4 viewports não tem folga). 0 = fundo do menu. */
+export function lushScenery(viewports: number): boolean { return viewports <= 2; }
+
+/** F4: tapetes (3 tufos de recorte, 12 △) a mais por segmento e lado (entre 9,6 e 23 m do centro): em toda lotação, a partir da Média (nota > 0,5) / só com 1–2 jogadores. */
+export const COVER_EXTRA = 1.8;
+export const COVER_LUSH = 4;
+/** F4: árvores a mais na mata, por segmento e lado, como fração da densidade da receita (só com 1–2 jogadores, de 25 a 65 m, o modelo de perto só até 40 segmentos). */
+export const GROVE_LUSH = 1;
+/** Piso da mata farta (árvores por segmento e lado): a savana e o litoral têm pouca mata (densidade 0,35–0,9) e ficariam sem o ganho. */
+const GROVE_LUSH_MIN = 0.5;
+const LUSH_FAR_FROM = 40;
 
 export interface Layout {
   models: string[];
@@ -91,7 +108,7 @@ class ModelTable {
 function base(model: number): Placement {
   return {
     model, far: -1, farFrom: 1e9, maxAhead: 1e9, f: 0.5, x: 0, y: 0, yaw: 0, pitch: 0, yawC: 1, yawS: 0, sx: 1, sy: 1, sz: 1,
-    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0,
+    ox: 0, oy: 0, oz: 0, spin: 0, spinY: 0, phase: 0, bob: 0, r: 1, g: 1, b: 1, sprite: false, linkSeg: 0, linkF: 0, linkX: 0, linkY: 0, wind: 0, rank: 0, lush: 0,
   };
 }
 
@@ -138,10 +155,27 @@ class Occupancy {
 
 // ───────────────────────────── Sprites ─────────────────────────────
 
-function tintFor(seed: number, amount: number): [number, number, number] {
-  const k = 1 + (hash2(seed, 1) - 0.5) * 2 * amount;
-  const warm = (hash2(seed, 2) - 0.5) * amount;
-  return [k * (1 + warm * 0.5), k, k * (1 - warm * 0.6)];
+/**
+ * Tom por instância (multiplicador por canal da cor do modelo; 1 = a cor dele). V22/F4: antes só o valor (±amount) e um vento quente/frio de ±amount/2 nos
+ * canais, que girava o matiz de um verde em ~1°: duas árvores da mesma espécie eram a mesma árvore. Agora o matiz gira até ±`TINT_HUE_DEG` (rotação em
+ * volta do eixo cinza do RGB, que preserva a croma; a luminância é reposta antes do valor) e o valor varia `±0,8 × amount` (≤ ±10% com os `amount` do layout).
+ * O giro é calculado sobre um verde de copa de referência e vira multiplicador: no amarelo e no rosa de outono o efeito é o mesmo sentido, menor.
+ */
+export const TINT_HUE_DEG = 10;
+const TINT_REF: readonly [number, number, number] = [0.09, 0.3, 0.1];
+export function tintFor(seed: number, amount: number): [number, number, number] {
+  const k = 1 + (hash2(seed, 1) - 0.5) * 2 * amount * 0.8;
+  const th = (hash2(seed, 2) - 0.5) * 2 * ((TINT_HUE_DEG * Math.PI) / 180);
+  const c = Math.cos(th); const s = Math.sin(th); const t = 1 - c; const q = 1 / Math.sqrt(3);
+  const [r, g, b] = TINT_REF;
+  const dot = (r + g + b) * q; // u · v, com u = (1,1,1)/√3
+  // Rodrigues: c·v + s·(u × v) + t·(u · v)·u
+  const rr = c * r + s * q * (g - b) + t * dot * q;
+  const gg = c * g + s * q * (b - r) + t * dot * q;
+  const bb = c * b + s * q * (r - g) + t * dot * q;
+  const lum = (x: number, y: number, z: number): number => 0.2126 * x + 0.7152 * y + 0.0722 * z;
+  const keep = k * (lum(r, g, b) / lum(rr, gg, bb)); // mesma luminância; o valor sorteado vai por cima
+  return [(rr / r) * keep, (gg / g) * keep, (bb / b) * keep];
 }
 
 /**
@@ -159,14 +193,16 @@ function placeSprites(track: Track, table: ModelTable, out: Placement[][], occ: 
     const sprites = segs[i].sprites;
     for (let k = 0; k < sprites.length; k++) {
       const sp: SpriteRef = sprites[k];
-      const vis0 = spriteVisual(sp.kind, sp.variant, sp.scale, def);
+      const seed = i * 31 + k * 7 + 3;
+      // F4: o núcleo sorteia a variante em 0–3; as listas de árvore têm 4 formas a mais (variante + 4), e o hash do sprite escolhe. Mesma pegada de colisão.
+      const alt = (sp.kind === 'tree' || sp.kind === 'pine') && hash2(seed, 77) < 0.5 ? 4 : 0;
+      const vis0 = spriteVisual(sp.kind, sp.variant + alt, sp.scale, def);
       const vis = vis0.mode === 'building'
         ? { ...vis0, models: vis0.models.map((m, mi) => (mi === 0 ? { ...m, id: withBuildingLook(m.id, looks[nBuilding++ % 4]) } : m)) }
         : vis0;
       const side = sp.x < 0 ? -1 : 1;
       const half = SPRITE_HALF_WIDTH[sp.kind] * sp.scale * ROAD_HALF_WIDTH_M;
       const xm = sp.x * ROAD_HALF_WIDTH_M;
-      const seed = i * 31 + k * 7 + 3;
       let x = xm; let yaw = 0; let s = sp.scale; let sy = sp.scale;
       if (vis.mode === 'round') {
         yaw = (hash2(seed, 5) - 0.5) * 2 * vis.yawJitter;
@@ -567,6 +603,9 @@ function footprintOf(id: string): number {
   return 1.2;
 }
 
+/** O que leva o tom por instância na decoração (F4): moita, capim e flor — a cor da pedra e do cupinzeiro não gira de matiz. */
+function tintable(id: string): boolean { return id.startsWith('bush:') || id.startsWith('tuft:') && !id.startsWith('tuft:cut') && !id.startsWith('tuft:patch') || id.startsWith('flowers:') || id.startsWith('cactus:'); }
+
 function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Placement[][], occ: Occupancy): void {
   const segs = track.segments; const n = segs.length;
   const turn = turnPerCurve(track);
@@ -620,7 +659,22 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
           const sc = 0.8 + h(30 + c) * 0.6;
           // Baixa de verdade: o carro passa por cima sem parecer atravessar uma moita da altura dele.
           const sy = Math.min(sc * (0.85 + h(60 + c) * 0.3), 1.05 / Math.max(0.1, modelHeight(id)));
-          put(i, id, side * lat, h(40 + c), { yaw: h(50 + c) * 6.28, sx: sc, sy, sz: sc, maxAhead: 34, rank: 0.02 + h(45 + c) * 0.98 });
+          const [tr, tg, tb] = tintable(id) ? tintFor(seed + i * 17 + c, 0.1) : [1, 1, 1];
+          put(i, id, side * lat, h(40 + c), { yaw: h(50 + c) * 6.28, sx: sc, sy, sz: sc, maxAhead: 34, rank: 0.02 + h(45 + c) * 0.98, r: tr, g: tg, b: tb });
+        }
+      }
+      // F4: o tapete rente à pista: capim de recorte e flores, mais perto da pista (onde o olho está) — `COVER_EXTRA` em toda lotação (nota > 0,5: Média e Alta) e `COVER_LUSH` só com 1–2 jogadores.
+      if (!pitSide && !nearStart && recipe.carpet.length) {
+        const n1 = Math.floor(COVER_EXTRA + h(600)); const n2 = Math.floor(COVER_LUSH + h(601));
+        for (let c = 0; c < n1 + n2; c++) {
+          if (sea && c >= n1) break; // do lado do mar (areia) só o tapete de todas as lotações: a faixa verde contínua na praia lia como gramado
+          const lat = 9.6 + (h(610 + c) ** 1.25) * (sea ? 13 : 13.5);
+          if (!occ.free(i, side, lat - 0.5, lat + 0.5, 0)) continue;
+          const id = pickWeighted(recipe.carpet, h(640 + c));
+          const sc = 0.8 + h(670 + c) * 0.7;
+          const sy = Math.min(sc * (0.85 + h(690 + c) * 0.3), 1.05 / Math.max(0.1, modelHeight(id)));
+          const [tr, tg, tb] = tintable(id) ? tintFor(seed + i * 19 + c, 0.1) : [1, 1, 1];
+          put(i, id, side * lat, h(710 + c), { yaw: h(730 + c) * 6.28, sx: sc, sy, sz: sc, maxAhead: 34, rank: 0.5 + h(750 + c) * 0.5, lush: c >= n1 ? 1 : 0, r: tr, g: tg, b: tb });
         }
       }
       // Guarda-sóis na areia, na beira d'água (além do alcance do carro).
@@ -689,7 +743,27 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
           const id = grove.near[Math.floor(h(140 + c) * grove.near.length)];
           const sc = 0.85 + h(150 + c) * 0.5;
           const [tr, tg, tb] = tintFor(seed + i * 13 + c, 0.09);
-          put(i, id, side * lat, h(160 + c), { yaw: h(170 + c) * 6.28, sx: sc, sy: sc * (0.9 + h(180 + c) * 0.3), sz: sc, far: table.of(grove.far), farFrom: 52, r: tr, g: tg, b: tb, rank: 0.02 + h(190 + c) * 0.98 });
+          // F4: largura x e z diferentes (±15% cada, em sentidos opostos): o giro livre faz da copa redonda uma elipse, e duas árvores iguais deixam de ser a mesma árvore.
+          const e = (h(155 + c) - 0.5) * 0.3;
+          put(i, id, side * lat, h(160 + c), { yaw: h(170 + c) * 6.28, sx: sc * (1 + e), sy: sc * (0.9 + h(180 + c) * 0.3), sz: sc * (1 - e), far: table.of(grove.far), farFrom: 52, r: tr, g: tg, b: tb, rank: 0.02 + h(190 + c) * 0.98 });
+          occ.mark(i, side, lat - 1.2, lat + 1.2, 0);
+        }
+      }
+      // F4: mais árvores perto da pista (de 25 a 65 m, onde o olho está) só com 1–2 jogadores: o modelo de perto só até 40 segmentos (depois, a silhueta), nota > 0,5 (nunca na Baixa).
+      if (recipe.groves.length && inForest && biome !== 'city_night') {
+        const dens = recipe.groveDensity * Math.min(1, (forest - recipe.clearing) / 0.25 + 0.3);
+        const count = Math.floor(Math.max(dens * GROVE_LUSH, GROVE_LUSH_MIN) + h(800));
+        for (let c = 0; c < count; c++) {
+          const lat = 26.5 + (h(810 + c) ** 1.3) * 38;
+          if (inner && lat < 95) continue;
+          const r = 1.8;
+          if (!occ.free(i, side, lat - r, lat + r, 0)) continue;
+          const grove = pickWeighted(recipe.groves.map((g) => [g, g.weight] as [typeof g, number]), h(830 + c));
+          const id = grove.near[Math.floor(h(840 + c) * grove.near.length)];
+          const sc = 0.8 + h(850 + c) * 0.55;
+          const [tr, tg, tb] = tintFor(seed + i * 23 + c, 0.09);
+          const e = (h(860 + c) - 0.5) * 0.3;
+          put(i, id, side * lat, h(870 + c), { yaw: h(880 + c) * 6.28, sx: sc * (1 + e), sy: sc * (0.9 + h(890 + c) * 0.3), sz: sc * (1 - e), far: table.of(grove.far), farFrom: LUSH_FAR_FROM, r: tr, g: tg, b: tb, rank: 0.5 + h(895 + c) * 0.5, lush: 1 });
           occ.mark(i, side, lat - 1.2, lat + 1.2, 0);
         }
       }
@@ -700,7 +774,8 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
         const r = footprintOf(id);
         if (!(inner && lat < 60 && (id.startsWith('cactus:saguaro') || id === 'cactus:mandacaru' || id === 'termite')) && occ.free(i, side, lat - r, lat + r, 0)) {
           const sc = 0.7 + h(203) * 0.6;
-          put(i, id, side * lat, h(204), { yaw: h(205) * 6.28, sx: sc, sy: sc, sz: sc, maxAhead: 150, rank: 0.02 + h(206) * 0.98 });
+          const [tr, tg, tb] = tintable(id) ? tintFor(seed + i * 29, 0.08) : [1, 1, 1];
+          put(i, id, side * lat, h(204), { yaw: h(205) * 6.28, sx: sc, sy: sc, sz: sc, maxAhead: 150, rank: 0.02 + h(206) * 0.98, r: tr, g: tg, b: tb });
           occ.mark(i, side, lat - r, lat + r, 0);
         }
       }
@@ -731,6 +806,9 @@ function dress(track: Track, recipe: DressingRecipe, table: ModelTable, out: Pla
     w.y = lastPole.y; w.linkSeg = firstPoleSeg + n - lastPoleSeg; w.linkF = firstPole.f; w.linkX = firstPole.x; w.linkY = firstPole.y;
   }
 }
+
+/** O layout que 3–4 jogadores desenham: o mesmo sem o enfeite farto (`lushScenery`). Os tetos estáticos de custo (≤ 900 △ por segmento, ≤ 16 objetos) medem este. */
+export function baseLayout(layout: Layout): Layout { return { ...layout, bySeg: layout.bySeg.map((list) => list.filter((p) => p.lush === 0)) }; }
 
 /**
  * Layout do cenário da pista. Sem cache aqui de propósito: são ~10 mil posições por pista, e guardar as
