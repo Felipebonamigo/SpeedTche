@@ -20,10 +20,11 @@ export const THIN_LEN_MAX_M = 12;
 export const THIN_ACROSS = 0.8;
 export const THIN_BACK = 0.35;
 /**
- * A mancha cobre mais chão esticada do que como disco: a opacidade de `sceneryLook().blobOpacity` (0,32 · 0,32 · 0,40, palette.ts, da F7) é multiplicada por isto no `Scenery`
- * (0,40 → 0,34 à noite; 0,32 → 0,27): o plano V22 §3.7 pede 0,34 → 0,28.
+ * Teto da opacidade da mancha (o plano V22 §3.7 pede ≤ 0,34): `sceneryLook().blobOpacity` (0,32 dia e entardecer, 0,40 noite; palette.ts, da F7) passa por aqui. Só a noite desce (0,40 → 0,34):
+ * a elipse esticada cobre mais chão que o disco redondo, e a noite roxa já era a mancha mais pesada. O dia fica em 0,32 (uma mancha mais fraca some sobre o verde vivo: medido, §3 do cartão).
  */
-export const BLOB_OPACITY_SCALE = 0.85;
+export const BLOB_OPACITY_MAX = 0.34;
+export function blobOpacityFor(lookOpacity: number): number { return Math.min(BLOB_OPACITY_MAX, lookOpacity); }
 
 export interface BlobShape {
   /** Direção da sombra no chão (unitária: para longe do sol). */

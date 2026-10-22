@@ -15,7 +15,7 @@ import { getModel, landmarkOf, modelHeight } from './catalog';
 import { FACADE_CELL_SPAN, type MatKey, type Model } from './geom';
 import { sceneryLayout, type Layout, type Placement } from './layout';
 import { HAZE_FOG_SCALE, SCENERY_BEHIND_DRAW, SCENERY_FOG_REACH } from './sight';
-import { BLOB_OPACITY_SCALE, blobShape, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
+import { blobOpacityFor, blobShape, contactRadius, isThin, type BlobShape, type SunDir } from './sombra-falsa';
 import { bladeTexture, cutoutMaterial } from './cutout';
 import { facadeTextures, panelAtlas } from './textures';
 import { applyWind, makeWindUniforms, windDetailOn } from './wind';
@@ -114,8 +114,9 @@ type BlobKind = 'crown' | 'thin' | 'contact';
 const BLOB_ORIGIN: Record<BlobKind, [number, number]> = { crown: [0, 0], thin: [BLOB_CELL, 0], contact: [0, BLOB_CELL] };
 
 function softDisc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, a: number): void {
+  // Corpo cheio até ~60% do raio e borda macia: com a opacidade do material (≤ 0,34) uma mancha de miolo fraco não aparece sobre o verde vivo.
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.62, `rgba(255,255,255,${a * 0.8})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.6, `rgba(255,255,255,${a * 0.96})`); g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
 }
 
@@ -126,10 +127,10 @@ function blobTexture(): THREE.CanvasTexture {
   if (!ctx) throw new Error('sem canvas 2D');
   const [cx0, cy0] = BLOB_ORIGIN.crown; const m = BLOB_CELL / 2;
   // Copa: um miolo cheio e 9 bolhas em volta (o contorno vira folhagem, não elipse lisa) e 7 buracos por onde o sol passa (alfa menor no miolo).
-  softDisc(ctx, cx0 + m, cy0 + m, 19, 0.92);
+  softDisc(ctx, cx0 + m, cy0 + m, 21, 1);
   for (let i = 0; i < 9; i++) {
     const a = i * 2.399 + 0.6; const rad = (0.3 + 0.32 * hash2(i, 3)) * 28;
-    softDisc(ctx, cx0 + m + Math.cos(a) * rad, cy0 + m + Math.sin(a) * rad, 9 + 6 * hash2(i, 5), 0.86);
+    softDisc(ctx, cx0 + m + Math.cos(a) * rad, cy0 + m + Math.sin(a) * rad, 10 + 6 * hash2(i, 5), 1);
   }
   ctx.globalCompositeOperation = 'destination-out';
   for (let i = 0; i < 7; i++) {
@@ -248,9 +249,11 @@ export class Scenery {
     this.textures.push(atlas);
     this.panelMat = new THREE.MeshStandardMaterial({ map: atlas, emissiveMap: atlas, emissive: '#ffffff', emissiveIntensity: 0.3, roughness: 0.55, side: THREE.DoubleSide });
     applyStylize(this.panelMat, 'facade');
+    // V22/F6: o disco é plano e o chão tem relevo (±10–25 cm na borda de uma copa de 5 m; o pé da árvore também afunda um pouco): com o deslocamento de profundidade de −2 quase toda
+    // mancha de árvore ficava ENTERRADA (só os mastros, na faixa plana junto da pista, apareciam). Deslocamento de decalque: o fator cresce com a inclinação da mancha vista de longe (−8).
     const blobTex = blobTexture();
     this.textures.push(blobTex);
-    this.blobMat = new THREE.MeshBasicMaterial({ map: blobTex, color: '#1c2248', transparent: true, opacity: 0.34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.blobMat = new THREE.MeshBasicMaterial({ map: blobTex, color: '#1c2248', transparent: true, opacity: 0.34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
     applyGrade(this.blobMat);
     const cone = new THREE.MeshBasicMaterial({ color: '#ffd98a', transparent: true, opacity: 0.035, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     applyGrade(cone);
@@ -286,7 +289,7 @@ export class Scenery {
     this.hazeMat.color.copy(this.flatMat.color);
     this.cutoutMat.color.copy(this.flatMat.color);
     this.blobMat.color.set(look.blob);
-    this.blobMat.opacity = look.blobOpacity * BLOB_OPACITY_SCALE;
+    this.blobMat.opacity = blobOpacityFor(look.blobOpacity);
     this.panelMat.emissiveIntensity = look.panel;
     this.glowMat.color.setScalar(look.glow);
     const cone = this.materials.cone as THREE.MeshBasicMaterial;
@@ -322,7 +325,7 @@ export class Scenery {
     this.hazeMat.color.copy(this.flatMat.color);
     this.cutoutMat.color.copy(this.flatMat.color);
     this.blobMat.color.set(look.blob);
-    this.blobMat.opacity = (time === 'night' ? 0.4 : 0.32) * BLOB_OPACITY_SCALE;
+    this.blobMat.opacity = blobOpacityFor(time === 'night' ? 0.4 : 0.32);
 
     // Geometrias por lote e contagem por segmento de cada uma (para a capacidade por janela).
     const batchGeoms = new Map<BatchKey, THREE.BufferGeometry[]>();

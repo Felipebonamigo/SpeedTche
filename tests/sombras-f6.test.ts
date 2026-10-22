@@ -86,8 +86,9 @@ describe('V22/F6 (A): a forma pura da sombra falsa (sombra-falsa.ts)', () => {
   });
 
   it('opacidade ≤ 0,34 e a tinta é de sombra (azul-lilás: o azul não cai abaixo do vermelho)', () => {
-    expect(SB.BLOB_OPACITY_SCALE).toBeLessThan(1);
-    for (const op of [0.32, 0.4]) expect(op * SB.BLOB_OPACITY_SCALE).toBeLessThanOrEqual(0.34 + 1e-9);
+    expect(SB.BLOB_OPACITY_MAX).toBeLessThanOrEqual(0.34);
+    for (const op of [0.32, 0.4, 0.9]) expect(SB.blobOpacityFor(op)).toBeLessThanOrEqual(0.34 + 1e-9);
+    expect(SB.blobOpacityFor(0.32)).toBeCloseTo(0.32, 9); // o dia não perde densidade: só o teto vale
   });
 });
 
