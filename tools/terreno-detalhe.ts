@@ -3,7 +3,7 @@
 // (lateral, distância ao longo) como o `Strip` do terreno escreve. Duas posições da câmera, 4 m uma da outra ao longo da pista; centenas de pontos do chão projetados nas duas
 // imagens: o mesmo ponto tem de ter a mesma luma (a diferença média em 0..255 é a medida). `nadar: true` escreve `aDet` relativo à câmera — o defeito que o teste existe para pegar.
 import * as THREE from 'three';
-import { applyBiomeDetail, detailTiling, installTerrainDetail } from '../src/render/terrain-detail';
+import { applyBiomeDetail, detailMap, detailTiling, installTerrainDetail } from '../src/render/terrain-detail';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const W = 640; const H = 360;
@@ -46,12 +46,17 @@ function ler(zCam: number, nadar: boolean, pontos: Array<[number, number]>): Arr
   const ctx = renderer.getContext();
   const buf = new Uint8Array(W * H * 4);
   ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, buf);
-  return pontos.map(([x, z]) => {
-    const v = new THREE.Vector3(x, 0, z).project(camera);
-    const px = Math.round(((v.x + 1) / 2) * W - 0.5); const py = Math.round(((1 - v.y) / 2) * H - 0.5);
-    if (px < 2 || px >= W - 2 || py < 2 || py >= H - 2) return null;
+  const luma = (px: number, py: number): number => {
     const i = ((H - 1 - py) * W + px) * 4;
     return 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+  };
+  return pontos.map(([x, z]) => {
+    const v = new THREE.Vector3(x, 0, z).project(camera);
+    const fx = ((v.x + 1) / 2) * W - 0.5; const fy = ((1 - v.y) / 2) * H - 0.5;
+    const x0 = Math.floor(fx); const y0 = Math.floor(fy);
+    if (x0 < 2 || x0 >= W - 3 || y0 < 2 || y0 >= H - 3) return null;
+    const tx = fx - x0; const ty = fy - y0; // bilinear: a posição do ponto na imagem tem fração de pixel; arredondar a ela viraria ruído de medida
+    return luma(x0, y0) * (1 - tx) * (1 - ty) + luma(x0 + 1, y0) * tx * (1 - ty) + luma(x0, y0 + 1) * (1 - tx) * ty + luma(x0 + 1, y0 + 1) * tx * ty;
   });
 }
 
@@ -81,8 +86,28 @@ function comparar(opts: { passo: number; nadar: boolean }): { n: number; mediaAb
   return { n, mediaAbs: soma / Math.max(1, n), desvioDoCampo: Math.sqrt(aa / Math.max(1, n)) };
 }
 
+/**
+ * Cintilação: a câmera anda `passo` m por quadro (3 quadros); no MESMO ponto do chão a luma muda de forma suave se o detalhe é bem filtrado (mip + anisotropia) e "pula" se for aliasing.
+ * Devolve a média da diferença segunda |A − 2B + C| (0..255) sobre a da primeira |A − B|: perto de 0 = movimento suave; ≥ 1 = a mudança entre quadros é ruído, não movimento.
+ */
+function cintilacao(passo: number, semMip = false): { n: number; primeira: number; segunda: number; indice: number } {
+  const pts = pontosDoChao();
+  // O controle negativo: sem mipmap o ladrilho de ruído é amostrado cru (aliasing de verdade).
+  const tex = detailMap(); const filtro = tex.minFilter;
+  tex.minFilter = semMip ? THREE.NearestFilter : THREE.LinearMipmapLinearFilter; tex.needsUpdate = true;
+  const A = ler(0, false, pts); const B = ler(-passo, false, pts); const C = ler(-2 * passo, false, pts);
+  let p1 = 0; let p2 = 0; let n = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = A[i]; const b = B[i]; const c = C[i];
+    if (a === null || b === null || c === null) continue;
+    p1 += Math.abs(a - b); p2 += Math.abs(a - 2 * b + c); n++;
+  }
+  tex.minFilter = filtro; tex.needsUpdate = true;
+  return { n, primeira: p1 / Math.max(1, n), segunda: p2 / Math.max(1, n), indice: p2 / Math.max(1e-6, p1) };
+}
+
 const gl = renderer.getContext();
 const shaderErrors: string[] = [];
 renderer.debug.onShaderError = (ctx, program, vs, fs) => { shaderErrors.push(`${ctx.getShaderInfoLog(vs) ?? ''} | ${ctx.getShaderInfoLog(fs) ?? ''} | ${ctx.getProgramInfoLog(program) ?? ''}`.slice(0, 600)); };
-(window as unknown as { chao: unknown }).chao = { comparar, shaderErrors: () => shaderErrors, glVersion: () => gl.getParameter(gl.VERSION) };
+(window as unknown as { chao: unknown }).chao = { comparar, cintilacao, shaderErrors: () => shaderErrors, glVersion: () => gl.getParameter(gl.VERSION) };
 (window as unknown as { chaoReady: boolean }).chaoReady = true;

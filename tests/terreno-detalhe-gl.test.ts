@@ -126,6 +126,16 @@ describe.skipIf(!available)('V22 · F1 · o detalhe do chão na imagem (swiftsha
     expect(await ensaio.evaluate(() => (window as unknown as { chao: { shaderErrors(): string[] } }).chao.shaderErrors())).toEqual([]);
   });
 
+  it('CINTILAÇÃO: com a câmera andando 8 cm por quadro, a luma do mesmo ponto do chão quase não muda e muda de forma suave (diferença segunda ≤ 2/255: o piso de 8 bits é ~1); sem o mipmap (controle negativo: o ladrilho cru, aliasing de verdade) a diferença segunda passa de 6/255', async () => {
+    type C = { n: number; primeira: number; segunda: number; indice: number };
+    const f = (semMip: boolean): Promise<C> => ensaio.evaluate((m) => (window as unknown as { chao: { cintilacao(p: number, s: boolean): C } }).chao.cintilacao(0.08, m), semMip);
+    const com = await f(false); const sem = await f(true);
+    registrar(`[F1] cintilação (8 cm por quadro, ${com.n} pontos): com mipmap |A−B| ${com.primeira.toFixed(2)} · |A−2B+C| ${com.segunda.toFixed(2)} · sem mipmap (controle) |A−B| ${sem.primeira.toFixed(2)} · |A−2B+C| ${sem.segunda.toFixed(2)}`);
+    expect(com.n).toBeGreaterThan(600);
+    expect(com.segunda, 'diferença segunda (a "aceleração" da luma entre quadros)').toBeLessThanOrEqual(2);
+    expect(sem.segunda, 'o controle negativo: sem o mipmap o teste enxerga o aliasing').toBeGreaterThan(6);
+  });
+
   it('o laboratório desenhou sem erro de shader (o programa do chão com detalhe compila e liga)', async () => {
     const p = await lab((L) => L.programs());
     expect(p.shaderErrors).toEqual([]);

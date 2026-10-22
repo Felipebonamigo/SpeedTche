@@ -42,7 +42,7 @@ export interface TerrainDetail {
 }
 
 const DETAIL: Record<SceneryId, TerrainDetail> = {
-  tropical: { coarseAmp: 0.15, fineAmp: 0.13, grainAmp: 0.16, hueDeg: 5, fadeM: 60, fadeEndM: 130, mow: [0.09, 0.09], mowPeriodM: 5.5, ripple: [0, 0], edge: 1, gravel: 0.7 },
+  tropical: { coarseAmp: 0.14, fineAmp: 0.13, grainAmp: 0.15, hueDeg: 5, fadeM: 60, fadeEndM: 130, mow: [0.08, 0.08], mowPeriodM: 5.5, ripple: [0, 0], edge: 1, gravel: 0.7 },
   savanna: { coarseAmp: 0.15, fineAmp: 0.13, grainAmp: 0.16, hueDeg: 6, fadeM: 60, fadeEndM: 130, mow: [0.07, 0.07], mowPeriodM: 6.5, ripple: [0, 0], edge: 1, gravel: 0.7 },
   alpine: { coarseAmp: 0.14, fineAmp: 0.12, grainAmp: 0.15, hueDeg: 4, fadeM: 60, fadeEndM: 130, mow: [0.07, 0.07], mowPeriodM: 5.5, ripple: [0, 0], edge: 1, gravel: 0.6 },
   desert: { coarseAmp: 0.14, fineAmp: 0.12, grainAmp: 0.16, hueDeg: 5, fadeM: 60, fadeEndM: 130, mow: [0, 0], mowPeriodM: 5, ripple: [0.10, 0.10], edge: 1, gravel: 1 },
@@ -92,7 +92,7 @@ export function detailMap(): THREE.DataTexture {
   const t = new THREE.DataTexture(detailNoiseImage(256), 256, 256, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
-  t.anisotropy = 4; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true;
+  t.anisotropy = 8; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true;
   sharedMap = t;
   return t;
 }
@@ -143,6 +143,8 @@ const FRAG_BODY = /* glsl */ `
   float tdPix = max( fwidth( vDet.x ), fwidth( vDet.y ) );
   float tdA = 1.0 - smoothstep( 0.3, 0.9, tdPix / ${DETAIL_COARSE_M.toFixed(1)} );
   float tdF = ( 1.0 - smoothstep( uDetailB.x, uDetailB.y, tdDist ) ) * ( 1.0 - smoothstep( 0.2, 0.6, tdPix / ${DETAIL_FINE_M.toFixed(1)} ) );
+  // O grão (12 cm) só vale perto (cheio até 30 m, some em 60 m): mais longe o mipmap o filtra, mas a distância o apaga de vez.
+  float tdG = 1.0 - smoothstep( uDetailB.x * 0.5, uDetailB.x, tdDist );
   vec4 s1 = texture2D( uDetailMap, tdUv );
   vec4 s2 = vec4( 0.5 );
   float m = uDetailA.y * clamp( ( s1.r - 0.5 ) * 2.8, -1.0, 1.0 ) * tdA;
@@ -156,7 +158,7 @@ const FRAG_BODY = /* glsl */ `
     hue += ( s2.g - 0.5 ) * 1.4 * tdF;
     if ( uDetailQ.y > 0.5 ) {
       s3 = texture2D( uDetailMap, tdUv * ${DETAIL_GRAIN_RATIO.toFixed(1)} );
-      m += uDetailQ.z * clamp( ( s3.r - 0.5 ) * 3.6, -1.0, 1.0 ) * ( 1.0 - smoothstep( uDetailB.x * 0.5, uDetailB.x, tdDist ) );
+      m += uDetailQ.z * clamp( ( s3.r - 0.5 ) * 3.6, -1.0, 1.0 ) * tdG;
     }
   }
   // Ceifa: faixas de capim paralelas à pista, com a largura e a força ondulando (a forma vem do ruído, não de uma régua).
@@ -177,17 +179,18 @@ const FRAG_BODY = /* glsl */ `
     m += tdRip * sin( ph * 6.2832 ) * ( 0.6 + 0.8 * s1.a ) * zone * aa;
   }
   // A amplitude é a do que se VÊ (referida à tela, ~gama 2): o albedo é linear, e ±12% de albedo são ~±3% de brilho na tela (invisíveis); o quadrado dá ±12% de brilho.
-  float tdK = max( 1.0 + tdKeep * m, 0.0 );
+  // As camadas se somam (grossa + fina + grão + ceifa): o total é limitado a ±0,26 (k² de 0,55 a 1,59), senão onde todas caem juntas o chão vira uma faixa quase preta.
+  float tdK = 1.0 + tdKeep * clamp( m, -0.26, 0.26 );
   vec3 tdCol = tdHue( diffuseColor.rgb, hue * uDetailA.w ) * ( tdK * tdK );
   // Borda irregular entre o acostamento (terra do \`verge\`) e o chão: a forma é um campo de ruído, não uma linha; junto à borda, cascalho.
   if ( uDetailC.z > 0.5 && tdLat < 14.0 ) {
-    float F = ( tdLat - 10.0 ) / 1.4 + ( s1.b - 0.5 ) * 2.3 + ( s2.b - 0.5 ) * 2.0 * tdF + ( s3.b - 0.5 ) * 1.0 * uDetailQ.y * ( 1.0 - smoothstep( uDetailB.x * 0.5, uDetailB.x, tdDist ) );
+    float F = ( tdLat - 10.0 ) / 1.4 + ( s1.b - 0.5 ) * 2.3 + ( s2.b - 0.5 ) * 2.0 * tdF + ( s3.b - 0.5 ) * 1.0 * uDetailQ.y * tdG;
     F -= 1.0 - smoothstep( 8.4, 9.9, tdLat );
     float w = max( 0.09, fwidth( F ) );
     float t = smoothstep( -w, w, F );
-    vec3 verge = uVergeC * ( 0.88 + 0.16 * s1.r + 0.30 * ( s2.r - 0.5 ) * tdF + 0.22 * ( s3.r - 0.5 ) * uDetailQ.y * ( 1.0 - smoothstep( uDetailB.x * 0.5, uDetailB.x, tdDist ) ) );
+    vec3 verge = uVergeC * ( 0.88 + 0.16 * s1.r + 0.30 * ( s2.r - 0.5 ) * tdF + 0.22 * ( s3.r - 0.5 ) * uDetailQ.y * tdG );
     float near = 1.0 - smoothstep( 0.0, 0.8, abs( F ) );
-    float peb = smoothstep( 0.64, 0.74, s3.a ) * uDetailC.w * near * uDetailQ.y;
+    float peb = smoothstep( 0.64, 0.74, s3.a ) * uDetailC.w * near * uDetailQ.y * tdG;
     verge = mix( verge, verge * ( s3.g > 0.5 ? 1.45 : 0.62 ), peb );
     tdCol = mix( verge, tdCol, t );
   }
