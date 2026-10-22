@@ -30,7 +30,7 @@ interface LabApi {
  * V22/F4: 101.126 → 101.964 (+838 △, a mesma diferença do gate copa-1p Média, 236.278 → 237.116). O que o teste prova (o corte de LOD da tela dividida não toca 1 jogador) continua;
  * o valor só andou porque o CONTEÚDO do cenário andou: o capim de recorte da saia das árvores, o tapete rente à pista e as árvores a mais com 1–2 jogadores (docs/ondas/V22-f4-vegetacao.md).
  */
-const CENARIO_COPA_1P = 101_964;
+const CENARIO_COPA_1P = 104_238; // V22/F5: 101.964 → 104.238 (+2.274 △: adereços de telhado, oclusão no pé e lajes dos prédios; o conteúdo do cenário andou, o corte de LOD da tela dividida não toca 1 jogador)
 
 /** Cascos completos (lod0) de Copacabana 1p Média, medidos antes do corte do LOD (tools/folga-perfil.mjs): a distância de 1 jogador é a de sempre. */
 const CARROS_1P_LOD0 = 8;
