@@ -26,7 +26,7 @@ Cada carro cai num estilo de carroceria que o jogo já tem (`CAR_BODIES`), entã
 | 1 | Gol (quadrado, anos 90–2000) | **"Cuiabano"** | hatch | livre | proporção mais larga e baixa que o original, farol retangular fino, lanterna vertical com 3 cubos, sem grade; teto reto |
 | 2 | Palio (hatch compacto, lanterna alta) | **"Tupiniquim"** | hatch | livre | lanterna em "L" invertido, vinco na porta que sobe para a coluna C, faróis mais separados e inclinados |
 | 3 | Corsa (hatch/sedã redondo, anos 2000) | **"Caipora"** | hatch | à venda ($ 8–10 mil) | corpo mais arredondado, lanterna em gota, para-choque com faixa lisa; sedã de porta-malas curto como variante de cor |
-| 4 | Peugeot 207 (hatch europeu, farol "garra") | **"Pampeiro"** | hatch | à venda ($ 12 mil) | farol alongado para o para-lama, mas com outro corte; teto com leve caimento; grade baixa de uma barra só |
+| 4 | Peugeot 206/207 (hatch europeu, farol "garra"; foto de referência do Felipe, 23/10/2026: o 206 de 5 portas) | **"Pampeiro"** | hatch | à venda ($ 12 mil) | farol alongado para o para-lama, mas com outro corte; teto com leve caimento; grade baixa de uma barra só |
 | 5 | Marea (sedã médio, anos 2000, lanterna larga) | **"Barão"** | sedan | à venda ($ 14 mil) | porta-malas alto, lanterna de ponta a ponta com friso cromado, faixa lateral fina; é o "carro do tio" |
 | 6 | Uno com escada (o carro da firma) | **"Furgãozinho da Firma"** | micro | **conquista** (ver abaixo) | micro-carro quadrado, escada de alumínio no teto e adesivo "Firma Ltda" fictício; sem nada do Uno real |
 | 7 | Fusca | **"Besouro"** | classic | à venda ($ 10 mil) | para-lamas bojudos e capô curto: o arquétipo é domínio comum, com faróis e lanterna próprios |
@@ -35,6 +35,7 @@ Cada carro cai num estilo de carroceria que o jogo já tem (`CAR_BODIES`), entã
 | 10 | Jipe / Troller | **"Trilheiro"** | pickup | à venda ($ 22 mil) | capô reto, grade de barras próprias, estepe atrás; sem o desenho do Troller |
 | 11 | Chevette (cupê/hatch compacto, anos 70–80) | **"Lambari"** | classic | à venda ($ 9 mil) | cupê de traseira inclinada e vidro de trás grande; faróis redondos mais baixos e afastados, lanterna horizontal fina; para-choque de lâmina; sem a grade de barras do modelo real |
 | 12 | Fiat 147 (compacto quadradinho, anos 70–80) | **"Jabuti"** | micro | à venda ($ 7 mil) | caixa curta e alta de teto reto, farol quadrado pequeno com friso, lanterna vertical estreita, capô com vinco central; grade lisa de uma só barra |
+| 13 | Ford Ka 2ª geração (hatch 3 portas, 2008–2013; foto de referência do Felipe, 23/10/2026) | **"Sagui"** | micro | a decidir (pedido do Felipe para o Detonauto, 23/10/2026; não está no jogo) | faróis grandes em gota com outro corte, grade de duas barras lisas sem emblema, para-lamas redondos e bojudos, só 3 portas |
 
 Os clássicos dos anos 70–80 (Besouro, Lambari, Jabuti, Gaúcho V8) combinam com a **Copa Retrô** (ideia): uma copa só com eles, sem nitro de verdade. Três já estão cobertos pelo roster atual e **não precisam de carro novo**: o Saci Mirim (micro), o Tatu 4x4 (picape), o Boto Luxo (clássico). A proposta é
 **trocar o visual** deles quando fizer sentido, em vez de acumular carros: o Saci Mirim pode virar o "Furgãozinho da Firma" com o desenho novo.
