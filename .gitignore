@@ -9,3 +9,6 @@ art/raw/
 # Capturas do playtest ficam fora; só docs/screenshot*.png é versionado.
 *.png
 !docs/*.png
+
+# Python (scripts do Blender)
+__pycache__/
