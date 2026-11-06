@@ -6,8 +6,12 @@ import { fitArt, selfCrossings } from '../scripts/shape-to-track';
 
 type V = [number, number];
 
-/** A rodada 1 da onda K (CRONOGRAMA, trilha D): estado e comprimento da volta (o `segments` de SHAPES; a cuia, `--current`). */
-const ROUND1: Readonly<Record<string, { state: string; segments: number }>> = {
+/**
+ * As três rodadas da trilha D (CRONOGRAMA, "Trilhas contínuas"): estado e comprimento da volta (o `segments` de SHAPES; a
+ * cuia, `--current`). A rodada 1 saiu na K (9 + o Cristo); as rodadas 2 e 3 (17) entram para a O1.
+ */
+const ROUNDS: Readonly<Record<string, { state: string; segments: number }>> = {
+  // rodada 1
   copacabana: { state: 'RJ', segments: 1800 },
   sampa_noite: { state: 'SP', segments: 1850 },
   pampulha: { state: 'MG', segments: 2050 },
@@ -18,6 +22,25 @@ const ROUND1: Readonly<Record<string, { state: string; segments: number }>> = {
   brasilia: { state: 'DF', segments: 2120 },
   caldas_novas: { state: 'GO', segments: 1990 },
   bonito: { state: 'MS', segments: 2020 },
+  // rodada 2
+  transpantaneira: { state: 'MT', segments: 2130 },
+  porto_seguro: { state: 'BA', segments: 1870 },
+  aracaju: { state: 'SE', segments: 1790 },
+  maceio: { state: 'AL', segments: 1760 },
+  olinda: { state: 'PE', segments: 1770 },
+  campina_grande: { state: 'PB', segments: 1820 },
+  cajueiro_pirangi: { state: 'RN', segments: 2030 },
+  canoa_quebrada: { state: 'CE', segments: 1950 },
+  serra_capivara: { state: 'PI', segments: 1890 },
+  // rodada 3
+  sao_luis: { state: 'MA', segments: 2070 },
+  belem: { state: 'PA', segments: 1800 },
+  manaus: { state: 'AM', segments: 2110 },
+  macapa: { state: 'AP', segments: 1750 },
+  monte_roraima: { state: 'RR', segments: 2040 },
+  porto_velho: { state: 'RO', segments: 1960 },
+  rio_branco: { state: 'AC', segments: 2080 },
+  palmas: { state: 'TO', segments: 1780 },
 };
 
 /** Comprimento acumulado ao longo do traço fechado: cum[i] até o ponto i; cum[n] é o perímetro (com o trecho de fechamento). */
@@ -31,8 +54,8 @@ function arcLengths(p: V[]): number[] {
 }
 
 describe('desenhos em cartum (scripts/track-art.ts)', () => {
-  it('a rodada 1 está desenhada (9 + o Cristo)', () => { // T2b
-    expect(Object.keys(ART).sort()).toEqual(Object.keys(ROUND1).sort());
+  it('as três rodadas estão desenhadas: os 27 desenhos, um por estado', () => { // T2b (K) e O1
+    expect(Object.keys(ART).sort()).toEqual(Object.keys(ROUNDS).sort());
   });
 
   for (const id of Object.keys(ART)) {
@@ -42,7 +65,7 @@ describe('desenhos em cartum (scripts/track-art.ts)', () => {
       const n = p.length;
 
       it('o estado bate', () => {
-        expect(art.state).toBe(ROUND1[id]?.state);
+        expect(art.state).toBe(ROUNDS[id]?.state);
       });
 
       it('fecha: o último ponto fica a menos de 1 do primeiro', () => {
@@ -74,7 +97,7 @@ describe('desenhos em cartum (scripts/track-art.ts)', () => {
       });
 
       it('o box cabe: fitArt não avisa do box nem da largada', () => {
-        const fit = fitArt(art, ROUND1[id]?.segments ?? 2000, 3, 6);
+        const fit = fitArt(art, ROUNDS[id]?.segments ?? 2000, 3, 6);
         expect(fit.warnings.filter((w) => /box|largada/.test(w))).toEqual([]);
       });
     });

@@ -149,6 +149,7 @@ Termine com DONE / DONE_WITH_CONCERNS / BLOCKED.
 | `scratch/` | é ignorado pelo git; a próxima sessão não tem o que ficou lá | ferramenta útil vai para `tools/`/`scripts/` |
 | Hook de parada pede push com a suíte rodando | tentação de subir sem verificar | não suba: diga que espera a suíte e suba quando ficar verde |
 | Arquivo grande para o dono | `SendUserFile` falha acima de ~150 MB; o proxy corta downloads em 150 MiB | release no GitHub; retomar download com `curl -C -` |
+| Chromium em outra pasta | `tools/*.mjs` apontam para `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` e o container pode vir com outra versão (06/11/2026: `chromium-1243/chrome-linux64`) | `mkdir -p /opt/pw-browsers/chromium-1194 && ln -s /opt/pw-browsers/chromium-1243/chrome-linux64 /opt/pw-browsers/chromium-1194/chrome-linux` (o link não é do repositório) |
 | Sessão local do dono | `claude remote-control` exige login com a conta do claude.ai (`/login`) | ensinar o `/login`; sem ele, as sessões não conversam |
 
 ---
